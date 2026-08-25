@@ -217,15 +217,57 @@ endpoint is restricted regardless of scope. Follow status is derived instead fro
 
 **The auto-skip-by-release-age feature is fully achievable** — every endpoint it needs survives.
 
+## Tests
+
+```bash
+npm test              # 100 tests
+npm run test:coverage # with coverage
+npm run typecheck     # src and test
+```
+
+Node's built-in test runner, plus [fast-check](https://github.com/dubzzz/fast-check) for
+property-based testing (PBT-09). Per the Q10 "Partial" opt-in, PBT covers pure functions and
+round-trips; example-based tests cover concrete behaviour alongside them (PBT-10).
+
+| Module | Line | Branch | Notes |
+|---|---:|---:|---|
+| `localGuard.ts` | 100% | 97% | Security-critical — predicates, middleware, and PBT |
+| `parseNowPlaying.ts` | 100% | 86% | Round-trip property against a model of upstream's template |
+| `enrichment.ts` | 100% | 83% | Includes followed-artists pagination and TTL cache |
+| `webApiClient.ts` | 100% | 95% | Token refresh, 401 retry, 403/429 handling — `fetch` stubbed |
+| `nowPlayingService.ts` | 98% | 91% | Poll loop and change detection |
+| `config.ts` | 100% | 67% | Branches are host-vs-container path selection |
+
+**Not covered, deliberately:** `server.ts` (Express/WebSocket wiring), `diagnostics.ts`, and
+`mcp/spotifyMcpClient.ts` (spawns a real subprocess). These are I/O composition rather than
+logic, and are exercised end to end by `GET /api/diagnostics` against a live account —
+which is a better test of them than a mock would be. `public/app.js` has no tests either.
+
+### Bugs the tests found
+
+Writing these was not a formality — the property tests found four real defects:
+
+1. **A `|` in a track title truncated it.** The parser cut at any pipe, because upstream
+   packs `**Shuffle**: Off | **Repeat**: off` onto one line. Shrunk to the title `"|a"`.
+2. **Quotes were stripped from every field.** Upstream only quotes the Track, so an album
+   genuinely titled `"Heroes"` (Bowie's, quotes included) lost them.
+3. **`[::1].a.com` and `[::1]evil.com` passed the Host check.** The bracketed-IPv6 branch
+   took everything up to `]` and ignored the remainder — a real bypass in the one control
+   that enforces local-only access.
+4. **Future release dates produced a negative age.** Spotify returns them for pre-releases;
+   `ageYears: -1` would have been unsafe input to the planned auto-skip rule.
+
+Each is now pinned by an example-based regression test naming the shrunk case.
+
 ## Known gaps
 
 - **Not yet run against a live Spotify account.** The parser is written against the upstream
   source template. It needs verification with real output, particularly the *nothing playing*
   case, which the upstream code paths suggest but which hasn't been observed.
 - **Enrichment layer not built** — pending clarification questions CQ1 and CQ2.
-- **No automated test suite yet.** Q10 scoped PBT to pure functions; `parseNowPlaying` and the
-  `localGuard` predicates are the targets. Both have been verified manually, not yet committed
-  as tests.
+- **No CI pipeline.** PBT-08 requires PBT to run in CI with seed logging. `npm test` does
+  this locally, but no workflow runs it on push — this is an open PBT compliance gap.
+- **No integration test** for the Express/WebSocket layer or the MCP subprocess spawn.
 - **`MCP_SERVER_REF: main` is unpinned** in `compose.yaml`. Pin to a commit SHA once verified.
 - **Upstream declares no license** — accepted for personal use, but it blocks open-sourcing
   this project later (Q8).

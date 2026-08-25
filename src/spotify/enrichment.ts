@@ -29,7 +29,7 @@ interface SpotifyArtistRef {
   name: string;
 }
 
-interface SpotifyImage {
+export interface SpotifyImage {
   url: string;
   width: number | null;
   height: number | null;
@@ -48,7 +48,7 @@ export interface AlbumArt {
  * Spotify returns images largest-first, but the sizes offered vary by album, so pick by
  * measured width rather than by array position.
  */
-function pickArt(images: SpotifyImage[] | undefined): AlbumArt | null {
+export function pickArt(images: SpotifyImage[] | undefined): AlbumArt | null {
   const usable = (images ?? []).filter((image) => typeof image.url === 'string' && image.url);
   if (usable.length === 0) return null;
 
@@ -175,7 +175,7 @@ export interface Enrichment {
   warnings: string[];
 }
 
-function parseYear(releaseDate: string | undefined): number | null {
+export function parseYear(releaseDate: string | undefined): number | null {
   if (!releaseDate) return null;
   const year = Number.parseInt(releaseDate.slice(0, 4), 10);
   return Number.isNaN(year) ? null : year;
@@ -184,18 +184,29 @@ function parseYear(releaseDate: string | undefined): number | null {
 /**
  * Whole years between release and now. Uses full date precision where Spotify provides it,
  * falling back to year-only, which is what most older catalogue entries carry.
+ *
+ * Clamped at zero. Spotify returns future release dates for scheduled and pre-release
+ * items, which previously produced a negative age — nonsense to display, and unsafe as the
+ * input to the planned "skip anything older than N years" rule. An unreleased track is
+ * treated as brand new. Found by the property test asserting age is never negative.
  */
-function ageInYears(releaseDate: string | undefined, precision: string | undefined): number | null {
+export function ageInYears(
+  releaseDate: string | undefined,
+  precision: string | undefined,
+): number | null {
   const year = parseYear(releaseDate);
   if (year === null) return null;
 
   if (precision === 'day' || precision === 'month') {
     const parsed = new Date(releaseDate!);
     if (!Number.isNaN(parsed.getTime())) {
-      return Math.floor((Date.now() - parsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      const years = Math.floor(
+        (Date.now() - parsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+      );
+      return Math.max(0, years);
     }
   }
-  return new Date().getUTCFullYear() - year;
+  return Math.max(0, new Date().getUTCFullYear() - year);
 }
 
 export class EnrichmentService {

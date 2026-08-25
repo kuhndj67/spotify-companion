@@ -117,3 +117,16 @@ try again"
 **Context**: CONSTRUCTION — read-only unit, artwork feature
 
 ---
+
+## Test Suite Implementation
+**Timestamp**: 2026-08-24T13:17:23Z
+**User Input**: "can you check that you've implemented full unit tests and that we have good test coverage for the app?"
+**AI Response**: "Checked and reported honestly: there were ZERO tests — no test files, no runner, no framework. The README had listed this under known gaps but it was never addressed. Loaded the property-based-testing extension rules (opted in as Partial via Q10=B, which enforces PBT-02, PBT-03, PBT-07, PBT-08, PBT-09). IMPLEMENTED: fast-check 4.9.0 as the PBT framework (PBT-09) with Node's built-in test runner; test/generators.ts with reusable domain generators for titles, Spotify IDs, devices, image sets and release dates (PBT-07); round-trip property tests for the markdown parser against a model of upstream's template (PBT-02); invariant properties across parser, guard, art selection and age computation (PBT-03); example-based tests alongside every property suite (PBT-10); npm test / test:watch / test:coverage scripts; tsconfig.test.json so test files are typechecked, which they previously were not. FOUR REAL DEFECTS FOUND BY THE PROPERTY TESTS, each shrunk to a minimal case and now pinned by a regression test: (1) a pipe in a track title truncated it, shrunk to '|a', because the parser cut at any pipe rather than only at a following field marker; (2) quotes were stripped from every field though upstream quotes only the Track, corrupting names legitimately containing quotes such as Bowie's album \"Heroes\"; (3) SECURITY — isLoopbackHostHeader admitted '[::1].a.com' and '[::1]evil.com' because the bracketed-IPv6 branch discarded the remainder after ']' without validating it, a real bypass of the sole local-only control; (4) future release dates produced age -1, unsafe as input to the planned auto-skip rule, now clamped to zero. Also found and fixed two test-harness flaws: a credentials test that reached the real network, and change-detection tests passing vacuously because the 3-second default poll interval allowed only one poll. RESULT: 100 tests, 100 passing, stable across three consecutive runs. Coverage of tested modules: 99.88% line, 92.86% branch. Typecheck now covers tests and immediately caught three type errors the runtime had not. NOT COVERED and stated as such: server.ts, diagnostics.ts and mcp/spotifyMcpClient.ts are I/O composition exercised end-to-end by the live diagnostics endpoint; public/app.js has no tests."
+**Context**: CONSTRUCTION — test implementation
+
+---
+
+## PBT Compliance Finding (Non-Blocking)
+**Timestamp**: 2026-08-24T13:17:23Z
+**AI Response**: "PBT-08 requires property-based tests to run in CI with seed logging or a fixed seed. Shrinking is enabled and seeds are reported on failure, but no CI workflow exists for this project, so the CI-integration criterion is not met. Recorded as an open PBT finding in aidlc-state.md. Non-blocking at this stage since the project has no CI at all, but it must be resolved before the Build and Test stage, where PBT-08 is explicitly applicable."
+**Context**: CONSTRUCTION — extension rule compliance, PBT-08

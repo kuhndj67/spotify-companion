@@ -39,13 +39,39 @@ export interface NowPlaying {
   raw: string;
 }
 
-/** Reads `**Label**: value` out of the markdown body. */
-function field(text: string, label: string): string | null {
-  const pattern = new RegExp(`\\*\\*${label}\\*\\*:\\s*(.+?)\\s*(?:\\||$)`, 'im');
+/**
+ * Reads `**Label**: value` out of the markdown body.
+ *
+ * Upstream packs two fields onto one line — `**Shuffle**: Off | **Repeat**: off` — so a
+ * value has to be cut at that separator. The cut must be made at a pipe that introduces
+ * *another field marker*, not at any pipe: track titles legitimately contain `|`
+ * ("Tom Sawyer | Live"), and cutting on those truncated the title.
+ *
+ * Found by the round-trip property test, which shrank it to the title `"|a"`.
+ *
+ * Known limitation: a title containing the literal sequence ` | **word**: ` is ambiguous in
+ * this wire format and would still be cut. That is unresolvable without a structured
+ * response from upstream, and does not occur in real track titles.
+ */
+function field(text: string, label: string, quoted = false): string | null {
+  // `.` excludes newlines, so this captures through to the end of the line.
+  const pattern = new RegExp(`\\*\\*${label}\\*\\*:[ \\t]*(.*)`, 'i');
   const match = pattern.exec(text);
-  if (!match?.[1]) return null;
-  // Track names come back wrapped in double quotes; strip them.
-  return match[1].trim().replace(/^"(.*)"$/, '$1') || null;
+  if (!match) return null;
+
+  let value = (match[1] ?? '').trim();
+
+  const nextFieldMarker = value.search(/\|\s*\*\*[^*]+\*\*:/);
+  if (nextFieldMarker !== -1) value = value.slice(0, nextFieldMarker).trim();
+
+  // Only the Track field is wrapped in quotes by upstream, so only it may be unwrapped.
+  // Stripping quotes everywhere corrupted names that legitimately contain them — Bowie's
+  // album «"Heroes"» is titled with the quotation marks. Found by the round-trip property.
+  if (quoted && value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    value = value.slice(1, -1);
+  }
+
+  return value || null;
 }
 
 /** "1:23" or "1:02:03" to milliseconds. Returns null for anything unrecognised. */
@@ -78,7 +104,7 @@ export function parseNowPlaying(raw: string): NowPlaying | null {
   return {
     // The heading reads "# Currently Playing" or "# Currently Paused".
     isPlaying: /#\s*Currently\s+Playing/i.test(raw),
-    track: field(raw, 'Track'),
+    track: field(raw, 'Track', true),
     artist: field(raw, 'Artist'),
     album: field(raw, 'Album'),
     trackId: field(raw, 'ID'),

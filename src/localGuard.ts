@@ -26,13 +26,36 @@ export function isLoopbackAddress(address: string | undefined): boolean {
   return false;
 }
 
-/** Accepts "localhost:3000", "127.0.0.1:3000", "[::1]:3000" — with or without a port. */
+/**
+ * Accepts "localhost:3000", "127.0.0.1:3000", "[::1]:3000" — with or without a port.
+ *
+ * The trailing content after the hostname must be validated, not merely discarded. An
+ * earlier version took everything up to `]` for bracketed hosts and ignored the remainder,
+ * which admitted `[::1].a.com` and `[::1]evil.com` — an attacker controls this header, so
+ * that was a real bypass. Found by the property test asserting that appending any label to
+ * a loopback name must not keep it loopback.
+ */
 export function isLoopbackHostHeader(value: string | undefined): boolean {
   if (!value) return false;
-  const withoutPort = value.startsWith('[')
-    ? value.slice(0, value.indexOf(']') + 1)
-    : value.split(':')[0]!;
-  return LOOPBACK_HOSTNAMES.has(withoutPort.toLowerCase());
+
+  let hostname: string;
+  let remainder: string;
+
+  if (value.startsWith('[')) {
+    const close = value.indexOf(']');
+    if (close === -1) return false;
+    hostname = value.slice(0, close + 1);
+    remainder = value.slice(close + 1);
+  } else {
+    const colon = value.indexOf(':');
+    hostname = colon === -1 ? value : value.slice(0, colon);
+    remainder = colon === -1 ? '' : value.slice(colon);
+  }
+
+  // Only an optional ":port" may follow the hostname.
+  if (remainder !== '' && !/^:\d{1,5}$/.test(remainder)) return false;
+
+  return LOOPBACK_HOSTNAMES.has(hostname.toLowerCase());
 }
 
 /** Origin is absent on same-origin navigations; only validate it when present. */

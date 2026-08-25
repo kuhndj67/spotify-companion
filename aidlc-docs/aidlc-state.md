@@ -34,9 +34,22 @@ blocking constraints; do not apply production-grade controls (authn/authz, secre
 TLS, audit logging) that are inapplicable to a single-user localhost tool. Implemented in
 `src/localGuard.ts` — loopback peer check, Host validation, Origin validation.
 
-**Q10 scoping**: PBT applies to pure functions and serialisation round-trips only. The
-identified targets are `parseNowPlaying` (markdown → structure) and the `localGuard`
-predicates.
+**Q10 scoping**: PBT applies to pure functions and serialisation round-trips only. Partial
+mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest are advisory.
+
+### PBT Compliance (as of 2026-08-24)
+
+| Rule | Status | Evidence |
+|---|---|---|
+| PBT-02 Round-trip | ✅ Compliant | `parseNowPlaying.property.test.ts` — format→parse round-trip against a model of upstream's template |
+| PBT-03 Invariants | ✅ Compliant | Progress ≤ duration; raw text preserved; age never negative; `pickArt` never fabricates a URL; guard never admits non-loopback |
+| PBT-07 Generator quality | ✅ Compliant | `test/generators.ts` — domain generators for titles, Spotify IDs, devices, image sets, release dates. No raw primitives in domain positions |
+| PBT-08 Shrinking / reproducibility | ⚠️ **Partial** | Shrinking enabled and seeds reported on failure (four defects found and shrunk). **CI integration missing** — open gap |
+| PBT-09 Framework | ✅ Compliant | fast-check 4.9.0, in `devDependencies`, integrated with `node:test` |
+| PBT-01, 04, 05, 06, 10 | Advisory | PBT-10 satisfied anyway (example + property tests, regressions pinned). PBT-06 N/A — no stateful component beyond simple caches |
+
+**Open PBT finding**: PBT-08 requires PBT to run in CI with seed logging. No CI workflow
+exists. This is non-blocking for the current stage but must be resolved before Build and Test.
 
 ## Key Decisions
 | Decision | Value | Source |

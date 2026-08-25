@@ -130,3 +130,11 @@ try again"
 **Timestamp**: 2026-08-24T13:17:23Z
 **AI Response**: "PBT-08 requires property-based tests to run in CI with seed logging or a fixed seed. Shrinking is enabled and seeds are reported on failure, but no CI workflow exists for this project, so the CI-integration criterion is not met. Recorded as an open PBT finding in aidlc-state.md. Non-blocking at this stage since the project has no CI at all, but it must be resolved before the Build and Test stage, where PBT-08 is explicitly applicable."
 **Context**: CONSTRUCTION — extension rule compliance, PBT-08
+
+---
+
+## PBT-08 Finding Resolved — CI Pipeline Added
+**Timestamp**: 2026-08-24T13:17:23Z
+**User Input**: "yes"
+**AI Response**: "User approved adding the CI workflow to close the open PBT-08 finding. IMPLEMENTED: test/fc-config.ts resolves a seed from FC_SEED or falls back to a timestamp, applies it via fc.configureGlobal, and logs it with a ready-to-paste replay command; imported by all three suites that use fast-check, since node:test gives each file its own process. Seeds from CI are normalised with >>>0 because github.run_id exceeds 32 bits, and the logged value is the normalised one so replaying with it is exact. Added .github/workflows/ci.yml with two jobs: (1) typecheck (src and test), test with coverage, and build on Node 22, with FC_SEED set from github.run_id (or a workflow_dispatch input for deliberate replay), the seed and coverage table written to the GitHub step summary, and test output uploaded as an artifact on failure; (2) a Docker image build, which doubles as an early warning for upstream MCP server drift given MCP_SERVER_REF is unpinned. Chose a per-run seed over a frozen one deliberately — a fixed seed explores the same inputs forever, defeating the purpose — which PBT-08 permits provided the seed is logged every run. VERIFICATION: FC_SEED=777 reproduced an identical shrunk counterexample ['z '] across two runs of a deliberately failing property, proving replay actually works rather than merely printing a number; large-seed normalisation confirmed (FC_SEED=18446744073 -> seed=1266874889, logged as replayable); full suite 100/100 passing and typecheck clean after the change. PBT compliance table in aidlc-state.md updated — PBT-08 now Compliant, no open PBT findings remain."
+**Context**: CONSTRUCTION — PBT-08 resolved

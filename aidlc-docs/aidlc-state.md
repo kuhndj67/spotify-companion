@@ -44,12 +44,12 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
 | PBT-02 Round-trip | ✅ Compliant | `parseNowPlaying.property.test.ts` — format→parse round-trip against a model of upstream's template |
 | PBT-03 Invariants | ✅ Compliant | Progress ≤ duration; raw text preserved; age never negative; `pickArt` never fabricates a URL; guard never admits non-loopback |
 | PBT-07 Generator quality | ✅ Compliant | `test/generators.ts` — domain generators for titles, Spotify IDs, devices, image sets, release dates. No raw primitives in domain positions |
-| PBT-08 Shrinking / reproducibility | ⚠️ **Partial** | Shrinking enabled and seeds reported on failure (four defects found and shrunk). **CI integration missing** — open gap |
+| PBT-08 Shrinking / reproducibility | ✅ Compliant | Shrinking enabled; `test/fc-config.ts` selects and logs a seed every run; `.github/workflows/ci.yml` runs the full suite on push/PR with `FC_SEED` set from the run ID and surfaced in the job summary. Replay verified: the same seed reproduces an identical shrunk counterexample |
 | PBT-09 Framework | ✅ Compliant | fast-check 4.9.0, in `devDependencies`, integrated with `node:test` |
 | PBT-01, 04, 05, 06, 10 | Advisory | PBT-10 satisfied anyway (example + property tests, regressions pinned). PBT-06 N/A — no stateful component beyond simple caches |
 
-**Open PBT finding**: PBT-08 requires PBT to run in CI with seed logging. No CI workflow
-exists. This is non-blocking for the current stage but must be resolved before Build and Test.
+**No open PBT findings.** The PBT-08 CI gap was closed on 2026-08-24 by adding
+`.github/workflows/ci.yml`.
 
 ## Key Decisions
 | Decision | Value | Source |

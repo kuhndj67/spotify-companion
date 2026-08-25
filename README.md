@@ -229,6 +229,22 @@ Node's built-in test runner, plus [fast-check](https://github.com/dubzzz/fast-ch
 property-based testing (PBT-09). Per the Q10 "Partial" opt-in, PBT covers pure functions and
 round-trips; example-based tests cover concrete behaviour alongside them (PBT-10).
 
+### Reproducing a property failure
+
+Every run prints its seed:
+
+```
+[fast-check] seed=1266874889 — replay with: FC_SEED=1266874889 npm test
+```
+
+Pass that seed back to replay the exact run, shrunk counterexample included. CI uses the
+run ID as its seed and surfaces it in the job summary, so a red build is replayable locally
+or re-runnable via **workflow_dispatch** with the same seed.
+
+The seed varies per run rather than being frozen — a fixed seed would only ever explore the
+same inputs, which defeats the purpose. Logging it keeps failures reproducible without
+freezing the search space.
+
 | Module | Line | Branch | Notes |
 |---|---:|---:|---|
 | `localGuard.ts` | 100% | 97% | Security-critical — predicates, middleware, and PBT |
@@ -265,8 +281,6 @@ Each is now pinned by an example-based regression test naming the shrunk case.
   source template. It needs verification with real output, particularly the *nothing playing*
   case, which the upstream code paths suggest but which hasn't been observed.
 - **Enrichment layer not built** — pending clarification questions CQ1 and CQ2.
-- **No CI pipeline.** PBT-08 requires PBT to run in CI with seed logging. `npm test` does
-  this locally, but no workflow runs it on push — this is an open PBT compliance gap.
 - **No integration test** for the Express/WebSocket layer or the MCP subprocess spawn.
 - **`MCP_SERVER_REF: main` is unpinned** in `compose.yaml`. Pin to a commit SHA once verified.
 - **Upstream declares no license** — accepted for personal use, but it blocks open-sourcing

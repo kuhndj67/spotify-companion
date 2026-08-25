@@ -9,6 +9,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
+import './fc-config.js'; // seed selection and reporting (PBT-08)
 import { pickArt, ageInYears, parseYear, type SpotifyImage } from '../src/spotify/enrichment.js';
 import { imageSetArb, releaseDateArb } from './generators.js';
 

@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      fc_seed:
+        description: 'fast-check seed to replay a specific failing run'
+        required: false
+        type: string
+
+# A newer push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+
+    env:
+      # PBT-08: property tests must be reproducible. A per-run seed keeps the search space
+      # moving (a frozen seed would only ever explore the same inputs), while being logged
+      # and replayable — either from the run summary below, or by re-running this workflow
+      # via workflow_dispatch with that seed.
+      FC_SEED: ${{ inputs.fc_seed || github.run_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (src and test)
+        run: npm run typecheck
+
+      - name: Test with coverage
+        run: npm run test:coverage 2>&1 | tee test-output.txt
+
+      - name: Build
+        run: npm run build
+
+      # PBT-08 requires the seed to be discoverable after the fact. Surfacing it in the run
+      # summary means a failure can be replayed without digging through raw logs.
+      - name: Report fast-check seed and coverage
+        if: always()
+        run: |
+          {
+            echo '## Property-based testing'
+            echo
+            echo "Seed: \`${FC_SEED}\`"
+            echo
+            echo 'Replay locally:'
+            echo '```bash'
+            grep -oE 'FC_SEED=[0-9]+ npm test' test-output.txt | head -1 || echo "FC_SEED=${FC_SEED} npm test"
+            echo '```'
+            echo
+            echo '## Coverage'
+            echo '```'
+            sed -n '/start of coverage report/,/end of coverage report/p' test-output.txt \
+              | grep -vE 'node_modules' | sed 's/^# //' || echo 'No coverage report produced.'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: test-output.txt
+          retention-days: 7
+
+  container:
+    name: Container image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Dockerfile clones the MCP server from an unpinned ref, so this job doubles as
+      # an early warning for upstream drift — the same drift that would break the markdown
+      # parser at runtime. Not pushed anywhere; the build succeeding is the whole test.
+      - name: Build image
+        run: docker build --tag spotify-companion:ci .

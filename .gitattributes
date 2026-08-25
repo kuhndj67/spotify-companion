@@ -1,0 +1,11 @@
+# Normalise to LF in the repository. Checkouts still get native endings on Windows,
+# but the committed content stays consistent — which matters because the Dockerfile and
+# the shell scripts inside it run on Linux.
+* text=auto eol=lf
+
+# Never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary

@@ -1,0 +1,42 @@
+# Local deployment on Rancher Desktop.
+#
+# Works with either Rancher Desktop container engine:
+#   dockerd (moby)  ->  docker compose up --build
+#   containerd      ->  nerdctl compose up --build
+
+services:
+  now-playing:
+    build:
+      context: .
+      args:
+        # Pin this to a commit SHA rather than a branch once the setup is verified working —
+        # the upstream repo declares no license and no release tags, so `main` can move
+        # underneath you and change the getNowPlaying output the parser depends on.
+        MCP_SERVER_REF: main
+    image: spotify-now-playing:0.1.0
+    container_name: spotify-now-playing
+
+    ports:
+      # 127.0.0.1 binding keeps this localhost-only (Question 7, option A).
+      # Drop the prefix to "3000:3000" to expose it on the LAN.
+      - "127.0.0.1:3000:3000"
+
+    environment:
+      PORT: 3000
+      # Must be 0.0.0.0 inside the container to receive traffic from the published port.
+      # Host exposure is constrained by the 127.0.0.1 binding above, and LOCAL_ONLY rejects
+      # anything non-loopback that arrives anyway (Q7/Q9).
+      HOST: 0.0.0.0
+      LOCAL_ONLY: "true"
+      POLL_INTERVAL_MS: 3000
+      # Shared with the MCP server: `npm run auth` writes it, the MCP server refreshes it,
+      # this app reads it. The app never writes, to avoid racing the MCP server's rewrites.
+      SPOTIFY_CONFIG_PATH: /opt/spotify-mcp/spotify-config.json
+
+    volumes:
+      # Question 6, option A: authenticate once on the host, mount the token file in.
+      # The MCP server rewrites this file when it refreshes the access token, so it is
+      # mounted read-write.
+      - ./secrets/spotify-config.json:/opt/spotify-mcp/spotify-config.json:rw
+
+    restart: unless-stopped

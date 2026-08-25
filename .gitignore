@@ -1,0 +1,22 @@
+node_modules/
+dist/
+
+# Host-side MCP server checkout (see npm run mcp:setup). Contains a credential copy.
+.mcp-server/
+.mcp-auth/
+
+# Machine-local tool settings, not project configuration.
+.claude/settings.local.json
+
+# Spotify OAuth credentials and tokens — never commit.
+# The whole secrets/ directory is ignored, except the committed example template.
+secrets/*
+!secrets/spotify-config.example.json
+spotify-config.json
+.env
+.env.local
+
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -1,0 +1,361 @@
+# Research Findings: Spotify MCP Server Selection
+
+**Date**: 2026-08-24
+**Stage**: INCEPTION — Requirements Analysis (input)
+**Question**: Which Spotify MCP server is the most mature choice for a locally-hosted
+"now playing" display application?
+
+---
+
+## Why this was researched before requirements
+
+The user's request named "the most mature spotify mcp server" as a deliverable. The choice
+is not cosmetic — it constrains the requirements themselves:
+
+- **Transport** (stdio vs. HTTP/SSE) determines whether the web app and the MCP server can
+  be separate containers or must share one.
+- **Auth model** determines what secrets the container needs and how first-run onboarding works.
+- **Tool surface** determines whether "now playing" is a first-class tool or must be
+  assembled from lower-level calls.
+
+So this spike ran first, and its result feeds the clarifying questions.
+
+---
+
+## Candidates evaluated
+
+| Repo | Lang | Stars | Last push | Now-playing tool | Notes |
+|---|---|---:|---|---|---|
+| **marcelmarais/spotify-mcp-server** | TypeScript | 435 | 2026-08-21 | ✅ `getNowPlaying` | Actively maintained; explicit device/volume/progress data |
+| varunneal/spotify-mcp | Python | 613 | 2026-03-11 | ⚠️ not first-class | **Self-declared inactive**: "Most PRs will not be merged" |
+| tylerpina/spotify-mcp | TypeScript | low | — | partial | Broad library/playlist focus, smaller community |
+| igorgarbuz/spotify-mcp | Node | low | — | partial | Playback + playlist control |
+| darrenjaworski/spotify-mcp | TypeScript | low | — | partial | Published to npm |
+| Carrieukie/spotify-mcp-server | Kotlin | low | — | partial | JVM runtime — heavier container |
+| thebigredgeek/spotify-mcp-server | TypeScript | 0 | — | ❌ not listed | Strong token-handling design, but no traction |
+
+Star counts and push dates retrieved from the GitHub API on 2026-08-24.
+
+---
+
+## Selection: `marcelmarais/spotify-mcp-server`
+
+**Rationale**
+
+1. **It is actively maintained.** Last push three days before evaluation. The higher-starred
+   alternative (`varunneal/spotify-mcp`, 613 stars) is explicitly declared inactive by its
+   own maintainer as of March 2026 — raw star count is a lagging indicator here, and
+   "most mature" should mean *maintained*, not *most historically popular*.
+2. **`getNowPlaying` is a first-class tool** and returns exactly the payload this project
+   displays: track name, artist, album, playback progress, duration, playback state,
+   active device, volume, and shuffle/repeat state. No assembly from primitives needed.
+3. **`getQueue` is available** for a natural "up next" extension without adding a dependency.
+4. **TypeScript/Node** matches a Node-based web app — one runtime in the container image,
+   one toolchain, smaller image than the Kotlin/JVM alternative.
+
+**Known trade-offs (carried into requirements)**
+
+- **`getNowPlaying` returns markdown text, not JSON.** Inspection of `src/read.ts` confirms
+  the handler builds a template literal:
+
+  ```
+  # Currently Playing
+
+  **Track**: "Song Name"
+  **Artist**: Artist One, Artist Two
+  **Album**: Album Name
+  **Progress**: 1:23 / 3:45
+  **ID**: 4cOdK2wGLETKBW3PvgPWqT
+
+  **Device**: MacBook Pro (Computer)
+  **Volume**: 75%
+  **Shuffle**: Off | **Repeat**: off
+  ```
+
+  The web app must therefore **parse markdown** to get structured fields. This is normal for
+  MCP (tools are designed for LLM consumption, not programmatic clients) but it is a brittle
+  seam: a template change upstream silently breaks parsing. The scaffold isolates this in a
+  single module with the raw text always passed through for debugging.
+
+- **No album artwork is available via MCP.** The `getNowPlaying` template contains no image
+  URL. The track **ID** is returned, so artwork could be fetched — but only by calling the
+  Spotify Web API directly (`GET /v1/tracks/{id}`), which means a second auth path alongside
+  MCP and partially defeats the "MCP-only" premise. This materially affects how good the
+  display can look, so it is raised explicitly as Q2a.
+
+- **No license file.** The repository does not declare a license. This is a real
+  consideration for anything beyond personal local use — it is raised as Q8.
+- **stdio transport only.** No HTTP/SSE mode is documented. A two-container split would
+  need a stdio↔HTTP bridge (e.g. `supergateway`). This drives Q3.
+- **17 open issues**, normal for a project of this size, but worth watching.
+- **Spotify Premium is generally required** for playback-control endpoints. Read-only
+  "currently playing" is less restricted, but this should be confirmed against your account.
+
+---
+
+## Architectural consequence
+
+`getNowPlaying` over stdio means the MCP **client** must be able to spawn the MCP server
+process. Two viable topologies:
+
+```
+Option A — single container (default assumption in the scaffold)
++--------------------------------------------------+
+|  Container: now-playing                          |
+|                                                  |
+|  [ Browser ] --HTTP--> [ Express app ]           |
+|                             |                    |
+|                        stdio (child process)     |
+|                             v                    |
+|                    [ spotify-mcp-server ] --HTTPS--> Spotify Web API
++--------------------------------------------------+
+
+Option B — two containers, needs a bridge
++---------------------+        +----------------------------+
+| Container: web app  | -HTTP->| Container: bridge + MCP     | --HTTPS--> Spotify Web API
+| [ Express + UI ]    |        | [ supergateway -> stdio ]   |
++---------------------+        +----------------------------+
+```
+
+Option A is simpler, has fewer moving parts, and is what the provisional scaffold implements.
+Option B is more faithful to a service-oriented deployment and is the better answer if this
+is meant as a Kubernetes learning exercise on Rancher Desktop. This is Q3.
+
+---
+
+## Worth stating plainly
+
+For a read-only now-playing display, MCP is **not** the minimal path — the Spotify Web API's
+`GET /v1/me/player/currently-playing` would do this in a few dozen lines with no MCP layer
+at all. MCP earns its place here if the intent is to (a) learn/exercise MCP, or (b) leave the
+door open for an LLM agent to drive playback later. The user asked for MCP, so the design
+uses MCP; this note exists so the trade-off is on the record rather than assumed. Q1 and Q2
+check which of those intents applies.
+
+---
+
+---
+
+# Part 2: Spotify Web API Capability Audit (2026)
+
+**Triggered by**: the Question 1 answer, which expanded intent well beyond a now-playing
+display — artist genre, signed-vs-independent status, play counts, release dates,
+preference-alignment scoring, follow status, and eventually auto-skipping tracks.
+
+**Finding**: Spotify has restricted its Web API twice since 2024, and **several of these
+goals are no longer achievable through Spotify's API at all**. This needs to be settled
+before requirements are written, because it changes what the product can be.
+
+## The two restriction waves
+
+**27 November 2024** — restricted for apps without prior extended access:
+Related Artists · Recommendations · **Audio Features** · **Audio Analysis** ·
+Get Featured Playlists · Get Category's Playlists · 30-second preview URLs ·
+algorithmic and Spotify-owned editorial playlists.
+
+**6 February 2026** (Development Mode apps, migration deadline **9 March 2026**):
+- **Spotify Premium is now mandatory for the app owner.**
+- 1 Client ID per developer; 5 users per app.
+- Search limit reduced: max 50 → **10**, default 20 → **5**.
+- Batch/multi-get endpoints removed (`GET /tracks`, `/albums`, `/artists`, …) — fetch individually.
+- Removed: browse categories, new releases, **artist top tracks**, public user profiles, `GET /markets`.
+- **Fields stripped from responses** (verbatim from the migration guide):
+  - **Track**: `available_markets`, `linked_from`, **`popularity`**
+  - **Album**: `album_group`, `available_markets`, **`label`**, **`popularity`**
+  - **Artist**: `followers`, **`popularity`**
+  - **User** (`GET /me`): `country`, `email`, `explicit_content`, `followers`, `product`
+
+Extended Quota Mode is exempt — but it requires a registered business and **250,000 monthly
+active users**. A personal tool cannot qualify. **This project is permanently in Development Mode.**
+
+## Scorecard against the Question 1 wishlist
+
+| Goal (from Q1/Q2) | Status | Detail |
+|---|---|---|
+| Track / artist / album names | ✅ Available | `getNowPlaying` already returns these |
+| **Release date** | ✅ Available | `release_date` on `GET /albums/{id}` — survives |
+| **Artist genre** | ⚠️ Available but thin | `genres` not in the removed-fields list. In practice Spotify's artist genres are frequently empty, especially for smaller artists |
+| **Is artist in my followed group** | ✅ Available | `GET /me/following/contains` survives |
+| Playback control (auto-skip) | ✅ Available | next/previous/pause/seek/volume/shuffle/repeat all survive |
+| **Independent vs. signed** | ❌ **Gone** | `label` was the only Spotify signal and was **removed from the Album object** in Feb 2026 |
+| **Number of plays** | ❌ **Never existed** | Spotify has never exposed play counts. `popularity` (0–100) was the closest proxy and is **now removed** from track *and* artist |
+| **"How well does this align with my preferences"** | ❌ **Gone** | `audio-features` (tempo, energy, valence, danceability…) was the mechanism. Deprecated Nov 2024, no replacement |
+| Recommendations / related artists | ❌ Gone | Deprecated Nov 2024 |
+
+**Three of the wishlist items are unreachable via Spotify.** They need external data or a
+different approach — see below.
+
+## The headline result: the auto-skip feature works
+
+The single most concrete thing asked for — *"tell the Spotify DJ I don't want music more
+than 5 years old, and skip it automatically"* — is **fully achievable**:
+
+```
+getNowPlaying  ->  track ID
+GET /albums/{id}   ->  release_date        (survives Feb 2026)
+   if (now - release_date) > threshold
+POST /me/player/next                       (survives Feb 2026)
+```
+
+This is worth stating plainly because it is the highest-value, lowest-risk item in the
+entire request, and it is unaffected by every deprecation above.
+
+## External enrichment options for the three gaps
+
+| Source | Fills | Cost / constraints |
+|---|---|---|
+| **MusicBrainz** | Label, release relationships → signed vs. independent | Free, no API key. Requires descriptive User-Agent, **~1 request/second**. Match via ISRC or artist+title |
+| **Last.fm** | Play counts, listener counts, community tags (genre) | Free API key. Good coverage of exactly the "number of plays" gap |
+| **Discogs** | Label, pressing detail | Free key; rate limited; strongest for physical releases |
+| **AcousticBrainz** | Audio features (the deprecated Spotify vector) | ⚠️ **Service shut down Feb 2022.** Only a frozen July 2022 dump exists — nothing released after that date, ~60% coverage of recent releases, requires MBIDs. Not viable for current music |
+| **Self-hosted Essentia** | Audio features, computed locally | The toolkit AcousticBrainz used. Needs audio to analyse — which Spotify does not give you. Impractical here |
+
+**On preference alignment specifically**: since neither Spotify audio-features nor
+AcousticBrainz can serve current tracks, the realistic path is to **build preference signal
+from your own behaviour** — release-year distribution, genre/tag frequency, artists you
+follow, saved-track overlap, and skip history that this app records. That is a data-collection
+problem, not an API problem, and it is a strong argument for the database layer already
+anticipated in the Question 3 answer.
+
+## Consequence: the MCP server does not cover this use case
+
+`marcelmarais/spotify-mcp-server` exposes no tool for **get artist**, **get album**, or
+**check-following**. So the enrichment data — genre, release date, follow status — **cannot
+be obtained through the selected MCP server at all**, and `getNowPlaying` returns only
+names plus a track ID.
+
+This collides with the Question 2a answer ("stay purely MCP"). The options are:
+
+- **(a) Hybrid** — MCP for playback/now-playing, Spotify Web API directly for enrichment.
+  One OAuth credential set serves both; the MCP server's own `spotify-config.json` tokens
+  can be reused. Least work, keeps MCP where it adds value.
+- **(b) Extend the MCP server** — fork and add `getArtist` / `getAlbum` / `checkFollowing`
+  tools. Keeps the app purely an MCP client; adds a fork to maintain against an
+  unlicensed upstream.
+- **(c) Drop MCP** — go direct to the Web API throughout.
+
+Also note: the MCP server's `getAlbums(albumIds)` tool calls the **batch** albums endpoint,
+which was **removed** in February 2026. That tool is already broken in Development Mode.
+
+## Question 6 resolved (the answer was "recommend the most straightforward option")
+
+**Recommendation: Option A — authenticate on the host, mount the token file.**
+
+Not because it is the tidiest, but because **Option B cannot work**. Inspection of the
+upstream `authorizeSpotify()` shows the callback server binds container-loopback:
+
+```js
+server.listen(Number.parseInt(port), '127.0.0.1', () => {
+```
+
+A published Docker port forwards to the container's external interface, not its loopback,
+so a host browser could never reach the callback. The flow also calls `open(authorizationUrl)`,
+and there is no browser in the container.
+
+Option A is made straightforward by scripting it: one `npm run auth` on the host handles
+clone, build, credential prompt, browser flow, and token placement.
+
+---
+
+---
+
+# Part 3: Empirical Verification (2026-08-24)
+
+**This part corrects two claims in Part 2.** Part 2 was derived from Spotify's published
+migration guide. Part 3 is derived from **live calls with a real Development Mode token**.
+Where they disagree, Part 3 is authoritative — documentation described the removed-fields
+list, but the live API is more restricted than that list implies.
+
+## Correction 1: `GET /me/following/contains` is 403, not available
+
+Part 2 listed this endpoint as surviving. It does not.
+
+```
+Granted scopes on the token include: user-follow-read   ✅ confirmed
+GET /v1/me/following/contains?type=artist&ids=...    ->  403 Forbidden
+```
+
+The scope is genuinely present — this was verified by inspecting the `scope` field returned
+with the refresh-token grant. The endpoint itself is restricted in Development Mode.
+
+**Workaround, implemented and working**: `GET /me/following?type=artist` returns **200**.
+The full followed-artists list is fetched once (cursor-paginated, 50 per page), cached for
+10 minutes, and membership is checked locally.
+
+This is strictly better than the original design: following changes rarely, so one paginated
+fetch serves every track, and a track change now costs **zero** follow-related API calls.
+Verified against a live account: 42 followed artists cached, membership resolving in 0 ms.
+
+## Correction 2: artist genres are not returned at all
+
+Part 2 said `genres` was "not in the removed-fields list" and therefore probably available
+but sparse. In practice the field is **entirely absent** from the response.
+
+```
+GET /v1/artists/{id}  ->  200
+Fields returned: external_urls, href, id, images, name, type, uri
+```
+
+No `genres`, no `followers`, no `popularity`. The `GET /artists/{id}` call was **removed
+from the enrichment chain** rather than left in as dead weight — it returned nothing the app
+displays. Genre now requires an external source (CQ2: MusicBrainz tags or Last.fm tags).
+
+## Confirmed working, end to end
+
+| Step | Result |
+|---|---|
+| Token refresh | ✅ |
+| `GET /me` | ✅ |
+| MCP server connect | ✅ 30 tools |
+| MCP `getNowPlaying` | ✅ **markdown parser verified against real output** |
+| `GET /tracks/{id}` | ✅ release date, album type, track number, explicit |
+| `GET /me/following` | ✅ 42 artists |
+| Follow status (local) | ✅ |
+
+## Correction 3: album artwork is available at zero extra cost
+
+Q2a was answered "skip album art" on the premise that artwork required a second auth path.
+That premise was wrong. `track.album.images` is returned by the `GET /tracks/{id}` call the
+enrichment chain **already makes** — no extra request, no extra auth, no extra scope.
+
+Verified live:
+
+```
+GET /v1/tracks/{id} -> album.images = [
+  { url: "https://i.scdn.co/image/ab67616d0000b273...", width: 640, height: 640 },
+  { url: "https://i.scdn.co/image/ab67616d00001e02...", width: 300, height: 300 },
+  { url: "https://i.scdn.co/image/ab67616d00004851...", width:  64, height:  64 }
+]
+Image fetch -> 200 image/jpeg, host i.scdn.co
+```
+
+Sizes vary by album, so the app selects by measured width rather than array position:
+largest for the blurred backdrop, ≤400px for the cover thumbnail, smallest as a fast first
+paint. **Artwork was added on 2026-08-24 at the user's direction, reversing Q2a.**
+
+## Net effect on the enrichment chain
+
+Went from 3 API calls per track to **1** (`GET /tracks/{id}`), plus one cached list fetch
+per 10 minutes. Available fields: release date, release precision, **age in years**, album
+type, total tracks, track number, explicit flag, primary artist, follow status, Spotify URL.
+
+Still unavailable from Spotify: genre, label/independent status, play counts, audio features.
+
+---
+
+## Sources
+
+- [Spotify: Introducing some changes to our Web API (Nov 2024)](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)
+- [Spotify: February 2026 Web API Dev Mode Migration Guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide)
+- [Spotify: Update on Developer Access and Platform Security (Feb 2026)](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security)
+- [Spotify: Quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes)
+- [TechCrunch: Spotify changes developer mode API to require premium accounts](https://techcrunch.com/2026/02/06/spotify-changes-developer-mode-api-to-require-premium-accounts-limits-test-users/)
+- [MetaBrainz: Pissed off by Spotify enshittifying more API endpoints?](https://blog.metabrainz.org/2024/11/28/pissed-off-by-spotify-enshittifying-more-api-endpoints-we-can-help/)
+- [MusicBrainz API documentation](https://musicbrainz.org/doc/MusicBrainz_API)
+- [marcelmarais/spotify-mcp-server](https://github.com/marcelmarais/spotify-mcp-server)
+- [varunneal/spotify-mcp](https://github.com/varunneal/spotify-mcp)
+- [thebigredgeek/spotify-mcp-server](https://github.com/thebigredgeek/spotify-mcp-server)
+- [tylerpina/spotify-mcp](https://github.com/tylerpina/spotify-mcp)
+- [igorgarbuz/spotify-mcp](https://github.com/igorgarbuz/spotify-mcp)
+- [darrenjaworski/spotify-mcp](https://github.com/darrenjaworski/spotify-mcp)
+- [Carrieukie/spotify-mcp-server](https://github.com/Carrieukie/spotify-mcp-server)

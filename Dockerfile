@@ -17,9 +17,16 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /opt
-RUN git clone --depth 1 --branch "${MCP_SERVER_REF}" \
-      https://github.com/marcelmarais/spotify-mcp-server.git spotify-mcp
+# Fetch by ref, where the ref may be a commit SHA.
+#
+# `git clone --branch` only accepts branch and tag names — it fails with exit 128 on a raw SHA,
+# which is exactly what pinning for R7 produced. Fetching an explicit ref into an empty repo
+# works for a SHA, a branch or a tag alike, and keeps the shallow depth.
+WORKDIR /opt/spotify-mcp
+RUN git init -q . \
+ && git remote add origin https://github.com/marcelmarais/spotify-mcp-server.git \
+ && git fetch --depth 1 origin "${MCP_SERVER_REF}" \
+ && git checkout -q FETCH_HEAD
 
 WORKDIR /opt/spotify-mcp
 RUN npm install && npm run build && npm prune --omit=dev
@@ -63,8 +70,17 @@ COPY public ./public
 # must be writable by the runtime user.
 RUN chown -R node:node /opt/spotify-mcp
 
-USER node
+# Bind-mounted host directories arrive root-owned, so the unprivileged user cannot create the
+# database inside them. The entrypoint starts as root purely to fix ownership of the mount
+# points, then drops to `node` via setpriv. Root never runs the application.
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# NOTE: no `USER node` here — the entrypoint drops privileges itself. Setting it would leave the
+# bind mount unwritable, which is the defect this replaced (found in U1 Build and Test).
 EXPOSE 3000
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

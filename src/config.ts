@@ -83,4 +83,39 @@ export const config = {
    * DNS-rebinding. Disable only for deliberate LAN exposure.
    */
   localOnly: process.env.LOCAL_ONLY !== 'false',
+
+  // -- U1: listening history --------------------------------------------------
+
+  /**
+   * Where the listening-history database lives (NFR-11).
+   *
+   * In the container this is a bind-mounted directory so a rebuild never destroys history; on
+   * the host it defaults to `./data/`. The *directory* is mounted, not the file — SQLite's
+   * `-wal` and `-shm` siblings must live beside the database or crash recovery breaks. Copying
+   * the single-file `secrets/` mount pattern here would be a subtle and hard-to-diagnose
+   * mistake.
+   */
+  historyDbPath: process.env.HISTORY_DB_PATH ?? join(projectRoot, 'data', 'history.db'),
+
+  /** Set false to run without recording. The display works either way. */
+  historyEnabled: process.env.HISTORY_ENABLED !== 'false',
+
+  /**
+   * Ratio at or above which a play counts as completed (U1 Functional Design Q1 + Q5).
+   *
+   * The ratio is *listened time* over duration, so it can exceed 1.0 when a track is replayed.
+   * Changing this does not rewrite existing verdicts — stored trails allow reclassification, so
+   * a change can be applied retroactively rather than only going forward.
+   */
+  completionThreshold: Number.parseFloat(process.env.COMPLETION_THRESHOLD ?? '0.90'),
+
+  /** Slack for progress jitter between polls; also bounds the forward-step cap. */
+  jitterToleranceMs: int('JITTER_TOLERANCE_MS', 1500),
+
+  // -- U1: export and snapshots (FR-56) ---------------------------------------
+
+  snapshotDir: process.env.SNAPSHOT_DIR ?? join(projectRoot, 'data', 'snapshots'),
+  snapshotIntervalHours: int('SNAPSHOT_INTERVAL_HOURS', 24),
+  snapshotKeep: int('SNAPSHOT_KEEP', 14),
+  snapshotsEnabled: process.env.SNAPSHOTS_ENABLED !== 'false',
 } as const;

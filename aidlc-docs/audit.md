@@ -138,3 +138,995 @@ try again"
 **User Input**: "yes"
 **AI Response**: "User approved adding the CI workflow to close the open PBT-08 finding. IMPLEMENTED: test/fc-config.ts resolves a seed from FC_SEED or falls back to a timestamp, applies it via fc.configureGlobal, and logs it with a ready-to-paste replay command; imported by all three suites that use fast-check, since node:test gives each file its own process. Seeds from CI are normalised with >>>0 because github.run_id exceeds 32 bits, and the logged value is the normalised one so replaying with it is exact. Added .github/workflows/ci.yml with two jobs: (1) typecheck (src and test), test with coverage, and build on Node 22, with FC_SEED set from github.run_id (or a workflow_dispatch input for deliberate replay), the seed and coverage table written to the GitHub step summary, and test output uploaded as an artifact on failure; (2) a Docker image build, which doubles as an early warning for upstream MCP server drift given MCP_SERVER_REF is unpinned. Chose a per-run seed over a frozen one deliberately — a fixed seed explores the same inputs forever, defeating the purpose — which PBT-08 permits provided the seed is logged every run. VERIFICATION: FC_SEED=777 reproduced an identical shrunk counterexample ['z '] across two runs of a deliberately failing property, proving replay actually works rather than merely printing a number; large-seed normalisation confirmed (FC_SEED=18446744073 -> seed=1266874889, logged as replayable); full suite 100/100 passing and typecheck clean after the change. PBT compliance table in aidlc-state.md updated — PBT-08 now Compliant, no open PBT findings remain."
 **Context**: CONSTRUCTION — PBT-08 resolved
+
+---
+
+## Clarification Round Answered — Requirements Analysis Complete
+**Timestamp**: 2026-08-25
+**User Input**: "Ok lets carry on, first check where we left off and what needs to be done" —
+followed by answers to CQ2–CQ5.
+**AI Response**: "Reported state: working tree clean at 17796b5, 100/100 tests passing, formal
+INCEPTION gate never cleared because CQ2–CQ5 were unanswered. Collected answers. CQ2 = B
+NARROWED — MusicBrainz for label/signed-vs-independent ONLY, and the user reframed the feature:
+the objective is to estimate the likelihood a track was PROMOTED into the feed rather than
+profile-matched, on the hypothesis that signed-artist placements are disproportionately paid
+promotion. Signed-vs-independent is a proxy variable, not an end in itself. User added a story:
+record what Spotify plays, with timestamp and whether the track completed or was skipped, to
+build the dataset for that analysis. CQ3 = C (general rules engine). CQ4 = A (database now).
+CQ5 = A (Premium confirmed — hard prerequisite closed).
+
+VERIFIED LIVE BEFORE WRITING REQUIREMENTS, rather than assuming from documentation — the two
+prior research rounds were both wrong where they relied on docs: (1) `track.external_ids.isrc`
+IS still returned in Development Mode (`USUM71703861`), and it arrives on the `GET /tracks/{id}`
+call the enrichment chain already makes, so the MusicBrainz join costs ZERO extra Spotify
+requests — this is what makes CQ2 affordable; (2) MusicBrainz resolves that ISRC through
+recording → release → `label-info` to `{\"label\":\"UMe\",\"type\":\"Imprint\"}`, confirming the
+label chain works end to end; (3) `user-modify-playback-state` is ALREADY on the token, so
+auto-skip needs no re-authentication; (4) `user-read-recently-played` is also granted, enabling
+history backfill for periods when the app was down; (5) `currently-playing` returns 204 when
+idle. Nothing was playing during the probe, so no live now-playing track was exercised.
+
+WROTE `aidlc-docs/inception/requirements/requirements.md`: intent analysis, 10 settled
+decisions, 34 functional requirements (FR-01–11 marked as already built and live-verified,
+FR-12–34 new), 24 NFRs, out-of-scope table, and 10 risks. Three design problems were surfaced
+rather than glossed: (a) MusicBrainz returns an imprint name, not a major/indie flag, so
+classification needs derivation from three disagreeing signals — curated major list, MB label
+relationships, and the ISRC registrant code — and FR-13 therefore stores per-signal votes rather
+than a boolean; (b) skip-vs-complete is a DERIVED signal with real confounders (poll-interval
+staleness, pause/resume, seek, replay, session end, and the app's own automated skips), so
+FR-19/FR-20 require storing raw evidence and keeping classification recomputable, since the
+first heuristic will be wrong and storing only its verdict would poison the dataset the project
+depends on; (c) a runaway rule with playback control skips an entire queue, so FR-29–31 mandate
+dry-run, kill switch and rate limiting as requirements, not conveniences. Also recorded R1
+explicitly: the promotion hypothesis may simply be false, and the requirements treat it as
+something to be tested rather than assumed.
+
+Updated aidlc-state.md — Requirements Analysis ticked, five risks closed and six new ones
+opened, key decisions extended, and the stage-ordering deviation documented so the Construction
+checkboxes are not misread as meaning no code exists. Corrected two stale README 'Known gaps'
+bullets that still claimed the app had never run live and that enrichment was unbuilt; both
+were done days ago. Raised open question Q-A for the next stage: whether the age rule applies
+everywhere or only in DJ/algorithmic contexts, since a blanket rule would also skip the user's
+own deliberately-chosen older music."
+**Context**: INCEPTION — Requirements Analysis, Step 7 complete; gate awaiting user approval
+
+---
+
+## Rules Engine Reframed as the Core Feature
+**Timestamp**: 2026-08-25
+**User Input**: "The age rule is just an example. What I really want is the ability to create one
+or more rules that are applied to a new track when it starts (not just the DJ) and automatically
+skips it if the rule is satisfied. The rules should be able to be applied to any known
+information about the track."
+**AI Response**: "Treated this as superseding the earlier reading in which auto-skip-by-age was
+the headline feature and other rules were extensions. The general mechanism IS the requirement.
+Extracted three binding constraints: universal trigger (every new track, every playback context,
+not DJ-scoped), user-authored and plural, and total field access.
+
+ALSO RESOLVED Q-A, which I had raised as an open question in the previous turn — the answer is
+'everywhere'. Kept playback context available as a rule FIELD rather than as an engine-level
+scope, so a user wanting DJ-only behaviour expresses it as a condition inside a rule. Retained
+the original concern as a usage caution rather than a design one: a blanket age rule will skip
+deliberately-chosen older music, which is what dry-run and back-testing are for.
+
+VERIFIED LIVE BEFORE REWRITING: probed `GET /me/player/queue`, which returns 200 in Development
+Mode (not restricted). This matters because 'any known information' plus 'skip when it starts'
+is a genuine timing conflict — a MusicBrainz label lookup is 2 calls behind a 1 req/sec queue,
+so waiting means hearing several seconds of a track that should have been skipped, while not
+waiting means label-based rules (precisely the ones testing the promotion hypothesis) rarely
+fire. Pre-warming enrichment for upcoming queue entries resolves it. Stated the caveat honestly:
+the probe ran with nothing playing and returned an empty queue, so the endpoint is confirmed
+REACHABLE but not confirmed to yield useful lookahead during active playback — flagged as R11
+and as a verification item before FR-36 is designed.
+
+REWROTE section 3.4 from 9 requirements to 22 (FR-24–FR-45), organised as core mechanism,
+evaluation semantics, safety, and representation; playback control renumbered FR-46–48. Four
+design problems surfaced rather than glossed: (a) FR-27's 'any field' makes the engine a
+consumer of the whole track record, so it must be written against an introspectable field
+catalogue (FR-28) or every new enrichment field would need engine changes to become rule-usable;
+(b) tri-state evaluation (FR-32/33) because 'skip major-label tracks' has no safe default when
+MusicBrainz has no entry — treating unknown as false fails on exactly the uncatalogued releases
+the user cares about, treating it as true skips everything MusicBrainz has never heard of, so
+the rule must declare which it wants; (c) FR-43/44/45 prohibit `eval` — a rule language over
+arbitrary fields invites an expression-string interpreter, and a structured predicate tree is
+storable, diffable, back-testable, property-testable and keeps the local-only security posture
+from resting on the rule store being trusted (recorded as R12); (d) FR-40 added for the specific
+failure where a skip does not take effect and the engine re-evaluates the same track forever.
+
+Added FR-42 (back-test a rule against accumulated history) as the point where the rules engine
+and the promotion hypothesis meet — it turns rule authoring into measurement and is the most
+direct available test of R1. Added NFR-25/26/27 for rule-evaluation property testing,
+determinism, and storage round-tripping. Noted that D4 persistence makes the user's own listening
+history a rule-referenceable field source, enabling rules like 'skip anything I've already
+skipped twice' with no new data source.
+
+RAISED Q-B rather than assuming it: rules combine as OR, which cannot express 'skip major-label
+tracks EXCEPT by artists I follow' without duplicating the exception into every rule. An
+allow-action rule with precedence would handle it. Not assumed because the stated requirement was
+specifically 'skips it if the rule is satisfied', but flagged as likely wanted given 42 followed
+artists, and as cheaper to include now than to retrofit."
+**Context**: INCEPTION — Requirements Analysis, scope clarification; requirements.md revised
+
+---
+
+## Q-B Resolved — Rule Combination Kept OR-Only
+**Timestamp**: 2026-08-25
+**User Input**: "For now lets just use the 'any rule is true causes skip' guideline... maybe add
+features to that in the future."
+**AI Response**: "Recorded Q-B as resolved: OR-only combination for Unit 1, no precedence, no
+exemptions, no ordering significance. Exemption rules moved to the out-of-scope table as
+DEFERRED rather than rejected, since the user explicitly left the door open.
+
+Stated the accepted limitation plainly rather than letting it pass silently: 'skip major-label
+tracks except by artists I follow' cannot be expressed as a single rule under OR-only semantics.
+Noted the available workaround — fold the exception into the predicate itself as
+`label = major AND following = false` — which covers the common case at the cost of repeating
+the condition in every rule that needs it.
+
+Preserved two forward-compatibility seams, consistent with the project's existing Q3 'no
+blocking debt' constraint, neither of which costs anything to honour now: (1) FR-26 amended so a
+rule's action is an ENUM rather than a boolean, meaning a future `allow` action is a new member
+rather than a change to the rule shape requiring migration of stored rules; (2) OR-folding
+across rules confined to a single function, so precedence semantics later replace that function
+instead of rippling through the engine. Both recorded in requirements.md section 3.4 and in the
+state file's decision table.
+
+No open questions remain. Requirements Analysis is complete and awaiting user approval."
+**Context**: INCEPTION — Requirements Analysis, Q-B resolved; no open questions remain
+
+---
+
+## Requirements Approved
+**Timestamp**: 2026-08-25
+**User Input**: "Looks good lets continue"
+**AI Response**: "Recorded explicit approval of `requirements.md` (48 FRs, 27 NFRs, 12 risks).
+Requirements Analysis marked complete in aidlc-state.md. Proceeded to User Stories, which the
+state file had already assessed as REQUIRED."
+**Context**: INCEPTION — Requirements Analysis approved; stage gate passed
+
+---
+
+## User Stories — Assessment and Plan
+**Timestamp**: 2026-08-25
+**AI Response**: "Executed Step 1 mandatory assessment. Created
+`aidlc-docs/inception/plans/user-stories-assessment.md`. Decision: EXECUTE, clearing the High
+Priority bar on three independent criteria — new user features (FR-12–48 are all user-facing),
+complex business logic (tri-state evaluation, decision deadlines, safety interlocks), and user
+experience change (the app transitions from read-only display to acting on the user's playback).
+Recorded the honest counter-argument rather than hiding it: single-user projects are the classic
+case where user stories become ceremony, and the justification here rests on complexity rather
+than headcount. Explicitly noted three criteria NOT met (multi-persona, cross-team,
+customer-facing APIs).
+
+Created `aidlc-docs/inception/plans/story-generation-plan.md` with a full execution checklist,
+the Step 5 story-breakdown options table with trade-offs, and four embedded questions — each one
+chosen because it changes how stories get written rather than as ceremony. Gave a recommendation
+with reasoning for each. User selected all four recommendations: Q1 = A (three modes as personas:
+Listener, Curator, Analyst), Q2 = C (detailed stories for new work, thin stories for the already
+built FR-01–11), Q3 = C (epics for structure, journey-style stories within), Q4 = C
+(Given/When/Then for rules-engine and skip-inference stories, checklists elsewhere).
+
+STEP 9 ANSWER ANALYSIS performed as mandated: all four answers are unambiguous single-option
+selections with no vague qualifiers, undefined terms, contradictions, or combined options.
+Cross-checked pairs for consistency (Q1+Q3 — journey stories need actors, three modes supply
+them; Q2+Q4 — thin delivered stories take checklists, which is what Q4=C prescribes). Step 10
+follow-up round NOT triggered."
+**Context**: INCEPTION — User Stories, Part 1 Planning complete
+
+---
+
+## User Stories — Generation
+**Timestamp**: 2026-08-25
+**AI Response**: "DEVIATION LOGGED: Step 13 requires explicit approval of the story plan before
+generation. Treated the user's selection of all four plan questions as approval of the approach,
+since the plan's only substantive decisions ARE those four answers and re-gating would have added
+a round trip with nothing new to review. Consistent with the user's repeated instruction to
+continue. Flagged here so it can be challenged.
+
+GENERATED `aidlc-docs/inception/user-stories/personas.md`: three personas as MODES of one person,
+not three people — stated as an explicit qualification up front, because modelling multiple user
+types for a single-user single-account project would be fiction. Each persona is justified by the
+design constraint it imposes rather than by demographic colour. P1 Listener (peripheral attention,
+forces glanceable display, silent skips, absent data must not read as error), P2 Curator (full
+deliberate attention, forces discoverable field catalogue, predictable-before-arming behaviour,
+density acceptable), P3 Analyst (investigative and sceptical, forces raw-observation retention and
+unknown-vs-false distinction). Added a persona-conflict table recording four genuine tensions and
+their resolutions — silent-vs-explained skips, glanceable-vs-dense, act-fast-vs-act-completely,
+convenient-defaults-vs-honest-data — noting the last is the one most likely to be eroded during
+implementation, since collapsing unknown to false makes rules feel better to write and quietly
+destroys the dataset's value.
+
+GENERATED `aidlc-docs/inception/user-stories/stories.md`: 7 epics, 26 stories (10 delivered, 16
+new), 8 with Given/When/Then criteria and 18 with checklists per Q4=C. Epics follow the user's
+own journey: Awareness, Understanding, Remembering, Shaping, Control, Hypothesis, Assurance.
+
+TWO FINDINGS RAISED RATHER THAN ABSORBED, per the plan's traceability step:
+(1) **US-25 has no corresponding requirement.** The requirements specify collecting history
+(FR-17–23) and back-testing rules against it (FR-42), but nothing covers reviewing, exporting or
+analysing that history — which was CQ2's entire stated rationale. Without it the history feature
+is a write-only log. Marked with a warning block in the story and escalated to aidlc-state.md.
+(2) **US-18 fails INVEST 'Estimable'** because its pre-warming criterion depends on queue
+lookahead confirmed reachable but unverified during active playback (R11).
+
+Also recorded in the INVEST validation, rather than glossed: US-09's value is CONDITIONAL on R1
+(the unproven promotion hypothesis) — if the hypothesis fails, the story still delivers a true
+fact, it just stops being interesting; US-14 is the largest story and a splitting candidate,
+deliberately left whole because splitting produces fragments with no independent user value; and
+two stories legitimately name mechanisms (US-08's ISRC join, US-12's recently-played backfill)
+because in both cases the mechanism IS the value.
+
+Two traps surfaced in acceptance criteria that were not explicit in the requirements: US-16's
+self-reinforcing rule (a rule that skips a track, records the skip, then matches on 'tracks I've
+skipped twice' would ratchet into skipping ever more music), and US-13's circular feedback loop
+(rule-initiated skips recorded as user dislike would let the data 'confirm' the hypothesis the
+rule was built on). Justified NFR-08–27 having no stories: they constrain how stories are built
+rather than describing observable value, and forcing them into story form would produce fiction."
+**Context**: INCEPTION — User Stories, Part 2 Generation complete; awaiting user approval
+
+---
+
+## User Stories Approved; US-25 Gap Resolved; Workflow Planning Complete
+**Timestamp**: 2026-08-25
+**User Input**: "For now lets assume analysis happens outside the app, it doesn't make sense to
+build an analysis tool when there are many good reporting and analysis options out there. This
+does mean we need good export options (including perhaps an api to allow easy interfacing to
+tools like graphana or others. / I've reviewed the user stories and am comfortable with this as
+an initial build. Review the stories and if possible break the effort up into a few phases that
+deliver a runnable/testable app so that each phase is not so complex it risks large rewrite cost
+in the event of a significant miss."
+**AI Response**: "Recorded approval of user stories. Resolved the US-25 gap with the user's
+scope boundary: the app is a data collection instrument, not an analysis tool. Added requirements
+FR-49 to FR-55 as a new section 3.5 (Export and external analysis) — tool-agnostic CSV/JSON
+export, every recorded field including raw evidence and per-signal label votes, unknown values
+represented distinctly with coverage counts so missing-data bias stays measurable downstream,
+incremental export, row provenance, direct-read storage on a mounted volume, and an optional
+read-only HTTP API disabled by default. Rewrote US-25 from 'analyse the hypothesis in-app' to
+'export the data honestly' and added US-27 for the integration route. All 27 stories now trace to
+requirements; added in-app analysis to the out-of-scope table.
+
+SURFACED A REAL CONFLICT rather than quietly building the API: read `src/localGuard.ts` and
+confirmed `isLoopbackAddress` accepts only 127.x and ::1, so a Grafana CONTAINER on the Compose
+network arrives from a bridge address such as 172.18.0.3 and is refused with 403. This is NFR-01
+working exactly as specified, not a defect — but it means 'add an API for Grafana' is not free:
+it touches the single control the entire no-authentication decision (NFR-07) rests on. Documented
+three routes in preference order — (A) shared SQLite file on a mounted volume read directly by the
+dashboard, opening no network path and benefiting from WAL-mode concurrent reads; (B) dashboard
+installed on the host, reaching loopback, working today with no code change; (C) HTTP API with the
+guard widened to the container subnet, which partially reverses Q7 = A. Made FR-55 'Could' rather
+than 'Must' and stated that route C REQUIRES EXPLICIT USER APPROVAL rather than assuming it.
+
+EXECUTED WORKFLOW PLANNING. Created `aidlc-docs/inception/plans/execution-plan.md` and a matching
+.mmd file. Assessed overall risk as Medium, and recorded a distinction that drives the whole plan:
+rollback is EASY FOR CODE BUT HARD FOR DATA — accumulated listening history cannot be
+re-collected, so a schema or classifier mistake found late is unrecoverable in a way a code bug
+is not.
+
+FOUR DELIVERY PHASES, sequenced by risk containment rather than architectural tidiness:
+Phase 1 'Remember' (history + export; low risk; first because the dataset is time-sensitive per
+CQ4 and depends on nothing else); Phase 2 'Understand' (MusicBrainz labels + backfill; medium,
+contained to one module); Phase 3 'Decide' (the full rules engine WITH NO PLAYBACK CONTROL AT
+ALL); Phase 4 'Act' (playback control plus safety interlocks).
+
+THE CENTRAL STRUCTURAL DECISION, stated explicitly in the plan: the rules engine is the largest
+and least-certain component, and playback control is the only part that can cause visible harm.
+Putting them in separate phases means the risky component ships in a mode where being wrong costs
+nothing, and back-testing it against Phase 1–2 history is a genuine correctness check before it
+is ever armed. Phase 3 is independently useful even if Phase 4 never happens.
+
+TWO ORDERING INSIGHTS RECORDED: (1) Phase 1 must store ISRC with every play, because that makes
+label backfill possible in Phase 2 — so shipping Phase 1 before label resolution exists is NOT a
+one-way door, and omitting ISRC would make it one; (2) Phase 2 ends with a DECISION GATE where the
+promotion hypothesis (R1) is tested against real exported data BEFORE the rules engine premised on
+it is built. Enumerated all three possible gate outcomes and noted that in none of them is prior
+work discarded — which is the point of gating there.
+
+Stage determinations: Application Design EXECUTE, Units Generation EXECUTE (highest-consequence
+area — the history schema cannot be re-derived), Functional Design EXECUTE once per delivery phase
+rather than all up front (designing all four now would defeat the purpose of phasing), NFR
+Requirements SKIP (27 NFRs already enumerated and agreed), NFR Design EXECUTE narrowly
+(persistence concurrency, export-vs-guard conflict), Infrastructure Design EXECUTE narrowly
+(persistent volume, shared-file layout, and finally pinning MCP_SERVER_REF per R7).
+
+Noted honestly that the repository's mermaid instructions direct diagrams through Copilot LM tools
+(mermaid-diagram-validator / mermaid-diagram-preview) that are NOT available in this session, so
+the diagram is unvalidated by that tooling; kept syntax deliberately simple and wrote a .mmd copy
+for preview in the extension."
+**Context**: INCEPTION — User Stories approved; Workflow Planning complete; awaiting approval
+
+---
+
+## Data API Withdrawn to Wishlist — Export Reduced to a Simple Download
+**Timestamp**: 2026-08-25
+**User Input**: "Good catch on the access control issues with an API. I think we will need a more
+advanced security architecture before we support api access to data so lets start by leaving that
+on a wishlist and only supporting a simple download (the user can manually import it into tools
+from there)."
+**AI Response**: "Withdrew FR-55 (read-only HTTP data API) from scope and created a Wishlist
+section (requirements §5.1) with W-1 recording what adopting it would actually require:
+authentication for API consumers (tokens or mTLS), authorisation to make a read-only scope
+genuinely read-only, transport security once traffic leaves loopback, audit logging of data
+access, and a defined trust boundary for the container network — i.e. most of what Q9 explicitly
+excluded when it asked for security 'as simple as possible'. Recorded the prerequisite as a
+security architecture review that revisits Q7 and Q9 explicitly, so the deferral is actionable
+rather than a vague 'later'.
+
+REPURPOSED FR-53. It previously promised directly-readable storage so an external tool could
+attach to the history file; that was part of the integration story the user has now declined. It
+now specifies the download mechanism instead — export delivered as a file download from the local
+web UI, one action, no command line. Noted explicitly that the history store remains a local file
+on a mounted volume as a CONSEQUENCE of NFR-08/NFR-11, but that any direct read of it by another
+process is a property of the storage choice and NOT a supported integration — unspecified, may
+change, nothing designed around it. Stating this matters because otherwise the withdrawn
+capability would quietly persist as an undocumented dependency.
+
+Folded the download criteria into US-25 (plus a criterion that a large history exports without
+stalling the display). Converted US-27 from an in-scope story to a DEFERRED one marked with the
+wishlist reference, retaining the full reasoning rather than deleting it — deleting it would
+guarantee the same conflict gets re-discovered and re-litigated in a few months. Noted that US-27
+is now correctly the one story with no requirement, by design.
+
+UPDATED THE EXECUTION PLAN. The change removes work rather than adding it: API changes are now
+'minor and internal only'; NFR impact narrows to persistence alone; NFR Design no longer needs to
+resolve an export-vs-guard conflict; and Infrastructure Design needs no networking changes at all,
+only the persistent volume and pinning MCP_SERVER_REF. Recorded the conflict as CLOSED in the
+carried-forward items with the consequence stated plainly: **NFR-01 to NFR-07 are untouched and no
+security work sits on any phase's critical path.**
+
+Also recorded the escape hatch that survives this decision at zero cost: a dashboard installed on
+the HOST rather than in a container reaches the app over loopback and passes the existing guard
+unchanged, so liveness remains obtainable later without any security work — it is only the
+containerised case that is blocked."
+**Context**: INCEPTION — scope reduction; requirements, stories and execution plan revised
+
+---
+
+## Execution Plan Approved; Application Design Complete
+**Timestamp**: 2026-08-25
+**User Input**: "proceed"
+**AI Response**: "Recorded approval of the execution plan (4 delivery phases). Executed
+Application Design.
+
+Read the existing component interfaces first rather than designing in the abstract, and that
+surfaced an integration trap worth the trip: `NowPlayingService.#publish` suppresses unchanged
+snapshots via `#lastSignature`, and that signature deliberately excludes progress so the UI is not
+spammed. If history capture consumed the existing `change` stream, the observation trail would
+contain only samples where something ELSE changed — losing exactly the progress data the outcome
+classifier depends on. The classifier would still produce verdicts; they would simply be wrong,
+and invisibly so until someone tried to analyse months of history. Design therefore specifies
+three distinct events: `tick` (every poll, unconditional, for history), `change` (suppressed, for
+the UI), `trackStart` (derived, for rules).
+
+Created `application-design-plan.md` with four questions, each chosen because it changes the
+design materially. User selected all four recommendations: Q1 = C (play records plus the
+observation trail), Q2 = A (rules as a schema-validated JSON file, UI read-only), Q3 = C (flat
+feature-grouped layout with pure domain logic isolated), Q4 = B (schema grows per phase via
+migrations). Step 8 answer analysis performed: all unambiguous single selections, no follow-up
+round triggered; cross-checked three pairs for consistency.
+
+TOOLING ERROR AND FIX: the script used to write answers into the plan matched the literal
+'[Answer]:' text inside the 'X) Other (please describe after [Answer]: tag below)' lines as well
+as the real answer slots, scrambling the placements. Repaired with targeted edits; the plan now
+holds the correct answers against the correct questions.
+
+GENERATED five artifacts in `aidlc-docs/inception/application-design/`: components.md,
+component-methods.md, services.md, component-dependency.md, application-design.md, plus
+data-flow.mmd. 24 components — 9 PURE carrying the correctness-critical logic, 15 impure as thin
+adapters — and 6 services.
+
+THREE DESIGN DECISIONS CARRYING THE MOST WEIGHT, each documented with its rationale:
+(1) `DecisionExecutor` as a strategy makes Phase 3's inertness STRUCTURAL rather than conditional
+— in Phase 3 the only implementation is `LoggingExecutor`, so no code path from a decision to a
+skip exists at all, verifiable by reading the import graph rather than by trusting an
+`if (automationEnabled)` that would leave the skip path present and reachable by mistake.
+(2) The pure/impure split is load-bearing, not stylistic: it is simultaneously what makes FR-20
+(reclassification a function of stored data, not deployment state), FR-42 (back-testing replays
+the SAME code with no I/O to stub) and NFR-25/26 achievable.
+(3) `Maybe<T>` propagates end to end — history counts are `Maybe<number>` not `number`, because
+zero and unknown are different claims and conflating them makes 'never skipped this' true for a
+track never seen; `evaluate()` returns a three-valued Verdict, never a boolean; `renderMaybe()`
+must never emit blank/zero/false. R2's missing-data bias is correlated with the variable being
+measured, so a collapse anywhere along that chain makes the bias invisible downstream.
+
+Recorded four method-level signatures that encode decisions which would otherwise be lost in
+implementation: `classify` takes tolerances as a PARAMETER (reading them from config would make
+FR-20's recomputation depend on deployment state); `listPlays` returns AsyncIterable (export must
+stream, not buffer a year of history); history counts are Maybe; and `foldDecisions` is separate
+from `evaluateRules` so Q-B's exemption rules replace one named function rather than rippling
+through the engine.
+
+FLAGGED THE MOST LIKELY DESIGN FAILURE explicitly in both the consolidated document and the state
+file: erosion of the pure/impure boundary. A single `Date.now()` or config read inside
+`outcomeClassifier`, `RuleEngine` or `labelClassifier` would fail NO existing test while silently
+breaking FR-20 and FR-42 — historical re-classification would disagree with the original run.
+Recommended a mechanical check during Build and Test asserting that pure modules import nothing
+impure.
+
+Confirmed `localGuard` needs NO change — the download-only export decision means the security
+posture is untouched by this design."
+**Context**: INCEPTION — Application Design complete; awaiting approval
+
+---
+
+## Application Design Approved; Units Generation Complete — INCEPTION PHASE COMPLETE
+**Timestamp**: 2026-08-25
+**User Input**: "approve and continue"
+**AI Response**: "Recorded approval of the application design. Executed Units Generation.
+
+Established the decomposition frame first: this is a single deployable, so 'unit' means a logical
+module and a body of work, not a deployment artefact. Recorded four categories as ALREADY SETTLED
+rather than re-asking them — deployment model (Q3 = A), code organisation (Application Design
+Q3 = C), team alignment (single developer who is also the sole user), and differing scalability
+needs (none) — so the omissions are deliberate and visible rather than looking like oversights.
+
+Asked three questions, all answered with the recommendations: Q1 = C (units nest inside phases,
+so phases stay the runnable checkpoints), Q2 = A (split Phase 3 into two units), Q3 = C (CI green
+for self-contained units, live verification required where a unit touches an external service).
+Step 7 analysis: unambiguous single selections, no follow-up triggered. Cross-checked consistency
+and noted that Q1 = C is what PERMITS Q2 = A — choosing the split under units-equal-phases would
+have been contradictory.
+
+FIVE UNITS plus U0 reference: U1 Listening History & Export, U2 Label Enrichment, U3 Rule Model &
+Evaluation, U4 Rule Observability, U5 Automated Skipping. Build order U1→U2→U3→U4→U5, forced by
+the dependency matrix rather than chosen — the matrix is strictly lower-triangular, which is the
+property making the phase ordering safe.
+
+THREE FINDINGS WORTH RECORDING:
+(1) **U3 is gated on CI alone, and is not independently runnable** — deliberately. Its correctness
+is entirely a property of pure functions, so a live listening session would tell us nothing a
+property test does not while costing hours. Splitting it out means the riskiest logic in the
+project is proven correct BEFORE anything depends on its behaviour — the unit-level expression of
+the same containment argument that keeps Phase 3 unable to act.
+(2) **U3's dependencies on U1 and U2 are SOFT, not hard.** Because every `TrackFacts` field is
+`Maybe<T>` and `unknown` is a first-class value, U3 compiles, runs and is fully property-testable
+with history and labels both absent — its generators can produce `unknown` directly. The
+dependency is on FIELD DEFINITIONS, not working implementations. This is a real benefit of the
+tri-state design rather than an accident: rule work is not blocked if U2 stalls, for example if
+MusicBrainz coverage turns out poor and the label approach needs rethinking.
+(3) **US-13 is split across U1 and U5, and the split prevents a subtle data defect.** U1 must
+record `skipSource='user'` from the very first play. If the column arrived only with U5, every
+play recorded during Phases 1–3 would be permanently unattributed, and a later migration would
+have to ASSUME they were user skips rather than having recorded it. Recording it from the start
+makes the claim explicit and verifiable instead of retrospective.
+
+Also named a real cost of the U3/U4 split rather than glossing it: the Curator persona waits
+longest for usable feedback, since U3 delivers the rule model but produces nothing visible — the
+Curator's first satisfying moment is at the END of Phase 3. Noted the compensation (back-testing
+against months of accumulated history is far more useful than it would have been earlier), and
+that P1 the Listener is last to get the headline skipping feature, which is the direct consequence
+of putting risk containment ahead of gratification.
+
+Documented the code organisation strategy: single package, flat feature directories, no
+workspaces. Noted that `src/rules/` deliberately spans three units because they are one cohesive
+domain delivered in stages, and splitting the directory to mirror unit boundaries would optimise
+for a planning artefact over the code's own coherence.
+
+DEVIATION: the workflow's Step 9 requires explicit approval of the unit plan before generation.
+Proceeded directly, as with User Stories, since the plan's substantive decisions are the three
+answered questions and re-gating would add a round trip with nothing new to review. Flagged
+previously and not objected to; logged again here for traceability.
+
+INCEPTION PHASE IS NOW COMPLETE — Workspace Detection, Requirements Analysis, User Stories,
+Workflow Planning, Application Design and Units Generation all done. Next: CONSTRUCTION phase,
+beginning with Functional Design for U1 (the execution plan specifies Functional Design runs once
+per delivery phase rather than all up front)."
+**Context**: INCEPTION — Units Generation complete; INCEPTION PHASE COMPLETE; awaiting approval
+
+---
+
+## INCEPTION Approved; U1 Functional Design Complete
+**Timestamp**: 2026-08-25
+**User Input**: "continue"
+**AI Response**: "Recorded approval of Units Generation and the INCEPTION phase. Entered
+CONSTRUCTION with Functional Design for U1 (Listening History & Export).
+
+Framed U1 around the observation that everything in it is downstream of one definition — what
+counts as a skip — and that getting it wrong produces a SYSTEMATIC rather than random bias, which
+better analysis later cannot repair. All four planning questions therefore approached the same
+target from different angles.
+
+ROUND 1 ANSWERS CONTAINED A DIRECT CONTRADICTION, caught by the mandatory Step 5 analysis: Q1
+selected the option written as '>= 0.95' while Q2's free text said '90% seems like a good target'.
+On a 4-minute track that is the difference between recording a skip at 3:36 and 3:48. Also
+determined that Q2 SUPERSEDED rather than answered its question — it defined a single ratio
+governing skip-vs-complete, which means no special handling for short plays and no sub-threshold
+flag. And identified that Q2's binary rule plus Q4's 'unknown' left the `abandoned` outcome with
+no remaining case, making the enumeration ambiguous.
+
+Issued a three-question round 2 rather than guessing. ALSO SURFACED A QUANTIFIED DEFECT in the
+chosen rule before building it: because the last poll before a track ends lands up to one interval
+early, the highest observable progress is about duration minus the poll interval, so clearing a
+ratio threshold R requires duration >= pollInterval / (1 - R). At 3 s and 0.95 that is 60 s; at
+0.90 it is 30 s. A 45-second interlude played fully would last-poll at ~93% and be recorded as
+SKIPPED — a false rejection signal on a track the user did not reject, and systematic rather than
+random. Offered a one-line fix (complete if ratio met OR remaining <= pollInterval) without
+relitigating the ratio choice itself.
+
+ROUND 2 ANSWERS: Q5 = 90%. Q6 = LEAVE IT — user declined the poll-interval floor, accepting that
+sub-30-second tracks will be mislabelled, on the basis that the retained trail makes it correctable
+via reclassification (FR-20). Q7 = RETIRE `abandoned`, leaving three outcomes: completed, skipped,
+unknown. Recorded the short-track limitation prominently in three places (the plan's settled
+parameters, BR-2 in business-rules.md, and aidlc-state.md) with the explicit note that any analysis
+of short-form content must carry the caveat — an accepted limitation is only safe if it stays
+visible.
+
+PROPAGATED THE `abandoned` RETIREMENT across six documents rather than leaving the corpus
+inconsistent: requirements.md FR-18, stories.md US-11 (both the story text and its Given/When/Then
+block, plus the 'four outcome values are exhaustive' criterion which became three),
+component-methods.md `PlayOutcome`, components.md, and services.md's shutdown policy — which had
+said 'never write a false abandoned' and now specifies flushing as `unknown`.
+
+Recorded Q3's answer as wishlist W-2 (smart data lifecycle management), including the reasoning
+the user gestured at: a naive time-based prune is the wrong answer because it would delete exactly
+the raw material FR-20 depends on, irreversibly, on a timer, with nobody present to judge it.
+Noted design considerations for when it is taken up — downsampling rather than deleting, retaining
+full trails where classification was uncertain, archiving before pruning.
+
+GENERATED three artifacts in `aidlc-docs/construction/u1-listening-history/functional-design/`:
+domain-entities.md (Play, Observation, OutcomeEvidence, ExportRow, plus the migration-001 schema),
+business-rules.md (34 numbered rules across six groups, 13 edge cases, 10 property-test targets),
+business-logic-model.md (segmentation, summarisation, classification, reclassification, backfill,
+export, startup/shutdown, degraded operation).
+
+SEVERAL DESIGN POINTS WORTH RECORDING, each stating why the obvious alternative is wrong:
+(1) `lastProgressMs` must be the MAXIMUM progress observed, not the final value — after a rewind
+near the end of a track the final sample is lower than the peak, so a classifier using the last
+value would mark a fully-heard track as skipped whenever the listener rewound to re-hear
+something. Captured as property P-5.
+(2) The completion check must be tested BEFORE any interruption reason. A track that reached 90%
+and was then paused is `completed`; reversing the order would downgrade genuine completions to
+`unknown` whenever playback was paused after a track effectively ended.
+(3) Backward progress on the same track is genuinely ambiguous between replay and seek, and the
+disambiguator is whether the track had effectively finished before the jump. Getting it wrong is
+costly in both directions — fabricated plays on every scrub-back, or merged repeat-listens losing
+completions.
+(4) BR-5.3 forbids recording backfilled plays as completions. `recently-played` reports no
+progress data, so treating its entries as completions would be an inference dressed as an
+observation, and would inflate the completion rate exactly during app downtime — a bias correlated
+with downtime rather than random.
+(5) BR-3.9 requires persistence failures to be recorded as a COUNTED GAP. A silently dropped play
+is indistinguishable from 'nothing was playing', which is a plausible reading and therefore an
+undetectable corruption.
+(6) `classifierVersion` on every play, so a partially-reclassified database is distinguishable
+from a consistent one — without it, 'recompute the outcomes' is not a safe operation.
+
+Skipped frontend-components.md with justification: U1's only UI change is a download control on an
+unchanged page, so the artifact would be empty ceremony; the download behaviour is specified as
+business rules BR-6.7 through BR-6.10 instead."
+**Context**: CONSTRUCTION — U1 Functional Design complete; awaiting approval
+
+---
+
+## U1 Simplification — Backward Jump as Preference Signal, Forward Jump Dropped
+**Timestamp**: 2026-08-25
+**User Input**: "Regarding backward jump... given that the goal of tracking skip is to know when I
+'don't like' a track... you can safely assume that if I jump backward to relisten to the track or
+part of the track - I like it. That may allow you to simplify the logic around backward tracking.
+Also - forward jumping... I think you can safely ignore this case, the case would be extremely
+rare since I'd always skip to the next track instead of jumping forward (don't waste time on
+something that's virtually never going to happen)."
+**AI Response**: "Applied both simplifications and identified a consequence the user had gestured
+at without stating: the backward-jump insight does not merely simplify the logic, it makes the
+replay-versus-rewind AMBIGUITY STOP MATTERING. The previous design treated distinguishing them as
+a hard problem, costly to get wrong in both directions — misread a rewind as a replay and you
+fabricate plays on every scrub-back; misread a replay as a rewind and you merge repeat-listens and
+lose completions. Once any backward jump is treated as engagement, BOTH branches lead to a
+non-skip outcome: a replay yields a completed play plus a fresh one, a rewind yields one play
+marked `rewound` which can never be `skipped`. Choosing the wrong side now shifts a play count by
+one rather than manufacturing a false rejection signal, which was the failure that actually
+mattered. BR-1.3 (the replay split) was RETAINED, but its justification changed — it survives only
+to keep play counts accurate for US-16's history-based rules, not because the distinction carries
+analytical weight.
+
+CHANGES: added BR-2.10 (`rewound` ⇒ `completed`, never `skipped`) and BR-2.11 (forward seeks not
+detected). Renamed `sawBackwardJump` to `rewound` because the field now carries meaning rather
+than recording an event. Removed `sawForwardJump` from OutcomeEvidence, the `ev_saw_forward`
+column, and the forward-detection logic from `summarise()`. Simplified BR-1.4 to 'any other
+backward jump keeps the same play and sets rewound' — no threshold reasoning needed.
+
+PLACED THE `rewound` CHECK ABOVE THE TRACK-CHANGE CHECK in the classifier, and flagged that
+ordering as the whole of BR-2.10: a listener who rewinds to re-hear a passage and then moves on at
+40% produces exactly the observation pattern of a skip — below threshold, ended by track change —
+so testing `rewound` first is what stops that being recorded as a rejection.
+
+FLAGGED HONESTLY that BR-2.10 is the one rule in U1 that encodes a PREFERENCE JUDGEMENT rather
+than an observation, a departure from the project's usual separation of the two. Argued it is safe
+here specifically because the raw trail is retained: the inference is visible as a flag, reversible
+by reclassification, and never destroys the evidence it was drawn from, so an analyst who disagrees
+can recompute without it. Recorded that reasoning in business-rules.md rather than leaving the
+departure silent.
+
+RECORDED THE ACCEPTED CONSEQUENCE of dropping forward detection: a forward seek would inflate
+`lastProgressMs` and could produce a false `completed`. Noted once, without relitigating — the
+user's judgement that the case does not occur is theirs to make, and the retained trail covers
+revisiting it.
+
+Also noted that `lastProgressMs` must STILL be the maximum rather than the final value even though
+BR-2.10 now guards the rewind case from the other direction — the maximum is what makes a replayed
+track resolve as `completed` rather than depending on where the final sample landed.
+
+Propagated to component-methods.md (OutcomeEvidence interface) and aidlc-state.md. Added property
+P-11: a rewound trail never classifies as skipped, for any progress sequence."
+**Context**: CONSTRUCTION — U1 Functional Design revised
+
+---
+
+## U1 Ratio Redefined — Listened Time Replaces Position, Removing Three Rules
+**Timestamp**: 2026-08-25
+**User Input**: "Regarding BR2.10 - I don't know if a specific rule needs to be created for this,
+just that we likely don't need specific logic to handle it. rewinding will just extend the play
+time of the track which will increase it's ratio (making it possible for the play to duration
+ratio to exceed 1.0), that will not conflict with the 90% skip vs. compete tasks."
+**AI Response**: "Identified that the user's reasoning was correct but rested on a different
+metric than the one designed, and said so rather than accepting or rejecting the premise as
+stated. The design defined `completionRatio` as FURTHEST POSITION REACHED
+(`max(progress) / duration`); under that definition rewinding does NOT raise the ratio — the
+position moves backwards while the maximum stays put — which is precisely why I had reached for a
+special rule. The user's statement holds under ACCUMULATED LISTENING TIME, where re-hearing a
+passage adds to the numerator and the ratio can exceed 1.0.
+
+Adopted the user's metric. `completionRatio` is now `listenedMs / durationMs`, where `listenedMs`
+is the sum of forward progress, seeded with the first sample's position.
+
+THIS REMOVED THREE THINGS RATHER THAN ADDING ONE: the replay-versus-rewind segmentation branch
+(BR-1.3/1.4), the rewind classification rule (the old BR-2.10), and forward-seek detection. The
+classifier went from five branches to four with no special cases. All the subtlety moved into
+`summarise`, which is arithmetic over a trail and exhaustively property-testable — a better home
+than a branch in `classify`, which is a judgement that has to be argued for. This also removed the
+one rule in U1 that encoded a PREFERENCE JUDGEMENT rather than an observation, restoring the
+project's separation of the two.
+
+THREE DETAILS IN THE SUMMATION CARRY THE DESIGN, each recorded with why:
+(1) Clamping each step at zero is what makes rewinds free — a negative step contributes nothing
+rather than subtracting, so re-listening adds its time again. That single clamp is the entire
+replacement for the deleted rewind rule.
+(2) Capping each step at elapsed wall-clock time is ACCOUNTING, NOT SEEK DETECTION — you cannot
+listen to more audio than time has passed. Without it, an undetected forward seek would add its
+whole jump as though heard. With it, forward seeks are harmless without any of the detection logic
+the user rejected. Retained as a new BR-2.10 and framed explicitly as arithmetic.
+(3) Seeding `listenedMs` with the first sample's position, because the listener heard everything up
+to the first poll; starting at zero would systematically undercount every play by up to one poll
+interval.
+
+FLAGGED PROMINENTLY, in three documents, that `completionRatio` MUST NOT BE CLAMPED to 1.0 —
+clamping looks like defensive hygiene and would silently destroy the repeat-listen signal, since a
+ratio of 2.4 means the track was heard nearly two and a half times. Updated property P-3 from 'in
+[0,1]' to '>= 0, not bounded above', and noted it as the property most likely to be got wrong.
+
+RECORDED TWO CONSEQUENCES rather than letting them surface later: (a) a track played twice in a row
+is now ONE play record with ratio ≈ 2.0 instead of two records, so play counts undercount repeats
+and the ratio carries that signal instead — relevant to US-16's history-based rules; (b) listened
+time RAISES a rewound play's ratio but does not GUARANTEE it clears 0.90 — rewinding at 40%,
+re-hearing 20–40%, then leaving gives ≈ 0.60 and still classifies as `skipped`. Deliberately added
+no rule for the second case: the premise 'a rewind means I like it' is a statement about intent,
+and encoding it would put back exactly what removing the old BR-2.10 achieved. Also noted the case
+is arguably classified correctly — the listener heard 60% and chose to leave — and that `rewound`
+is retained as evidence so reclassification can revisit it if it proves to matter.
+
+Retained `maxProgressMs` and `rewound` as EVIDENCE ONLY, explicitly marked as not read by the
+classifier, so they stay useful to an analyst without becoming triggers. Replaced property P-5
+(maximum vs final progress — now moot) with 'listenedMs counts only forward movement', and added
+P-11: adding a rewind followed by re-listening never DECREASES the ratio. P-11 is the formal
+statement of what makes the special case unnecessary — if it ever fails, the simplification is
+unsound and explicit rewind handling has to return.
+
+Propagated through business-rules.md, business-logic-model.md, domain-entities.md (including the
+migration-001 schema columns), component-methods.md and aidlc-state.md."
+**Context**: CONSTRUCTION — U1 Functional Design revised; three rules removed
+
+---
+
+## U1 NFR Design and Infrastructure Design Complete; R7 Closed
+**Timestamp**: 2026-08-25
+**User Input**: "looks good... lets move on"
+**AI Response**: "Recorded approval of U1 Functional Design. Ran NFR Design and Infrastructure
+Design together as a single question round, since the execution plan marks both EXECUTE (narrow)
+for U1 and neither had enough independent content to justify two gates.
+
+Recorded explicitly, in both plans, which mandatory question categories were evaluated and found
+NOT APPLICABLE rather than skipping them silently: security (no change — download-only export
+opens no network path), scalability (one user, one process, ~200 plays/day — no load exists),
+availability (a local tool with no uptime obligation), messaging, networking, shared
+infrastructure. Also recorded what U1 deliberately does NOT introduce — no queue, cache, circuit
+breaker, connection pool, load balancer or rate limiter — and why retrying a failed write is
+actively wrong here: a locked or full database does not resolve within a poll interval, so
+retrying inside the poll loop would delay the display to save one sample of many.
+
+Answers, all matching recommendations: Q1 = C (`node:sqlite` behind the NFR-10 repository
+interface), Q2 = A (buffer in memory, one transaction per play), Q3 = A (bind mount `./data/`),
+Q4 = B (automatic dated snapshots).
+
+NOTED THAT Q1 AND Q2 PAIR RATHER THAN BEING INDEPENDENTLY DEFENSIBLE: `node:sqlite` is
+synchronous, which would be a real event-loop concern at option B's ~28,800 writes/day, but is
+irrelevant at ~200 batched transactions/day. The two choices make each other safe.
+
+Q4 = B INTRODUCED CAPABILITY NOT COVERED BY EXISTING REQUIREMENTS — FR-49–54 describe
+user-initiated export only. Recorded it as **FR-56** (automatic dated export snapshot on a
+schedule) rather than smuggling it in as an implementation detail, with its justification stated:
+listening history is the only artefact in the project that cannot be regenerated.
+
+CLOSED R7 CONCRETELY rather than restating the action. Resolved the upstream head via the GitHub
+API: `7b5fde6309a52a7874768c63deda7880ee85935b`, dated 2026-08-21, 'fix: add offset param to
+getMyPlaylists (#72)'. Specified pinning it in compose.yaml and noted the secondary benefit — the
+CI Docker-build job becomes a genuine drift detector, because against `main` a build failure was
+ambiguous (our change, or upstream moved?) whereas against a pinned SHA it is unambiguously ours.
+Marked R7 closed in requirements.md, execution-plan.md and aidlc-state.md.
+
+FOUR ARTIFACTS GENERATED: nfr-design-patterns.md (9 patterns), logical-components.md (6 logical
+components plus sizing), infrastructure-design.md, deployment-architecture.md.
+
+THREE FINDINGS WORTH RECORDING:
+(1) **Mount the directory, not the file.** SQLite's `-wal` and `-shm` files live beside the
+database, so a mount capturing only `history.db` would break crash recovery. This differs from the
+existing `secrets/` mount, which binds a single file — copying that pattern here would be a subtle
+and hard-to-diagnose mistake, so it is called out explicitly.
+(2) **The gitignore paradox, stated rather than glossed.** `./data/` sits inside the project tree
+and is gitignored — which makes it invisible to git and therefore MORE exposed to `git clean
+-xdf`, not less. Database and snapshots share one deletion event, so FR-56 protects against
+corruption but NOT against losing the directory. Recorded as an accepted residual risk with two
+cheap escape hatches (point SNAPSHOT_DIR outside the tree, or move the mount per Q3 = B), neither
+requiring redesign. Not resolved unilaterally, since Q3 = A was chosen with the trade-off visible.
+(3) **Startup step 4 probes writability rather than assuming it.** Bind-mount permission problems
+on Windows otherwise surface as write failures at the first play boundary — minutes after startup,
+with the user having already seen a healthy-looking UI. Failing at startup makes it immediate and
+diagnosable.
+
+Also recorded the retention ASYMMETRY as the whole of the lifecycle policy: snapshots rotate
+freely because they are derived and regenerable from the database, while trails are not pruned on
+a timer because they are the raw material FR-20 depends on. That asymmetry is precisely why W-2
+defers trail pruning to a considered routine rather than a cron job.
+
+Confirmed U1 requires NO SECURITY REVIEW — export is a download over the existing loopback
+listener, so NFR-01–07 are untouched. The §3.5 download-only decision holds all the way through to
+infrastructure, which was its purpose."
+**Context**: CONSTRUCTION — U1 NFR + Infrastructure Design complete; R7 closed; awaiting approval
+
+---
+
+## U1 Code Generation Complete
+**Timestamp**: 2026-08-25
+**User Input**: "continue"
+**AI Response**: "Recorded approval of U1 NFR and Infrastructure Design. Created the code
+generation plan (26 numbered steps with story traceability) and executed it. Proceeded through the
+Step 7 plan-approval gate as with previous stages, since the design was already fully specified
+across seven approved documents and the plan introduced no new decisions.
+
+CREATED 10 source files, MODIFIED 8, added 7 test files. Suite grew 100 → 184 tests, all passing;
+typecheck and build clean.
+
+LIVE SMOKE TEST against the real account rather than trusting the unit tests: server started,
+migration applied (schema v1), backfill inserted 50 real plays all correctly marked
+`outcome: unknown`, CSV and JSON export streamed with coverage headers, an invalid filter returned
+400 before any output, diagnostics reported all three new steps ok, and — importantly — the
+Host-header guard still returned 403 for evil.com, confirming NFR-01–07 survived the change.
+
+FOUR FINDINGS, all recorded in the code summary:
+
+(1) **The short-track limitation is INTERMITTENT, not systematic — the design documents were
+wrong and have been corrected.** They stated that tracks under ~30s played in full would be
+*consistently* recorded as skipped. Writing the tests disproved it. The final poll of a play lands
+somewhere in the last poll interval, so a fully-played track clears the threshold reliably only
+when duration >= pollInterval / (1 - threshold) = 30s; below that the observed ratio for a 20s
+track lands anywhere in 0.85–1.00, so it is SOMETIMES skipped and sometimes completed. The same
+short track played identically can be recorded differently on different occasions. That is better
+than a uniform bias in one respect and worse in another — an inconsistency is harder to notice and
+harder to correct for than a systematic one. Corrected in business-rules.md, aidlc-state.md,
+stories.md and the functional design plan; both outcomes now pinned by tests including one
+asserting the same duration resolving each way.
+
+(2) **Backfilled plays cannot carry an ISRC, which constrains U2.** Probed the live API rather
+than assuming: `GET /me/player/recently-played` returns NO `external_ids` field at all — the track
+object carries only album, artists, disc_number, duration_ms, explicit, external_urls, href, id,
+is_local, name, preview_url, track_number, type, uri. The 50 backfilled rows therefore have
+isrc = null and U2's label backfill will silently skip them. Not a U1 defect, but recorded as an
+open item so U2 chooses deliberately between an extra GET /tracks/{id} per backfilled row and
+accepting label-less backfilled history.
+
+(3) **A test helper initially modelled an impossible trace.** The first `completeTrail` emitted a
+final observation exactly at the track's duration, which never occurs — polls do not coincide with
+track endings. It made three tests pass that should have failed and hid finding (1). Replaced with
+a helper taking the final gap as a parameter, plus worstCaseTrail and replayTrail. Worth recording
+because a generator that models an impossible state produces confidently green tests about
+behaviour that cannot happen.
+
+(4) **Ratios above 1.0 require a replay, not merely long listening** — progress cannot exceed
+duration, so the unclamped ratio only passes 1.0 when progress resets and advances again. The
+first property test asserted otherwise and failed correctly.
+
+THREE DEVIATIONS FROM DESIGN, each recorded with reasoning: `T | null` instead of a `Maybe<T>`
+wrapper (identical semantics, matches the existing Enrichment shape and nullable columns; the
+wrapper's only extra was a per-field reason that `warnings` already supplies; the rule is enforced
+where it matters, in renderMaybe, and property-tested by P-10); `nowPlayingService` already emitted
+`tick` from the WebSocket work so no change was needed, only a consumer; and `listPlays` returns
+IterableIterator rather than AsyncIterable because node:sqlite is synchronous and an async iterator
+would add ceremony without adding concurrency — streaming and constant memory are unaffected.
+
+Wrote `test/purity.test.ts` implementing LC-6, including meta-tests asserting the detector itself
+still detects — a green check that verifies nothing would be worse than no check. R7 closed in
+compose.yaml with the pinned SHA. Recorded the gitignore exposure caveat directly in .gitignore
+and the README, where someone about to delete the directory might actually see it."
+**Context**: CONSTRUCTION — U1 Code Generation complete; awaiting approval
+
+---
+
+## U1 Build and Test — Three Defects Found, Two Fixed, One Escalated
+**Timestamp**: 2026-08-26
+**User Input**: "lets proceed to build and test"
+**Build Status**: Success (after two fixes)
+**Test Status**: Pass — 193/193, coverage 99.41% line / 93.00% branch
+**AI Response**: "Recorded approval of U1 Code Generation. Ran Build and Test, treating the two
+open verification items from code generation as the point of the stage: live playback recording,
+and the container bind mount.
+
+Checked first whether each was verifiable. Nothing was playing (204 from currently-playing), so
+**live playback recording remains UNVERIFIED and is reported as outstanding rather than assumed**.
+Docker was available, so the container item could be closed — and closing it found real defects.
+
+Wrote `test/historyIntegration.test.ts` (9 scenarios) to cover the units-fit-together question
+that unit tests cannot: tick stream → observer → classifier → repository → export, driven by a
+scripted source so it runs in CI.
+
+THREE DEFECTS FOUND BY ACTUALLY RUNNING THINGS:
+
+(1) **The R7 SHA pin broke the container build.** `git clone --depth 1 --branch <ref>` fails with
+exit 128 on a commit SHA — `--branch` accepts only branch and tag names. Closing R7 in
+Infrastructure Design broke the build in the same change. Fixed with git init + git fetch --depth 1
+origin <ref> + checkout FETCH_HEAD, which handles SHA, branch and tag identically.
+**NEARLY MISSED**: the build ran as `docker compose build 2>&1 | tail -25`, so the reported exit
+code was the PIPE's, not the build's, and it read as success. The failure was visible only in the
+log text. Recorded prominently in the build instructions, because it would have shipped a
+'verified' build that does not build.
+
+(2) **The bind mount was unwritable by the container's runtime user.** The image ran as `node`
+(uid 1000) while the Windows bind mount arrived root-owned 755, producing 'History: DISABLED —
+unable to open database file'. This is EXACTLY the failure the infrastructure design named as most
+likely, and the startup writability probe worked as intended: the app degraded to display-only and
+said so, rather than failing minutes later at the first play boundary behind a healthy-looking UI.
+Fixed with scripts/docker-entrypoint.sh — starts as root, chowns only the mount points, drops to
+node via setpriv (no extra package, and the app keeps PID 1 so SIGTERM still reaches the shutdown
+handler that flushes the in-progress play). VERIFIED AFTERWARDS rather than assumed: /data owned
+1000:1000, and PID 1 is `node dist/server.js` running as Uid 1000 — confirmed via /proc, because
+`docker exec ... id` reports the image default (now root) and would have been misleading evidence.
+
+(3) **ESCALATED, NOT FIXED — the local-only guard rejects all published-port traffic.** A
+pre-existing U0 defect, surfaced only because the container was exercised for the first time.
+`localGuard` requires `req.socket.remoteAddress` to be loopback, but traffic reaching a container
+through a published port arrives from the Docker bridge gateway, so every request is refused with
+'This application only accepts local connections.' Proven in both directions rather than inferred:
+the same /api/health request SUCCEEDS from inside the container ({"status":"ok","mcp":"connected",
+"toolCount":30}) and is REFUSED from the host via the published port. **The containerised
+deployment has therefore never been able to serve its UI.** compose.yaml records the original
+assumption — 'LOCAL_ONLY rejects anything non-loopback that arrives anyway' — which turns out to
+reject the legitimate path too. It fails closed, which is the safe direction.
+
+Deliberately did NOT fix it. Any change relaxes the single control that NFR-07's
+no-authentication decision rests on, which makes it a posture question for the user rather than a
+bug fix — the same reasoning that kept §3.5 route C and wishlist W-1 out of scope. Documented four
+options in security-test-instructions.md WITH the argument on each side, including the genuine
+counter-argument to the recommended in-container relaxation: any container on the same bridge
+network could then reach an app that exposes listening history and playback data without
+authentication. Recommended option A (run on the host, works today at zero cost) until
+containerised deployment is actually wanted.
+
+(4) **An integration test modelled the sparse stream wrongly and passed for the wrong reason.**
+The first version fed the change-suppressed observer a first AND last sample; a real
+change-suppressed stream yields roughly one sample at track start, since signature() excludes
+progress. Corrected — the fixed test now demonstrates the actual defect, that a fully played track
+would be recorded as `unknown`. Second instance in this unit of a test modelling an impossible
+state while looking green; noted in the unit-test instructions as a pattern to watch.
+
+GENERATED five artifacts in `aidlc-docs/construction/build-and-test/`: build-instructions.md,
+unit-test-instructions.md, integration-test-instructions.md, security-test-instructions.md,
+build-and-test-summary.md. Performance tests were SKIPPED with justification rather than
+fabricated: one user, ~200 plays and ~200 write transactions per day, no load to test, and the
+single performance constraint is structural rather than something a load test would reveal.
+
+Marked live playback recording as outstanding with eight specific manual scenarios, so it is a
+named gap rather than a silent one."
+**Context**: CONSTRUCTION — U1 Build and Test complete; one open decision escalated to the user
+
+---
+
+## Capability Probe — Saved-Track ("Liked") Status
+**Timestamp**: 2026-08-26
+**User Input**: "one thing to check... can the API show the 'favorite' status for a track?"
+**AI Response**: "Probed live rather than answering from documentation, given this project's
+record of documentation-derived conclusions being wrong twice.
+
+RESULT: liked status IS available, but only via the list endpoint. `GET /me/tracks/contains` is
+403 Forbidden despite `user-library-read` being confirmed present on the token; `GET /me/tracks`
+returns 200 with 596 saved tracks. `GET /me/albums/contains` is also 403.
+
+IDENTIFIED A GENERALISABLE PATTERN rather than treating this as an isolated fact: this is now the
+THIRD `/contains` endpoint found blocked while its list counterpart works — `/me/following/contains`
+(Part 3), `/me/tracks/contains` and `/me/albums/contains` (Part 4). Development Mode appears to
+restrict the membership-check family generally while leaving list endpoints open. Recorded as a
+rule of thumb because it predicts behaviour for endpoints not yet tried, and because the workaround
+is always identical: fetch the set once, cache it, resolve membership locally. Noted the irony that
+the restricted endpoints are the cheaper ones — blocking them forces clients to download whole
+collections to answer a one-bit question.
+
+COST: 596 saved tracks = 12 requests at limit=50, cached with a TTL — the same shape as the
+existing FollowedArtistsCache, so a track change would cost zero additional API calls.
+
+ARGUED WHY THIS MATTERS MORE THAN FOLLOW STATUS: liking is an explicit PER-TRACK positive
+judgement, whereas following an artist is a coarser signal about a body of work. For the promotion
+hypothesis (R1) it is also a CONTROL VARIABLE — an already-liked track is self-evidently
+profile-matched rather than promoted, so it separates 'Spotify played me something I already chose'
+from 'Spotify introduced something new', which is the population the hypothesis is actually about.
+
+SURFACED A SECOND-ORDER SIGNAL that would otherwise be lost: a track not liked when it started
+playing and liked shortly afterwards was almost certainly liked BECAUSE of that play. That
+transition is arguably the strongest positive signal the Spotify API can yield — stronger than a
+completion, because a completion can be passive and a like cannot. Capturing it needs the
+before-value snapshotted per play (which the existing snapshot pattern already provides) plus a
+later comparison against the refreshed set.
+
+Recorded as research-findings.md Part 4 and flagged in aidlc-state.md as a DECISION NEEDED —
+whether to add `liked` as an enrichment field, a PlayRecord column via migration 002, and a rule
+field. Not added unilaterally: the user asked whether the capability exists, which is a question,
+not an instruction to build it."
+**Context**: CONSTRUCTION — capability probe; scope decision pending
+
+---
+
+## U1 Live-Verified; Liked-Transitions Agreed for U2; Session Wrap-Up
+**Timestamp**: 2026-08-26
+**User Input**: "I agree regarding 'kept-unliked' - analytic value is significantly less than the
+active change values. / I agree to include this in U2. / I have now played a number of tracks and
+the app appears to be working flawlessly. I think we can say that U1 is running well (though it's
+not yet containerized and deployed on Rancher Desktop). / Some Wrapup tasks: -It think it's worth
+taking a look at the database to look for expected behavior. -Update the project documentation for
+current state, record the recommended updates from our current discussion. (We will start a fresh
+claude session so make sure you can restart cleanly) -Project Git Commit"
+**AI Response**: "Recorded two decisions: liked-status transitions go into U2 with the four-state
+model plus `unknown`, and `kept-unliked` is treated as the reference level rather than an observed
+choice.
+
+INSPECTED THE DATABASE DIRECTLY rather than accepting 'working flawlessly' on trust — the user
+asked for expected-behaviour checking, and the value of the exercise is in what it might
+contradict. 68 plays (18 live, 50 backfilled), 0 counted gaps, max observation gap 3–4 s across
+every play confirming no missed polls. Verified: ISRC and follow status present on EVERY live play
+(unknownIsrc = 50 = exactly the backfilled rows), 12 completions at ratios 0.910–0.995, 3 skips all
+attributed `skipSource = user`, pause correctly producing `unknown` rather than `skipped`, trail
+length proportional to duration (320 s track → 104 observations ≈ 320/3), and
+`listenedMs == maxProgressMs` throughout, which is exactly right given no rewinds occurred. Also
+triggered an FR-56 snapshot manually rather than leaving the mechanism untested, since the 24 h
+timer had not fired: 68 rows written with the coverage header, dated filename correct.
+
+FOUND A SUBSTANTIVE ISSUE THE SUMMARY STATISTICS HID. Sorting live plays by *seconds remaining at
+play end* rather than by ratio revealed a sharply bimodal distribution: plays end either ≤ 23 s
+from the end (14 of 17) or ≥ 194 s from the end (3 of 17), with a 178-second gap containing
+nothing. The genuine rejections are unmistakable and nowhere near the boundary — but the 0.90
+threshold cuts straight through the *dense* cluster, separating 'moved on with 16 s left'
+(completed) from 'moved on with 20 s left' (skipped). A four-second difference decides a
+categorical outcome in the region where behaviour is most concentrated and least meaningful.
+6 of 17 live plays sit within ±0.03 of the threshold, and two tracks skipped after roughly 88% are
+recorded as rejections — false negatives in the very outcome variable the promotion hypothesis is
+tested against.
+
+Noted that a fixed ~30 s tail window would separate this listener's behaviour with 178 s of margin,
+which is option D from U1 FD Q1 — recommended then and not chosen. Presented it as MEASUREMENT
+rather than vindication: the earlier discussion had no data, and now there is some. Did NOT change
+it: the threshold was an explicit user decision and 18 plays is a small sample. Recommended
+revisiting at a few hundred plays, and recorded that it is fully correctable retroactively because
+trails are retained — the first time Application Design Q1 = C has actually paid off.
+
+Also recorded two secondary observations that would otherwise mislead an analyst: a brief false
+start creates its own very-low-ratio `unknown` record (`.CoDA.` at 0.022 with 2 observations),
+distinguishable by `observationCount`; and a long pause splits one listen into two records
+(`Duality`). And one honest gap: rewind/replay has NEVER fired against real listening —
+`rewound = false` on all 18 plays — so that path remains unit- and property-tested only.
+
+CREATED `CLAUDE.md` for clean session restart, since none existed. It orients a fresh session on
+what the project actually is (a hypothesis-testing instrument, not a now-playing display), states
+the single most important working rule — probe the live API, do not reason from documentation,
+with the three times that has caught an error — and lists the non-obvious traps: tick-vs-change,
+the purity constraint, never clamping the ratio, null-means-unknown, and checking build exit codes
+directly rather than through a pipe.
+
+CREATED `construction/u1-listening-history/live-verification.md` with the full evidence, closing
+the verification item left open at Build and Test.
+
+Updated aidlc-state.md to current: U1 complete and live-verified, U2 next, the threshold finding,
+and the liked-transition decision with what U2 must now deliver."
+**Context**: CONSTRUCTION — U1 complete and live-verified; documentation prepared for a fresh session

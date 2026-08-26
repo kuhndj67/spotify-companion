@@ -275,13 +275,78 @@ Writing these was not a formality — the property tests found four real defects
 
 Each is now pinned by an example-based regression test naming the shrunk case.
 
+## Listening history (U1)
+
+Every track that plays is recorded automatically: what it was, when, and whether you let it play
+or skipped it. This is the dataset the project exists to build — it is what makes the
+"is Spotify pushing promoted tracks at me?" question answerable later.
+
+### Where it lives
+
+```
+data/
+├── history.db          SQLite; also -wal and -shm alongside it
+└── snapshots/          dated CSV backups, newest 14 kept
+```
+
+`data/` is gitignored and bind-mounted into the container, so `compose up --build` never destroys
+it.
+
+> ⚠️ **This is the only data here that cannot be regenerated.** Code comes back from git,
+> enrichment from Spotify, labels from MusicBrainz — months of play records come back from
+> nowhere. Snapshots live in the same directory, so the database and its backups share a single
+> deletion event, and being gitignored makes them *more* exposed to `git clean -xdf`, not less.
+> Set `SNAPSHOT_DIR` to somewhere outside the project if that bothers you.
+
+### Outcomes
+
+Three values: `completed`, `skipped`, `unknown`.
+
+A play counts as **completed** when listened time reaches **90%** of the track's duration.
+Listened time is the sum of forward progress, so rewinding to re-hear something adds to it — and
+a track played twice in a row produces one record with a ratio near 2.0. The ratio is deliberately
+not capped at 1.0; that is the repeat-listen signal.
+
+Anything else that is not a below-threshold track change — paused and never resumed, device
+switched off, app restarted mid-track — is `unknown` rather than a guess.
+
+> **Known limitation.** The final poll of a play lands up to one interval before the track ends,
+> so a fully-played track is only guaranteed to clear 90% when it is at least ~30 seconds long.
+> Shorter tracks are *sometimes* recorded as skipped, depending on where that last poll falls —
+> the same interlude can resolve either way on different plays. Every play keeps its raw
+> observation trail, so these records can be recomputed later without re-collecting anything.
+
+### Export
+
+The **Export** button downloads the full history as CSV or JSON, or:
+
+```
+curl -OJ 'http://127.0.0.1:3000/api/history/export?format=csv'
+curl -OJ 'http://127.0.0.1:3000/api/history/export?format=json&since=2026-08-01T00:00:00Z'
+```
+
+Analysis happens in whatever tool you prefer — this app collects and exports, it does not analyse.
+Exports carry every recorded field plus coverage counts, and **unknown values render as the literal
+token `unknown`**, never as blanks or zeros. That matters: missing data here is correlated with
+what is being measured, so an unknown that looks like an empty cell would hide a bias rather than
+show it.
+
+There is deliberately no data API. Serving a containerised dashboard would mean widening the
+local-only guard that the no-password setup depends on — see `aidlc-docs` §5.1 (W-1). A dashboard
+installed *on the host* reaches `127.0.0.1` and works today with no change.
+
 ## Known gaps
 
-- **Not yet run against a live Spotify account.** The parser is written against the upstream
-  source template. It needs verification with real output, particularly the *nothing playing*
-  case, which the upstream code paths suggest but which hasn't been observed.
-- **Enrichment layer not built** — pending clarification questions CQ1 and CQ2.
 - **No integration test** for the Express/WebSocket layer or the MCP subprocess spawn.
+- **U1 not yet verified against live playback.** The classifier and repository are covered by
+  tests, but recording during a real listening session — and the `./data` bind mount working
+  under Rancher Desktop — are on the Build and Test checklist.
+- **Not yet built** (requirements agreed 2026-08-25, see
+  `aidlc-docs/inception/requirements/requirements.md`): MusicBrainz label resolution (FR-12–16,
+  U2), the **rules engine** (FR-24–45, U3/U4) — user-authored rules over any known track field —
+  and playback control (FR-46–48, U5).
+- **`node:sqlite` is experimental** in Node 22. Contained behind `HistoryRepository`, so
+  swapping to `better-sqlite3` or Postgres is one file.
 - **`MCP_SERVER_REF: main` is unpinned** in `compose.yaml`. Pin to a commit SHA once verified.
 - **Upstream declares no license** — accepted for personal use, but it blocks open-sourcing
   this project later (Q8).

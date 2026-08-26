@@ -68,7 +68,9 @@ C) **Drop MCP** — call the Spotify Web API directly throughout. Simplest possi
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: A — resolved implicitly on 2026-08-24 by the instruction to build the read items.
+Enrichment is impossible through MCP alone, so building it necessarily implied the hybrid.
+Confirmed retrospectively; the hybrid is built and verified against live Spotify.
 
 ---
 
@@ -87,7 +89,20 @@ D) **Add external sources and build my own preference model** — record listeni
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: B, narrowed — **MusicBrainz, and pull only the label / signed-vs-independent
+signal.** Not genres, not play counts.
+
+**The reason, which reframes the feature:** the goal is not trivia about the artist. It is to
+estimate **the likelihood that a given track was *promoted* into my feed rather than selected
+because it fits my profile.** The working hypothesis is that signed-artist placements are
+disproportionately paid promotion, and are therefore more likely to be tracks I won't enjoy.
+Signed-vs-independent is a *proxy variable for promotional placement*, not an end in itself.
+
+**Additional user story:** to collect the dataset needed for that statistical analysis, the app
+must also record what Spotify actually plays for me. This needs a database (or a schema-aware
+file format such as JSON Schema-validated JSON), with a schema recording, per play: the
+collected information about the track, a timestamp, and **whether the track played to
+completion or was skipped.**
 
 ---
 
@@ -104,7 +119,9 @@ C) **Display + enrichment + a general rules engine** — auto-skip by age is jus
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: C — **general rules engine.** Auto-skip by age is the first rule, not the only one;
+also genre-based, artist-based and unfollowed-artist rules. Design the rule evaluation as a
+first-class concept rather than hard-coding the age check.
 
 ---
 
@@ -122,7 +139,9 @@ C) **Not yet** — keep it stateless; revisit when preference scoring is actuall
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: A — **now.** Persistence lands in Unit 1 and starts accumulating listening history
+immediately. Reinforced by the CQ2 answer: the promotion-likelihood analysis is a statistical
+model over play history, so every day without recording is a day of lost training data.
 
 ---
 
@@ -138,7 +157,8 @@ C) No — and I'd want to reconsider the project in that case
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: A — **Yes, Premium, ready to proceed.** The hard prerequisite is satisfied; this risk
+is closed.
 
 ---
 

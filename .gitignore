@@ -16,6 +16,14 @@ spotify-config.json
 .env
 .env.local
 
+# Listening history and its snapshots (U1).
+#
+# NOTE: this directory holds the only data in the project that cannot be regenerated. Being
+# gitignored makes it invisible to git and therefore MORE exposed to `git clean -xdf`, not less.
+# Snapshots live here too, so database and backups share a single deletion event. Point
+# SNAPSHOT_DIR outside the project tree if that matters to you.
+data/
+
 *.log
 npm-debug.log*
 .DS_Store

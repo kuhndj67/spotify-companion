@@ -50,6 +50,7 @@ function track(overrides: Partial<NowPlaying> = {}): NowPlaying {
 function enrichment(overrides: Partial<Enrichment> = {}): Enrichment {
   return {
     trackId: 'track-1',
+    isrc: 'USUM71703861',
     releaseDate: '2020-01-01',
     releaseDatePrecision: 'day',
     releaseYear: 2020,

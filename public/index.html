@@ -15,7 +15,19 @@
       <section id="card" class="card" data-state="loading">
         <header class="card-head">
           <p class="status" id="status">Connecting&hellip;</p>
-          <button id="diag-open" class="ghost" type="button">Diagnostics</button>
+          <button
+            id="export-open"
+            class="ghost"
+            type="button"
+            data-testid="history-export-button"
+            title="Download listening history"
+          >Export</button>
+          <button
+            id="diag-open"
+            class="ghost"
+            type="button"
+            data-testid="diagnostics-open-button"
+          >Diagnostics</button>
         </header>
 
         <!-- Blurred cover, sits behind the card content. Purely decorative. -->

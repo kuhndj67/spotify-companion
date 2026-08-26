@@ -46,10 +46,32 @@ async function step(
   }
 }
 
+/** U1 subsystems, passed in so diagnostics stays usable when history failed to start. */
+export interface HistoryDiagnosticsInput {
+  repository: {
+    schemaVersion: number;
+    coverage(): { totalPlays: number; countedGaps: number; unknownIsrc: number };
+  } | null;
+  observerStats: {
+    recorded: number;
+    gaps: number;
+    degraded: boolean;
+    lastRecordedAt: string | null;
+  } | null;
+  snapshotStatus: {
+    lastRunAt: string | null;
+    lastRowCount: number | null;
+    lastError: string | null;
+  } | null;
+  startupError: string | null;
+  dbPath: string;
+}
+
 export async function runDiagnostics(
   mcp: SpotifyMcpClient,
   api: SpotifyWebApiClient,
   enrichment: EnrichmentService,
+  history?: HistoryDiagnosticsInput,
 ): Promise<DiagnosticsReport> {
   const steps: DiagnosticStep[] = [];
   let trackId: string | null = null;
@@ -179,6 +201,49 @@ export async function runDiagnostics(
       return `Released ${result.releaseDate ?? '?'} · age ${result.ageYears ?? '?'}y · following=${result.following}`;
     }),
   );
+
+  // -- U1: listening history --------------------------------------------------
+  // History is optional to the app's core function, so a missing database reports `skip`
+  // rather than `fail` — the same convention the rest of this report uses. Only an active
+  // fault (degraded recording, a failed snapshot) is a failure.
+  if (history) {
+    steps.push(
+      await step('Database', async () => {
+        if (!history.repository) {
+          if (history.startupError) throw new Error(history.startupError);
+          return null;
+        }
+        return `${history.dbPath} · schema v${history.repository.schemaVersion}`;
+      }),
+    );
+
+    steps.push(
+      await step('Listening history', async () => {
+        if (!history.repository || !history.observerStats) return null;
+        const coverage = history.repository.coverage();
+        if (history.observerStats.degraded) {
+          throw new Error(
+            `Recording degraded — ${history.observerStats.gaps} gap(s) counted. Display unaffected.`,
+          );
+        }
+        return (
+          `${coverage.totalPlays} play(s) recorded · ` +
+          `last ${history.observerStats.lastRecordedAt ?? 'none yet'} · ` +
+          `${coverage.unknownIsrc} without ISRC · ${coverage.countedGaps} gap(s)`
+        );
+      }),
+    );
+
+    steps.push(
+      await step('Snapshots', async () => {
+        if (!history.snapshotStatus) return null;
+        if (history.snapshotStatus.lastError) throw new Error(history.snapshotStatus.lastError);
+        return history.snapshotStatus.lastRunAt
+          ? `last ${history.snapshotStatus.lastRunAt} · ${history.snapshotStatus.lastRowCount} row(s)`
+          : 'scheduled; none written yet';
+      }),
+    );
+  }
 
   return {
     ranAt: new Date().toISOString(),

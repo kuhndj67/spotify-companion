@@ -343,6 +343,140 @@ Still unavailable from Spotify: genre, label/independent status, play counts, au
 
 ---
 
+---
+
+# Part 4: Saved-Track ("Liked") Status — Empirical Probe (2026-08-26)
+
+Prompted by the question *"can the API show the favourite status for a track?"*. Probed live
+rather than answered from documentation, given Part 3's record.
+
+## Result: available, but only through the list endpoint
+
+| Endpoint | Status | Detail |
+|---|---|---|
+| `GET /me/tracks/contains?ids={id}` | ❌ **403 Forbidden** | Despite `user-library-read` present on the token |
+| `GET /me/tracks?limit=n` | ✅ **200** | Returns the saved set — **596 tracks** on this account |
+| `GET /me/albums/contains?ids={id}` | ❌ **403 Forbidden** | Same restriction |
+
+Token scopes confirmed at probe time include `user-library-read` and `user-library-modify`, so
+this is an endpoint-level restriction, not a scope problem.
+
+## The generalisable pattern
+
+This is the **third** `/contains` endpoint found blocked while its list counterpart works:
+
+| Blocked | Working alternative | Found |
+|---|---|---|
+| `GET /me/following/contains` | `GET /me/following` | Part 3 |
+| `GET /me/tracks/contains` | `GET /me/tracks` | Part 4 |
+| `GET /me/albums/contains` | `GET /me/albums` (untested, expected 200) | Part 4 |
+
+**Development Mode appears to restrict the membership-check family generally, while leaving the
+list endpoints open.** That is worth stating as a rule of thumb: it predicts behaviour for
+endpoints not yet tried, and it means the workaround is always the same — fetch the set once,
+cache it, resolve membership locally.
+
+Ironically the restricted endpoints are the *cheaper* ones. Blocking them forces clients to
+download entire collections to answer a one-bit question.
+
+## Cost of the workaround
+
+596 saved tracks = **12 requests** at `limit=50`, cached with a TTL — the same shape as the
+existing `FollowedArtistsCache`, which already does exactly this for 42 followed artists.
+
+Refreshing periodically rather than per track means a track change costs **zero** additional API
+calls, as with follow status.
+
+## Why this matters more than follow status
+
+**Liking a track is an explicit, per-track positive judgement.** Following an artist is a coarser
+signal — it says something about a body of work, not about the track playing now.
+
+For the promotion hypothesis (R1) it is also a **control variable**: an already-liked track is
+self-evidently profile-matched rather than promoted, so liked status separates "Spotify played me
+something I already chose" from "Spotify introduced something new" — which is the population the
+hypothesis is actually about.
+
+## A subtlety worth designing around
+
+Liked status must be **snapshotted at play time**, as `following` already is. But there is a
+second-order signal hiding here:
+
+> **A track that was not liked when it started playing, and *is* liked shortly afterwards, was
+> almost certainly just liked because of that play.**
+
+That transition is arguably the strongest positive signal the Spotify API can yield — stronger
+than a completion, because completion can be passive and liking cannot. Capturing it needs the
+before value stored per play (which the snapshot gives) plus a later comparison against the
+refreshed set.
+
+Not in scope for U1; recorded so the option is not lost.
+
+---
+
+## Part 4b: Liked-status transitions — the four-state model (2026-08-26)
+
+The user observed that liked status across a play forms a natural enumeration: the 2×2 over
+*(liked at start, liked at end)*. That is exhaustive and correct.
+
+| Start | End | State | Signal |
+|---|---|---|---|
+| ✗ | ✓ | **`liked-during`** | **Strongest positive available.** An explicit, deliberate act caused by this play |
+| ✓ | ✗ | **`unliked-during`** | **Strongest negative available** — stronger than a skip, which can be idle impatience. Removing a track is deliberate |
+| ✓ | ✓ | `kept-liked` | Positive but passive. Interesting mainly *in combination* — liked yet skipped is a real signal about mood or overplay |
+| ✗ | ✗ | `kept-unliked` | **The null case.** See the caution below |
+| — | — | `unknown` | Needed as a fifth member: the liked set may be unavailable, so either end can be unknown (project tri-state discipline) |
+
+### ⚠️ The two static states are not symmetric in informativeness
+
+`kept-liked` and `kept-unliked` look like a matched pair and are not one.
+
+The user's framing — *"indicating I chose not to change the status"* — holds well for `kept-liked`:
+the track was in the library, it stayed there, and a skip against that background says something.
+
+It **over-reads** `kept-unliked`. That state covers the overwhelming majority of plays, nearly all
+of which involve no like/unlike consideration whatsoever. **Absence of an action is not evidence of
+a decision.** Treating it as one would import a deliberate-choice interpretation into the baseline
+population of a statistical model — precisely the kind of error that is invisible once the data is
+aggregated.
+
+Recommendation: keep the four states, but treat `kept-unliked` as the *reference level* in any
+analysis rather than as an observed choice.
+
+### Detectability is also asymmetric — and this shapes the implementation
+
+Probed 2026-08-26: **`GET /me/tracks` is ordered most-recently-saved first**, and every item
+carries `added_at` with second precision.
+
+```
+0  2026-08-25T01:41:24Z  Mason Jar
+1  2026-08-25T01:36:03Z  HOT!
+2  2026-08-25T01:26:06Z  Revenge And a Little More
+...
+593 (of 596)  2025-03-12T14:25:13Z  M.I.A
+```
+
+| Transition | Cost to detect | Attribution quality |
+|---|---|---|
+| **`liked-during`** | **1 request** — page 1 only; a new like appears at position 0 | **Definitive.** `added_at` falling inside the play's window proves the like belongs to that play, rather than being inferred |
+| **`unliked-during`** | Expensive — unliking leaves **no tombstone and no timestamp**. The row simply vanishes | Imprecise: only "sometime since the last refresh" |
+
+**The cheap trick for unlikes**: an unlike is only *possible* when `likedAtStart` was true. The
+cache knows that track's `added_at`, hence its approximate rank in the list, so a targeted
+`offset` probe of a small window confirms presence or absence in ~1–2 requests rather than a
+full 12-request diff.
+
+Net cost: **1 request per play** in the common case, 2–3 when the played track was already liked.
+That is affordable, where a full-set refresh per play (12 requests × ~200 plays/day) would not be.
+
+### Design consequence
+
+Store the two booleans (`likedAtStart`, `likedAtEnd`) as **evidence**, and derive the enumeration
+from them — the same separation of observation from judgement used for play outcomes. The
+difference: unlike an observation trail, these are point-in-time facts that cannot be
+reconstructed later, so they must be captured correctly at the time. Recording `added_at` alongside
+gives the transition an exact timestamp rather than an inference.
+
 ## Sources
 
 - [Spotify: Introducing some changes to our Web API (Nov 2024)](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)

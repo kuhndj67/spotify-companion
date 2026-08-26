@@ -77,6 +77,13 @@ interface SpotifyTrack {
     images?: SpotifyImage[];
   };
   external_urls?: { spotify?: string };
+  /**
+   * Verified live on 2026-08-25 to survive Development Mode's field stripping: a real response
+   * returned `{"isrc":"USUM71703861"}`. This is the join key to MusicBrainz (U2), and it arrives
+   * on the `GET /tracks/{id}` call the chain already makes — so label resolution costs zero
+   * additional Spotify requests.
+   */
+  external_ids?: { isrc?: string };
 }
 
 interface FollowedArtistsPage {
@@ -149,6 +156,12 @@ class FollowedArtistsCache {
 
 export interface Enrichment {
   trackId: string;
+  /**
+   * International Standard Recording Code. Free on the existing track lookup, and the join key
+   * MusicBrainz needs in U2 — recorded with every play from U1 so labels can be backfilled
+   * retrospectively rather than only from the day U2 ships.
+   */
+  isrc: string | null;
   releaseDate: string | null;
   releaseDatePrecision: string | null;
   releaseYear: number | null;
@@ -247,6 +260,7 @@ export class EnrichmentService {
 
     const result: Enrichment = {
       trackId,
+      isrc: null,
       releaseDate: null,
       releaseDatePrecision: null,
       releaseYear: null,
@@ -271,6 +285,7 @@ export class EnrichmentService {
     });
 
     if (track) {
+      result.isrc = track.external_ids?.isrc ?? null;
       result.releaseDate = track.album?.release_date ?? null;
       result.releaseDatePrecision = track.album?.release_date_precision ?? null;
       result.releaseYear = parseYear(track.album?.release_date);

@@ -275,6 +275,26 @@ el('diag-open').addEventListener('click', () => {
 el('diag-close').addEventListener('click', () => ui.diag.close());
 el('diag-run').addEventListener('click', runDiagnostics);
 
+/**
+ * Export download (US-25).
+ *
+ * Navigates rather than fetching: the response carries `Content-Disposition: attachment`, so the
+ * browser streams it straight to disk. Buffering it through `fetch` into a Blob would defeat the
+ * streaming the server does and could hold a year of history in memory for no benefit.
+ */
+el('export-open').addEventListener('click', () => {
+  const format = window.prompt('Export format — csv or json?', 'csv');
+  if (format === null) return;
+
+  const normalised = format.trim().toLowerCase();
+  if (normalised !== 'csv' && normalised !== 'json') {
+    window.alert(`Unsupported format "${format}". Use csv or json.`);
+    return;
+  }
+
+  window.location.href = `/api/history/export?format=${normalised}`;
+});
+
 // -- Transport --------------------------------------------------------------
 
 function connect() {

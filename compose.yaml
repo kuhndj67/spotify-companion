@@ -9,10 +9,12 @@ services:
     build:
       context: .
       args:
-        # Pin this to a commit SHA rather than a branch once the setup is verified working —
-        # the upstream repo declares no license and no release tags, so `main` can move
-        # underneath you and change the getNowPlaying output the parser depends on.
-        MCP_SERVER_REF: main
+        # Pinned 2026-08-25, closing risk R7. Upstream declares no license and no release tags,
+        # so `main` can move underneath you and silently change the getNowPlaying output the
+        # parser depends on. Pinning also makes the CI Docker-build job a real drift detector:
+        # against `main` a failure was ambiguous, against a SHA it is unambiguously ours.
+        #   7b5fde63 (2026-08-21) "fix: add offset param to getMyPlaylists (#72)"
+        MCP_SERVER_REF: 7b5fde6309a52a7874768c63deda7880ee85935b
     image: spotify-now-playing:0.1.0
     container_name: spotify-now-playing
 
@@ -33,10 +35,29 @@ services:
       # this app reads it. The app never writes, to avoid racing the MCP server's rewrites.
       SPOTIFY_CONFIG_PATH: /opt/spotify-mcp/spotify-config.json
 
+      # -- U1: listening history ------------------------------------------------
+      HISTORY_DB_PATH: /data/history.db
+      # Ratio of listened time to duration at or above which a play counts as completed.
+      # Changing this does not rewrite existing verdicts — stored trails allow the change to be
+      # applied retroactively via reclassification rather than only going forward.
+      COMPLETION_THRESHOLD: "0.90"
+      # FR-56: automatic dated snapshots. Listening history is the only artefact here that
+      # cannot be regenerated, and relying on remembering to export fails silently.
+      SNAPSHOT_DIR: /data/snapshots
+      SNAPSHOT_INTERVAL_HOURS: 24
+      SNAPSHOT_KEEP: 14
+
     volumes:
       # Question 6, option A: authenticate once on the host, mount the token file in.
       # The MCP server rewrites this file when it refreshes the access token, so it is
       # mounted read-write.
       - ./secrets/spotify-config.json:/opt/spotify-mcp/spotify-config.json:rw
+
+      # Listening history (NFR-11): survives `compose up --build`.
+      #
+      # The DIRECTORY is mounted, not the file. SQLite's -wal and -shm siblings must live beside
+      # the database or crash recovery breaks — copying the single-file secrets mount pattern
+      # above would be a subtle and hard-to-diagnose mistake.
+      - ./data:/data:rw
 
     restart: unless-stopped

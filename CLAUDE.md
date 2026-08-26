@@ -127,6 +127,12 @@ A failing build once read as success here.
 
 ---
 
+## Git workflow
+
+**Commit directly to `main`.** Single developer, single dev machine, so there are no
+multi-developer merge concerns and no reason for feature branches — they only add a merge step.
+Remote is `origin` (GitHub). Push when asked.
+
 ## Commands
 
 ```bash

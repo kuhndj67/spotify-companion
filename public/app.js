@@ -48,6 +48,27 @@ function formatTime(ms) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
+/**
+ * The track's position within its release: "#3 of 12 tracks".
+ *
+ * Both halves are optional — Spotify does not always supply either — so each combination is
+ * handled rather than assumed:
+ *
+ *   3, 12   -> "#3 of 12 tracks"
+ *   3, 1    -> "#3 of 1 track"      (singular; a "1 tracks" defect was fixed here once before)
+ *   3, null -> "#3"                 ("of ?" would be worse than saying less
+ *   null, 12-> "12 tracks"          (the total is still a fact worth showing)
+ *   null,null -> em dash
+ */
+function formatTrackPosition(trackNumber, totalTracks) {
+  const plural = (n) => `${n} track${n === 1 ? '' : 's'}`;
+
+  if (trackNumber && totalTracks) return `#${trackNumber} of ${plural(totalTracks)}`;
+  if (trackNumber) return `#${trackNumber}`;
+  if (totalTracks) return plural(totalTracks);
+  return DASH;
+}
+
 function setState(state, statusText) {
   ui.card.dataset.state = state;
   ui.status.textContent = statusText;
@@ -140,11 +161,14 @@ function renderEnrichment(data, albumName) {
     data.following === null ? DASH : data.following ? 'Yes' : 'No';
   ui.following.dataset.flag = data.following === null ? '' : data.following ? 'yes' : 'no';
 
-  const trackCount = data.totalTracks
-    ? ` · ${data.totalTracks} track${data.totalTracks === 1 ? '' : 's'}`
-    : '';
-  ui.albumType.textContent = data.albumType ? `${data.albumType}${trackCount}` : DASH;
-  ui.trackNo.textContent = data.trackNumber ? `#${data.trackNumber}` : DASH;
+  // "Release type" is the album *type* — album, single, compilation. It used to be labelled
+  // "Album", which read as though it should show the album name; the name is already in the
+  // Playing section above, so duplicating it here would be redundant as well as confusing.
+  ui.albumType.textContent = data.albumType ?? DASH;
+
+  // Track position reads as one fact — "#3 of 12 tracks" — rather than a bare "#3" with the
+  // total stranded on a different row.
+  ui.trackNo.textContent = formatTrackPosition(data.trackNumber, data.totalTracks);
   ui.explicit.textContent = data.explicit === null ? DASH : data.explicit ? 'Yes' : 'No';
 
   // Build via DOM rather than innerHTML — this text comes from an API response.

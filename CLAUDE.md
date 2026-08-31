@@ -50,15 +50,23 @@ what was rejected.
 > **Probe the live API. Do not reason from documentation.**
 
 Spotify's Development Mode has been restricted twice since 2024, and the docs do not reflect it.
-This project has drawn wrong conclusions from documentation **three times**, each caught only by a
+This project has drawn wrong conclusions from documentation **four times**, each caught only by a
 live probe:
 
 - `GET /me/following/contains` → **403** despite a valid scope
 - `GET /artists/{id}` → returns **no `genres` field at all**
 - `GET /me/tracks/contains` → **403**, while `GET /me/tracks` works
+- MusicBrainz `GET /ws/2/isrc/{id}?inc=releases` → **200 with the `inc` silently ignored**
 
-**Pattern**: Development Mode blocks the `/contains` membership-check family while leaving list
-endpoints open. Workaround is always the same — fetch the set once, cache it, resolve locally.
+**Pattern (Spotify)**: Development Mode blocks the `/contains` membership-check family while
+leaving list endpoints open. Workaround is always the same — fetch the set once, cache it, resolve
+locally.
+
+⚠️ **The fourth one is the dangerous shape.** The first three failed loudly. MusicBrainz returned
+**200 and plausible-looking data** — 19 ISRCs that appeared to have no releases at all. It read as
+a coverage finding, not a bug, and was caught only by checking a track *known* to have 44 releases.
+**A wrong request shape is indistinguishable from absent data.** When a probe says "no data",
+verify against a case where you know what the answer must be.
 
 Credentials are at `secrets/spotify-config.json`; probe scripts follow the pattern in
 `research-findings.md`.
@@ -73,12 +81,12 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 |---|---|---|
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
-| U2 Label enrichment | 2 | ⬅️ **NEXT** |
+| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — MusicBrainz probed live ×2; **Functional Design complete, awaiting approval** |
 | U3 Rule model (pure core) | 3 | Pending |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-193 tests passing · coverage 99.41% line / 93.00% branch · 68 plays recorded.
+193 tests passing · coverage 99.41% line / 93.00% branch · 71 plays recorded.
 
 ### Phases are sequenced by risk containment
 
@@ -121,7 +129,8 @@ A failing build once read as success here.
 |---|---|---|
 | 1 | **Container deployment is blocked** — `localGuard` requires a loopback peer, but published-port traffic arrives from the Docker bridge gateway, so every request is refused. Pre-existing U0 defect. **Security-posture decision for the user**; options in `construction/build-and-test/security-test-instructions.md`. Works today via `npm start` on the host | User |
 | 2 | **Liked-status transitions — agreed for U2.** Four states + `unknown`; `kept-unliked` is the reference level, not an observed choice. Design in `research-findings.md` Part 4b | U2 |
-| 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`, so U2's label backfill will skip them unless it fetches per track | U2 |
+| 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`. They *do* carry `track_id`, so ISRC is recoverable at **47 one-off `GET /tracks/{id}` calls**. Spend them or not → U2 FD **Q7** | U2 |
+| 3b | **MusicBrainz label coverage is 58%, and the misses are recency-biased** (pre-2022 100%, 2022+ 43%) — i.e. concentrated on the recent independent releases R1 is about. Measured 2026-08-26, `research-findings.md` Part 5 | U2 |
 | 4 | **Completion threshold may misclassify outro skips.** 6 of 17 live plays sit within ±0.03 of 0.90. Retroactively correctable. Revisit with a few hundred plays | Later |
 | 5 | R11 — queue lookahead unverified during playback | U5 |
 

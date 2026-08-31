@@ -477,6 +477,240 @@ difference: unlike an observation trail, these are point-in-time facts that cann
 reconstructed later, so they must be captured correctly at the time. Recording `added_at` alongside
 gives the transition an exact timestamp rather than an inference.
 
+---
+
+# Part 5: MusicBrainz — first live probe (2026-08-26)
+
+**Until this probe, every U2 assumption was documentation-derived.** MusicBrainz had never been
+called by this project. Probed against the **19 distinct ISRCs actually in `history.db`** — real
+listening, not a curated sample. Raw responses retained.
+
+`User-Agent: SpotifyNowPlaying-Research/0.1 ( <email> )` (NFR-14), 1.2 s spacing (NFR-15).
+**47 requests total.** No rate-limit rejection, no API key needed. Latency 0.1–6.7 s, highly
+variable — confirming NFR-16 (never on the display path) is a real constraint, not a precaution.
+
+## Correction 4: `inc=` is silently ignored on the ISRC endpoint
+
+The obvious first attempt — `GET /ws/2/isrc/{isrc}?inc=releases` — returns **200 with recordings
+and no releases**. Not an error, not a warning: the parameter is dropped. Nineteen ISRCs came back
+looking like "MusicBrainz has no releases for anything I listen to", which is false.
+
+**A wrong request shape here is indistinguishable from absent data.** Had this not been checked
+against a track known to have 44 releases, it would have been recorded as a coverage finding.
+Fourth instance of the documentation-vs-reality pattern in this project, and the first where the
+wrong answer was *plausible* rather than an error code.
+
+### The chain that works — 2 requests per track
+
+```
+1.  GET /ws/2/isrc/{isrc}                       -> recording MBID   (404 if unknown)
+2.  GET /ws/2/release?recording={mbid}&inc=labels&limit=100
+                                                -> releases, each with label-info
+```
+
+Step 2 is a **browse**, not a lookup, and `inc=labels` *is* honoured there. This matches R11's
+"2 MusicBrainz calls" estimate exactly. Label classification adds `GET /ws/2/label/{mbid}?
+inc=label-rels`, but labels are a small recurring set — cache by label MBID, not per track.
+
+## Coverage — measured, not estimated
+
+| Stage | Result |
+|---|---|
+| ISRC resolves to a recording | **13 / 19 — 68.4 %** |
+| …and yields a **named** label | **11 / 19 — 57.9 %** |
+| Resolved, but label is `[no label]` | 2 (Imminence, Red Leather) |
+| ISRC unknown to MusicBrainz (404) | 6 |
+
+### ⚠️ R2 is confirmed on real data, and the bias is recency
+
+| Spotify release year | Label resolved |
+|---|---|
+| 2002 – 2021 | **5 / 5 — 100 %** |
+| 2022 – 2026 | **6 / 14 — 43 %** |
+
+The gap is not random. Audioslave (2002) and Slipknot (2004) resolve richly; the misses are
+Prof, Ren singles, BOVSKI, Ark Woods and a 2022 remix — recent independent releases, **exactly the
+population the promotion hypothesis is about**. R2 moves from "feared" to **measured**: any
+analysis that drops `unknown` rows silently drops the newest independent music first.
+
+**All five `QZ*`-prefixed ISRCs missed** (0/5), while `USUM`(Universal), `USSM`(Sony) and
+`GBUM`(Universal UK) all resolved. The ISRC registrant prefix is available for **100 %** of tracks,
+including the 404s — see the classification signals below.
+
+## ⚠️ "The label" is not a single value
+
+This is the finding that most affects the design. A recording maps to *many* releases, and they
+carry **different labels — sometimes different corporate parents**.
+
+| Track | Releases | Distinct labels |
+|---|---|---|
+| Slipknot — Duality | **50** | **12** — Roadrunner, Warner Music France, Rhino, X5, Sum, EMI… |
+| Audioslave — Like a Stone | **44** | **10** — **Epic (Sony) *and* Interscope / A&M / UMe (Universal)** |
+| NF — The Search | 3 | 3 — NF Real Music, Capitol, Caroline |
+
+FR-13 already says *store per-signal votes, not a boolean*. The probe shows the ambiguity starts
+**one step earlier than FR-13 assumed** — not in classifying the label, but in deciding which label
+is even the input.
+
+### Narrowing by Spotify's album title and date
+
+Spotify supplies `album_name` and `release_date`. Matching those against the release list:
+
+| Strategy | Behaviour on the 13 resolved tracks |
+|---|---|
+| Album title **and** exact date | Precise where it fires (Audioslave 44 → **1**), but **fires on only 8/13**. Fails on year-only Spotify dates (Slipknot `2004`) and deluxe reissues (DPS `-!- (Deluxe)`) |
+| Album title only (normalised) | **Fires on 13/13.** Slipknot 50 → **1 release → Roadrunner Records**, which is correct |
+| Any release | Maximum recall, maximum noise |
+
+A **cascade** — title+date, else title, else all — is the only strategy that both fires reliably
+and narrows meaningfully. Title-only reduced Slipknot from 12 labels to the right one.
+
+## Classification signals — all three exist, and they disagree
+
+FR-13's three signals were speculative. All three are now confirmed present, with real
+disagreements:
+
+**Signal 1 — label `type`.** MusicBrainz types labels: `Imprint`, `Original Production`,
+`Distributor`, `Publisher`, or **null**. ⚠️ **`Publisher` is not a record label.** Faouzia's only
+"label" is `Faouzia Music`, type **Publisher**, disambiguation `SOCAN` — a publishing entity.
+Faouzia records for Atlantic. **Taking it as the label yields a confidently wrong "independent"
+verdict.** Publisher-typed entries must be excluded, or independence is over-counted exactly where
+majors use publishing subsidiaries.
+
+**Signal 2 — label relationships.** `inc=label-rels` returns three distinct relation types —
+`imprint`, `label ownership`, `label distribution` — each with a direction. They are **not
+interchangeable**:
+
+| Label | Walks to | Correct? |
+|---|---|---|
+| Epic | `imprint` → Sony Music Entertainment Inc. | ✅ Sony |
+| Interscope Records | `imprint` → UMGRI Interscope; disambiguation *"part of UMG Recordings, Inc."* | ✅ Universal |
+| Roadrunner Records | `imprint` → Elektra Music Group; `distribution` → Atlantic Records Group | ✅ Warner |
+| **Spinefarm Records** | `distribution` → **[PIAS] UK Ltd.** (an indie); `ownership` → Candlelight | ❌ **Spinefarm is Universal-owned** |
+
+**Spinefarm is R3 happening on real data**: following `distribution` says independent, and the
+truth is Universal. Ownership and distribution must be voted separately, never merged.
+`broke` (Marino, bbno$) is typed `Distributor`, *"LA-based independent label & distributor"* —
+correct, and readable from `type` alone. `CloudKid` and `The Other Songs` have **no type and no
+useful parent**: present in MusicBrainz, unclassifiable from it.
+
+**Signal 3 — the ISRC registrant prefix.** Free, no request, and — uniquely — **available for the
+6 tracks MusicBrainz cannot resolve at all**. `USUM`→Universal, `USSM`→Sony, `GBUM`→Universal UK
+all matched the label MusicBrainz returned. `QZ*`/`QT*`/`GX*` are indie-distributor ranges
+(DistroKid, CD Baby, TuneCore) and were exactly the ranges that 404'd. Weakest signal — a
+distributor prefix says nothing about a deal — but it is the **only** signal with full coverage.
+
+## Fallback search for the 6 misses — recovers little, and misattributes
+
+Tested `GET /ws/2/recording?query=recording:"…" AND artist:"…"`:
+
+| Track | Result |
+|---|---|
+| BOVSKI — Low Again | ✅ count=1, score 100, exact |
+| Prof — Kia Boy | ✅ count=1, score 100, exact |
+| Mjhanks — Parachute (Remix) | ⚠️ Found, but the recording has **no releases** — no label obtainable |
+| Ark Woods — Soul in Love | ❌ count=0 |
+| Prof, Ren — Pain Salesmen | ❌ count=0 |
+| **Ren — Vincent's Tale · Starry Night Act III** | 🚨 **count=7; the top two hits score 100 and are *different tracks*** (*The Bedroom*, *Self Portrait*). The near-correct *Starry Night, Act II* scores **95** — lower |
+
+**Net: 2 clean recoveries out of 6, and one confident wrong answer.** The Ren case is the
+important one — `score` does not rank correctness, so "take the top hit" would attach another
+track's label to the play, and nothing downstream could detect it. A wrong label is worse than
+`unknown` here: `unknown` is visible in the coverage counts (FR-51), a misattribution is not.
+
+## Backfill cost
+
+47 of the 71 recorded plays are backfilled and carry **no ISRC** (open item 3). They do carry
+`track_id`, so ISRC is recoverable via `GET /tracks/{id}` — 47 Spotify requests, one-off. Whether
+that is worth spending is a Functional Design question, not a foregone conclusion.
+
+---
+
+# Part 6: MusicBrainz — second probe, artist-level (2026-08-26)
+
+Triggered by the user's Q5 answer: *"prioritise accuracy in the **Artist Is Independent**
+determination even if it ultimately misses some independent products."* Two things in that sentence
+warranted testing rather than interpreting — the **precision-over-recall** principle, and the fact
+that it is framed at the **artist** level, where U2 had been designed at the release level.
+
+## ⚠️ Correction 5: `[no label]` is NOT an assertion of self-release
+
+Part 5 recommended treating the `[no label]` sentinel as `independent`, reasoning that it is an
+assertion rather than an absence. **That recommendation was wrong.** Tested by asking whether the
+same artists carry real labels on their *other* MusicBrainz releases:
+
+| Artist | Releases | Named label | `[no label]` | Labels actually present |
+|---|---|---|---|---|
+| **Imminence** | 66 | **41** | 8 | Arising Empire, Sumerian Records, **Virgin Music Group** |
+| **Red Leather** | 25 | 6 | 8 | EMPIRE, Sounds Good |
+
+Both of the sample's `[no label]` tracks belong to artists MusicBrainz **knows to have labels** —
+one of them Virgin Music Group, i.e. **Universal**. The sentinel reflects *incomplete per-release
+data entry*, not a claim that the release had no label.
+
+Under the Part 5 recommendation both plays would have been classified **`independent`** — wrong,
+and wrong in the direction that **falsely supports the promotion hypothesis**. This is the
+"confident wrong data" failure mode arriving in the one place a recommendation had waved it
+through. `[no label]` must be `unknown`.
+
+## 🔑 An exact Spotify → MusicBrainz artist join exists
+
+The most consequential finding in U2 so far, and it was not known at Application Design.
+
+```
+GET /ws/2/url?resource=https://open.spotify.com/artist/{spotifyArtistId}&inc=artist-rels
+   -> relations[].artist.id   (MusicBrainz artist MBID)
+```
+
+MusicBrainz stores streaming links as first-class `url` entities. **The Spotify artist ID we
+already hold is therefore a direct, exact key** — no name matching, no `score`, no misattribution
+hazard of the kind that made search fallback unsafe in Part 5.
+
+The hazard it removes is real: MusicBrainz holds **three** artists named `Prof`. Name search
+happened to rank the right one first (score 100 vs 82), but nothing guarantees that, and the Part 5
+Ren case proved `score` does not rank correctness. The URL join returned the same MBID **by
+construction rather than by luck**. It also resolved `Mjhanks`, which name search failed to find
+at all.
+
+## Artist-level coverage, measured on the same 19 tracks
+
+Directly comparable to Part 5's release-level figures:
+
+| Level | Coverage |
+|---|---|
+| Release-level (ISRC → recording → releases) | **11 / 19 — 57.9 %** |
+| Spotify artist URL → MusicBrainz artist | **15 / 17 — 88.2 %** |
+| …and artist has ≥ 1 named label | **13 / 17 — 76.5 %** |
+
+Artist-level recovers **5 of the 6 ISRC 404s** (BOVSKI, Ark Woods, Prof ×2, Ren) **and both
+`[no label]` cases**. Misses: `bbno$` and `Silent Child` have no MusicBrainz artist behind the
+Spotify URL; `Faouzia` and `Mjhanks` resolve but carry no named label.
+
+## ⚠️ But artist-level answers a *different question*
+
+It is not a strictly better version of the release-level signal, and one track in the sample proves
+it:
+
+> **Token — *Full Bag***. Release-level says **`Never Too Different`** (an independent).
+> Artist-level says **`Atlantic`**. Both are true: Token is an Atlantic artist who put *this*
+> release out independently.
+
+That is the distinction between *"is this artist signed?"* and *"was this particular track a
+label release?"* — and the promotion hypothesis arguably wants the first as a **control** and the
+second as the **treatment**. They should be stored as **separate fields**, never merged into one
+"label" column.
+
+**Two artist-level noise sources to handle:**
+- **Bootlegs and regional licensees inflate the label set.** Slipknot's 100 releases yield
+  Roadrunner alongside `Smokin' Cactus`, `Metal Mind Records`, `Jigu Records Corporation`.
+  Weight by release count, or restrict to `status = Official`.
+- **Career aggregation ignores time.** Audioslave shows Epic, Interscope, Columbia, Polydor,
+  Geffen across a career. For "is this artist signed" that is fine; it is not a statement about any
+  one release.
+
+**Cost**: 2 requests per *artist* (URL join + release browse), and artists repeat heavily across a
+listening history — so a per-artist cache is far more effective than a per-track one.
+
 ## Sources
 
 - [Spotify: Introducing some changes to our Web API (Nov 2024)](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)

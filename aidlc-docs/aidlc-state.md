@@ -4,11 +4,136 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION - **U1 COMPLETE and live-verified** (2026-08-26), approved by
-  user. 193/193 tests, coverage 99.41% line / 93.00% branch, **68 plays recorded, 0 gaps**.
-  Next: **U2 — Label Enrichment** (Functional Design)
+- **Current Stage**: CONSTRUCTION — **U2 Functional Design COMPLETE** (2026-08-26), all 13
+  questions answered across two rounds. Artifacts at
+  [`construction/u2-label-enrichment/functional-design/`](construction/u2-label-enrichment/functional-design/).
+  **Awaiting user approval.** Next: **NFR Design** (narrow — MusicBrainz integration only).
+  Two live MusicBrainz probes done — Parts 5 and 6 of `research-findings.md`.
+  U1 complete and live-verified: 193/193 tests, 99.41% line / 93.00% branch, **71 plays, 0 gaps**.
+
+## U2 Settled Design Parameters (Functional Design, 2026-08-26)
+| Parameter | Value | Source |
+|---|---|---|
+| Join key | **ISRC only** at release level; **exact Spotify-URL join** at artist level | Q3, Q12 |
+| Resolution chain | **Two calls** — `/isrc/{isrc}` then `/release?recording=…&inc=labels` | Part 5 |
+| Release narrowing | **Cascade** `title+date → title → all`, tier recorded | Q1 = A |
+| Tier `all` | **Caps confidence at `low`** | Q1 = A |
+| Search fallback | Only `count == 1` **and** exact normalised match; `matchMethod` recorded | Q3 = B+D |
+| `Publisher` candidates | **Ineligible** — never vote | Q5 = A |
+| `Distributor` / untyped | Eligible, **`strength = weak`** | Q13 = A |
+| `[no label]` | **`unknown`** — never `independent` | Q10 = A |
+| Fold rule | Any strong `major` ⇒ `major`; `independent` requires **no** major vote | Q5 principle |
+| `contested` | **Major-vs-major only**; caps confidence at `low` | Q2 = A+C |
+| Confidence | **Ordinal `high`/`medium`/`low`**, per-signal votes retained underneath | Q6+Q11 = A |
+| Two levels | Release and artist stored **separately, never merged** | Q12 = A |
+| Artist confidence | **Capped at `medium`** — aggregates a career, not a release | Part 6 |
+| ISRC backfill | **Yes** — 47 one-off `GET /tracks/{id}` | Q7 = A |
+| `likedAtEnd` | Play close **+ ~30 s grace window**, attributed by `added_at` | Q8 = A |
+| Hypothesis gate | **Pre-registered**, `unknown` group reported alongside | Q9 = C |
+
+### ⭐ The standing rule for U2 — precision over recall
+User, Q5: *"prioritise accuracy in the 'Artist Is Independent' determination even if it ultimately
+misses some independent products."*
+
+**Deliberately asymmetric.** Missing an independent track costs one row; calling a major track
+independent **manufactures support for the hypothesis under test**, invisibly. BR-3.1 (publishers
+ineligible), BR-3.2 (`[no label]` ⇒ unknown) and BR-4.3/4.4 (any major wins) are all expressions
+of it. **This principle already caught one live error** — it is what exposed that the round-1
+`[no label]` recommendation was wrong.
+
+**Migration 002**: 5 new tables (`label_resolution`, `label_candidate`, `artist_label_resolution`,
+`artist_label`, `label_signal_vote`), 14 new nullable `play` columns, 2 indexes. Additive only —
+no existing column altered or dropped.
 
 > **New session?** Read `CLAUDE.md` first, then this file, then the last few `audit.md` entries.
+
+## 🔬 U2 — MusicBrainz first live probe (2026-08-26)
+Probed against the **19 distinct ISRCs actually in `history.db`**, 47 requests, no API key, no
+rate-limit rejection. Full detail in `inception/research/research-findings.md` **Part 5**.
+
+**Working chain — 2 requests/track** (matches R11's estimate):
+`GET /ws/2/isrc/{isrc}` → recording MBID, then
+`GET /ws/2/release?recording={mbid}&inc=labels&limit=100` → releases with `label-info`.
+
+⚠️ **`inc=` is silently ignored on the ISRC endpoint.** `GET /isrc/{isrc}?inc=releases` returns
+**200 with no releases** — not an error. Nineteen ISRCs looked like "MusicBrainz has nothing",
+which was false. **Fourth** documentation-vs-reality catch in this project, and the first where the
+wrong answer was *plausible* rather than an error code. Caught only by checking against a track
+known to have 44 releases.
+
+| Coverage stage | Result |
+|---|---|
+| ISRC → recording | **13/19 — 68.4%** |
+| …→ a **named** label | **11/19 — 57.9%** |
+| Resolved but `[no label]` | 2 |
+| 404 | 6 |
+
+**⚠️ R2 confirmed and measured — the bias is recency.** Pre-2022 releases: **5/5 (100%)**.
+2022-onward: **6/14 (43%)**. The misses are recent independent singles — *exactly* the population
+the promotion hypothesis is about. Dropping `unknown` rows silently drops the newest independent
+music first. All five `QZ*` ISRCs missed; `USUM`/`USSM`/`GBUM` (major registrants) all resolved.
+
+**⚠️ "The label" is not a single value.** Audioslave → 44 releases → 10 labels spanning **two
+different majors** (Epic/Sony *and* Interscope/Universal). Slipknot → 50 releases → 12 labels.
+FR-13 anticipated ambiguity in *classifying* the label; the ambiguity actually starts one step
+earlier, in deciding which label is even the input. Narrowing by Spotify's album title fires on
+13/13 and cut Slipknot to the single correct label; title **and** date is more precise but fires on
+only 8/13 (year-only dates, deluxe reissues).
+
+**All three FR-13 signals exist and genuinely disagree**:
+- **`type`** — `Imprint` / `Original Production` / `Distributor` / `Publisher` / null.
+  ⚠️ **`Publisher` is not a label**: Faouzia's only entry is `Faouzia Music`, type `Publisher`
+  (`SOCAN`) — she records for Atlantic. Including publishers **over-counts independence in the
+  direction that would falsely support the hypothesis.**
+- **Relationships** (`inc=label-rels`) — `imprint`, `label ownership`, `label distribution`, each
+  directional and **not interchangeable**. Epic→Sony ✅, Interscope→UMG ✅, Roadrunner→Warner ✅,
+  but **Spinefarm's `distribution` points at indie [PIAS] while Spinefarm is Universal-owned** ❌.
+  R3 on real data — ownership and distribution must vote separately.
+- **ISRC registrant prefix** — free, and the **only signal with 100% coverage**, including the 6
+  tracks MusicBrainz cannot resolve.
+
+**🚨 Search fallback misattributes.** For Ren's *Starry Night Act III*, the top **two** hits score
+**100 and are different tracks**; the near-correct one scores **95**. `score` does not rank
+correctness. Net over the 6 misses: 2 clean recoveries, 2 count=0, 1 with no releases, **1
+confidently wrong**. A wrong label is invisible downstream; `unknown` is counted (FR-51).
+
+> **U2's failure mode is not missing data — that is visible in the coverage counts. It is
+> confident wrong data, which is not.**
+
+## 🔑 U2 — second probe, artist-level (2026-08-26) — `research-findings.md` Part 6
+
+Prompted by the user's Q5 answer: *"prioritise accuracy in the **Artist Is Independent**
+determination even if it ultimately misses some independent products."* Precision over recall is
+now a **standing rule for U2**.
+
+**⚠️ Correction 5 — `[no label]` is NOT self-release, and Part 5's recommendation was wrong.**
+Both `[no label]` artists carry real labels on their other MusicBrainz releases — **Imminence: 41
+of 66 named, including Virgin Music Group (Universal)**; Red Leather: EMPIRE. The sentinel means
+incomplete data entry. Treating it as `independent` would have been wrong **in the direction that
+falsely supports the hypothesis**.
+
+**🔑 An exact Spotify → MusicBrainz artist join exists** — not known at Application Design:
+```
+GET /ws/2/url?resource=https://open.spotify.com/artist/{spotifyArtistId}&inc=artist-rels
+```
+MusicBrainz stores streaming links as first-class `url` entities, so the Spotify artist ID the app
+already holds is a **direct exact key** — no name matching, no `score`, none of the misattribution
+hazard that made search fallback unsafe. MusicBrainz holds **three** artists named `Prof`; the join
+returns the right one by construction, and resolves `Mjhanks`, which name search cannot find.
+
+| Level | Coverage (same 19 tracks) |
+|---|---|
+| Release-level (ISRC chain) | **57.9%** |
+| Artist-level, exact join | **88.2%** resolved · **76.5%** named label |
+
+Recovers **5 of the 6 ISRC 404s and both `[no label]` cases**.
+
+**⚠️ It answers a different question — do not merge the two.** Token — *Full Bag* is
+`Never Too Different` (independent) at **release** level and **`Atlantic`** at **artist** level.
+Both true: an Atlantic artist releasing this one independently. Plausibly *control* (is the artist
+signed?) vs *treatment* (was this release a label push?) for R1. Artist-level noise to handle:
+bootlegs/regional licensees inflate the set (Slipknot → Roadrunner + `Smokin' Cactus`, `Jigu
+Records`), and career aggregation ignores time (Audioslave spans five labels).
 
 ## ✅ U1 live verification (2026-08-26)
 User played real tracks; database inspected directly. Full evidence in
@@ -367,7 +492,8 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
 
 ### 🟢 CONSTRUCTION PHASE
 *Runs once per delivery phase, not all up front (execution plan).*
-- [x] Functional Design — **U1 complete** 2026-08-25, approved. U2–U5 pending.
+- [x] Functional Design — **U1 complete** 2026-08-25, approved. **U2 complete** 2026-08-26,
+      awaiting approval. U3–U5 pending.
 - [x] NFR Requirements — **SKIPPED** (27 NFRs already agreed in requirements.md §4)
 - [x] NFR Design — **U1 complete** 2026-08-25 (narrow: persistence only), awaiting approval
 - [x] Infrastructure Design — **U1 complete** 2026-08-25 (narrow: storage + R7), approved

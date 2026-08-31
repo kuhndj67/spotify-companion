@@ -1130,3 +1130,214 @@ the verification item left open at Build and Test.
 Updated aidlc-state.md to current: U1 complete and live-verified, U2 next, the threshold finding,
 and the liked-transition decision with what U2 must now deliver."
 **Context**: CONSTRUCTION — U1 complete and live-verified; documentation prepared for a fresh session
+
+---
+
+## U2 Functional Design — MusicBrainz First Live Probe; Questions Written
+**Timestamp**: 2026-08-26
+**User Input**: "Starting an new session so we have clean context for the U2 work... so review
+project state and lets get going."
+**AI Response**: "Reviewed aidlc-state.md, the last audit entries, the U2 unit definition and
+FR-12-16, then STOPPED BEFORE WRITING FUNCTIONAL DESIGN QUESTIONS because of a gap the review
+exposed: MusicBrainz had never been called by this project. Every U2 assumption -- that ISRC
+lookup works, that labels come back, that coverage is adequate, that the three FR-13 classification
+signals exist -- was documentation-derived, which is the exact pattern that has produced a wrong
+conclusion three times here. Probed it live against the 19 distinct ISRCs actually in history.db
+rather than a curated sample. 47 requests, 1.2 s spacing, descriptive User-Agent (NFR-14/15).
+
+CAUGHT A FOURTH DOCUMENTATION-VS-REALITY FAILURE, and the first one that was PLAUSIBLE rather than
+an error code. `GET /ws/2/isrc/{isrc}?inc=releases` returns 200 with recordings and NO releases --
+the inc parameter is silently dropped. All 19 ISRCs came back looking like MusicBrainz has no
+releases for anything the user listens to. That is false, and it would have been recorded as a
+coverage finding had it not been checked against Audioslave, known to have 44 releases. Noted the
+general hazard: a wrong request shape is indistinguishable from absent data. The chain that works
+is /isrc/{isrc} -> recording MBID, then /release?recording={mbid}&inc=labels -- a browse, where inc
+IS honoured. Two requests per track, matching R11's estimate exactly.
+
+MEASURED R2 INSTEAD OF FEARING IT. End-to-end label coverage is 57.9% (11/19). Crucially the
+missingness is not random: pre-2022 releases resolved 5/5 (100%), 2022-onward 6/14 (43%). The
+misses are recent independent singles -- Prof, Ren, BOVSKI, Ark Woods -- precisely the population
+the promotion hypothesis is about. All five QZ* ISRCs missed while USUM/USSM/GBUM (major
+registrants) all resolved. Consequence recorded plainly: any analysis that drops `unknown` rows
+silently drops the newest independent music first.
+
+FOUND THAT FR-13'S PREMISE IS ONE STEP TOO LATE. FR-13 says store per-signal votes rather than a
+boolean, anticipating that CLASSIFICATION is ambiguous. The probe shows the INPUT is ambiguous:
+a recording maps to many releases carrying different labels. Audioslave -- Like a Stone yields 44
+releases and 10 labels spanning TWO DIFFERENT MAJORS (Epic/Sony and Interscope/Universal);
+Slipknot -- Duality yields 50 releases and 12 labels. There is no single 'the label'. Tested
+narrowing by the album title and release date Spotify already gives us: title-only fires on 13/13
+and cut Slipknot from 12 labels to the one correct one (Roadrunner); title+date is more precise
+(Audioslave 44 -> 1) but fires on only 8/13, failing on year-only Spotify dates and deluxe
+reissues.
+
+CONFIRMED ALL THREE FR-13 SIGNALS EXIST, AND THAT THEY DISAGREE ON REAL DATA. Label `type`
+(Imprint / Original Production / Distributor / Publisher / null) -- and found that Publisher is NOT
+a record label: Faouzia's only entry is `Faouzia Music`, type Publisher, disambiguation SOCAN, a
+publishing entity, while she records for Atlantic. Flagged the direction of that error as the
+dangerous part -- majors routinely use publishing subsidiaries, so including publishers
+over-counts independence in exactly the direction that would FALSELY SUPPORT the hypothesis.
+Relationships (inc=label-rels) return three non-interchangeable, directional types -- imprint,
+label ownership, label distribution. Epic->Sony, Interscope->UMG and Roadrunner->Warner all walk
+correctly, but Spinefarm's distribution relationship points at [PIAS], an independent, while
+Spinefarm is Universal-owned. That is R3 occurring on real data, and it is why ownership and
+distribution must be voted separately rather than merged. The ISRC registrant prefix is the
+weakest signal but the only one with 100% coverage -- it is available for the six tracks
+MusicBrainz cannot resolve at all.
+
+ESTABLISHED THAT THE OBVIOUS FIX FOR THE COVERAGE GAP IS UNSAFE. Tested artist+title search
+fallback on the six ISRC misses: 2 clean recoveries, 2 count=0, 1 found with no releases (so no
+label obtainable), and 1 CONFIDENTLY WRONG -- for Ren's 'Vincent's Tale - Starry Night - Act III'
+the top TWO hits score 100 and are DIFFERENT TRACKS ('The Bedroom', 'Self Portrait'), while the
+near-correct 'Starry Night, Act II' scores 95. `score` does not rank correctness, so any
+threshold rule will occasionally attach another track's label to a play, and nothing downstream
+could detect it. Stated the asymmetry that follows and made it the organising principle of the
+unit: a wrong label is invisible, `unknown` is counted in the coverage figures (FR-51). U2's
+failure mode is not missing data but confident wrong data.
+
+RECORDED the probe as research-findings.md Part 5 (authoritative, with Correction 4), summarised
+it in aidlc-state.md, and WROTE construction/plans/u2-functional-design-plan.md with NINE questions
+-- three of which exist only because of the probe (which release's label counts; whether to use
+search fallback; whether Publisher entries are excluded) -- each with options grounded in measured
+numbers rather than speculation, plus a recommendation and its reasoning. Also carried forward the
+already-agreed liked-status work as Q8, raising the one functional detail still open (liking often
+happens just AFTER a track ends, so sampling at the exact play boundary would record the strongest
+positive signal available as `kept-unliked`), and Q9 on pre-registering the Phase 2 hypothesis-gate
+criterion before results are seen rather than after.
+
+Did NOT proceed to generate functional design artifacts -- the stage gates on user answers."
+**Context**: CONSTRUCTION — U2 Functional Design, questions awaiting user answers
+
+---
+
+## U2 Functional Design — Round 1 Answers; Two Recommendations Reversed by Further Probing
+**Timestamp**: 2026-08-26
+**User Input**: "completed questionaire - if I didn't enter a value use the recommended value for
+that question." (Q5 = A, with "in general we should prioritize accuracy in the 'Artist Is
+Independant' determination even if it ultimately misses some independant products."; Q6 = A, "we
+shouldn't imply precision that doesn't exist.")
+**AI Response**: "Recorded Q1-Q9, applying recommended defaults to the seven blanks as instructed.
+Both explicit answers DEPARTED from my recommendation (Q5 = A not C, Q6 = A not D), and both
+departures turned out to be better than what I proposed.
+
+TREATED THE Q5 ANSWER AS CARRYING MORE THAN AN OPTION LETTER. Two things in it warranted live
+testing rather than interpretation: the precision-over-recall principle, and the fact that it is
+framed at the ARTIST level while U2 had been designed entirely at the RELEASE level. Probed both
+rather than reading them as phrasing.
+
+REVERSED MY OWN Q4 RECOMMENDATION ON EVIDENCE. I had argued that MusicBrainz's `[no label]`
+sentinel is an assertion of self-release and should count as `independent`. Tested it by asking
+whether the two affected artists carry real labels on their OTHER MusicBrainz releases. They do:
+Imminence has 41 of 66 releases with named labels including Arising Empire, Sumerian and VIRGIN
+MUSIC GROUP -- i.e. Universal -- and Red Leather has 6 of 25 including EMPIRE. The sentinel
+reflects incomplete per-release data entry, not a claim of self-release. Under my recommendation
+both plays would have been classified `independent`, which is wrong, and wrong in the direction
+that FALSELY SUPPORTS the promotion hypothesis. Withdrew Q4 = A as Q10 and recommended `unknown`.
+Noted the irony plainly: this is the 'confident wrong data' failure mode that the unit's whole
+framing warns about, arriving in the one place a recommendation had waved it through, and it was
+the user's precision principle that exposed it.
+
+FOUND AN EXACT SPOTIFY-TO-MUSICBRAINZ ARTIST JOIN THAT WAS NOT KNOWN AT APPLICATION DESIGN.
+MusicBrainz stores streaming links as first-class `url` entities, so
+GET /ws/2/url?resource=https://open.spotify.com/artist/{id}&inc=artist-rels maps the Spotify artist
+ID the app already holds directly to a MusicBrainz artist MBID. No name matching, no `score`, and
+therefore none of the misattribution hazard that made search fallback unsafe in Part 5. Demonstrated
+the hazard it removes rather than asserting it: MusicBrainz holds THREE artists named `Prof`, and
+while name search happened to rank the right one first, the join returns it by construction rather
+than by luck -- and the join also resolved `Mjhanks`, which name search failed to find at all.
+
+MEASURED artist-level coverage on the SAME 19 tracks so the numbers are directly comparable rather
+than extrapolated: Spotify artist URL resolves to a MusicBrainz artist for 15/17 distinct artists
+(88.2%), and 13/17 (76.5%) yield at least one named label, against 57.9% at release level. It
+recovers 5 of the 6 ISRC 404s and both `[no label]` cases.
+
+DID NOT PRESENT THIS AS A STRICT UPGRADE. Artist-level answers a DIFFERENT question, and one track
+in the sample proves it: Token -- 'Full Bag' is `Never Too Different` (independent) at release
+level and ATLANTIC at artist level. Both are true -- an Atlantic artist who released this one
+independently. For R1 that is plausibly a control variable (is the artist signed?) versus the
+treatment (was this release a label push?), so the recommendation is two SEPARATE fields, never
+merged. Also recorded two artist-level noise sources found in the data: bootlegs and regional
+licensees inflate the label set (Slipknot's 100 releases yield Roadrunner alongside Smokin' Cactus
+and Jigu Records Corporation), and career aggregation ignores time (Audioslave spans Epic,
+Interscope, Columbia, Polydor, Geffen).
+
+FLAGGED ONE AMBIGUITY IN Q6 RATHER THAN RESOLVING IT SILENTLY. The user's reasoning is decisive
+against a numeric score, but option A read literally as 'band only, discard votes' would contradict
+FR-13's explicit requirement to record which signals fired and how they voted, the U2 exit
+criterion, and the store-observations-derive-judgements rule whose value U1's threshold finding
+already demonstrated. Almost certainly not the intent; asked as Q11 rather than assumed.
+
+ASKED whether the user's own precision principle should move Q5 from A to C (treating `Distributor`
+as a weaker signal than `Imprint`/`Original Production`), since C is the direct application of the
+principle they stated and they may simply have been endorsing A's core content.
+
+RECORDED the second probe as research-findings.md Part 6 with Correction 5, and wrote four
+follow-ups (Q10 withdrawal, Q11 clarification, Q12 artist-level join, Q13 distributor weighting).
+Did not generate design artifacts -- Step 5 forbids proceeding while ambiguity is open."
+**Context**: CONSTRUCTION — U2 Functional Design, round 2 questions awaiting answers
+
+---
+
+## U2 Functional Design — Complete
+**Timestamp**: 2026-08-26
+**User Input**: "Updated" (Q10 = A, Q11 = A, Q12 = A, Q13 = A — all recommended)
+**AI Response**: "All 13 questions now answered across two rounds, no ambiguity remaining, so
+generated the three functional design artifacts.
+
+CONFIRMED THE FULL ANSWER SET before generating: Q1 = A cascade, Q2 = A+C store all and mark
+contested, Q3 = B+D single-hit fallback with match method recorded, Q4 WITHDRAWN and superseded by
+Q10 = A ([no label] is unknown), Q5 = A extended by Q13 = A (Publisher ineligible, Distributor
+weak), Q6 = A with Q11 = A (ordinal band, votes retained underneath), Q7 = A backfill ISRCs,
+Q8 = A grace window, Q9 = C pre-registered gate with unknown reported alongside, Q12 = A
+artist-level as a separate never-merged field.
+
+ELEVATED THE USER'S Q5 SENTENCE TO A STANDING RULE FOR THE UNIT rather than treating it as a
+comment on one question. 'Prioritise accuracy in the Artist Is Independent determination even if it
+ultimately misses some independent products' is a precision-over-recall directive, and it is stated
+at the top of both business-rules.md and domain-entities.md as the rule governing the other rules.
+Made its asymmetry explicit as arithmetic in BR-4.3/4.4: any strong major vote makes the verdict
+major, while independent requires the ABSENCE of any major vote at any strength. Stated the
+justification in terms of the hypothesis rather than in terms of tidiness -- missing an independent
+track costs one row, whereas calling a major track independent manufactures support for the very
+hypothesis under test, and does so invisibly. Noted that the principle has already caught one live
+error: it is what exposed that my own round-1 `[no label]` recommendation was wrong.
+
+GENERATED domain-entities.md (7 entities), business-logic-model.md (8 flows) and business-rules.md
+(BR-1 to BR-11, 60 numbered rules), each carrying the measured evidence for why the rule exists
+rather than asserting it. Two entities -- ArtistLabelResolution and SignalVote -- would not exist
+had the design been written from documentation.
+
+DEFINED MIGRATION 002 as additive only: 5 new tables (label_resolution, label_candidate,
+artist_label_resolution, artist_label, label_signal_vote), 14 new nullable play columns, 2 indexes.
+No existing column altered or dropped, so U1 data is untouched and every existing row simply
+becomes a row with unresolved labels -- which is exactly what it is. Every new column is nullable
+and NULL means unknown, never false or 0, end to end including exports.
+
+CARRIED THE OBSERVATION-VERSUS-JUDGEMENT SPLIT THROUGH DELIBERATELY. Cached MusicBrainz facts
+(resolutions, candidates, votes) live in their own tables keyed by ISRC and artist, satisfying
+FR-14 and the rate limit; the derived verdict is snapshotted onto the play with a
+label_classifier_version, so exports need no join (FR-50) and a re-tuned classifier cannot silently
+rewrite what was believed at the time. Consequence recorded as BR-8.7: reclassification recomputes
+verdicts from stored candidates and votes with ZERO MusicBrainz requests -- the same structure that
+let U1's completion threshold be revisited without re-collecting a play. R3 guarantees this
+classifier will be re-tuned, so that property is the difference between cheap and impossible.
+
+PINNED THE SILENT-FAILURE TRAPS AS RULES RATHER THAN PROSE. BR-1.2 requires the two-call chain and
+asks for a test against a recording known to have many releases, because folding it into one call
+reintroduces a 200-with-inc-ignored response that is indistinguishable from absent data -- a
+plausible wrong answer being worse than a loud one. BR-4.8 requires labelClassifier purity and
+names test/purity.test.ts as the only thing that catches a Date.now() there, since FR-42 would
+break while every other test passed. BR-7.7 keeps `pending` distinct from `unknown`, because
+collapsing them would corrupt the very coverage metric that exists to measure R2.
+
+MADE THE HYPOTHESIS GATE FALSIFIABLE IN THE ARTIFACTS, not just in intent: BR-11.1 pre-registers
+the comparison before results are seen, BR-11.5 requires the result be recorded either way, and
+BR-11.6 requires 'insufficient data' rather than a verdict below a stated minimum sample. Argued
+BR-11.2 (report the unknown group alongside) as substantive rather than procedural -- if the
+unknown group's skip rate resembles the independent group's, that is evidence about who the
+unknowns are, and given the measured recency bias it is the single most informative check
+available.
+
+Skipped frontend-components.md with justification rather than producing an empty artifact: the U0
+component hierarchy is unchanged, and the one new UI behaviour is specified as BR-7.7."
+**Context**: CONSTRUCTION — U2 Functional Design complete, awaiting approval

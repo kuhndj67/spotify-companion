@@ -81,7 +81,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 |---|---|---|
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
-| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — MusicBrainz probed live ×2; **Functional Design approved** (+ BR-12 resolution trace). Next: NFR Design |
+| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — FD approved (+ BR-12 trace); **NFR Design complete**. Next: Infrastructure Design |
 | U3 Rule model (pure core) | 3 | Pending |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
@@ -133,6 +133,7 @@ A failing build once read as success here.
 | 3b | **MusicBrainz label coverage is 58%, and the misses are recency-biased** (pre-2022 100%, 2022+ 43%) — i.e. concentrated on the recent independent releases R1 is about. Measured 2026-08-26, `research-findings.md` Part 5 | U2 |
 | 4 | **Completion threshold may misclassify outro skips.** 6 of 17 live plays sit within ±0.03 of 0.90. Retroactively correctable. Revisit with a few hundred plays | Later |
 | 5 | R11 — queue lookahead unverified during playback | U5 |
+| 6 | **`label_resolved_at` missing from migration 002.** The 30-day unknown TTL means a play's label can be filled in months later; nothing records *when the fact arrived*, only when the rules changed. Additive one-column fix. **Decide before Code Generation** | U2 |
 
 ---
 

@@ -4,13 +4,68 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 Functional Design APPROVED** (2026-08-31), with one
-  addition made at the gate: a **resolution trace** (BR-12, Flow 9, `ResolutionTrace`) showing how a
-  track's label verdict was reached and which rules fired. Artifacts at
-  [`construction/u2-label-enrichment/functional-design/`](construction/u2-label-enrichment/functional-design/).
-  **Next: NFR Design** — narrow: MusicBrainz integration, plus the trace's delivery route.
+- **Current Stage**: CONSTRUCTION — **U2 NFR Design COMPLETE** (2026-08-31), 7 questions
+  answered across all five mandated categories. Artifacts at
+  [`construction/u2-label-enrichment/nfr-design/`](construction/u2-label-enrichment/nfr-design/).
+  **Awaiting user approval.** Next: **Infrastructure Design** (narrow).
+  U2 Functional Design approved 2026-08-31, incl. BR-12 resolution trace.
   Two live MusicBrainz probes done — Parts 5 and 6 of `research-findings.md`.
   U1 complete and live-verified: 193/193 tests, 99.41% line / 93.00% branch, **71 plays, 0 gaps**.
+
+## 🚩 OPEN FINDING — `label_resolved_at` is missing from migration 002
+
+**Raised by NFR Design Q1 = A (2026-08-31). Flagged, not decided.**
+
+The asymmetric TTL means a previously-`unknown` ISRC can resolve months later, and BR-8.3's backfill
+will fill it in. That is *desirable* — it is the coverage bias correcting itself — but it is
+currently **invisible**:
+
+> `label_classifier_version` records when the **rules** changed. Nothing records when the **fact
+> arrived.** A verdict filled in by a later re-resolution is indistinguishable from one known at
+> play time.
+
+BR-12.5 guards classifier drift; this is the same gap in a different variable. Recommended fix:
+add **`label_resolved_at`** to the `play` snapshot — migration 002 goes 14 → 15 columns, still
+additive. **Decide before Code Generation.**
+
+Second consequence, already recorded in P-3: **a coverage figure is only meaningful with an as-of
+date.** The same query run twice can legitimately differ.
+
+## U2 NFR Design decisions (2026-08-31)
+
+| Q | Decision | Source |
+|---|---|---|
+| Q1 Cache lifetime | **A** — successes cached indefinitely; `unknown`s retried on a **30-day TTL** | **User** |
+| Q2 Failure handling | **D** — retry `503`/timeout only, never `404`; **pause the queue** on repeated `503`s | default |
+| Q3 Restart | **C** — no queue persistence; the **database is the queue of record**; startup sweep | default |
+| Q4 Contention | **A** — two priority classes; the live track jumps, backfill fills idle time | default |
+| Q5 Outbound posture | **A** — proceed as designed; compliant `User-Agent` with contact address | **User** |
+| Q6 Trace route | **A** — separate `GET /api/explain/{playId}`, rendered in the diagnostics dialog | default |
+| Q7 Point-in-time capture | **C** — scheduled + startup saved-track refresh; flush grace window on graceful shutdown | default |
+
+### ⭐ Q1 is a measurement decision, not a performance one
+
+FR-14 read literally means a `404` today is a `404` **forever**. But MusicBrainz is crowd-sourced and
+growing, and the probe measured exactly where it is thin — **2022-onward 43%, pre-2022 100%**.
+Caching negatives permanently would **freeze the measured coverage bias into the dataset
+permanently**, converting a temporary property of an upstream database into a fixed property of this
+project's data — in precisely the population R1 is about.
+
+### The 503 pause is a shared queue stop, not per-request backoff
+
+Per-request retry **increases** pressure exactly when the service signals overload. There is no API
+key here, so there is no per-key throttle to absorb the mistake: being blocked takes out the whole
+unit rather than degrading it. A pause leaves items **`pending`, never `unknown`** — a pause is a
+delay, not an answer.
+
+### `notFound` and `error` stay separate end to end
+
+Both render as `unknown` to a reader. But `notFound` is a finding about **MusicBrainz's catalogue**;
+`error` is a finding about **the network on Tuesday**. Folding the second into the first inflates
+the apparent coverage gap with noise — and that gap is the measurement R2 depends on.
+
+**The load-bearing claim**: with MusicBrainz entirely down, display, recording and export are all
+unaffected. U2's total failure costs the label column and nothing else.
 
 ## ⭐ Added at the approval gate (2026-08-31) — the resolution trace
 

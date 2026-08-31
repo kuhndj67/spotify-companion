@@ -1414,3 +1414,89 @@ Repo state on restart: 193/193 tests, typecheck clean, 71 plays, database untouc
 2026-08-26."
 **Context**: CONSTRUCTION — U2 Functional Design APPROVED with BR-12 added. Next: NFR Design,
 scoped to the MusicBrainz integration and the trace's delivery route
+
+---
+
+## U2 NFR Design Complete — Cache Lifetime Recognised as a Measurement Decision
+**Timestamp**: 2026-08-31
+**User Input**: "alright lets continue" · Q1 = A (retry unknowns on a 30-day TTL) · Q5 = A (proceed
+as designed); remaining five taken at the recommended defaults per the user's standing instruction
+**AI Response**: "Generated the U2 NFR Design plan with seven questions across all five mandated
+categories, then the two artifacts. NFR Requirements stayed SKIP per the execution plan.
+
+FRAMED THE UNIT'S ONE NEW NFR PROBLEM PRECISELY: the app now depends on a third-party service it
+does not own, cannot authenticate to, and can be banned from. U0 and U1 talked only to Spotify --
+authenticated, quota'd per user, failing loudly with status codes. MusicBrainz is free,
+unauthenticated and community-run, its rate limit is policy rather than enforcement, and it signals
+rejection with 503 rather than 429. Every pattern follows from that plus two measured facts:
+latency 0.1-6.7s, and 58% coverage whose misses are recency-biased.
+
+Q1 WAS THE QUESTION WORTH ASKING, AND IT IS NOT A PERFORMANCE QUESTION. FR-14 says an ISRC is
+resolved at most once, which read literally means a 404 today is a 404 forever. But MusicBrainz is
+crowd-sourced and still growing, and the probe measured exactly where it is thin -- 2022-onward
+releases resolved 43% against pre-2022's 100%. Caching negatives permanently would freeze the
+measured coverage bias into the dataset permanently, turning a temporary property of an upstream
+database into a fixed property of this project's data, in precisely the population R1 is about. The
+user chose the asymmetric TTL: successes cached indefinitely because a resolved label is a stable
+fact, unknowns retried after 30 days because a 404 is a statement about MusicBrainz's completeness
+rather than about the release.
+
+FOLLOWED THAT ANSWER THROUGH TO A CONSEQUENCE IT CREATES, RATHER THAN STOPPING AT THE DECISION.
+Under Q1 = A, coverage becomes time-dependent: the same query run twice can legitimately differ, so
+a coverage figure is only meaningful with an as-of date. More importantly, a play's stored verdict
+can change months after the play when a previously-unknown ISRC resolves. That is desirable -- it is
+the coverage bias correcting itself -- but it is currently invisible. label_classifier_version
+records when the RULES changed; nothing records when the FACT arrived, so a verdict filled in later
+is indistinguishable from one known at play time. Flagged label_resolved_at as a recommended
+addition to migration 002 (14 to 15 columns, still additive) and marked it explicitly as flagged,
+not decided. BR-12.5 guards classifier drift; this is the same gap in a different variable.
+
+PUT THE POSTURE CHANGE TO THE USER RATHER THAN DECIDING IT, consistent with how the localGuard item
+was handled. U2 is the first thing to send data anywhere other than Spotify: an ISRC per distinct
+track plus a User-Agent that NFR-14 REQUIRES to carry a contact address, so anonymity is not
+available without violating a policy the app is choosing to honour. Stated the real mitigation
+honestly -- caching means each ISRC is sent once, so what leaves the machine resembles a library
+rather than a listening timeline. User chose to proceed as designed. Recorded in P-6 that the
+contact address is read from configuration and never committed to source, since NFR-14 requires a
+real contact and the repository is on GitHub; a missing address is a startup error rather than a
+silent fallback to anonymous traffic.
+
+MADE THE 503 RESPONSE A SHARED QUEUE PAUSE RATHER THAN PER-REQUEST BACKOFF. Per-request retry gets
+this backwards: it increases pressure exactly when the service is signalling overload. There is no
+API key here and therefore no per-key throttle to absorb the mistake -- being blocked would take out
+the whole unit rather than degrade it. Also required that a pause leaves items pending, never
+unknown, because a pause is a delay and not an answer.
+
+SEPARATED notFound FROM error THROUGHOUT. Both render as unknown to a reader, but notFound is a
+finding about MusicBrainz's catalogue while error is a finding about the network on Tuesday. Folding
+the second into the first would inflate the apparent coverage gap with noise, and that gap is the
+measurement R2 depends on. BR-10.2 already had the field; the patterns now say when each is written
+and which are retried. A 404 is never retried because it is an answer.
+
+GAVE THE QUEUE TWO PRIORITY CLASSES BUT CONSTRAINED PRIORITY TO ORDERING ONLY, never rate. Backfill
+has real volume, and under strict FIFO the track playing right now queues behind all of it, showing
+the user a pending panel that never settles. A priority that bypassed the limiter would defeat
+NFR-15 exactly when the app is busiest.
+
+DECLINED QUEUE PERSISTENCE BECAUSE THE DATABASE ALREADY IMPLIES THE WORK SET. BR-8.3's backfill
+scans for plays with an ISRC and no resolution, which is exactly what a dropped in-memory queue
+leaves behind, so the system self-heals with no new machinery. Persisting a queue would add durable
+state duplicating what the play table implies and introduce a way for the two to disagree. Same
+shape as BR-8.7: a decision made for other reasons paying off again.
+
+KEPT THE TRACE ON ITS OWN ROUTE WHILE KEEPING THE USER'S UI PLACEMENT. /api/diagnostics runs a fixed
+system sweep hitting Spotify and MCP on every call; adding a playId mode would mean either a trace
+re-runs the live health check, violating BR-12.7, or the endpoint grows a switch that changes
+whether it touches the network -- the kind of switch that later gets set by accident. The split is
+in the route, not the interface: the trace still renders inside the diagnostics dialog.
+
+RECORDED WHAT WAS NOT ADOPTED as decisions rather than omissions -- no message broker, no
+circuit-breaker library, no external cache, no parallelism, no latency target -- each with the
+reason. Also recorded that scalability patterns are not applicable, with the arithmetic: the 1
+req/sec ceiling is 86,400 requests/day against a working set of a few hundred distinct ISRCs.
+
+Stated the design's load-bearing claim explicitly: with MusicBrainz entirely down, display,
+recording and export are all unaffected and U2's total failure costs the label column and nothing
+else."
+**Context**: CONSTRUCTION — U2 NFR Design complete, awaiting approval. Next: Infrastructure Design
+(narrow). One finding open for decision: `label_resolved_at` column

@@ -58,10 +58,10 @@ thing that catches it, and step A6 extends it.
 
 ### B. Repository layer — migration 002 and versioned access
 
-- [ ] **B1.** `src/history/migrations.ts` — **migration 002**: 6 tables, 16 `play` columns, 6 indexes (additive, forward-only)
-- [ ] **B2.** `src/history/HistoryRepository.ts` — extend the interface: resolution read/write, as-of-play lookups, coverage query
-- [ ] **B3.** `src/history/SqliteHistoryRepository.ts` — implement; append-only writes, `ORDER BY resolved_at DESC LIMIT 1` for current
-- [ ] **B4.** `test/labelRepository.test.ts` — migration applies to a U1-shaped database; version chains append; `UNIQUE(isrc, resolved_at)` blocks duplicates; current-version query
+- [x] **B1.** `src/history/migrations.ts` — **migration 002**: 6 tables, 16 `play` columns, 6 indexes (additive, forward-only)
+- [x] **B2.** `src/musicbrainz/LabelRepository.ts` — *deviation from plan*: a **separate** interface rather than extending `HistoryRepository`, so U2 owns its own types and the dependency points the right way. `SqliteHistoryRepository` implements both, so callers still get one object and one connection
+- [x] **B3.** `src/history/SqliteHistoryRepository.ts` — implement; append-only writes, `ORDER BY resolved_at DESC LIMIT 1` for current
+- [x] **B4.** `test/labelRepository.test.ts` — migration applies to a U1-shaped database; version chains append; `UNIQUE(isrc, resolved_at)` blocks duplicates; current-version query
 
 ### C. MusicBrainz I/O
 

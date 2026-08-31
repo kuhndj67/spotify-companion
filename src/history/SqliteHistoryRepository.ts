@@ -22,6 +22,25 @@ import { dirname } from 'node:path';
 import type { HistoryRepository } from './HistoryRepository.js';
 import { migrate, type MigrationReport } from './migrations.js';
 import type {
+  ArtistLabelSnapshot,
+  LabelCoverage,
+  LabelRepository,
+  LabelSnapshot,
+  LikedEvidence,
+  NewArtistLabelResolution,
+  NewLabelResolution,
+  PlayNeedingLabels,
+  StaleResolution,
+} from '../musicbrainz/LabelRepository.js';
+import type {
+  ArtistLabelResolution,
+  LabelCandidate,
+  LabelResolution,
+  LabelVerdict,
+  SignalVote,
+  UnknownReason,
+} from '../musicbrainz/types.js';
+import type {
   CoverageStats,
   CloseReason,
   HistoryFilter,
@@ -107,7 +126,7 @@ function rowToRecord(row: PlayRow): PlayRecord {
   };
 }
 
-export class SqliteHistoryRepository implements HistoryRepository {
+export class SqliteHistoryRepository implements HistoryRepository, LabelRepository {
   #db: DatabaseSync;
   #migration: MigrationReport;
 
@@ -377,7 +396,485 @@ export class SqliteHistoryRepository implements HistoryRepository {
     }
   }
 
+  // ==========================================================================
+  // U2 — label enrichment (LabelRepository)
+  //
+  // Everything below is APPEND-ONLY. There is deliberately no updateLabelResolution:
+  // re-resolving inserts a new version, because "our knowledge changed" and "the world
+  // changed" are different facts that MusicBrainz cannot distinguish for us (BR-13.1).
+  // ==========================================================================
+
+  insertLabelResolution(resolution: NewLabelResolution): number {
+    this.#db.exec('BEGIN');
+    try {
+      // The previous newest version, so the chain is explicitly linked rather than only
+      // implied by timestamp ordering.
+      const previous = this.#db
+        .prepare(
+          'SELECT id FROM label_resolution WHERE isrc = ? ORDER BY resolved_at DESC LIMIT 1',
+        )
+        .get(resolution.isrc) as { id: number } | undefined;
+
+      const info = this.#db
+        .prepare(
+          `INSERT INTO label_resolution
+             (isrc, recording_mbid, match_method, narrowing_tier, release_count,
+              resolved_at, status, supersedes_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          resolution.isrc,
+          resolution.recordingMbid,
+          resolution.matchMethod,
+          resolution.narrowingTier,
+          resolution.releaseCount,
+          resolution.resolvedAt,
+          resolution.status,
+          previous?.id ?? null,
+        );
+
+      const id = Number(info.lastInsertRowid);
+      this.#insertCandidates('label_candidate', id, resolution.candidates);
+      this.#insertVotes('label_signal_vote', id, resolution.votes);
+
+      this.#db.exec('COMMIT');
+      return id;
+    } catch (error) {
+      this.#db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  insertArtistLabelResolution(resolution: NewArtistLabelResolution): number {
+    this.#db.exec('BEGIN');
+    try {
+      const previous = this.#db
+        .prepare(
+          `SELECT id FROM artist_label_resolution
+           WHERE spotify_artist_id = ? ORDER BY resolved_at DESC LIMIT 1`,
+        )
+        .get(resolution.spotifyArtistId) as { id: number } | undefined;
+
+      const info = this.#db
+        .prepare(
+          `INSERT INTO artist_label_resolution
+             (spotify_artist_id, artist_mbid, release_count, named_label_count,
+              resolved_at, status, supersedes_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          resolution.spotifyArtistId,
+          resolution.artistMbid,
+          resolution.releaseCount,
+          resolution.namedLabelCount,
+          resolution.resolvedAt,
+          resolution.status,
+          previous?.id ?? null,
+        );
+
+      const id = Number(info.lastInsertRowid);
+      this.#insertCandidates('artist_label', id, resolution.candidates);
+      this.#insertVotes('artist_label_signal_vote', id, resolution.votes);
+
+      this.#db.exec('COMMIT');
+      return id;
+    } catch (error) {
+      this.#db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  #insertCandidates(table: string, resolutionId: number, candidates: LabelCandidate[]): void {
+    if (table === 'artist_label') {
+      // The artist-level table carries a per-label release count rather than release detail:
+      // it aggregates a career, so which pressing a label appeared on is not the question.
+      const statement = this.#db.prepare(
+        `INSERT INTO artist_label (resolution_id, label_name, label_mbid, label_type, release_count)
+         VALUES (?, ?, ?, ?, ?)`,
+      );
+      const counts = new Map<string, number>();
+      for (const candidate of candidates) {
+        counts.set(candidate.labelName, (counts.get(candidate.labelName) ?? 0) + 1);
+      }
+      const seen = new Set<string>();
+      for (const candidate of candidates) {
+        if (seen.has(candidate.labelName)) continue;
+        seen.add(candidate.labelName);
+        statement.run(
+          resolutionId,
+          candidate.labelName,
+          candidate.labelMbid,
+          candidate.labelType,
+          counts.get(candidate.labelName) ?? 1,
+        );
+      }
+      return;
+    }
+
+    const statement = this.#db.prepare(
+      `INSERT INTO label_candidate
+         (resolution_id, label_name, label_mbid, label_type, catalog_number,
+          release_id, release_title, release_date, release_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const candidate of candidates) {
+      statement.run(
+        resolutionId,
+        candidate.labelName,
+        candidate.labelMbid,
+        candidate.labelType,
+        candidate.catalogNumber,
+        candidate.releaseId,
+        candidate.releaseTitle,
+        candidate.releaseDate,
+        candidate.releaseStatus,
+      );
+    }
+  }
+
+  #insertVotes(table: string, resolutionId: number, votes: SignalVote[]): void {
+    const statement = this.#db.prepare(
+      `INSERT INTO ${table} (resolution_id, signal, verdict, strength, evidence)
+       VALUES (?, ?, ?, ?, ?)`,
+    );
+    for (const vote of votes) {
+      statement.run(resolutionId, vote.signal, vote.verdict, vote.strength, vote.evidence);
+    }
+  }
+
+  #loadCandidates(resolutionId: number): LabelCandidate[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT label_name, label_mbid, label_type, catalog_number,
+                release_id, release_title, release_date, release_status
+         FROM label_candidate WHERE resolution_id = ?`,
+      )
+      .all(resolutionId) as Record<string, string | null>[];
+
+    return rows.map((row) => ({
+      labelName: row.label_name as string,
+      labelMbid: row.label_mbid ?? null,
+      labelType: (row.label_type ?? null) as LabelCandidate['labelType'],
+      catalogNumber: row.catalog_number ?? null,
+      releaseId: row.release_id as string,
+      releaseTitle: row.release_title ?? null,
+      releaseDate: row.release_date ?? null,
+      releaseStatus: row.release_status ?? null,
+    }));
+  }
+
+  #loadArtistCandidates(resolutionId: number): LabelCandidate[] {
+    const rows = this.#db
+      .prepare(
+        'SELECT label_name, label_mbid, label_type, release_count FROM artist_label WHERE resolution_id = ?',
+      )
+      .all(resolutionId) as Record<string, string | number | null>[];
+
+    return rows.map((row) => ({
+      labelName: row.label_name as string,
+      labelMbid: (row.label_mbid ?? null) as string | null,
+      labelType: (row.label_type ?? null) as LabelCandidate['labelType'],
+      catalogNumber: null,
+      // Artist-level candidates are not tied to one release; the count is the evidence.
+      releaseId: `aggregate:${String(row.release_count ?? 0)}`,
+      releaseTitle: null,
+      releaseDate: null,
+      releaseStatus: null,
+    }));
+  }
+
+  #loadVotes(table: string, resolutionId: number): SignalVote[] {
+    const rows = this.#db
+      .prepare(`SELECT signal, verdict, strength, evidence FROM ${table} WHERE resolution_id = ?`)
+      .all(resolutionId) as Record<string, string | null>[];
+
+    return rows.map((row) => ({
+      signal: row.signal as SignalVote['signal'],
+      verdict: row.verdict as LabelVerdict,
+      strength: row.strength as SignalVote['strength'],
+      evidence: row.evidence ?? null,
+    }));
+  }
+
+  getCurrentLabelResolution(isrc: string): LabelResolution | null {
+    // No is_current flag to maintain: a maintained flag can end up with two rows both claiming
+    // to be current, and that reads as valid data. This query cannot go stale (BR-13.3).
+    const row = this.#db
+      .prepare('SELECT * FROM label_resolution WHERE isrc = ? ORDER BY resolved_at DESC LIMIT 1')
+      .get(isrc) as Record<string, unknown> | undefined;
+    return row === undefined ? null : this.#toLabelResolution(row);
+  }
+
+  getLabelResolutionById(id: number): LabelResolution | null {
+    const row = this.#db.prepare('SELECT * FROM label_resolution WHERE id = ?').get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row === undefined ? null : this.#toLabelResolution(row);
+  }
+
+  #toLabelResolution(row: Record<string, unknown>): LabelResolution {
+    const id = row.id as number;
+    return {
+      id,
+      isrc: row.isrc as string,
+      recordingMbid: (row.recording_mbid ?? null) as string | null,
+      matchMethod: row.match_method as LabelResolution['matchMethod'],
+      narrowingTier: row.narrowing_tier as LabelResolution['narrowingTier'],
+      releaseCount: row.release_count as number,
+      resolvedAt: row.resolved_at as string,
+      status: row.status as LabelResolution['status'],
+      supersedesId: (row.supersedes_id ?? null) as number | null,
+      candidates: this.#loadCandidates(id),
+      votes: this.#loadVotes('label_signal_vote', id),
+    };
+  }
+
+  getCurrentArtistLabelResolution(spotifyArtistId: string): ArtistLabelResolution | null {
+    const row = this.#db
+      .prepare(
+        `SELECT * FROM artist_label_resolution
+         WHERE spotify_artist_id = ? ORDER BY resolved_at DESC LIMIT 1`,
+      )
+      .get(spotifyArtistId) as Record<string, unknown> | undefined;
+    return row === undefined ? null : this.#toArtistResolution(row);
+  }
+
+  getArtistLabelResolutionById(id: number): ArtistLabelResolution | null {
+    const row = this.#db.prepare('SELECT * FROM artist_label_resolution WHERE id = ?').get(id) as
+      | Record<string, unknown>
+      | undefined;
+    return row === undefined ? null : this.#toArtistResolution(row);
+  }
+
+  #toArtistResolution(row: Record<string, unknown>): ArtistLabelResolution {
+    const id = row.id as number;
+    return {
+      id,
+      spotifyArtistId: row.spotify_artist_id as string,
+      artistMbid: (row.artist_mbid ?? null) as string | null,
+      releaseCount: row.release_count as number,
+      namedLabelCount: row.named_label_count as number,
+      resolvedAt: row.resolved_at as string,
+      status: row.status as ArtistLabelResolution['status'],
+      supersedesId: (row.supersedes_id ?? null) as number | null,
+      candidates: this.#loadArtistCandidates(id),
+      votes: this.#loadVotes('artist_label_signal_vote', id),
+    };
+  }
+
+  /**
+   * Write the as-of-play snapshot, refusing to overwrite one that already exists.
+   *
+   * `WHERE label_verdict IS NULL` is the whole of BR-8.4a. A later resolution appends a version;
+   * it does not revise what was believed at the time. Backfill depends on this being enforced
+   * here rather than remembered by every caller.
+   */
+  applyLabelSnapshot(playId: number, snapshot: LabelSnapshot): boolean {
+    const info = this.#db
+      .prepare(
+        `UPDATE play SET
+           label_verdict = ?, label_confidence = ?, label_contested = ?,
+           label_names = ?, label_match_method = ?, label_narrowing_tier = ?,
+           label_unknown_reason = ?, label_resolution_id = ?, label_classifier_version = ?
+         WHERE id = ? AND label_verdict IS NULL`,
+      )
+      .run(
+        snapshot.verdict,
+        snapshot.confidence,
+        snapshot.contested ? 1 : 0,
+        snapshot.labelNames.length > 0 ? JSON.stringify(snapshot.labelNames) : null,
+        snapshot.matchMethod,
+        snapshot.narrowingTier,
+        snapshot.unknownReason,
+        snapshot.resolutionId,
+        snapshot.classifierVersion,
+        playId,
+      );
+    return info.changes > 0;
+  }
+
+  applyArtistLabelSnapshot(playId: number, snapshot: ArtistLabelSnapshot): boolean {
+    const info = this.#db
+      .prepare(
+        `UPDATE play SET
+           artist_label_verdict = ?, artist_label_confidence = ?,
+           artist_label_names = ?, artist_label_resolution_id = ?
+         WHERE id = ? AND artist_label_verdict IS NULL`,
+      )
+      .run(
+        snapshot.verdict,
+        snapshot.confidence,
+        snapshot.labelNames.length > 0 ? JSON.stringify(snapshot.labelNames) : null,
+        snapshot.resolutionId,
+        playId,
+      );
+    return info.changes > 0;
+  }
+
+  /**
+   * Amend liked evidence.
+   *
+   * Booleans are stored as 1/0/NULL, and **NULL is never written as 0** — the saved-track set can
+   * be unavailable, and a fabricated `false` would read as an observed choice (BR-9.5). The
+   * transition is derived here rather than passed in, so the two can never disagree.
+   */
+  updateLikedEvidence(playId: number, evidence: LikedEvidence): void {
+    const { likedAtStart: start, likedAtEnd: end } = evidence;
+
+    const transition =
+      start === null || end === null
+        ? 'unknown'
+        : start && end
+          ? 'kept-liked'
+          : !start && end
+            ? 'liked-during'
+            : start && !end
+              ? 'unliked-during'
+              : 'kept-unliked';
+
+    this.#db
+      .prepare(
+        `UPDATE play SET liked_at_start = ?, liked_at_end = ?, liked_added_at = ?,
+                         liked_transition = ?
+         WHERE id = ?`,
+      )
+      .run(
+        start === null ? null : start ? 1 : 0,
+        end === null ? null : end ? 1 : 0,
+        evidence.likedAddedAt,
+        transition,
+        playId,
+      );
+  }
+
+  listPlaysNeedingLabels(limit: number): PlayNeedingLabels[] {
+    // The database is the queue of record (P-5): a restart loses the in-memory queue and
+    // nothing else, because this query re-derives exactly what remains to be done.
+    const rows = this.#db
+      .prepare(
+        `SELECT id, track_id, isrc, artist_id, album_name, release_date
+         FROM play
+         WHERE isrc IS NOT NULL AND label_verdict IS NULL
+         ORDER BY started_at DESC
+         LIMIT ?`,
+      )
+      .all(limit) as Record<string, string | number | null>[];
+    return rows.map(toPlayNeedingLabels);
+  }
+
+  listPlaysNeedingIsrc(limit: number): PlayNeedingLabels[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT id, track_id, isrc, artist_id, album_name, release_date
+         FROM play
+         WHERE isrc IS NULL
+         ORDER BY started_at DESC
+         LIMIT ?`,
+      )
+      .all(limit) as Record<string, string | number | null>[];
+    return rows.map(toPlayNeedingLabels);
+  }
+
+  /**
+   * Keys whose newest version has aged past its TTL.
+   *
+   * Two TTLs, because they answer different questions (P-3). A `resolved` row is re-checked
+   * because the underlying fact can change — an artist signs. An `unknown` row is re-checked
+   * because MusicBrainz's *completeness* changes, and the probe measured that gap as
+   * recency-biased toward exactly the music the hypothesis is about.
+   *
+   * `now` is a parameter rather than a clock read, so TTL behaviour is testable without waiting
+   * ninety days.
+   */
+  listStaleLabelResolutions(
+    now: string,
+    unknownTtlDays: number,
+    resolvedTtlDays: number,
+    limit: number,
+  ): StaleResolution[] {
+    const cutoff = (days: number): string =>
+      new Date(Date.parse(now) - days * 86_400_000).toISOString();
+
+    const rows = this.#db
+      .prepare(
+        `SELECT isrc AS key, status, resolved_at FROM label_resolution AS r
+         WHERE r.resolved_at = (
+                 SELECT MAX(resolved_at) FROM label_resolution WHERE isrc = r.isrc)
+           AND ( (r.status = 'resolved'  AND r.resolved_at < ?)
+              OR (r.status <> 'resolved' AND r.resolved_at < ?) )
+         ORDER BY r.resolved_at ASC
+         LIMIT ?`,
+      )
+      .all(cutoff(resolvedTtlDays), cutoff(unknownTtlDays), limit) as Record<string, string>[];
+
+    return rows.map((row) => ({
+      key: row.key as string,
+      status: row.status as StaleResolution['status'],
+      resolvedAt: row.resolved_at as string,
+    }));
+  }
+
+  labelCoverage(now: string): LabelCoverage {
+    const count = (sql: string, ...params: (string | number)[]): number => {
+      const row = this.#db.prepare(sql).get(...params) as { n: number } | undefined;
+      return row?.n ?? 0;
+    };
+
+    const byVerdict: Record<LabelVerdict, number> = {
+      major: count("SELECT COUNT(*) AS n FROM play WHERE label_verdict = 'major'"),
+      independent: count("SELECT COUNT(*) AS n FROM play WHERE label_verdict = 'independent'"),
+      unknown: count("SELECT COUNT(*) AS n FROM play WHERE label_verdict = 'unknown'"),
+    };
+
+    const reasons: UnknownReason[] = ['noIsrc', 'notFound', 'noEligibleCandidate', 'error'];
+    const unknownByReason = Object.fromEntries(
+      reasons.map((reason) => [
+        reason,
+        count('SELECT COUNT(*) AS n FROM play WHERE label_unknown_reason = ?', reason),
+      ]),
+    ) as Record<UnknownReason, number>;
+
+    // BR-10.3 — the breakdown that keeps R2 visible. A single aggregate would hide that the
+    // misses concentrate on recent releases.
+    const yearRows = this.#db
+      .prepare(
+        `SELECT COALESCE(substr(release_date, 1, 4), 'unknown') AS year,
+                COUNT(*) AS total,
+                SUM(CASE WHEN label_verdict IS NOT NULL AND label_verdict <> 'unknown'
+                         THEN 1 ELSE 0 END) AS resolved
+         FROM play GROUP BY year ORDER BY year`,
+      )
+      .all() as Record<string, string | number>[];
+
+    return {
+      asOf: now,
+      total: count('SELECT COUNT(*) AS n FROM play'),
+      resolved: byVerdict.major + byVerdict.independent,
+      // `pending` is a real state, never folded into `unknown` (BR-7.7): counting in-flight
+      // lookups as absent data would corrupt the very metric R2 is measured with.
+      pending: count('SELECT COUNT(*) AS n FROM play WHERE label_verdict IS NULL'),
+      byVerdict,
+      unknownByReason,
+      byReleaseYear: yearRows.map((row) => ({
+        year: String(row.year),
+        total: Number(row.total),
+        resolved: Number(row.resolved),
+      })),
+    };
+  }
+
   close(): void {
     this.#db.close();
   }
+}
+
+function toPlayNeedingLabels(row: Record<string, string | number | null>): PlayNeedingLabels {
+  return {
+    playId: row.id as number,
+    trackId: row.track_id as string,
+    isrc: (row.isrc ?? null) as string | null,
+    artistId: (row.artist_id ?? null) as string | null,
+    albumName: row.album_name as string,
+    releaseDate: (row.release_date ?? null) as string | null,
+  };
 }

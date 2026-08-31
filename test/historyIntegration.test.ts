@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import { Writable } from 'node:stream';
 import { PlayObserver, type PlaybackSample } from '../src/history/PlayObserver.js';
 import { SqliteHistoryRepository } from '../src/history/SqliteHistoryRepository.js';
+import { MIGRATIONS } from '../src/history/migrations.js';
 import { DEFAULT_TOLERANCES } from '../src/history/outcomeClassifier.js';
 import { ExportService, validateFilter, parseFormat } from '../src/export/ExportService.js';
 import { UNKNOWN_TOKEN } from '../src/export/serialisers.js';
@@ -274,7 +275,7 @@ describe('restart behaviour', () => {
     first.close();
 
     const second = new SqliteHistoryRepository(path);
-    assert.equal(second.schemaVersion, 1);
+    assert.equal(second.schemaVersion, MIGRATIONS[MIGRATIONS.length - 1]!.version);
     assert.equal(second.migrationReport.applied.length, 0, 'migration must not re-run');
     assert.equal([...second.listPlays()].length, 1, 'history must survive a restart (NFR-11)');
     second.close();

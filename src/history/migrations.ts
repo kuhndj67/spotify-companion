@@ -93,6 +93,172 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 2,
+    description: 'label enrichment: versioned resolutions, liked evidence',
+    up(db) {
+      db.exec(`
+        -- ============================================================================
+        -- Cached MusicBrainz facts. APPEND-ONLY (BR-13.1).
+        --
+        -- Re-resolving inserts a NEW ROW rather than replacing the old one, because two
+        -- different things are both called "the data changed":
+        --
+        --   our knowledge changed  a volunteer catalogued a release we could not see
+        --                          -> the old verdict was WRONG, prefer the new one
+        --   the world changed      the artist signed to a major
+        --                          -> the old verdict was RIGHT FOR ITS TIME, keep it
+        --
+        -- MusicBrainz cannot tell you which occurred: a lookup that 404'd in August and
+        -- returns Atlantic in January is byte-identical either way. So both readings are
+        -- kept and the choice is made per level at analysis time (BR-13.6).
+        -- ============================================================================
+
+        CREATE TABLE label_resolution (
+          id             INTEGER PRIMARY KEY AUTOINCREMENT,
+          isrc           TEXT    NOT NULL,
+          recording_mbid TEXT,
+          match_method   TEXT    NOT NULL
+                           CHECK (match_method IN ('isrc','search','none')),
+          narrowing_tier TEXT    NOT NULL
+                           CHECK (narrowing_tier IN ('title-date','title','all','none')),
+          release_count  INTEGER NOT NULL DEFAULT 0,
+          resolved_at    TEXT    NOT NULL,
+          status         TEXT    NOT NULL
+                           CHECK (status IN ('resolved','not-found','error')),
+          supersedes_id  INTEGER REFERENCES label_resolution(id),
+          -- Idempotence guard for BR-8.6: a backfill re-run that resolved the same ISRC
+          -- twice in the same instant would otherwise silently double the candidate set.
+          UNIQUE (isrc, resolved_at)
+        );
+
+        -- Candidates key to the RESOLUTION VERSION, never to the ISRC (BR-13.2). Keyed to
+        -- the ISRC they would accumulate across every resolution, and BR-8.7's
+        -- reclassification would fold 2026 facts together with 2027 facts and vote on the
+        -- union -- a verdict derived from a world-state that never existed at any moment.
+        CREATE TABLE label_candidate (
+          resolution_id  INTEGER NOT NULL
+                           REFERENCES label_resolution(id) ON DELETE CASCADE,
+          label_name     TEXT    NOT NULL,
+          label_mbid     TEXT,
+          label_type     TEXT,
+          catalog_number TEXT,
+          release_id     TEXT    NOT NULL,
+          release_title  TEXT,
+          release_date   TEXT,
+          release_status TEXT
+        );
+
+        CREATE TABLE artist_label_resolution (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          spotify_artist_id TEXT    NOT NULL,
+          artist_mbid       TEXT,
+          release_count     INTEGER NOT NULL DEFAULT 0,
+          named_label_count INTEGER NOT NULL DEFAULT 0,
+          resolved_at       TEXT    NOT NULL,
+          status            TEXT    NOT NULL
+                              CHECK (status IN ('resolved','not-found','error')),
+          supersedes_id     INTEGER REFERENCES artist_label_resolution(id),
+          UNIQUE (spotify_artist_id, resolved_at)
+        );
+
+        CREATE TABLE artist_label (
+          resolution_id INTEGER NOT NULL
+                          REFERENCES artist_label_resolution(id) ON DELETE CASCADE,
+          label_name    TEXT    NOT NULL,
+          label_mbid    TEXT,
+          label_type    TEXT,
+          release_count INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- Votes are split by scope rather than carrying a scope column, because once they key
+        -- to a resolution_id a single column would have to point into TWO tables. SQLite
+        -- cannot express a polymorphic foreign key and therefore cannot enforce it; six
+        -- columns of duplication buys a real REFERENCES with cascade on both.
+        CREATE TABLE label_signal_vote (
+          resolution_id INTEGER NOT NULL
+                          REFERENCES label_resolution(id) ON DELETE CASCADE,
+          signal        TEXT    NOT NULL
+                          CHECK (signal IN ('major-root-list','label-relationship','isrc-prefix')),
+          verdict       TEXT    NOT NULL
+                          CHECK (verdict IN ('major','independent','unknown')),
+          strength      TEXT    NOT NULL CHECK (strength IN ('strong','weak')),
+          evidence      TEXT
+        );
+
+        CREATE TABLE artist_label_signal_vote (
+          resolution_id INTEGER NOT NULL
+                          REFERENCES artist_label_resolution(id) ON DELETE CASCADE,
+          signal        TEXT    NOT NULL
+                          CHECK (signal IN ('major-root-list','label-relationship','isrc-prefix')),
+          verdict       TEXT    NOT NULL
+                          CHECK (verdict IN ('major','independent','unknown')),
+          strength      TEXT    NOT NULL CHECK (strength IN ('strong','weak')),
+          evidence      TEXT
+        );
+
+        -- ============================================================================
+        -- The derived snapshot on the play: AS-OF-PLAY, immutable once written (BR-8.4a).
+        --
+        -- Every column is nullable and NULL means UNKNOWN -- never false, never 0, end to
+        -- end including exports, where it renders as the literal token "unknown". Missing
+        -- data here is correlated with the variable being measured (R2), so a blank that
+        -- reads as "no" would manufacture the finding.
+        -- ============================================================================
+
+        ALTER TABLE play ADD COLUMN label_verdict TEXT
+          CHECK (label_verdict IN ('major','independent','unknown'));
+        ALTER TABLE play ADD COLUMN label_confidence TEXT
+          CHECK (label_confidence IN ('high','medium','low'));
+        ALTER TABLE play ADD COLUMN label_contested INTEGER;
+        ALTER TABLE play ADD COLUMN label_names TEXT;
+        ALTER TABLE play ADD COLUMN label_match_method TEXT;
+        ALTER TABLE play ADD COLUMN label_narrowing_tier TEXT;
+        ALTER TABLE play ADD COLUMN label_unknown_reason TEXT;
+        ALTER TABLE play ADD COLUMN artist_label_verdict TEXT
+          CHECK (artist_label_verdict IN ('major','independent','unknown'));
+        ALTER TABLE play ADD COLUMN artist_label_confidence TEXT
+          CHECK (artist_label_confidence IN ('high','medium','low'));
+        ALTER TABLE play ADD COLUMN artist_label_names TEXT;
+        ALTER TABLE play ADD COLUMN label_classifier_version INTEGER;
+
+        -- Pointers to the EXACT versions the verdict came from (BR-13.4). These replace the
+        -- label_resolved_at timestamp proposed at NFR Design: a pointer is strictly more
+        -- informative and cannot drift out of step with the row it describes. They are also
+        -- what lets BR-12's trace reconstruct the derivation from the candidates that
+        -- version actually held, rather than from whatever the current ones happen to be.
+        ALTER TABLE play ADD COLUMN label_resolution_id INTEGER
+          REFERENCES label_resolution(id);
+        ALTER TABLE play ADD COLUMN artist_label_resolution_id INTEGER
+          REFERENCES artist_label_resolution(id);
+
+        -- Liked evidence. NULL means unknown and NEVER false: the saved-track set can be
+        -- unavailable, and a false written in its place would read as an observed choice
+        -- and is unrecoverable (BR-9.5).
+        ALTER TABLE play ADD COLUMN liked_at_start INTEGER;
+        ALTER TABLE play ADD COLUMN liked_at_end INTEGER;
+        ALTER TABLE play ADD COLUMN liked_added_at TEXT;
+        ALTER TABLE play ADD COLUMN liked_transition TEXT
+          CHECK (liked_transition IN
+            ('liked-during','unliked-during','kept-liked','kept-unliked','unknown'));
+
+        -- The current version for a key is ORDER BY resolved_at DESC LIMIT 1 (BR-13.3).
+        -- There is deliberately NO is_current flag: a maintained flag has to be updated on
+        -- every insert, and its failure mode is two rows both claiming to be current, which
+        -- reads as valid data. A query cannot go stale.
+        CREATE INDEX idx_label_resolution_key
+          ON label_resolution(isrc, resolved_at DESC);
+        CREATE INDEX idx_artist_resolution_key
+          ON artist_label_resolution(spotify_artist_id, resolved_at DESC);
+        CREATE INDEX idx_label_candidate_res ON label_candidate(resolution_id);
+        CREATE INDEX idx_artist_label_res    ON artist_label(resolution_id);
+        CREATE INDEX idx_label_vote_res      ON label_signal_vote(resolution_id);
+        CREATE INDEX idx_artist_vote_res     ON artist_label_signal_vote(resolution_id);
+        CREATE INDEX idx_play_label_verdict  ON play(label_verdict);
+        CREATE INDEX idx_play_artist_id      ON play(artist_id);
+      `);
+    },
+  },
 ];
 
 /**

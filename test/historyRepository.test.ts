@@ -10,6 +10,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SqliteHistoryRepository } from '../src/history/SqliteHistoryRepository.js';
+import { MIGRATIONS } from '../src/history/migrations.js';
+
+/** The newest schema this codebase knows about. */
+const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
 import { DEFAULT_TOLERANCES, CLASSIFIER_VERSION, summarise } from '../src/history/outcomeClassifier.js';
 import type { NewPlayRecord } from '../src/history/types.js';
 import { completeTrail } from './historyGenerators.js';
@@ -44,11 +48,14 @@ function samplePlay(overrides: Partial<NewPlayRecord> = {}): NewPlayRecord {
 }
 
 describe('migrations', () => {
-  it('applies migration 001 on a fresh database', () => {
+  it('applies every migration on a fresh database', () => {
+    // Asserted against MIGRATIONS rather than a hardcoded number: the schema grows per phase
+    // (U2 added 002, U5 will add another), and a literal here turns every future migration
+    // into a spurious failure in a U1 test that is not actually about U2.
     const repo = makeRepo();
-    assert.equal(repo.schemaVersion, 1);
+    assert.equal(repo.schemaVersion, LATEST_SCHEMA_VERSION);
     assert.equal(repo.migrationReport.from, 0);
-    assert.equal(repo.migrationReport.applied.length, 1);
+    assert.equal(repo.migrationReport.applied.length, MIGRATIONS.length);
     repo.close();
   });
 

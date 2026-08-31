@@ -73,7 +73,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## Current state (2026-08-26)
+## Current state (2026-08-31)
 
 **INCEPTION complete. CONSTRUCTION in progress — U1 of 5 units done.**
 
@@ -81,7 +81,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 |---|---|---|
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
-| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — MusicBrainz probed live ×2; **Functional Design complete, awaiting approval** |
+| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — MusicBrainz probed live ×2; **Functional Design approved** (+ BR-12 resolution trace). Next: NFR Design |
 | U3 Rule model (pure core) | 3 | Pending |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |

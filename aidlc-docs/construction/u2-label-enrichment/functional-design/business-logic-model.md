@@ -20,6 +20,7 @@ src/musicbrainz/
   LabelCache.ts           I/O    ISRC and artist resolutions, TTL
   LabelBackfillJob.ts     I/O    historical rows
   LikedSetCache.ts        I/O    saved-track set + grace-window re-check
+  resolutionTrace.ts   ⚙️ PURE   stored candidates + votes -> ordered derivation (BR-12)
 ```
 
 **Three pure modules, and the purity is load-bearing.** `labelClassifier` decides the variable the
@@ -298,6 +299,56 @@ BR-11.1 and BR-11.5 together are what make this a gate rather than a formality. 
 stops the criterion being fitted to the result; recording the outcome either way is the project's
 stated commitment that **R1 is a hypothesis to be tested, and the design was built so it can be
 disconfirmed.**
+
+---
+
+## Flow 9 — `explain(playId)` — the resolution trace ⚙️ PURE over stored data
+
+**Added 2026-08-31 by user decision at the approval gate.** BR-12. Answers *"how did this track
+get this verdict, and which rules fired to get there?"*
+
+```
+1.  Load the play, its LabelResolution and ArtistLabelResolution,
+    their LabelCandidates and SignalVotes          <- database only, no network (BR-12.7)
+2.  If no resolution exists -> emit the unknown REASON (BR-10.2), not an empty trace  (BR-12.8)
+3.  Re-run classify() over the stored candidates    <- the SAME pure function (BR-12.2)
+      collecting, per step, the rule IDs that fired
+4.  Emit the derivation, in order:
+      a. join      — isrc / spotify-url · matchMethod (isrc | search)     BR-1, BR-2.x
+      b. narrowing — which tier fired: title+date | title | all           BR-2.x
+      c. candidates— every label found, each marked eligible or SUPPRESSED
+                     with the rule ID that suppressed it                  BR-3.1, BR-3.2
+      d. votes     — each signal, its verdict, its strength               BR-5.x
+      e. fold      — the rule that decided, incl. asymmetry and contested BR-4.3, BR-4.4, BR-6.5
+      f. confidence— the band and every cap that applied                  BR-4.x
+5.  Compare play.label_classifier_version to the running version
+      -> if they differ, FLAG the trace as recomputed under newer rules   (BR-12.5)
+```
+
+**No `ok`/`fail` status anywhere in the output** (BR-12.6). This is a derivation, not a health
+check — and the distinction is load-bearing, because U2's failure mode is a verdict that is
+confidently wrong while every step "succeeded".
+
+### Step 4c is the step that exists for the standing rule
+
+The precision-over-recall rule operates by **exclusion**, and exclusion is invisible in a verdict.
+`unknown` because MusicBrainz knew nothing and `unknown` because a `Publisher` candidate was found
+and refused are the same output with entirely different meanings. Marking suppressed candidates
+**with the rule ID that suppressed them** is what separates them.
+
+### Step 5 is not optional
+
+Steps 1–4 are a faithful account only if the classifier has not changed since the play was
+classified. R3 guarantees it will change. Without step 5 the trace would present today's reasoning
+as the historical record — internally consistent, plausible, and wrong. That is the failure shape
+this project keeps meeting; here it is anticipated rather than discovered.
+
+### Why this is not a step in Flow 1
+
+Flow 1 is the live path and is bound by NFR-16 — MusicBrainz must never delay the display. The
+trace is user-initiated, reads only local state, and is affordable precisely because BR-8.7 already
+made recomputation free. It is a **separate, on-demand read**, and it can address any historical
+play (BR-12.4), which the live path by definition cannot.
 
 ---
 

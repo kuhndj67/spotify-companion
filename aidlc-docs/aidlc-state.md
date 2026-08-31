@@ -4,12 +4,47 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 Functional Design COMPLETE** (2026-08-26), all 13
-  questions answered across two rounds. Artifacts at
+- **Current Stage**: CONSTRUCTION — **U2 Functional Design APPROVED** (2026-08-31), with one
+  addition made at the gate: a **resolution trace** (BR-12, Flow 9, `ResolutionTrace`) showing how a
+  track's label verdict was reached and which rules fired. Artifacts at
   [`construction/u2-label-enrichment/functional-design/`](construction/u2-label-enrichment/functional-design/).
-  **Awaiting user approval.** Next: **NFR Design** (narrow — MusicBrainz integration only).
+  **Next: NFR Design** — narrow: MusicBrainz integration, plus the trace's delivery route.
   Two live MusicBrainz probes done — Parts 5 and 6 of `research-findings.md`.
   U1 complete and live-verified: 193/193 tests, 99.41% line / 93.00% branch, **71 plays, 0 gaps**.
+
+## ⭐ Added at the approval gate (2026-08-31) — the resolution trace
+
+User approved the design **and** asked for *"a debug output that shows how the data for a track was
+collected … showing the rules applied so different rule paths can be tested"*, suggesting the
+existing diagnostics pop-up as its home.
+
+**Migration 002 is unchanged.** The trace is *recomputed* from `label_candidate` and
+`label_signal_vote` by re-running the pure classifier — data BR-8.7 already required so
+reclassification needs no MusicBrainz request. Second time the observation/judgement split has paid
+(first was U1's completion threshold).
+
+| Decision | Rule |
+|---|---|
+| Works for **any play in history**, not just now-playing | BR-12.4 |
+| Names the rule IDs that fired, **including suppressions** | BR-12.3 |
+| Shows stored **and** running `label_classifier_version`, flags divergence | BR-12.5 |
+| A **derivation**, not `ok`/`fail` steps — own section in the dialog | BR-12.6 |
+| Zero MusicBrainz / Spotify requests | BR-12.7 |
+
+**Why BR-12.3 matters most.** The standing precision rule works by **exclusion**, which is invisible
+in a verdict: `unknown` because MusicBrainz knew nothing and `unknown` because a `Publisher`
+candidate was found and refused are the same output. Faouzia is the live case — `Faouzia Music`,
+type `Publisher`, artist actually on Atlantic.
+
+**Why BR-12.5 is mandatory.** R3 guarantees the classifier is re-tuned. After that, a recomputed
+trace explains an old play with today's rules — self-consistent, plausible, and never actually run.
+Same failure shape as the MusicBrainz `200`-with-`inc`-ignored catch, anticipated rather than
+discovered.
+
+**Assumption, not blocking**: trace always available, not dev-flag-gated. Local single-user app.
+
+**Deferred to NFR Design**: whether it is `/api/explain/{playId}` or an extension of
+`/api/diagnostics`, and how a historical play is selected in the UI.
 
 ## U2 Settled Design Parameters (Functional Design, 2026-08-26)
 | Parameter | Value | Source |

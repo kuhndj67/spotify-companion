@@ -464,3 +464,54 @@ behaviour — `pending` must never render as `unknown` — is specified as **BR-
 **Precision over recall in the independent determination** (user, Q5). Missing an independent track
 costs one row; calling a major track independent **manufactures support for the hypothesis under
 test**, invisibly. BR-3.1, BR-3.2 and BR-4.3/4.4 are all expressions of this.
+
+---
+
+## Approval — with one addition (2026-08-31)
+
+**User approved the Functional Design**, adding a requirement at the gate:
+
+> *"Include a debug output that shows how the data for a track was collected (perhaps showing the
+> rules applied so different rule paths can be tested). The app has a diagnostics pop-up and I think
+> that likely could be used for debug data."*
+
+Adopted as **BR-12** (8 rules), **Flow 9 — `explain(playId)`**, and the **ResolutionTrace** entity.
+
+### Why this cost no schema
+
+The trace is **recomputed** from `label_candidate` and `label_signal_vote` by re-running the pure
+classifier — data BR-8.7 already required for reclassification. **Migration 002 is unchanged.** The
+observation/judgement split paid for a second time (the first was U1's completion threshold).
+
+### Three things the request implied that were made explicit
+
+1. **"So different rule paths can be tested" means it cannot be now-playing only.** The paths worth
+   inspecting — `contested`, the `all` tier, a search fallback, a `Distributor`-only weak vote —
+   cannot be summoned by playing a track. BR-12.4 extends the trace to **any play in history**,
+   which recomputation makes free.
+2. **The trace must show what the rules *refused*, not just what they found.** The standing
+   precision rule works by exclusion, and exclusion is invisible in a verdict: `unknown` because
+   MusicBrainz knew nothing and `unknown` because a `Publisher` candidate was found and discarded
+   are the same output. BR-12.3 records the **suppressing rule ID** per candidate.
+3. **A recomputed trace can lie about history.** R3 guarantees the classifier gets re-tuned; after
+   that, tracing an old play explains it with today's rules. BR-12.5 requires the stored and running
+   `label_classifier_version` both be shown, with divergence flagged.
+
+### On the diagnostics pop-up
+
+The existing dialog is a **connect/auth/query health check** — a flat `DiagnosticStep[]` of
+`ok`/`fail`/`skip`. The trace is a **derivation**, and appending it as steps would misrepresent it:
+every step can read "ok" while the verdict is wrong, which is precisely U2's failure mode. It
+therefore becomes a **second section within the same dialog**, with its own structure and no
+pass/fail status (BR-12.6). The user's instinct that the dialog is the right home is kept; only the
+row format is not reused.
+
+**Assumption stated, not blocking**: the trace is always available rather than hidden behind a
+dev-only flag — this is a local single-user app whose whole premise is inspectable evidence. Say so
+if it should be gated instead.
+
+### Deferred to NFR Design
+
+- Whether the trace is a new `/api/explain/{playId}` route or an extension of `/api/diagnostics`
+- How a historical play is chosen in the UI (BR-12.4 requires *some* selector; the mechanism is a
+  design question, not a rule)

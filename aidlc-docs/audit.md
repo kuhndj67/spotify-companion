@@ -1341,3 +1341,76 @@ available.
 Skipped frontend-components.md with justification rather than producing an empty artifact: the U0
 component hierarchy is unchanged, and the one new UI behaviour is specified as BR-7.7."
 **Context**: CONSTRUCTION — U2 Functional Design complete, awaiting approval
+
+---
+
+## U2 Functional Design APPROVED — Resolution Trace Added at the Gate
+**Timestamp**: 2026-08-31
+**User Input**: "Approve the design but include a debug output that shows how the data for a track
+was collected (perhaps showing the rules applied so different rule path's can be tested). The app
+has a diagnostics pop-up and I think that likely could be used for debug data." · plus "Commit now
+to main"
+**AI Response**: "Approved the U2 Functional Design and folded the new requirement into the
+artifacts rather than deferring it to Code Generation, since it changes what the unit must produce.
+
+COMMITTED THE EXISTING U2 WORK FIRST as 297d06b, before amending anything. Four modified files and
+the whole u2-label-enrichment tree had been sitting uncommitted since 2026-08-26 — a week of design
+work living only in the working tree, on a project whose stated rule is commit directly to main.
+Kept the amendment as a separate change so the approval is legible in history.
+
+ADDED BR-12 (8 rules), FLOW 9 `explain(playId)`, AND THE ResolutionTrace ENTITY. Traced the
+derivation in order: join and match method, narrowing tier, candidates with eligibility, per-signal
+votes, the fold, and the confidence caps — each step naming the rule IDs that fired.
+
+THE AMENDMENT COSTS NO SCHEMA, AND THAT IS NOT LUCK. The trace is recomputed by re-running the pure
+classifier over `label_candidate` and `label_signal_vote` — exactly the data BR-8.7 already required
+so reclassification could run without MusicBrainz requests. Migration 002 is unchanged. This is the
+second time the store-observations-derive-judgements split has paid for itself; the first was U1's
+completion threshold, which could be revisited without re-collecting a play.
+
+READ THREE THINGS OUT OF THE REQUEST THAT IT DID NOT SAY LITERALLY.
+
+First, 'so different rule paths can be tested' cannot be satisfied by a now-playing-only view. The
+paths that most need inspection are the rare ones — contested (two majors on one release), the
+`all` narrowing tier, a search-fallback match, a Distributor-only weak vote — and none of them can
+be summoned on demand by playing a track. BR-12.4 makes the trace work for any play in history.
+Recomputation is what makes that affordable, so the requirement and its feasibility come from the
+same property.
+
+Second, the trace has to show what the rules REFUSED, not only what they found. The standing
+precision-over-recall rule operates almost entirely by exclusion — BR-3.1 discards Publisher
+candidates, BR-3.2 turns [no label] into unknown, BR-4.4 requires the absence of any major vote —
+and exclusion leaves no mark in a verdict. `unknown` because MusicBrainz knew nothing and `unknown`
+because a Publisher candidate was found and deliberately discarded are the same output with
+completely different meanings. BR-12.3 records the suppressing rule ID per candidate. Faouzia is
+the worked case: her only MusicBrainz label is Faouzia Music, type Publisher, and she records for
+Atlantic.
+
+Third, a recomputed trace can lie about history, and this one is a certainty rather than a risk. R3
+guarantees the classifier will be re-tuned; after that, tracing an old play explains it with today's
+rules and produces a derivation that never actually ran. It would be internally consistent,
+plausible, and wrong — the same failure shape as MusicBrainz returning 200 with `inc` silently
+ignored, which this project was caught by four times. BR-12.5 requires the stored and running
+label_classifier_version both be shown with divergence flagged. Anticipated this time rather than
+discovered.
+
+DECLINED TO REUSE THE DIAGNOSTIC STEP FORMAT while keeping the user's placement. The existing dialog
+is a connect/auth/query health check: a flat DiagnosticStep[] of ok/fail/skip. A derivation is not
+pass/fail, and forcing it into that shape would let every step read 'ok' while the verdict is wrong
+— which is exactly U2's stated failure mode. BR-12.6 gives the trace its own structure as a second
+section in the same dialog.
+
+STATED ONE ASSUMPTION RATHER THAN BLOCKING ON IT: the trace is always available, not behind a
+dev-only flag, on the grounds that this is a local single-user app whose premise is inspectable
+evidence. Flagged for reversal if wrong.
+
+VERIFIED THE BACKFILL NUMBER AGAINST THE LIVE DATABASE instead of trusting the document. 50 rows
+lack an ISRC but resolve to 47 distinct track_ids, so Q7's '47 one-off GET /tracks/{id}' is correct.
+
+ALSO CORRECTED A STALE LINE IN CLAUDE.md that still described U2 as having questions awaiting
+answers, contradicting aidlc-state.md. It is the first file a new session reads.
+
+Repo state on restart: 193/193 tests, typecheck clean, 71 plays, database untouched since
+2026-08-26."
+**Context**: CONSTRUCTION — U2 Functional Design APPROVED with BR-12 added. Next: NFR Design,
+scoped to the MusicBrainz integration and the trace's delivery route

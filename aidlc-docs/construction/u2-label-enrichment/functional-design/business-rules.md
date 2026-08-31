@@ -303,6 +303,56 @@ recoverable by re-analysis.
 
 ---
 
+## BR-12: The resolution trace — how a verdict was reached
+
+**Added 2026-08-31 by user decision at the Functional Design approval gate:** *"include a debug
+output that shows how the data for a track was collected (perhaps showing the rules applied so
+different rule paths can be tested)."*
+
+| # | Rule | Source |
+|---|---|---|
+| **BR-12.1** | Any play with a stored label resolution can produce a **resolution trace**: the ordered derivation from ISRC through candidates, eligibility, votes and fold to the final verdict | User, 2026-08-31 |
+| **BR-12.2** | The trace is **recomputed** by re-running the pure classifier over stored candidates and votes — it is never a separately persisted narrative | BR-4.8, BR-8.7 |
+| **BR-12.3** | The trace names the **rule IDs** that fired, including every rule that **suppressed** a candidate | User, 2026-08-31 |
+| **BR-12.4** | The trace is available for **any play in history**, not only the currently playing track | User: *"so different rule paths can be tested"* |
+| **BR-12.5** | The trace reports the `label_classifier_version` stored on the play **and** the version generating the trace, and **flags divergence explicitly** | BR-8.7, FR-20 |
+| **BR-12.6** | The trace renders as a **derivation**, not as pass/fail steps; it has no `ok`/`fail` status | — |
+| **BR-12.7** | Generating a trace issues **zero** MusicBrainz and zero Spotify requests | BR-8.7, NFR-15 |
+| **BR-12.8** | A play with no resolution traces as its `unknown` **reason** (BR-10.2), not as an empty trace | BR-10.2, BR-7.7 |
+
+> ### BR-12.3 is the rule that makes the precision principle visible
+>
+> The standing rule for this unit works almost entirely **by exclusion**. BR-3.1 discards
+> `Publisher` candidates, BR-3.2 turns `[no label]` into `unknown`, and BR-4.4 requires the
+> *absence* of any major vote before `independent` can be returned. None of those leave a mark in
+> the verdict — a suppressed candidate and a candidate that never existed produce identical output.
+>
+> Faouzia is the worked example: her only MusicBrainz label is `Faouzia Music`, type `Publisher`,
+> and she records for Atlantic. The correct verdict is `unknown`. Without BR-12.3 that is
+> indistinguishable from "MusicBrainz returned nothing" — the trace is what shows a candidate was
+> found and deliberately refused, and **which rule refused it**.
+
+> ### BR-12.2 and BR-12.5 together — why the trace is recomputed, and why that needs a guard
+>
+> Recomputation is what makes the trace honest: it runs **the same pure function** that produced the
+> verdict, so it cannot drift into a hand-written description of what the code is believed to do.
+> BR-8.7 already guarantees this costs nothing, which is also what makes BR-12.4 affordable.
+>
+> But a classifier that has since been re-tuned will trace a historical play with **today's** rules
+> and produce a derivation that never actually ran. R3 guarantees the classifier *will* be re-tuned,
+> so this is a certainty rather than a risk. The output would be a plausible, self-consistent, wrong
+> account — **the exact failure shape this project has been caught by four times already**, and the
+> reason BR-12.5 is mandatory rather than a nicety.
+
+> ### BR-12.4 is a testing requirement, not a convenience
+>
+> The rule paths most in need of inspection are the rare ones — `contested` (two majors on one
+> release), the `all` narrowing tier, a search-fallback match, a `Distributor`-only weak vote.
+> **None of them can be summoned on demand by playing a track.** Restricting the trace to
+> now-playing would leave precisely the paths with the least test coverage the hardest to observe.
+
+---
+
 ## Rule-to-requirement coverage
 
 | Requirement | Rules |
@@ -322,3 +372,4 @@ recoverable by re-analysis.
 | R3 no clean major/indie definition | BR-4.1, BR-4.2, BR-4.7 |
 | Liked transitions (added by decision) | BR-9.1–9.8 |
 | Phase 2 decision gate | BR-11.1–11.6 |
+| Resolution trace (added 2026-08-31) | BR-12.1–12.8 |

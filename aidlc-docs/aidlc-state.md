@@ -4,12 +4,54 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 NFR Design COMPLETE**, revised 2026-08-31 to add
-  **BR-13 versioned resolutions**. Artifacts at
+- **Current Stage**: CONSTRUCTION — **U2 Infrastructure Design COMPLETE** (2026-08-31).
+  Functional Design, NFR Design and Infrastructure Design are all done. Artifacts at
   [`construction/u2-label-enrichment/`](construction/u2-label-enrichment/).
-  **Awaiting user approval.** Next: **Infrastructure Design** (narrow).
+  **Awaiting user approval.** Next: **Code Generation**.
   Two live MusicBrainz probes done — Parts 5 and 6 of `research-findings.md`.
   U1 complete and live-verified: 193/193 tests, 99.41% line / 93.00% branch, **71 plays, 0 gaps**.
+
+## 🏗️ U2 Infrastructure Design (2026-08-31)
+
+**The whole delta: a way out of the machine, plus one secret that is not a credential.**
+No new inbound port, no new listener, no new process, no broker.
+
+| Q | Decision | Source |
+|---|---|---|
+| Q1 Contact address | **B** — `secrets/musicbrainz.json`, read by `config.ts`, **fails closed** | **User** |
+| Q2 Deployment target | **A** — host `npm start` stays real; `compose.yaml` kept correct but unverified | **User** |
+| Q3 Container egress | **A** — verify at Build and Test, do not assume | default |
+| Q4 Config surface | **D** — TTLs/backfill tunable, **rate limit and retry fixed**, base URL configurable | default |
+| Q5 Coverage metrics | **A** — a `coverage` block in `/api/diagnostics`, its own dialog section | default |
+
+### ⭐ Measurement parameters are tunable; compliance values are not
+
+`LABEL_TTL_UNKNOWN_DAYS` (30) and `LABEL_TTL_RESOLVED_DAYS` (90) sit beside `COMPLETION_THRESHOLD`
+— they shape what the dataset contains, and R2 guarantees they need revisiting. The **1 req/sec
+spacing stays a constant in code**: there is no legitimate value other than 1, so a setting there
+would exist only to violate NFR-15.
+
+`MUSICBRAINZ_BASE_URL` is configurable for one reason — BR-1.2's regression test needs a fixture
+with a **known non-empty** answer, because a test asserting "no releases" would pass against the
+`inc=`-silently-ignored bug.
+
+### Why `secrets/` and not `.env`
+
+`node --env-file-if-exists=.env` was **verified working** on Node 22.17.0 (prints a notice and
+continues when absent). Rejected anyway: the project already has exactly one place for uncommittable
+things, and two places means two to check before publishing. Extending `spotify-config.json` was
+rejected because **the MCP server rewrites that file on every token refresh** — a hand-added field
+would be clobbered silently and intermittently.
+
+### Why the container guard was still not fixed
+
+U2 is the first unit wanting a long-running unattended process, which makes `restart:
+unless-stopped` genuinely attractive — **and that is exactly why the change was not bundled in**.
+Relaxing the single control NFR-07's no-authentication decision rests on, inside a unit about label
+enrichment, is how a security posture changes as a side effect. **Open item 1 stays open.**
+
+Consequence accepted: on the host, scheduled work runs only while the terminal is open. Backfill is
+built for this (P-5, startup sweep) — intermittent running degrades **timeliness, not correctness**.
 
 ## ⭐ BR-13 — resolutions are versioned, never overwritten (2026-08-31)
 

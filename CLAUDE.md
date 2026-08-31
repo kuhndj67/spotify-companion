@@ -81,7 +81,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 |---|---|---|
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
-| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — FD + NFR Design complete (BR-12 trace, BR-13 versioning). Next: Infrastructure Design |
+| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — FD + NFR + Infrastructure Design complete. Next: **Code Generation** |
 | U3 Rule model (pure core) | 3 | Pending |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
@@ -127,7 +127,7 @@ A failing build once read as success here.
 
 | # | Item | Owner |
 |---|---|---|
-| 1 | **Container deployment is blocked** — `localGuard` requires a loopback peer, but published-port traffic arrives from the Docker bridge gateway, so every request is refused. Pre-existing U0 defect. **Security-posture decision for the user**; options in `construction/build-and-test/security-test-instructions.md`. Works today via `npm start` on the host | User |
+| 1 | **Container deployment is blocked** — *re-raised and deferred again at U2 Infrastructure Design (2026-08-31), deliberately: not a change to bundle into a label unit.* — `localGuard` requires a loopback peer, but published-port traffic arrives from the Docker bridge gateway, so every request is refused. Pre-existing U0 defect. **Security-posture decision for the user**; options in `construction/build-and-test/security-test-instructions.md`. Works today via `npm start` on the host | User |
 | 2 | **Liked-status transitions — agreed for U2.** Four states + `unknown`; `kept-unliked` is the reference level, not an observed choice. Design in `research-findings.md` Part 4b | U2 |
 | 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`. They *do* carry `track_id`, so ISRC is recoverable at **47 one-off `GET /tracks/{id}` calls**. Spend them or not → U2 FD **Q7** | U2 |
 | 3b | **MusicBrainz label coverage is 58%, and the misses are recency-biased** (pre-2022 100%, 2022+ 43%) — i.e. concentrated on the recent independent releases R1 is about. Measured 2026-08-26, `research-findings.md` Part 5 | U2 |

@@ -1598,3 +1598,75 @@ means at most once per TTL window.
 Migration 002 is now 6 tables and 16 play columns, still additive, still unimplemented."
 **Context**: CONSTRUCTION — U2 FD + NFR Design complete with BR-13. Awaiting approval.
 Next: Infrastructure Design (narrow)
+
+---
+
+## U2 Infrastructure Design Complete — Contact Address to `secrets/`, Container Guard Deferred Deliberately
+**Timestamp**: 2026-08-31
+**User Input**: "continue" · Q1 = B (`secrets/musicbrainz.json`) · Q2 = A (host deployment stays
+real); Q3, Q4, Q5 at recommended defaults
+**AI Response**: "Generated the U2 Infrastructure Design plan with five questions across all seven
+mandated categories, then the two artifacts.
+
+FRAMED THE DELTA HONESTLY AND NARROWLY: U1 needed somewhere durable for a database; U2 needs a way
+out of the machine plus one secret that is not a credential. No new inbound port, no new listener,
+no new process, no broker, no external cache. The entire infrastructure change is outbound egress to
+one host and configuration.
+
+Q1 -- CHOSE secrets/ OVER .env FOR A PROJECT-SHAPED REASON, NOT A TECHNICAL ONE. Verified that
+`node --env-file-if-exists=.env` works on this machine's Node 22.17.0 and degrades gracefully with a
+notice when the file is absent, so option A was technically sound rather than dismissed. Rejected it
+because the project already has exactly one place where uncommittable things live, and a second
+means two places to check before publishing. Recorded that extending spotify-config.json was the
+option to avoid: the MCP server rewrites that file on every token refresh, so a hand-added field
+would be clobbered by a process we do not control -- silently and intermittently, the worst
+combination. Required the contact address to FAIL CLOSED at startup rather than falling back to an
+anonymous User-Agent, on the grounds that traffic which is unidentified while believed compliant is
+worse than a refusal to start.
+
+Q2 -- RE-RAISED OPEN ITEM 1 AT THE POINT IT STARTED TO MATTER, AND THEN DELIBERATELY DID NOT FIX IT.
+U2 is the first unit that wants a long-running unattended process (scheduled sweeps, TTL
+re-resolution, the 30-second grace window), which makes `restart: unless-stopped` genuinely
+attractive -- and that is precisely the argument for keeping the decision standalone. Relaxing the
+single control NFR-07's no-authentication decision rests on, inside a unit about label enrichment,
+is how a security posture gets changed as a side effect. User chose to keep the host deployment.
+Accepted the consequence in writing: on the host, scheduled work runs only while the terminal is
+open, which degrades TIMELINESS, NOT CORRECTNESS, because P-5 already makes the database the queue
+of record and a startup sweep catches up.
+
+Q4 -- DREW THE CONFIGURATION LINE AT MEASUREMENT VERSUS COMPLIANCE. Both TTLs, the backfill interval
+and the batch size are tunable and belong beside COMPLETION_THRESHOLD, whose configurability is the
+only reason U1's threshold finding is actionable rather than academic; R2 guarantees the TTLs will
+need revisiting. The 1 req/sec spacing and the retry policy stay constants in code, because there is
+no legitimate value other than 1 and a knob there would exist only to violate NFR-15 -- most likely
+while debugging, and then forgotten. Added MUSICBRAINZ_BASE_URL as configurable for exactly one
+reason: BR-1.2's regression test needs a fixture whose correct answer is KNOWN TO BE NON-EMPTY,
+because a test asserting 'no releases' would pass against the inc-silently-ignored bug.
+
+Q3 -- REFUSED TO ASSUME CONTAINER EGRESS WORKS even though compose.yaml declares no networks block
+and the Docker default permits it. The project has drawn wrong conclusions from documentation four
+times, and the container has already produced one silent networking failure in this exact area --
+localGuard and the bridge gateway. Recorded it as a Build and Test step rather than a design
+assertion.
+
+Q5 -- KEPT COVERAGE OUT OF THE PASS/FAIL RENDERER. /api/diagnostics gains a `coverage` block
+alongside `steps`, rendered as its own dialog section beside the trace. The existing renderer only
+speaks ok/fail/skip, and presenting a 58% coverage rate as a green tick would render the instrument
+R2 is measured with as a verdict about system health. Required an `asOf` timestamp as load-bearing
+rather than decorative: under BR-13 the same coverage query run twice can legitimately differ, so a
+figure without a timestamp is not interpretable.
+
+NOTICED ONE SMALL THING WORTH GETTING RIGHT NOW: the new secrets mount is read-only while the
+existing one is read-write. spotify-config.json is rw because the MCP server rewrites it;
+musicbrainz.json has no writer. Copying the rw out of habit would grant a write capability with no
+use -- free to get right at design time, awkward to notice later.
+
+RECORDED STORAGE RETENTION AS A DECISION RATHER THAN AN OMISSION: the versioned tables are
+append-only and never pruned, because BR-8.7 recomputes verdicts from them and BR-12 traces over
+them, so eviction would break both capabilities the storage exists for. Measured growth is ~4,000
+rows per quarter against the ~3,600 rows/day observation already absorbs.
+
+Carried five verification items forward into Build and Test explicitly so they are not lost between
+stages, including that BR-1.2's fixture must be a known-non-empty case."
+**Context**: CONSTRUCTION — U2 Functional, NFR and Infrastructure Design all complete.
+Awaiting approval. Next: Code Generation. Open item 1 deliberately still open

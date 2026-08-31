@@ -65,10 +65,10 @@ thing that catches it, and step A6 extends it.
 
 ### C. MusicBrainz I/O
 
-- [ ] **C1.** `src/musicbrainz/RequestQueue.ts` — single queue, 1 req/sec, HIGH/LOW, pause-on-`503` (P-1, P-4)
-- [ ] **C2.** `test/requestQueue.test.ts` — ordering, spacing, priority never bypasses rate, pause behaviour
-- [ ] **C3.** `src/musicbrainz/MusicBrainzClient.ts` — **two-call chain**, URL join, search fallback, typed errors, `User-Agent`
-- [ ] **C4.** `test/musicBrainzClient.test.ts` — ⚠️ **BR-1.2 regression**: a fixture recording with *many* releases, so a "no releases" assertion cannot pass against the `inc=`-ignored bug
+- [x] **C1.** `src/musicbrainz/RequestQueue.ts` — single queue, 1 req/sec, HIGH/LOW, pause-on-`503` (P-1, P-4)
+- [x] **C2.** `test/requestQueue.test.ts` — ordering, spacing, priority never bypasses rate, pause behaviour
+- [x] **C3.** `src/musicbrainz/MusicBrainzClient.ts` — **two-call chain**, URL join, search fallback, typed errors, `User-Agent`
+- [x] **C4.** `test/musicBrainzClient.test.ts` — ⚠️ **BR-1.2 regression**: a fixture recording with *many* releases, so a "no releases" assertion cannot pass against the `inc=`-ignored bug
 
 ### D. Orchestration
 

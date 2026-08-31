@@ -4,38 +4,84 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 NFR Design COMPLETE** (2026-08-31), 7 questions
-  answered across all five mandated categories. Artifacts at
-  [`construction/u2-label-enrichment/nfr-design/`](construction/u2-label-enrichment/nfr-design/).
+- **Current Stage**: CONSTRUCTION — **U2 NFR Design COMPLETE**, revised 2026-08-31 to add
+  **BR-13 versioned resolutions**. Artifacts at
+  [`construction/u2-label-enrichment/`](construction/u2-label-enrichment/).
   **Awaiting user approval.** Next: **Infrastructure Design** (narrow).
-  U2 Functional Design approved 2026-08-31, incl. BR-12 resolution trace.
   Two live MusicBrainz probes done — Parts 5 and 6 of `research-findings.md`.
   U1 complete and live-verified: 193/193 tests, 99.41% line / 93.00% branch, **71 plays, 0 gaps**.
 
-## 🚩 OPEN FINDING — `label_resolved_at` is missing from migration 002
+## ⭐ BR-13 — resolutions are versioned, never overwritten (2026-08-31)
 
-**Raised by NFR Design Q1 = A (2026-08-31). Flagged, not decided.**
+**Raised by the user**, after NFR Design flagged a missing `label_resolved_at` column:
 
-The asymmetric TTL means a previously-`unknown` ISRC can resolve months later, and BR-8.3's backfill
-will fill it in. That is *desirable* — it is the coverage bias correcting itself — but it is
-currently **invisible**:
+> *"Some of that data can change (an artist can sign with a label for instance)… I'm not sure if
+> there's enough value in that chain of changes to make it worth the added complexity."*
 
-> `label_classifier_version` records when the **rules** changed. Nothing records when the **fact
-> arrived.** A verdict filled in by a later re-resolution is indistinguishable from one known at
-> play time.
+### The distinction that resolves it
 
-BR-12.5 guards classifier drift; this is the same gap in a different variable. Recommended fix:
-add **`label_resolved_at`** to the `play` snapshot — migration 002 goes 14 → 15 columns, still
-additive. **Decide before Code Generation.**
+| | What happened | Correct handling |
+|---|---|---|
+| **Our knowledge changed** | A volunteer catalogued a release we could not see | Old verdict was **wrong**. Prefer the new |
+| **The world changed** | The artist signed to a major | Old verdict was **right for its time**. Keep it |
 
-Second consequence, already recorded in P-3: **a coverage figure is only meaningful with an as-of
-date.** The same query run twice can legitimately differ.
+**MusicBrainz cannot tell you which occurred** — a lookup that 404'd in August and returns `Atlantic`
+in January is byte-identical either way. So the design keeps **both readings** and chooses per level
+(BR-13.6), which is only expressible because **Q12 kept the two levels separate**:
+
+| Level | What it is | A later change means | Analysis uses |
+|---|---|---|---|
+| **Release** | A fact about a **past event** | We **learned** it | **Latest** — better measurement of a fixed fact |
+| **Artist** | A fact about **now** | The **world** may have changed | **As-of-play** — the covariate is "signed *when this played*" |
+
+Using the latest artist-level verdict would count an artist who signed *after* the play as signed at
+the time — **the direction that fabricates support for R1**, which the standing precision rule
+forbids.
+
+### ⚠️ The finding that changed Q1: the chain is inert under Q1 = A
+
+Caching successes indefinitely means the app never looks again, so a version chain could only ever
+record `unknown → known` — our own catalogue gaps — and **never** `independent → major`, the case
+that prompted the design. It would have appeared to work while being structurally incapable of
+observing what it was built for.
+
+**Q1 revised A → C**: TTL on everything (`unknown` ~30 d, success ~90 d). Measured cost at 1,000
+distinct ISRCs: ~2,000 requests, about **33 minutes** of `LOW`-priority queue per quarter. Current
+corpus is **19 distinct ISRCs**.
+
+### The proposal was tested against the schema, not assumed
+
+| Check | Result |
+|---|---|
+| Precedent | ✅ `observation` is already this shape — many timestamped rows per parent |
+| Migration cost | ✅ **Zero.** `schema_version` is still **1**; migration 002 was designed, never written |
+| Storage | ✅ `observation` holds 1,296 rows for 71 plays (~3,600/day); a quarterly sweep of 1,000 ISRCs appends ~4,000 rows |
+| "Same track record" | ⚠️ **No `track` table exists** — `play` denormalises. The parent is a key, not a row |
+| Candidates / votes | ⚠️ Must key to `resolution_id`; keyed to `isrc` they would make BR-8.7 vote on a **union of 2026 and 2027 facts** |
+| Vote table | ⚠️ Splits in two — one `resolution_id` cannot be a foreign key into two tables |
+
+### Consequences
+
+- **Migration 002**: **6 tables** (was 5), **16 `play` columns** (was 14). Still additive; nothing implemented yet
+- **`label_resolved_at` finding CLOSED** — superseded by `label_resolution_id`, a pointer to the
+  exact version, which cannot drift out of step with the row it describes
+- **No `is_current` flag.** The current value is `ORDER BY resolved_at DESC LIMIT 1`, which cannot go
+  stale; a maintained flag can end up with two rows both claiming to be current, and that reads as
+  valid data
+- **BR-13.5**: as-of-play is the **pointer**, not a timestamp comparison — a track is `pending` at
+  play start, so its resolution lands *after* `started_at` and a timestamp query would return nothing
+- **FR-14 drift recorded**: "resolved at most once" now means *at most once per TTL window*
+
+> **On "is the chain worth the complexity"** — the doubt was well founded, and the expensive version
+> is not needed. A track's sequence of plays is **already a sparse time series**, sampled at the
+> moments that mattered. Versioning the resolutions makes that series legible. No revision log, no
+> temporal-join machinery.
 
 ## U2 NFR Design decisions (2026-08-31)
 
 | Q | Decision | Source |
 |---|---|---|
-| Q1 Cache lifetime | **A** — successes cached indefinitely; `unknown`s retried on a **30-day TTL** | **User** |
+| Q1 Cache lifetime | ~~A~~ → **C** (revised 2026-08-31) — TTL on everything; each resolution **appends a version** (BR-13) | **User** |
 | Q2 Failure handling | **D** — retry `503`/timeout only, never `404`; **pause the queue** on repeated `503`s | default |
 | Q3 Restart | **C** — no queue persistence; the **database is the queue of record**; startup sweep | default |
 | Q4 Contention | **A** — two priority classes; the live track jumps, backfill fills idle time | default |
@@ -43,7 +89,7 @@ date.** The same query run twice can legitimately differ.
 | Q6 Trace route | **A** — separate `GET /api/explain/{playId}`, rendered in the diagnostics dialog | default |
 | Q7 Point-in-time capture | **C** — scheduled + startup saved-track refresh; flush grace window on graceful shutdown | default |
 
-### ⭐ Q1 is a measurement decision, not a performance one
+### ⭐ Q1 is a measurement decision, not a performance one (superseded in part by BR-13 above)
 
 FR-14 read literally means a `404` today is a `404` **forever**. But MusicBrainz is crowd-sourced and
 growing, and the probe measured exactly where it is thin — **2022-onward 43%, pre-2022 100%**.
@@ -131,9 +177,10 @@ ineligible), BR-3.2 (`[no label]` ⇒ unknown) and BR-4.3/4.4 (any major wins) a
 of it. **This principle already caught one live error** — it is what exposed that the round-1
 `[no label]` recommendation was wrong.
 
-**Migration 002**: 5 new tables (`label_resolution`, `label_candidate`, `artist_label_resolution`,
-`artist_label`, `label_signal_vote`), 14 new nullable `play` columns, 2 indexes. Additive only —
-no existing column altered or dropped.
+**Migration 002** (revised 2026-08-31 for BR-13): **6 new tables** — `label_resolution`,
+`label_candidate`, `label_signal_vote`, `artist_label_resolution`, `artist_label`,
+`artist_label_signal_vote` — **16 new nullable `play` columns**, 6 indexes. Additive only, and
+still unimplemented (`schema_version` = 1).
 
 > **New session?** Read `CLAUDE.md` first, then this file, then the last few `audit.md` entries.
 

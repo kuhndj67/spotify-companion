@@ -18,7 +18,7 @@
            ┌────────────────────────┐   ┌──────────────────────┐
            │ MusicBrainzQueue       │   │ LabelCache           │
            │  1 req/sec · 2 classes │   │  release + artist    │
-           │  pause-on-503    (P-1) │   │  asymmetric TTL (P-3)│
+           │  pause-on-503    (P-1) │   │  versioned  TTL (P-3)│
            └───────────┬────────────┘   └──────────┬───────────┘
                        │                           │
                        ▼                           ▼
@@ -105,25 +105,27 @@ than defaulting to anonymous traffic.
 
 **Implements**: P-3 · **Addresses**: FR-14, NFR-15, R2
 
-Two independent caches over the tables migration 002 adds, never merged (Q12):
+Two independent **append-only** stores over the tables migration 002 adds, never merged (Q12):
 
-| Level | Key | Tables |
-|---|---|---|
-| Release | `isrc` | `label_resolution`, `label_candidate` |
-| Artist | `spotify_artist_id` | `artist_label_resolution`, `artist_label` |
+| Level | Key | Tables | Versioned? |
+|---|---|---|---|
+| Release | `isrc` | `label_resolution`, `label_candidate`, `label_signal_vote` | ✅ BR-13.1 |
+| Artist | `spotify_artist_id` | `artist_label_resolution`, `artist_label`, `artist_label_signal_vote` | ✅ BR-13.1 |
 
-**Asymmetric lifetime**, and it is a measurement decision (Q1 = A):
+**Uniform TTL, versioned writes** (Q1 = C, revised 2026-08-31):
 
 ```
-status = resolved   ─▶ never re-fetched     a label is a stable fact
-status = unknown    ─▶ re-fetched after 30d MusicBrainz's completeness changes; the release does not
+status = resolved   ─▶ re-resolved after ~90d, APPENDING a version   catches a label change
+status = unknown    ─▶ re-resolved after ~30d, APPENDING a version   catches knowledge arriving
 status = error      ─▶ eligible on the next sweep (P-4)
+current value       ─▶ ORDER BY resolved_at DESC LIMIT 1             no is_current flag to go stale
 ```
 
-**Not a performance cache.** It is a durable store that BR-8.7 depends on: reclassification recomputes
-verdicts from `label_candidate` and `label_signal_vote` with zero upstream requests, and BR-12's
-trace re-runs the classifier over the same rows. Eviction would break both. Nothing here may be
-treated as discardable.
+**Not a cache in the evictable sense.** It is a durable record that BR-8.7 depends on:
+reclassification recomputes verdicts from the candidate and vote tables with zero upstream requests,
+and BR-12's trace re-runs the classifier over the same rows — now over the **specific version** a
+play pointed at (BR-13.4), so re-resolving a track cannot silently rewrite the explanation of an
+older play. Eviction would break both. Nothing here may be treated as discardable.
 
 ---
 
@@ -137,7 +139,7 @@ queue:
 ```
 1. plays with track_id but no ISRC      ─▶ GET /tracks/{id}   (Spotify, 47 one-off, NFR-17 applies)
 2. plays with ISRC but no resolution    ─▶ MusicBrainzQueue @ LOW
-3. resolutions unknown and older than TTL ─▶ MusicBrainzQueue @ LOW      (P-3)
+3. resolutions older than their TTL      ─▶ MusicBrainzQueue @ LOW   (P-3, appends a version)
 4. artists with no artist-level resolution ─▶ MusicBrainzQueue @ LOW
 ```
 
@@ -146,6 +148,7 @@ queue:
 | Priority | `LOW` always — never competes with the live track |
 | Idempotent | Yes (BR-8.6); re-running finds less to do, never duplicates |
 | Touches U1 fields | **Never** (BR-8.4) — outcome, evidence, provenance and trail are read-only here |
+| Touches a written label snapshot | **Never** (BR-8.4a) — a new resolution appends a version; the play's as-of-play reading stands |
 | Batching | Bounded per sweep, so a long backlog does not monopolise the queue for hours |
 
 **Step 1 uses Spotify, not MusicBrainz**, so it is governed by NFR-17's existing 429/401 handling
@@ -201,7 +204,7 @@ the machine already holds.
 |---|---|---|---|---|---|
 | `MusicBrainzQueue` | — | ✅ primary | ✅ async boundary | ✅ pause | In-memory only |
 | `MusicBrainzClient` | ✅ primary | via queue | — | ✅ typed errors | None |
-| `LabelCache` | — | ✅ avoids repeats | — | — | **Durable** (5 tables) |
+| `LabelCache` | — | ✅ TTL-bounded repeats | — | — | **Durable, append-only** (6 tables) |
 | `LabelBackfillJob` | — | ✅ `LOW` only | ✅ never blocks | ✅ retry sweep | None — derives from DB |
 | `LikedSetCache` | — | n/a (Spotify) | ✅ async | ✅ `null` on failure | In-memory + play columns |
 | `ResolutionTraceSvc` | — | ✅ zero requests | ✅ not on path | — | None |
@@ -212,7 +215,7 @@ the machine already holds.
 
 | Failure | Behaviour | Rule |
 |---|---|---|
-| MusicBrainz `404` | `notFound`, no retry, cached 30 days | P-4, P-3 |
+| MusicBrainz `404` | `notFound`, no retry within the window; re-tried after the 30-day TTL as a **new version** | P-4, P-3 |
 | MusicBrainz `503` | Bounded retry, then **queue pause**; items stay `pending` | P-4 |
 | Timeout | Bounded retry, then `error`, eligible for the next sweep | P-4 |
 | `200` with unexpected shape | `Malformed` → `error`. **Never** parsed optimistically | BR-1.2 |

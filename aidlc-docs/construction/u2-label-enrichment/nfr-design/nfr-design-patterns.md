@@ -1,9 +1,10 @@
 # NFR Design Patterns — U2: Label Enrichment
 
 **Date**: 2026-08-31 · **Stage**: CONSTRUCTION — NFR Design, Unit U2
-**Decisions**: Q1 = A (asymmetric TTL) · Q2 = D (typed retry + queue pause) · Q3 = C (backfill
-self-heals, startup sweep) · Q4 = A (priority classes) · Q5 = A (proceed as designed) ·
-Q6 = A (separate `/api/explain/{playId}`) · Q7 = C (refresh + graceful flush)
+**Decisions**: Q1 = **C** (TTL on everything — *revised from A on 2026-08-31*) · Q2 = D (typed retry
++ queue pause) · Q3 = C (backfill self-heals, startup sweep) · Q4 = A (priority classes) ·
+Q5 = A (proceed as designed) · Q6 = A (separate `/api/explain/{playId}`) ·
+Q7 = C (refresh + graceful flush) · **BR-13 versioned resolutions**
 
 ---
 
@@ -71,45 +72,63 @@ persist for minutes, so this is a common state rather than a transient one.
 
 ---
 
-## P-3: Two-level cache with **asymmetric** TTL
+## P-3: Versioned resolutions with a uniform TTL
 
-**Addresses**: FR-14, NFR-15, R2 · **Decision**: Q1 = A
+**Addresses**: FR-14, NFR-15, R2, BR-13 · **Decision**: Q1 = C *(revised from A, 2026-08-31)*
 
 ```
-success    ─▶ cached indefinitely      a resolved label is a stable fact
-unknown    ─▶ re-tried after 30 days   a 404 is a statement about MusicBrainz, not about the release
+every resolution  ─▶ appends a new version, keyed by resolution_id   (BR-13.1)
+successes         ─▶ re-resolved on a ~90-day TTL                     records label CHANGE
+unknowns          ─▶ re-resolved on a ~30-day TTL                     records knowledge ARRIVING
+current value     ─▶ ORDER BY resolved_at DESC LIMIT 1                (BR-13.3)
 ```
 
 **This is the pattern with the largest effect on the data, and it is a measurement decision rather
-than a performance one.** The probe measured MusicBrainz as thin precisely where the hypothesis
-lives: 2022-onward releases resolved 43%, pre-2022 100%. MusicBrainz is crowd-sourced and growing,
-so a meaningful share of today's misses will be catalogued later.
+than a performance one.** Two distinct problems are being solved, and conflating them is what made
+the first version of this pattern wrong.
 
-Caching negatives permanently would **freeze the measured coverage bias into the dataset
-permanently** — the recency gap would become a fixed property of the data instead of a temporary
-property of an upstream database. The asymmetry spends a bounded trickle of requests on exactly the
-population R1 is about.
+| Problem | Measured / raised | Handled by |
+|---|---|---|
+| MusicBrainz is **incomplete**, and the gaps are recency-biased (2022+ at 43%, pre-2022 100%) | Probe, Part 5 | TTL on `unknown` |
+| The underlying fact **changes** — an artist signs to a label | User, 2026-08-31 | TTL on **success** + versioning |
 
-Both levels (release-by-ISRC, artist-by-Spotify-ID) follow the same rule and are cached separately,
-consistent with Q12's never-merged split.
+### ⚠️ Why Q1 was revised from A to C
 
-### ⚠️ Consequence — coverage becomes time-dependent, and a play's label can change
+The original answer cached successes **indefinitely**. Under it, a version chain could only ever
+record `unknown → known` — our own catalogue gaps filling in. It could **never** record
+`independent → major`, because after the first success the app stops looking. The chain would have
+appeared to work while being structurally incapable of observing the case that motivated it.
 
-Under Q1 = A, an ISRC that was `unknown` in September may resolve in October, and BR-8.3's backfill
-will fill it in. Two things follow, and neither is optional:
+Measured cost of the revision, at 1,000 distinct ISRCs: ~2,000 requests, about **33 minutes** of
+background queue at `LOW` priority, once per quarter. Current corpus is **19 distinct ISRCs**. The
+constraint that makes this cheap is the same one that makes P-1 necessary — everything is already
+serialised at 1 req/sec, so a quarterly sweep is just a longer quiet stretch of the queue.
 
-1. **A coverage figure is only meaningful with an as-of date.** BR-10's metrics must be reported
-   with the timestamp they were computed at; the same query run twice can legitimately differ.
-2. **A play's stored label verdict can change months after the play.** This is *desirable* — it is
-   the coverage bias correcting itself — but it must be visible, or a re-run analysis will silently
-   disagree with an earlier one.
+### Storage was checked, not assumed
 
-> **🔎 Finding for Code Generation — one column is missing.** `label_classifier_version` records
-> when the *rules* changed, but nothing records when the *fact arrived*. A verdict filled in by a
-> later re-resolution is indistinguishable from one known at play time. Recommend adding
-> **`label_resolved_at`** to the `play` snapshot (migration 002: 14 → 15 columns, still additive).
-> Without it, BR-12.5's divergence flag covers classifier drift while data drift stays invisible —
-> the same gap in a different variable. **Flagged, not decided.**
+`observation` already holds **1,296 rows for 71 plays** — roughly 3,600/day at the project's rate. A
+full quarterly re-resolution of 1,000 ISRCs appending ~4 candidates each is **4,000 rows per
+quarter**. The version chain is two to three orders of magnitude below what the database already
+absorbs daily. Storage is not a constraint here, and this is why.
+
+### The cache is not a cache
+
+It is a durable, append-only record. BR-8.7 recomputes verdicts from `label_candidate` and the vote
+tables; BR-12 re-runs the classifier over the same rows to build a trace. **Eviction would break
+both.** Nothing in these tables may be treated as discardable, and there is no `is_current` flag to
+maintain — the current row is a query (`ORDER BY resolved_at DESC LIMIT 1`), which cannot go stale.
+
+### Consequence — coverage is time-dependent, and that is now visible rather than hidden
+
+A coverage figure is only meaningful **with an as-of date**: the same query run twice can
+legitimately differ. That was true under the original design too, but silently. With versioning it
+is a property of the data anyone can see and query.
+
+> **The `label_resolved_at` finding raised here on 2026-08-31 is closed.** It asked for a timestamp
+> recording when a fact arrived. Versioning supersedes it with something stronger: the play stores
+> `label_resolution_id`, a pointer to the **exact version** its verdict came from (BR-13.4). A
+> pointer cannot drift out of step with the row it describes, and it lets the trace reconstruct the
+> derivation from the candidates that version actually held.
 
 ---
 
@@ -238,7 +257,7 @@ missing it degrades *every* play.
 | **NFR-15** ≤ 1 req/sec, single queue | P-1 (and P-4's pause, which only ever reduces rate) |
 | **NFR-16** never delay the display | P-2, reinforced by P-1's priority classes |
 | **NFR-18** failures are partial data | P-4, P-2 (`pending` ≠ `unknown`) |
-| **FR-14** resolve at most once | P-3 (as bounded by the asymmetric TTL) |
+| **FR-14** resolve at most once | P-3 — reinterpreted as *at most once per TTL window* (BR-7.3). Drift recorded, not silent |
 | **BR-12.7** trace makes no upstream calls | P-7 |
 
 ---

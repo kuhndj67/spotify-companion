@@ -356,41 +356,56 @@ play (BR-12.4), which the live path by definition cannot.
 
 Forward-only (NFR-12). Additive: no existing column is altered or dropped, so U1 data is untouched.
 
+**Revised 2026-08-31** — resolutions are versioned (BR-13). Nothing had been implemented yet
+(`schema_version` was still **1**), so this is a design edit rather than a schema migration.
+
 ```sql
--- cached facts
+-- cached facts, APPEND-ONLY (BR-13.1)
 CREATE TABLE label_resolution (
-  isrc TEXT PRIMARY KEY, recording_mbid TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  isrc TEXT NOT NULL, recording_mbid TEXT,
   match_method TEXT CHECK (match_method IN ('isrc','search','none')),
   narrowing_tier TEXT CHECK (narrowing_tier IN ('title-date','title','all','none')),
   release_count INTEGER NOT NULL DEFAULT 0, resolved_at TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('resolved','not-found','error')));
+  status TEXT NOT NULL CHECK (status IN ('resolved','not-found','error')),
+  supersedes_id INTEGER REFERENCES label_resolution(id),
+  UNIQUE (isrc, resolved_at));
 
 CREATE TABLE label_candidate (
-  isrc TEXT NOT NULL REFERENCES label_resolution(isrc) ON DELETE CASCADE,
+  resolution_id INTEGER NOT NULL REFERENCES label_resolution(id) ON DELETE CASCADE,
   label_name TEXT NOT NULL, label_mbid TEXT, label_type TEXT, catalog_number TEXT,
   release_id TEXT NOT NULL, release_title TEXT, release_date TEXT, release_status TEXT);
 
 CREATE TABLE artist_label_resolution (
-  spotify_artist_id TEXT PRIMARY KEY, artist_mbid TEXT,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  spotify_artist_id TEXT NOT NULL, artist_mbid TEXT,
   release_count INTEGER NOT NULL DEFAULT 0, named_label_count INTEGER NOT NULL DEFAULT 0,
   resolved_at TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('resolved','not-found','error')));
+  status TEXT NOT NULL CHECK (status IN ('resolved','not-found','error')),
+  supersedes_id INTEGER REFERENCES artist_label_resolution(id),
+  UNIQUE (spotify_artist_id, resolved_at));
 
 CREATE TABLE artist_label (
-  spotify_artist_id TEXT NOT NULL REFERENCES artist_label_resolution(spotify_artist_id)
-    ON DELETE CASCADE,
+  resolution_id INTEGER NOT NULL REFERENCES artist_label_resolution(id) ON DELETE CASCADE,
   label_name TEXT NOT NULL, label_mbid TEXT, label_type TEXT,
   release_count INTEGER NOT NULL DEFAULT 0);
 
+-- votes split by scope so the FK is real (see note below)
 CREATE TABLE label_signal_vote (
-  scope TEXT NOT NULL CHECK (scope IN ('release','artist')),
-  scope_key TEXT NOT NULL,
+  resolution_id INTEGER NOT NULL REFERENCES label_resolution(id) ON DELETE CASCADE,
   signal TEXT NOT NULL CHECK (signal IN ('major-root-list','label-relationship','isrc-prefix')),
   verdict TEXT NOT NULL CHECK (verdict IN ('major','independent','unknown')),
   strength TEXT NOT NULL CHECK (strength IN ('strong','weak')),
   evidence TEXT);
 
--- derived snapshot on the play
+CREATE TABLE artist_label_signal_vote (
+  resolution_id INTEGER NOT NULL REFERENCES artist_label_resolution(id) ON DELETE CASCADE,
+  signal TEXT NOT NULL CHECK (signal IN ('major-root-list','label-relationship','isrc-prefix')),
+  verdict TEXT NOT NULL CHECK (verdict IN ('major','independent','unknown')),
+  strength TEXT NOT NULL CHECK (strength IN ('strong','weak')),
+  evidence TEXT);
+
+-- derived snapshot on the play: AS-OF-PLAY, immutable once written (BR-8.4a)
 ALTER TABLE play ADD COLUMN label_verdict TEXT
   CHECK (label_verdict IN ('major','independent','unknown'));
 ALTER TABLE play ADD COLUMN label_confidence TEXT
@@ -405,6 +420,10 @@ ALTER TABLE play ADD COLUMN artist_label_confidence TEXT
   CHECK (artist_label_confidence IN ('high','medium','low'));
 ALTER TABLE play ADD COLUMN artist_label_names TEXT;
 ALTER TABLE play ADD COLUMN label_classifier_version INTEGER;
+ALTER TABLE play ADD COLUMN label_resolution_id INTEGER
+  REFERENCES label_resolution(id);                        -- BR-13.4
+ALTER TABLE play ADD COLUMN artist_label_resolution_id INTEGER
+  REFERENCES artist_label_resolution(id);                 -- BR-13.4
 ALTER TABLE play ADD COLUMN liked_at_start INTEGER;
 ALTER TABLE play ADD COLUMN liked_at_end INTEGER;
 ALTER TABLE play ADD COLUMN liked_added_at TEXT;
@@ -412,9 +431,50 @@ ALTER TABLE play ADD COLUMN liked_transition TEXT
   CHECK (liked_transition IN
     ('liked-during','unliked-during','kept-liked','kept-unliked','unknown'));
 
-CREATE INDEX idx_play_label_verdict ON play(label_verdict);
-CREATE INDEX idx_play_artist_id     ON play(artist_id);
+CREATE INDEX idx_label_resolution_key ON label_resolution(isrc, resolved_at DESC);
+CREATE INDEX idx_artist_resolution_key
+  ON artist_label_resolution(spotify_artist_id, resolved_at DESC);
+CREATE INDEX idx_label_candidate_res  ON label_candidate(resolution_id);
+CREATE INDEX idx_artist_label_res     ON artist_label(resolution_id);
+CREATE INDEX idx_play_label_verdict   ON play(label_verdict);
+CREATE INDEX idx_play_artist_id       ON play(artist_id);
 ```
+
+**16 new `play` columns** (was 14). The two extra are the resolution pointers, which replace the
+`label_resolved_at` column proposed at NFR Design — a pointer to the exact version is strictly more
+informative than a timestamp, and it cannot drift out of step with the row it describes.
+
+### Why votes were split into two tables
+
+The original design had one `label_signal_vote` with `scope ('release'|'artist')` and a free-text
+`scope_key`. Once votes key to a `resolution_id`, that column would have to point at **two different
+tables** — a polymorphic foreign key, which SQLite cannot express and therefore cannot enforce.
+
+Splitting them buys a real `REFERENCES` constraint with `ON DELETE CASCADE` on both. The duplication
+is six columns; the alternative is an unenforceable pointer into one of two tables, distinguishable
+only by a sibling column. This is a **consequence** of BR-13.2, not an independent decision.
+
+### `UNIQUE (isrc, resolved_at)` is the idempotence guard
+
+BR-8.6 requires backfill to be idempotent. With append-only rows, a re-run that resolved the same
+ISRC twice in the same instant would otherwise insert a duplicate version. The constraint makes the
+second insert fail rather than silently double the candidate set.
+
+### The current value is a query, not a column
+
+```sql
+-- current (BR-13.3): release-level analysis, BR-13.6
+SELECT * FROM label_resolution WHERE isrc = ? ORDER BY resolved_at DESC LIMIT 1;
+
+-- as-of-play (BR-13.5): artist-level analysis, BR-13.6
+SELECT r.* FROM artist_label_resolution r
+  JOIN play p ON p.artist_label_resolution_id = r.id WHERE p.id = ?;
+```
+
+There is deliberately **no `is_current` flag**. A denormalised current-version marker has to be
+maintained on every insert, and the failure mode is two rows both claiming to be current — which
+would read as valid data. `ORDER BY resolved_at DESC LIMIT 1` cannot be wrong, and the index above
+makes it a single seek.
 
 **Every new column is nullable, and `NULL` means unknown** — not `false`, not `0`, end to end
 including exports, where it renders as the literal token `unknown`. Every existing U1 row becomes a

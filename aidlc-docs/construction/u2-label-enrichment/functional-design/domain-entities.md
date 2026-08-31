@@ -38,10 +38,10 @@ hypothesis under test.**
 
 | Entity | Cardinality | Lifetime | Mutable? |
 |---|---|---|---|
-| **LabelResolution** | One per ISRC | Cached, refreshable | Re-resolvable; facts replaced wholesale |
-| **LabelCandidate** | Many per LabelResolution | With its resolution | Never |
-| **ArtistLabelResolution** | One per Spotify artist ID | Cached, refreshable | Re-resolvable |
-| **SignalVote** | Many per classification | With its resolution | Never |
+| **LabelResolution** | **Many per ISRC** — one per resolution | Permanent, append-only | **Never.** Re-resolution appends a version (BR-13.1) |
+| **LabelCandidate** | Many per LabelResolution **version** | With its version | Never |
+| **ArtistLabelResolution** | **Many per Spotify artist ID** — one per resolution | Permanent, append-only | **Never** (BR-13.1) |
+| **SignalVote** | Many per classification | With its resolution **version** | Never |
 | **LabelClassification** | One per Play, per level | Permanent on the Play | Recomputed with classifier version |
 | **LikedEvidence** | One per Play | Permanent | Amended once, within the grace window |
 | **CoverageMetrics** | Derived, transient | Query-scoped | N/A |
@@ -54,17 +54,20 @@ values — one release-level, one artist-level. See the Token case below.
 
 ## LabelResolution
 
-The MusicBrainz facts for one ISRC. Cached: a given ISRC is resolved at most once (FR-14).
+The MusicBrainz facts for one ISRC **at one moment**. **Append-only** (BR-13.1): re-resolving
+inserts a new version rather than replacing the old one, so an ISRC accumulates a chain.
 
 | Attribute | Type | Notes |
 |---|---|---|
-| `isrc` | string | Cache key. The join key from U1 |
+| `id` | id | **Version identity.** What candidates, votes and plays point at (BR-13.2, BR-13.4) |
+| `isrc` | string | The join key from U1. **Not** unique — one per version |
+| `supersedesId` | `Maybe<id>` | The version this one replaced; `null` for the first |
 | `recordingMbid` | `Maybe<string>` | `null` when MusicBrainz does not know the ISRC |
 | `matchMethod` | `isrc \| search \| none` | **Q3 = D.** How the recording was found |
 | `narrowingTier` | `title-date \| title \| all \| none` | **Q1 = A.** Which cascade tier fired |
 | `candidates` | `LabelCandidate[]` | May be empty even when `recordingMbid` is set |
 | `releaseCount` | number | Total releases seen before narrowing — the ambiguity measure |
-| `resolvedAt` | timestamp | For TTL and for re-resolution auditing |
+| `resolvedAt` | timestamp | TTL input, **and the version ordering key** (BR-13.3) |
 | `status` | `resolved \| not-found \| error` | `error` is retryable; `not-found` is a fact |
 
 ### `matchMethod` exists because search misattributes
@@ -91,6 +94,25 @@ honestly instead of presenting all verdicts as equivalent.
 request failed — retryable, must not poison the cache) and neither is "resolved with no labels".
 Collapsing them would make R2's coverage rate unmeasurable, because transport failures would be
 counted as missing data.
+
+### Versioning exists because two different things are called "the data changed"
+
+**Raised by the user, 2026-08-31**: *"some of that data can change (an artist can sign with a label
+for instance)."*
+
+| | What happened | Correct handling |
+|---|---|---|
+| **Our knowledge changed** | A volunteer catalogued a release we could not see in August | The old verdict was **wrong**. Prefer the new one |
+| **The world changed** | The artist signed to a major in January | The old verdict was **right for its time**. Keep it |
+
+**MusicBrainz cannot tell you which occurred.** A lookup that 404'd in August and returns `Atlantic`
+in January is byte-identical in both cases. So the design does not try to distinguish them at write
+time — it **keeps both readings** and lets the analysis choose per level (BR-13.6), which is
+possible because release-level and artist-level facts have opposite temporal behaviour.
+
+The chain is not extra machinery for its own sake: **a track's sequence of plays is already a sparse
+time series**, sampled at exactly the moments that mattered. Versioning the resolutions is what makes
+that series legible instead of collapsing it to whatever was true last.
 
 ---
 
@@ -364,15 +386,23 @@ MusicBrainz `200` with `inc` silently ignored, caught in advance this time.
 ### New tables — the cached facts
 
 ```
-label_resolution        isrc PK, recording_mbid, match_method, narrowing_tier,
-                        release_count, resolved_at, status
-label_candidate         isrc FK, label_name, label_mbid, label_type, catalog_number,
-                        release_id, release_title, release_date, release_status
-artist_label_resolution spotify_artist_id PK, artist_mbid, release_count,
-                        named_label_count, resolved_at, status
-artist_label            spotify_artist_id FK, label_name, label_mbid, label_type, release_count
-label_signal_vote       scope ('release'|'artist'), scope_key, signal, verdict, strength, evidence
+label_resolution          id PK, isrc, recording_mbid, match_method, narrowing_tier,
+                          release_count, resolved_at, status, supersedes_id
+                          UNIQUE (isrc, resolved_at)              append-only, BR-13.1
+label_candidate           resolution_id FK, label_name, label_mbid, label_type,
+                          catalog_number, release_id, release_title, release_date,
+                          release_status
+artist_label_resolution   id PK, spotify_artist_id, artist_mbid, release_count,
+                          named_label_count, resolved_at, status, supersedes_id
+                          UNIQUE (spotify_artist_id, resolved_at) append-only, BR-13.1
+artist_label              resolution_id FK, label_name, label_mbid, label_type, release_count
+label_signal_vote         resolution_id FK -> label_resolution
+artist_label_signal_vote  resolution_id FK -> artist_label_resolution
 ```
+
+**Six tables, not five.** Votes split by scope because a single `resolution_id` would otherwise be a
+polymorphic foreign key across two tables — unenforceable in SQLite. A consequence of BR-13.2, not a
+separate decision.
 
 ### New columns on `play` — the derived snapshot
 
@@ -381,16 +411,27 @@ label_verdict, label_confidence, label_contested, label_names,
 label_match_method, label_narrowing_tier,
 artist_label_verdict, artist_label_confidence, artist_label_names,
 label_classifier_version,
+label_resolution_id, artist_label_resolution_id,      <- BR-13.4, as-of-play pointers
 liked_at_start, liked_at_end, liked_added_at, liked_transition
 ```
 
+**16 columns** (was 14). The two resolution pointers replace the `label_resolved_at` column proposed
+at NFR Design: a pointer to the exact version is strictly more informative than a timestamp, and it
+cannot drift out of step with the row it describes. **Immutable once written** (BR-8.4a) — the play
+snapshot is the as-of-play reading and backfill never revises it.
+
 ### The ResolutionTrace adds no schema
 
-Migration 002 is **unchanged** by the 2026-08-31 trace decision. The trace is recomputed from
-`label_candidate` and `label_signal_vote`, which BR-8.7 already required to be stored for
-reclassification. Getting a new capability for zero schema is not luck — it is the direct payoff of
-storing observations separately from judgements, and it is the second time that split has paid
-(the first was U1's completion threshold).
+The trace is recomputed from `label_candidate` and `label_signal_vote`, which BR-8.7 already required
+to be stored for reclassification. Getting a new capability for zero schema is not luck — it is the
+direct payoff of storing observations separately from judgements, and it is the second time that
+split has paid (the first was U1's completion threshold).
+
+**Versioning makes the trace strictly better**: because a play points at the exact
+`label_resolution_id` its verdict came from (BR-13.4), the trace can reconstruct the derivation from
+the candidates *that version actually held* — not from whatever the current ones happen to be. Under
+the pre-versioning design, re-resolving a track would have silently changed the explanation of an
+older play.
 
 ### Why facts are cached but judgements are copied onto the Play
 

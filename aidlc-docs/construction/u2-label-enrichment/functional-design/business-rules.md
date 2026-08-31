@@ -197,8 +197,8 @@ is the only thing that catches it — `labelClassifier` must be added to its lis
 |---|---|---|
 | **BR-7.1** | All MusicBrainz requests pass through **one** serialised queue at **≤ 1 req/sec** | NFR-15 |
 | **BR-7.2** | Every request sends a descriptive `User-Agent` identifying the app and a contact address | NFR-14 |
-| **BR-7.3** | A given ISRC is resolved **at most once** while cached | FR-14 |
-| **BR-7.4** | A given Spotify artist ID is resolved at most once while cached | Q12 |
+| **BR-7.3** | A given ISRC is resolved **at most once per TTL window**; each resolution **appends a version**, never overwrites | FR-14, Q1 = C, BR-13 |
+| **BR-7.4** | A given Spotify artist ID is resolved at most once per TTL window; each resolution **appends a version** | Q12, BR-13 |
 | **BR-7.5** | MusicBrainz latency **never** delays the now-playing display. Enrichment is asynchronous and the panel renders without it | NFR-16, FR-16 |
 | **BR-7.6** | A MusicBrainz failure degrades that field to `unknown` and never propagates as an error | NFR-18, FR-10 |
 | **BR-7.7** | Label state is `pending` until resolved, and `pending` is **never** rendered or exported as `unknown` | FR-11 |
@@ -221,6 +221,7 @@ is the only thing that catches it — `labelClassifier` must be added to its lis
 | **BR-8.2** | ISRC recovery is a **one-off job**, not a per-play cost | Q7 |
 | **BR-8.3** | Label backfill scans plays with an ISRC and no label resolution, in batches, through the BR-7.1 queue | FR-14 |
 | **BR-8.4** | Backfill **never** rewrites a play's U1 fields — outcome, evidence, provenance, trail | NFR-12 |
+| **BR-8.4a** | Backfill **never** rewrites a play's label snapshot or its resolution pointers once written. A new resolution appends a version; it does not revise history | BR-13.4, user 2026-08-31 |
 | **BR-8.5** | Backfilled label data is indistinguishable in *content* from live-resolved label data; `provenance` on the play already marks how the **play** was captured | FR-54 |
 | **BR-8.6** | Re-running backfill is idempotent | — |
 | **BR-8.7** | Reclassification recomputes verdicts from stored candidates and votes **without any MusicBrainz request** | FR-20 analogue |
@@ -283,6 +284,7 @@ recoverable by re-analysis.
 | # | Rule | Source |
 |---|---|---|
 | **BR-11.1** | The comparison is **pre-registered before results are seen**: skip rate for `major` versus `independent` among plays with a **known** label | Q9 = C |
+| **BR-11.1a** | The primary variable is the **latest** release-level verdict and the **as-of-play** artist-level verdict. The alternative reading of each is reported as a robustness check | User 2026-08-31 |
 | **BR-11.2** | The `unknown` group is reported **alongside**, never omitted | Q9 = C |
 | **BR-11.3** | Coverage counts and the by-year breakdown accompany the result | Q9 = C, FR-51 |
 | **BR-11.4** | Rule-initiated skips are excluded from the comparison | FR-23 |
@@ -353,6 +355,69 @@ different rule paths can be tested)."*
 
 ---
 
+## BR-13: Resolutions are versioned, never overwritten
+
+**Added 2026-08-31 by user decision.** Raised by the user as a general problem: *"some of that data
+can change (an artist can sign with a label for instance)"*. Resolves the `label_resolved_at`
+finding raised at NFR Design.
+
+| # | Rule | Source |
+|---|---|---|
+| **BR-13.1** | A resolution is **append-only**. Re-resolving an ISRC or artist inserts a **new row**; no existing row is updated or deleted | User 2026-08-31 |
+| **BR-13.2** | Candidates and votes key to the **`resolution_id`**, never to the `isrc` or artist id | BR-8.7 |
+| **BR-13.3** | Every resolution carries `resolved_at`; the **current** value for a key is the row with the greatest `resolved_at` | — |
+| **BR-13.4** | A play stores `label_resolution_id` and `artist_label_resolution_id` — the **exact versions** its verdict was derived from. Immutable once written | BR-8.4a |
+| **BR-13.5** | The **as-of-play** value is the version the play points at, **not** a timestamp comparison against `started_at` | see below |
+| **BR-13.6** | Release-level analysis uses the **latest** version; artist-level analysis uses the **as-of-play** version | BR-11.1a |
+| **BR-13.7** | Exports carry **both** readings plus `resolved_at`, so the choice is visible in the data rather than baked into the export | FR-50, FR-51 |
+| **BR-13.8** | A new version that agrees with its predecessor is still recorded — *"unchanged at this date"* is evidence, not noise | R2 |
+
+> ### BR-13.2 is the rule that stops the classifier voting across time
+>
+> Candidates keyed to the `isrc` would **accumulate across every resolution**, so BR-8.7's
+> reclassification would fold 2026 facts together with 2027 facts and vote on the union. The verdict
+> would be derived from a state of the world that never existed at any single moment.
+>
+> This is the reason all five tables change together rather than only `label_resolution`. Keying
+> candidates to a version is not bookkeeping — it is what makes a version *mean* anything.
+
+> ### BR-13.5 — why the pointer, not the timestamp
+>
+> "The resolution as of the play's `started_at`" is **not well defined**. A track playing now is
+> `pending` (BR-7.7); its resolution arrives seconds to minutes *after* the play began, and under a
+> paused queue (P-4) possibly much later. A timestamp comparison would return *nothing* for the
+> common case and would silently pick a stale version for a re-resolved track.
+>
+> The play stores the version it actually used. That is a fact about what the app did, not an
+> inference about what it might have seen.
+
+> ### BR-13.6 — the two levels are asymmetric because the underlying facts are
+>
+> | Level | What it is | A later change means | Use |
+> |---|---|---|---|
+> | **Release** | A fact about a **past event** — this pressing, on this date, carried this label | We **learned** it. The release did not change | **Latest** — strictly better measurement of a fixed fact |
+> | **Artist** | A fact about **now** — an aggregate over a career | The **world** may have changed. The artist may have signed | **As-of-play** — the covariate is "signed *when this played*" |
+>
+> Using the latest artist-level verdict would count an artist who signed *after* the play as having
+> been signed at the time — **the direction that fabricates support for R1**, and therefore the one
+> the standing precision rule forbids. Using an as-of-play release verdict would discard a genuine
+> improvement in measurement for no gain, since the release itself cannot have changed.
+>
+> **This asymmetry is only expressible because Q12 kept the two levels separate.** Merged, one rule
+> would have to serve two facts with opposite temporal behaviour.
+
+> ### ⚠️ BR-13 is inert without a TTL on successes
+>
+> Under the original Q1 = A, a successful resolution was **never re-fetched**, so a version chain
+> could only ever record `unknown → known` — our own catalogue gaps. It could **never** record
+> `independent → major`, which is the case that prompted this design. The chain would have looked
+> like it was working the entire time.
+>
+> Q1 was therefore revised **A → C** (TTL on everything). Measured cost at 1,000 distinct ISRCs:
+> ~2,000 requests, about **33 minutes** of background queue, once per quarter.
+
+---
+
 ## Rule-to-requirement coverage
 
 | Requirement | Rules |
@@ -373,3 +438,4 @@ different rule paths can be tested)."*
 | Liked transitions (added by decision) | BR-9.1–9.8 |
 | Phase 2 decision gate | BR-11.1–11.6 |
 | Resolution trace (added 2026-08-31) | BR-12.1–12.8 |
+| Versioned resolutions (added 2026-08-31) | BR-13.1–13.8, BR-7.3, BR-7.4, BR-8.4a, BR-11.1a |

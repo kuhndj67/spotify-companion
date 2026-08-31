@@ -70,7 +70,9 @@ C) **TTL on everything** (e.g. 90 days) — labels can also be *corrected* upstr
 D) **Cache everything indefinitely, plus a manual "re-resolve unknowns" action** — no automatic
    behaviour; the user decides when to spend the requests
 
-[Answer]: A — cache successes indefinitely; retry `unknown`s on a 30-day TTL. **User.**
+[Answer]: ~~A~~ → **C**, revised 2026-08-31. TTL on everything: `unknown`s at ~30 days,
+successes at ~90 days, **each resolution appending a version** (BR-13). **User.**
+See "Revision" at the end of this plan — A was structurally unable to record a label *change*.
 
 ---
 
@@ -266,3 +268,72 @@ C) **A + flush pending grace-window checks on graceful shutdown** — covers the
 - [x] Verify the trace path makes zero upstream requests (BR-12.7)
 - [x] Confirm the cache policy's effect on coverage metrics is stated, not incidental (BR-10, R2)
 - [x] Update `aidlc-state.md`; log in `audit.md`
+
+
+---
+
+## Revision — Q1 reopened by the user, 2026-08-31
+
+After the plan was answered, the user raised a problem the questions had not covered:
+
+> *"The back-correcting of any of our data fields raises a bigger issue given the fact that some of
+> that data can change (an artist can sign with a label for instance). I'm thinking maybe we just
+> stick to the data that is available at the time the track is played … I'm not sure if there's
+> enough value in that chain of changes to make it worth the added complexity."*
+
+### The distinction that resolves it
+
+Two different things are called "the data changed", and they need opposite handling:
+
+| | What happened | Correct handling |
+|---|---|---|
+| **Our knowledge changed** | A volunteer catalogued a release we could not see | The old verdict was **wrong**. Prefer the new |
+| **The world changed** | The artist signed to a major | The old verdict was **right for its time**. Keep it |
+
+**MusicBrainz cannot tell you which one occurred** — a lookup that 404'd in August and returns
+`Atlantic` in January is byte-identical either way. So the design stops trying to decide at write
+time and **keeps both readings**, choosing per level (BR-13.6). That is only expressible because Q12
+kept release-level and artist-level separate: a release's label is a fact about a past event, while
+an artist's is a fact about now.
+
+### The user's proposal, tested against the schema rather than assumed
+
+Proposed: a timestamped details table in a many-relationship with the track, latest row winning.
+**Adopted as BR-13.** What checking the actual schema found:
+
+| Check | Result |
+|---|---|
+| Precedent in the codebase | ✅ `observation` is already this shape — many timestamped rows per parent |
+| Migration cost | ✅ **Zero.** `schema_version` is still 1; migration 002 was designed, never written |
+| Storage cost | ✅ Negligible. `observation` already holds 1,296 rows for 71 plays (~3,600/day); a quarterly re-resolution of 1,000 ISRCs appends ~4,000 rows |
+| "Same track record" | ⚠️ **There is no `track` table.** `play` denormalises track fields, so the parent is a key (`isrc`, `spotify_artist_id`), not a row |
+| Candidates and votes | ⚠️ Must key to `resolution_id`, not `isrc` — otherwise BR-8.7 reclassification votes on a **union of 2026 and 2027 facts** |
+| Vote table | ⚠️ Splits in two: one `resolution_id` cannot be a foreign key into two different tables |
+
+### ⚠️ The finding that changed the answer
+
+**The version chain is inert under Q1 = A.** Caching successes indefinitely means the app never looks
+again, so the chain could only ever record `unknown → known` — our own catalogue gaps — and **never**
+`independent → major`, which is the case that prompted the question. It would have appeared to work
+while being structurally incapable of observing what it was built for.
+
+Q1 therefore revised **A → C**. Measured cost at 1,000 distinct ISRCs: ~2,000 requests, roughly
+**33 minutes** of `LOW`-priority queue, once per quarter. The current corpus is 19 distinct ISRCs.
+
+### On "is the chain worth the complexity"
+
+The user's doubt was well founded, and the answer is that **the expensive version is not needed**: a
+track's sequence of plays is already a sparse time series, sampled at the moments that mattered.
+Versioning the resolutions makes that series legible. No revision log, no temporal join machinery,
+no `is_current` flag — the current value is `ORDER BY resolved_at DESC LIMIT 1`, which cannot go
+stale.
+
+### Consequences recorded
+
+- **BR-13** added (8 rules); **BR-7.3, BR-7.4, BR-8.4a, BR-11.1a** amended
+- Migration 002: **6 tables** (was 5), **16 `play` columns** (was 14)
+- **Open finding `label_resolved_at` is closed** — superseded by `label_resolution_id`, a pointer to
+  the exact version, which cannot drift out of step with the row it describes
+- **FR-14 drift recorded**: "resolved at most once" now means *at most once per TTL window*
+- **BR-11.1a**: the hypothesis test uses the **latest** release-level verdict and the
+  **as-of-play** artist-level verdict; the alternative reading of each is a robustness check

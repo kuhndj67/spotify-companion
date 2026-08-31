@@ -1500,3 +1500,101 @@ recording and export are all unaffected and U2's total failure costs the label c
 else."
 **Context**: CONSTRUCTION — U2 NFR Design complete, awaiting approval. Next: Infrastructure Design
 (narrow). One finding open for decision: `label_resolved_at` column
+
+---
+
+## BR-13 — Versioned Resolutions; Q1 Revised A → C After Testing the Proposal Against the Schema
+**Timestamp**: 2026-08-31
+**User Input**: "So the back-correcting of any of our data fields raises a bigger issue given the
+fact that some of that data can change (an artist can sign with a a label for instance). I'm
+thinking maybe we just stick to the data that is available at the time the track is played (or
+within some small time window) and then ONLY edit that data if the track is played again at a later
+date and the data has changed (update at that point). I'm not sure if there's enough value in that
+chain of changes to make it worth the added complexity." Then, on the proposal: "Depending on the db
+schema it may be straightforward to have a track details stored in a table that's a many
+relationship with the track itself… The details record is timestamped so to see the details for the
+last time a track was played we'd just query for the latest details record?" — with the explicit
+instruction: "don't just assume this is the right path, test against the current architecture to
+make sure it works". Answers: versioned + TTL on everything; release = latest, artist = as-of-play
+**AI Response**: "The user identified a problem larger than the label_resolved_at column I had
+flagged, and was right to.
+
+SEPARATED TWO THINGS BOTH CALLED 'THE DATA CHANGED', which is what made the problem tractable. Our
+knowledge changing (a volunteer catalogues a release we could not see) means the old verdict was
+wrong and the new one is better. The world changing (the artist signs to a major) means the old
+verdict was RIGHT FOR ITS TIME and must be kept. These need opposite handling, and MusicBrainz
+cannot tell you which occurred -- a lookup that 404'd in August and returns Atlantic in January is
+byte-identical in both cases. So the design stops trying to decide at write time and keeps both
+readings.
+
+THAT CHOICE IS ONLY EXPRESSIBLE BECAUSE Q12 KEPT THE TWO LEVELS SEPARATE. A release's label is a
+fact about a past event -- this pressing, on this date, carried this label -- so a later change means
+we learned something and the latest reading is strictly better measurement. An artist's label is a
+fact about now, so a later change may be the world moving. Hence BR-11.1a: latest for release,
+as-of-play for artist. Using the latest artist verdict would count an artist who signed AFTER the
+play as signed at the time, which is the direction that fabricates support for R1 -- exactly what
+the standing precision rule forbids. The temporal asymmetry was already latent in the two-level
+split; it had simply never been named.
+
+TESTED THE USER'S PROPOSAL AGAINST THE ACTUAL SCHEMA AS INSTRUCTED, rather than accepting it. Four
+findings, two favourable and two corrective. Favourable: the pattern already exists in this codebase
+-- the observation table is many timestamped rows keyed to a parent, so this is the shape already in
+use, not a novelty. And migration cost is zero: schema_version is still 1, migration 002 was designed
+but never written, so restructuring five tables is a design edit rather than a migration. Corrective:
+there is no track table -- play denormalises track fields -- so 'pointing back to the same track
+record' maps to a key (isrc, spotify_artist_id) rather than a row. And candidates and votes must key
+to resolution_id rather than isrc, or BR-8.7's reclassification would fold 2026 and 2027 facts
+together and vote on a union representing a state of the world that never existed at any moment.
+
+CHECKED STORAGE RATHER THAN ASSERTING IT WAS FINE. The observation table already holds 1,296 rows
+for 71 plays, about 3,600/day at this project's rate. A quarterly re-resolution of 1,000 ISRCs
+appending roughly 4 candidates each is 4,000 rows per quarter -- two to three orders of magnitude
+below what the database already absorbs daily.
+
+FOUND THAT THE PROPOSAL WAS INERT UNDER THE ANSWER GIVEN EARLIER THE SAME DAY, which is the finding
+that mattered. Q1 = A cached successes indefinitely, so the app would never look again after a first
+success. A version chain under that policy could only ever record unknown-to-known -- our own
+catalogue gaps filling in -- and could NEVER record independent-to-major, which is the precise case
+that prompted the user's question. It would have appeared to work while being structurally incapable
+of observing what it was built for. Q1 revised A to C, and priced the revision instead of hand-waving
+it: at 1,000 distinct ISRCs a full sweep is about 2,000 requests, roughly 33 minutes of LOW-priority
+queue, once per quarter. The current corpus is 19 distinct ISRCs.
+
+PUSHED BACK ON ONE PART OF THE ORIGINAL PROPOSAL. Making REPLAY the update trigger would make
+re-resolution conditional on the user playing a track again -- and replay is downstream of whether
+they liked it. That would correlate missingness with the outcome variable, which is methodologically
+worse than the recency bias it was trying to avoid, because recency bias is at least independent of
+the thing being measured. A scheduled TTL sweep is blind to user behaviour, which is the property
+that matters.
+
+ANSWERED THE USER'S ACTUAL DOUBT -- whether the chain is worth the complexity -- with the observation
+that the expensive version is not needed. A track's sequence of plays is ALREADY a sparse time
+series, sampled at exactly the moments that mattered; versioning the resolutions is what makes that
+series legible rather than collapsing it to whatever was true last. No revision log, no temporal-join
+machinery, and deliberately no is_current flag, since a maintained flag can end up with two rows both
+claiming to be current and that reads as valid data. ORDER BY resolved_at DESC LIMIT 1 cannot be
+wrong.
+
+MADE BR-13.5 A POINTER RATHER THAN A TIMESTAMP COMPARISON, which is not obvious. 'The resolution as
+of the play's started_at' is not well defined: a track is pending at play start and its resolution
+lands seconds to minutes later, so a timestamp query would return nothing for the common case and
+silently pick a stale version for a re-resolved track. The play stores the version it actually used
+-- a fact about what the app did, not an inference about what it might have seen.
+
+CLOSED THE label_resolved_at FINDING by superseding it. A pointer to the exact version is strictly
+more informative than a timestamp and cannot drift out of step with the row it describes. It also
+makes BR-12's trace strictly better: the derivation is reconstructed from the candidates that
+version actually held, so re-resolving a track can no longer silently change the explanation of an
+older play.
+
+SPLIT label_signal_vote INTO TWO TABLES as a consequence rather than a preference: once votes key to
+a resolution_id, a single column would have to point into two different tables, which SQLite cannot
+express and therefore cannot enforce. Six columns of duplication buys a real foreign key with
+cascade on both.
+
+RECORDED THE REQUIREMENT DRIFT rather than leaving it silent: FR-14's 'resolved at most once' now
+means at most once per TTL window.
+
+Migration 002 is now 6 tables and 16 play columns, still additive, still unimplemented."
+**Context**: CONSTRUCTION — U2 FD + NFR Design complete with BR-13. Awaiting approval.
+Next: Infrastructure Design (narrow)

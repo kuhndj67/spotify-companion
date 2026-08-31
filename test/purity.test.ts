@@ -31,6 +31,13 @@ const PURE_MODULES = [
   'history/types.ts',
   'export/serialisers.ts',
   'mcp/parseNowPlaying.ts',
+  // U2. labelClassifier decides the independent variable the promotion hypothesis rests on:
+  // a Date.now() here breaks FR-42 while every other test still passes (BR-4.8).
+  'musicbrainz/types.ts',
+  'musicbrainz/majorRootList.ts',
+  'musicbrainz/isrcPrefix.ts',
+  'musicbrainz/releaseNarrowing.ts',
+  'musicbrainz/labelClassifier.ts',
 ];
 
 /**

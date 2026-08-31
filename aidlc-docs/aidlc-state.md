@@ -53,6 +53,20 @@ enrichment, is how a security posture changes as a side effect. **Open item 1 st
 Consequence accepted: on the host, scheduled work runs only while the terminal is open. Backfill is
 built for this (P-5, startup sweep) — intermittent running degrades **timeliness, not correctness**.
 
+### 🎯 Rancher Desktop packaging is a stated goal (user, 2026-08-31)
+
+> *"I do eventually want the entire app to be packaged and deployable in Rancher Desktop, but for
+> now we can continue using host deployment for dev/test."*
+
+**Open item 1 is therefore a *when*, not an *if*.** Two consequences that bind from now on:
+
+1. **All new code stays container-compatible.** No host-only assumptions — paths resolved through
+   `config.ts`'s existing `inContainer` detection, no reliance on a terminal being open, no
+   absolute host paths. `compose.yaml` is kept current even while unverified.
+2. **The `localGuard` decision is still owed**, and it is the one thing standing between the
+   current image and a working container. Options A–D remain in
+   `construction/build-and-test/security-test-instructions.md`.
+
 ## ⭐ BR-13 — resolutions are versioned, never overwritten (2026-08-31)
 
 **Raised by the user**, after NFR Design flagged a missing `label_resolved_at` column:

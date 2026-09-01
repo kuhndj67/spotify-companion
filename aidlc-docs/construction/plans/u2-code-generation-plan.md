@@ -72,12 +72,12 @@ thing that catches it, and step A6 extends it.
 
 ### D. Orchestration
 
-- [ ] **D1.** `src/musicbrainz/LabelCache.ts` — versioned read/write over B2, TTL decisions
-- [ ] **D2.** `src/musicbrainz/LabelEnrichmentService.ts` — live path; `pending` → resolved; never blocks the display (BR-7.5)
-- [ ] **D3.** `src/musicbrainz/LabelBackfillJob.ts` — startup + scheduled sweep, bounded batches, LOW priority
-- [ ] **D4.** `src/musicbrainz/resolutionTrace.ts` ⚙️ — **pure**; stored rows → ordered derivation with rule IDs (BR-12)
-- [ ] **D5.** `test/resolutionTrace.test.ts` — suppression is visible (`suppressedBy`), version divergence flagged
-- [ ] **D6.** `test/labelBackfill.test.ts` — idempotent; never rewrites a written snapshot (BR-8.4a)
+- [x] **D1.** `src/musicbrainz/LabelCache.ts` — versioned read/write over B2, TTL decisions
+- [x] **D2.** `src/musicbrainz/LabelEnrichmentService.ts` — live path; `pending` → resolved; never blocks the display (BR-7.5)
+- [x] **D3.** `src/musicbrainz/LabelBackfillJob.ts` — startup + scheduled sweep, bounded batches, LOW priority
+- [x] **D4.** `src/musicbrainz/resolutionTrace.ts` ⚙️ — **pure**; stored rows → ordered derivation with rule IDs (BR-12)
+- [x] **D5.** `test/resolutionTrace.test.ts` — suppression is visible (`suppressedBy`), version divergence flagged
+- [x] **D6.** `test/labelBackfill.test.ts` — idempotent; never rewrites a written snapshot (BR-8.4a)
 
 ### E. Liked-status capture
 

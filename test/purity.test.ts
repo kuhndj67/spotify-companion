@@ -38,6 +38,7 @@ const PURE_MODULES = [
   'musicbrainz/isrcPrefix.ts',
   'musicbrainz/releaseNarrowing.ts',
   'musicbrainz/labelClassifier.ts',
+  'musicbrainz/resolutionTrace.ts',
 ];
 
 /**

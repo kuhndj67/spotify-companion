@@ -81,8 +81,8 @@ thing that catches it, and step A6 extends it.
 
 ### E. Liked-status capture
 
-- [ ] **E1.** `src/spotify/LikedSetCache.ts` — saved-track set, grace window, `null` never `false` (BR-9)
-- [ ] **E2.** `test/likedSetCache.test.ts` — `added_at` attribution, grace flush, unavailable ⇒ `unknown`
+- [x] **E1.** `src/spotify/LikedSetCache.ts` — saved-track set, grace window, `null` never `false` (BR-9)
+- [x] **E2.** `test/likedSetCache.test.ts` — `added_at` attribution, grace flush, unavailable ⇒ `unknown`
 
 ### F. Wiring (modify existing)
 

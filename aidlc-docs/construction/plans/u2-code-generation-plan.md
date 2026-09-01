@@ -86,18 +86,18 @@ thing that catches it, and step A6 extends it.
 
 ### F. Wiring (modify existing)
 
-- [ ] **F1.** `src/config.ts` — U2 settings; `secrets/musicbrainz.json` read, **fails closed**
-- [ ] **F2.** `src/server.ts` — `GET /api/explain/{playId}`, U2 lifecycle, shutdown flush
-- [ ] **F3.** `src/diagnostics.ts` — `coverage` block with `asOf`, by-reason and by-year (BR-10)
-- [ ] **F4.** `src/export/serialisers.ts` — label columns, both readings, `unknown` as the literal token (BR-13.7, FR-51)
-- [ ] **F5.** `public/index.html` + `public/app.js` + `styles.css` — label fields; trace and coverage sections in the diagnostics dialog
+- [x] **F1.** `src/config.ts` — U2 settings; `secrets/musicbrainz.json` read, **fails closed**
+- [x] **F2.** `src/server.ts` — `GET /api/explain/{playId}`, U2 lifecycle, shutdown flush
+- [x] **F3.** `src/diagnostics.ts` — `coverage` block with `asOf`, by-reason and by-year (BR-10)
+- [x] **F4.** `src/export/serialisers.ts` — label columns, both readings, `unknown` as the literal token (BR-13.7, FR-51)
+- [x] **F5.** `public/index.html` + `public/app.js` + `styles.css` — label fields; trace and coverage sections in the diagnostics dialog
 
 ### G. Deployment and docs
 
-- [ ] **G1.** `compose.yaml` — U2 env vars, read-only `musicbrainz.json` mount
-- [ ] **G2.** `secrets/musicbrainz.example.json` — committed template (mirrors the Spotify one)
-- [ ] **G3.** `README.md` — MusicBrainz setup, contact address, what leaves the machine
-- [ ] **G4.** Code summary → `aidlc-docs/construction/u2-label-enrichment/code/code-summary.md`
+- [x] **G1.** `compose.yaml` — U2 env vars, read-only `musicbrainz.json` mount
+- [x] **G2.** `secrets/musicbrainz.example.json` — committed template (mirrors the Spotify one)
+- [x] **G3.** `README.md` — MusicBrainz setup, contact address, what leaves the machine
+- [x] **G4.** Code summary → `aidlc-docs/construction/u2-label-enrichment/code/code-summary.md`
 
 ---
 
@@ -105,12 +105,12 @@ thing that catches it, and step A6 extends it.
 
 Applied at the end of every batch, not only at the end:
 
-- [ ] `npm run typecheck` clean across `src` **and** `test`
-- [ ] `npm test` green — 193 existing tests must not regress
-- [ ] `test/purity.test.ts` covers all four new pure modules
-- [ ] No new inbound port or listener
-- [ ] `pending` never renders or exports as `unknown` (BR-7.7)
-- [ ] `null` means unknown end to end — never `false`, never `0`
+- [x] `npm run typecheck` clean across `src` **and** `test`
+- [x] `npm test` green — 193 existing tests must not regress
+- [x] `test/purity.test.ts` covers all four new pure modules
+- [x] No new inbound port or listener
+- [x] `pending` never renders or exports as `unknown` (BR-7.7)
+- [x] `null` means unknown end to end — never `false`, never `0`
 
 ---
 

@@ -129,6 +129,8 @@ npm start
 | `GET /api/now-playing` | Current snapshot as JSON, for scripting and debugging |
 | `GET /api/diagnostics` | **Full connect / auth / query cycle check**, step by step |
 | `GET /api/health` | Liveness + a real MCP round-trip (lists tools) |
+| `GET /api/explain/:playId` | **Why a track got its label** — the full derivation, local reads only |
+| `GET /api/history/recent` | The last 50 plays, so the trace UI has something to offer |
 
 ## Testing the connect / auth / query cycle
 
@@ -334,6 +336,93 @@ show it.
 There is deliberately no data API. Serving a containerised dashboard would mean widening the
 local-only guard that the no-password setup depends on — see `aidlc-docs` §5.1 (W-1). A dashboard
 installed *on the host* reaches `127.0.0.1` and works today with no change.
+
+## Label enrichment (U2)
+
+Resolves each track's record label from MusicBrainz and classifies it major / independent /
+unknown, so the promotion hypothesis has an independent variable to test.
+
+### Setup — one file, and the app will not start without it
+
+MusicBrainz policy requires every request to identify the application and carry a contact
+address. Copy the template and put a real address in:
+
+```bash
+cp secrets/musicbrainz.example.json secrets/musicbrainz.json
+# edit "contact"
+```
+
+**This fails closed on purpose.** There is no anonymous fallback: sending unidentified traffic
+while believing you are compliant is worse than a loud refusal at startup. To run without label
+enrichment entirely, set `LABELS_ENABLED=false`.
+
+`secrets/` is gitignored, which is why the contact address lives there rather than in
+`compose.yaml` — that file is tracked and this repository is public.
+
+### What leaves the machine
+
+This is the first thing the app sends anywhere other than Spotify. Per **distinct** track, once:
+
+- the **ISRC**, or the Spotify **artist ID**, to `musicbrainz.org`
+- a `User-Agent` naming the app and your contact address
+
+Because resolutions are cached, what is exposed is closer to *your distinct library* than *your
+listening timeline*. Everything is serialised through a single queue at **1 request/second** —
+that spacing and the retry policy are constants in code, not settings, because there is no
+legitimate value other than one per second.
+
+### Reading the output
+
+| State | Meaning |
+|---|---|
+| `pending` | The lookup has not happened yet. **Not** the same as `unknown` |
+| `unknown` | We looked and could not tell — with a reason: `noIsrc`, `notFound`, `noEligibleCandidate`, `error` |
+| `major` / `independent` | A verdict, with an ordinal confidence and the per-signal votes behind it |
+
+Two levels are recorded **side by side and never merged**: the *release* label (a fact about a
+past pressing) and the *artist* label (a fact about now). They can legitimately disagree — an
+artist signed to a major releasing one track independently is both at once.
+
+### Coverage is a measurement, and it is reported as one
+
+Open **Diagnostics** for a coverage panel broken down **by release year**. That breakdown is not
+decoration: measured against real listening, MusicBrainz resolved **100% of pre-2022 releases and
+43% of 2022-onward ones**. The gaps concentrate on recent independent releases — exactly the
+population the hypothesis is about — so an analysis that quietly drops `unknown` rows drops the
+newest independent music first.
+
+The panel carries an **as-of timestamp**, because the same query run twice can legitimately
+differ: resolutions are re-checked over time and a previously-unknown track may have resolved.
+
+### "Why this label?"
+
+The Diagnostics dialog has a **Why this label?** section that shows the full derivation for any
+play in history — the join, which narrowing tier fired, every candidate label, and **which rule
+refused each one it rejected**.
+
+That last part is the point. The classifier is deliberately biased toward *not* calling something
+independent, and it works by exclusion: `unknown` because MusicBrainz knew nothing and `unknown`
+because a publishing entity was found and discarded are the same verdict with opposite meanings.
+The trace is what tells them apart.
+
+It also warns when it is explaining an old play with newer rules, rather than presenting today's
+reasoning as history.
+
+### Configuration
+
+| Variable | Default | Notes |
+|---|---|---|
+| `LABELS_ENABLED` | `true` | Set `false` to run without MusicBrainz entirely |
+| `LABEL_TTL_UNKNOWN_DAYS` | `30` | How long before an `unknown` is retried |
+| `LABEL_TTL_RESOLVED_DAYS` | `90` | How long before a success is re-checked |
+| `LABEL_BACKFILL_INTERVAL_HOURS` | `6` | Scheduled sweep cadence |
+| `LABEL_BACKFILL_BATCH` | `25` | Bounds one sweep |
+| `MUSICBRAINZ_BASE_URL` | MusicBrainz | Overridable for testing against a stub |
+
+The two TTLs are **measurement parameters**, not tuning knobs — they shape what the dataset
+contains. They differ because they answer different questions: an `unknown` is retried because
+MusicBrainz's *completeness* changes, a success because the underlying *fact* can change when an
+artist signs.
 
 ## Known gaps
 

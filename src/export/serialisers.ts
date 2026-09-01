@@ -50,7 +50,46 @@ export const CSV_COLUMNS = [
   'saw_pause',
   'rewound',
   'ended_with_idle',
+  // -- U2 --------------------------------------------------------------------
+  // Both levels are exported side by side and never merged (Q12, BR-13.7), so the choice of
+  // which one an analysis uses is visible in the data rather than baked in here.
+  'label_verdict',
+  'label_confidence',
+  'label_contested',
+  'label_names',
+  'label_match_method',
+  'label_narrowing_tier',
+  'label_unknown_reason',
+  'label_resolution_id',
+  'label_classifier_version',
+  'artist_label_verdict',
+  'artist_label_confidence',
+  'artist_label_names',
+  'artist_label_resolution_id',
+  'liked_at_start',
+  'liked_at_end',
+  'liked_added_at',
+  'liked_transition',
 ] as const;
+
+/**
+ * `pending` is exported as its own token, never as `unknown` (BR-7.7).
+ *
+ * A lookup that has not happened and a lookup that came back empty are different facts. Counting
+ * in-flight rows as absent data would corrupt the very coverage metric R2 is measured with — and
+ * a downstream analysis dropping `unknown` rows would drop them for the wrong reason.
+ */
+export const PENDING_TOKEN = 'pending';
+
+function renderVerdict(value: string | null | undefined): string {
+  return value === null || value === undefined ? PENDING_TOKEN : value;
+}
+
+/** Label name lists are joined rather than nested, so a CSV cell stays one value. */
+function renderNames(names: string[] | null | undefined): string {
+  if (names === null || names === undefined) return UNKNOWN_TOKEN;
+  return names.length === 0 ? UNKNOWN_TOKEN : names.join('; ');
+}
 
 /**
  * Render a possibly-absent value.
@@ -104,6 +143,23 @@ export function toCsvRow(play: PlayRecord): string {
     play.evidence.sawPause,
     play.evidence.rewound,
     play.evidence.endedWithIdle,
+    renderVerdict(play.label?.verdict),
+    play.label?.confidence ?? null,
+    play.label?.contested ?? null,
+    renderNames(play.label?.names),
+    play.label?.matchMethod ?? null,
+    play.label?.narrowingTier ?? null,
+    play.label?.unknownReason ?? null,
+    play.label?.resolutionId ?? null,
+    play.label?.classifierVersion ?? null,
+    renderVerdict(play.label?.artistVerdict),
+    play.label?.artistConfidence ?? null,
+    renderNames(play.label?.artistNames),
+    play.label?.artistResolutionId ?? null,
+    play.label?.likedAtStart ?? null,
+    play.label?.likedAtEnd ?? null,
+    play.label?.likedAddedAt ?? null,
+    play.label?.likedTransition ?? null,
   ];
   return values.map((value) => csvEscape(renderMaybe(value))).join(',');
 }
@@ -144,6 +200,31 @@ export function toJsonObject(play: PlayRecord): Record<string, unknown> {
       saw_pause: play.evidence.sawPause,
       rewound: play.evidence.rewound,
       ended_with_idle: play.evidence.endedWithIdle,
+    },
+    // Two levels, side by side and never merged (Q12). Nested so a reader cannot mistake an
+    // artist-level verdict for a release-level one -- they answer different questions.
+    label: {
+      verdict: renderVerdict(play.label?.verdict),
+      confidence: renderMaybe(play.label?.confidence),
+      contested: renderMaybe(play.label?.contested),
+      names: renderNames(play.label?.names),
+      match_method: renderMaybe(play.label?.matchMethod),
+      narrowing_tier: renderMaybe(play.label?.narrowingTier),
+      unknown_reason: renderMaybe(play.label?.unknownReason),
+      resolution_id: renderMaybe(play.label?.resolutionId),
+      classifier_version: renderMaybe(play.label?.classifierVersion),
+    },
+    artist_label: {
+      verdict: renderVerdict(play.label?.artistVerdict),
+      confidence: renderMaybe(play.label?.artistConfidence),
+      names: renderNames(play.label?.artistNames),
+      resolution_id: renderMaybe(play.label?.artistResolutionId),
+    },
+    liked: {
+      at_start: renderMaybe(play.label?.likedAtStart),
+      at_end: renderMaybe(play.label?.likedAtEnd),
+      added_at: renderMaybe(play.label?.likedAddedAt),
+      transition: renderMaybe(play.label?.likedTransition),
     },
   };
 }

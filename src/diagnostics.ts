@@ -20,10 +20,40 @@ export interface DiagnosticStep {
   durationMs: number;
 }
 
+/**
+ * Label coverage (BR-10) — a **measurement**, not a health check.
+ *
+ * It rides alongside `steps` rather than inside them because the step renderer only speaks
+ * ok/fail/skip, and rendering a 58% coverage rate as a green tick would present the instrument R2
+ * is measured with as a verdict about system health.
+ */
+export interface CoverageReport {
+  /**
+   * ⚠️ **Required, not decorative.** Under BR-13 the same query run twice can legitimately
+   * differ, because a previously-`unknown` ISRC may have resolved in between. A coverage figure
+   * without a timestamp is not interpretable.
+   */
+  asOf: string;
+  total: number;
+  resolved: number;
+  /** Queued or in flight — never counted as `unknown` (BR-7.7). */
+  pending: number;
+  byVerdict: Record<string, number>;
+  unknownByReason: Record<string, number>;
+  /**
+   * The breakdown that keeps R2 visible. Measured: pre-2022 resolved 5/5, 2022-onward 6/14.
+   * A single aggregate would hide that the misses concentrate on recent independent releases —
+   * exactly the population the hypothesis is about.
+   */
+  byReleaseYear: { year: string; total: number; resolved: number }[];
+}
+
 export interface DiagnosticsReport {
   ranAt: string;
   ok: boolean;
   steps: DiagnosticStep[];
+  /** Absent when label enrichment is disabled or history is unavailable. */
+  coverage?: CoverageReport;
 }
 
 async function step(
@@ -67,11 +97,24 @@ export interface HistoryDiagnosticsInput {
   dbPath: string;
 }
 
+/** U2 subsystems, passed in so diagnostics still works when label enrichment failed to start. */
+export interface LabelDiagnosticsInput {
+  coverage: CoverageReport | null;
+  queueDepth: number;
+  queuePaused: boolean;
+  likedSetSize: number;
+  likedSetAvailable: boolean;
+  backfillRunning: boolean;
+  startupError: string | null;
+  userAgent: string | null;
+}
+
 export async function runDiagnostics(
   mcp: SpotifyMcpClient,
   api: SpotifyWebApiClient,
   enrichment: EnrichmentService,
   history?: HistoryDiagnosticsInput,
+  labels?: LabelDiagnosticsInput,
 ): Promise<DiagnosticsReport> {
   const steps: DiagnosticStep[] = [];
   let trackId: string | null = null;
@@ -245,9 +288,49 @@ export async function runDiagnostics(
     );
   }
 
+  // -- U2: label enrichment ---------------------------------------------------
+  //
+  // Label enrichment is optional to everything else: with MusicBrainz entirely unreachable the
+  // display, recording and export are unaffected and only the label column is missing. So a
+  // disabled or unavailable subsystem reports `skip`, and only an active fault is a failure.
+  if (labels) {
+    steps.push(
+      await step('MusicBrainz identity (NFR-14)', async () => {
+        if (labels.startupError) throw new Error(labels.startupError);
+        if (labels.userAgent === null) return null;
+        return `User-Agent: ${labels.userAgent}`;
+      }),
+    );
+
+    steps.push(
+      await step('Label request queue', async () => {
+        if (labels.userAgent === null) return null;
+        if (labels.queuePaused) {
+          throw new Error(
+            `Paused after repeated 503s. ${labels.queueDepth} request(s) waiting; ` +
+              'lookups are delayed, not failed.',
+          );
+        }
+        return `${labels.queueDepth} queued · 1 req/sec · ${labels.backfillRunning ? 'backfill running' : 'idle'}`;
+      }),
+    );
+
+    steps.push(
+      await step('Saved tracks (liked status)', async () => {
+        if (!labels.likedSetAvailable) {
+          // Not a failure: liked status degrades to `unknown`, which is a recorded value
+          // rather than a fabricated `false`.
+          return null;
+        }
+        return `${labels.likedSetSize} saved track(s) cached for local lookup`;
+      }),
+    );
+  }
+
   return {
     ranAt: new Date().toISOString(),
     ok: steps.every((s) => s.status !== 'fail'),
     steps,
+    ...(labels?.coverage ? { coverage: labels.coverage } : {}),
   };
 }

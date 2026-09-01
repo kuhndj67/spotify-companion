@@ -240,8 +240,23 @@ export class LabelEnrichmentService {
     };
   }
 
-  /** Derive the as-of-play snapshot from a resolution. */
-  toSnapshot(resolution: LabelResolution | null, isrc: string | null): LabelSnapshot {
+  /**
+   * Derive the as-of-play snapshot from a resolution.
+   *
+   * ⚠️ **Returns `null` for a transient failure**, and the caller must then write nothing.
+   *
+   * This is not a nicety. The snapshot is immutable once written (BR-8.4a), so recording
+   * `unknown / error` would let **one network blip permanently mark a play as unresolvable** —
+   * it would never re-enter the backfill work set, because that set is "plays with no verdict".
+   * A transport failure is not an answer; the play stays `pending` and is retried.
+   *
+   * Found by running the real system against an unreachable endpoint: 21 plays were written as
+   * `unknown / error` in a single sweep, and under BR-8.4a every one of them would have stayed
+   * that way forever.
+   */
+  toSnapshot(resolution: LabelResolution | null, isrc: string | null): LabelSnapshot | null {
+    if (resolution !== null && resolution.status === 'error') return null;
+
     if (resolution === null) {
       return {
         verdict: 'unknown',
@@ -262,14 +277,12 @@ export class LabelEnrichmentService {
       isrcVote: isrcPrefixVote(resolution.isrc),
     });
 
-    // A transport failure is `error`, not `notFound`. Both read as `unknown`, but one is a
-    // finding about MusicBrainz's catalogue and the other about the network on a Tuesday.
+    // Transport failures never reach here (they returned null above), so an `unknown` at this
+    // point is a genuine finding about MusicBrainz's catalogue rather than about the network.
     const unknownReason: UnknownReason | null =
       classification.verdict !== 'unknown'
         ? null
-        : resolution.status === 'error'
-          ? 'error'
-          : (classification.unknownReason ?? 'notFound');
+        : (classification.unknownReason ?? 'notFound');
 
     return {
       verdict: classification.verdict,
@@ -284,7 +297,10 @@ export class LabelEnrichmentService {
     };
   }
 
-  toArtistSnapshot(resolution: ArtistLabelResolution | null): ArtistLabelSnapshot {
+  /** Same rule as {@link toSnapshot}: a transient failure writes nothing. */
+  toArtistSnapshot(resolution: ArtistLabelResolution | null): ArtistLabelSnapshot | null {
+    if (resolution !== null && resolution.status === 'error') return null;
+
     if (resolution === null) {
       return { verdict: 'unknown', confidence: 'low', labelNames: [], resolutionId: null };
     }

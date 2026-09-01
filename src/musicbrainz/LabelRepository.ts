@@ -102,6 +102,19 @@ export interface LikedEvidence {
   likedAddedAt: string | null;
 }
 
+/**
+ * The as-of-play pointers stored on a play row.
+ *
+ * These are what let the trace reconstruct a derivation from the candidates the traced version
+ * **actually held** (BR-13.4), rather than from whatever the current ones happen to be.
+ */
+export interface PlayLabelPointers {
+  labelResolutionId: number | null;
+  artistLabelResolutionId: number | null;
+  labelClassifierVersion: number | null;
+  labelUnknownReason: UnknownReason | null;
+}
+
 /** One play awaiting label work. */
 export interface PlayNeedingLabels {
   playId: number;
@@ -145,6 +158,9 @@ export interface LabelCoverage {
 export interface LabelRepository {
   /** Append a release-level resolution version. Returns the new version's id. */
   insertLabelResolution(resolution: NewLabelResolution): number;
+
+  /** The exact versions a play's verdict came from, for the trace (BR-13.4). */
+  getPlayLabelPointers(playId: number): PlayLabelPointers;
 
   /** The newest version for an ISRC (BR-13.3), or `null` if never resolved. */
   getCurrentLabelResolution(isrc: string): LabelResolution | null;

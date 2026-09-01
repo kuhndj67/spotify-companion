@@ -29,6 +29,7 @@ import type {
   LikedEvidence,
   NewArtistLabelResolution,
   NewLabelResolution,
+  PlayLabelPointers,
   PlayNeedingLabels,
   StaleResolution,
 } from '../musicbrainz/LabelRepository.js';
@@ -43,6 +44,7 @@ import type {
 import type {
   CoverageStats,
   CloseReason,
+  LabelFields,
   HistoryFilter,
   NewPlayRecord,
   Observation,
@@ -123,6 +125,49 @@ function rowToRecord(row: PlayRow): PlayRecord {
       rewound: row.ev_rewound !== 0,
       endedWithIdle: row.ev_ended_with_idle !== 0,
     },
+    label: toLabelFields(row as unknown as Record<string, unknown>),
+  };
+}
+
+/**
+ * Read the U2 columns off a play row.
+ *
+ * `label_names` is stored as JSON so a label containing a comma or a semicolon survives the round
+ * trip. A parse failure yields `null` rather than a partial list — a truncated label list would
+ * be a plausible-looking wrong answer, which is the failure mode this unit exists to avoid.
+ */
+function toLabelFields(row: Record<string, unknown>): LabelFields {
+  const names = (value: unknown): string[] | null => {
+    if (typeof value !== 'string') return null;
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as string[]) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const bool = (value: unknown): boolean | null =>
+    value === null || value === undefined ? null : value !== 0;
+
+  return {
+    verdict: (row.label_verdict ?? null) as string | null,
+    confidence: (row.label_confidence ?? null) as string | null,
+    contested: bool(row.label_contested),
+    names: names(row.label_names),
+    matchMethod: (row.label_match_method ?? null) as string | null,
+    narrowingTier: (row.label_narrowing_tier ?? null) as string | null,
+    unknownReason: (row.label_unknown_reason ?? null) as string | null,
+    resolutionId: (row.label_resolution_id ?? null) as number | null,
+    classifierVersion: (row.label_classifier_version ?? null) as number | null,
+    artistVerdict: (row.artist_label_verdict ?? null) as string | null,
+    artistConfidence: (row.artist_label_confidence ?? null) as string | null,
+    artistNames: names(row.artist_label_names),
+    artistResolutionId: (row.artist_label_resolution_id ?? null) as number | null,
+    likedAtStart: bool(row.liked_at_start),
+    likedAtEnd: bool(row.liked_at_end),
+    likedAddedAt: (row.liked_added_at ?? null) as string | null,
+    likedTransition: (row.liked_transition ?? null) as string | null,
   };
 }
 
@@ -596,6 +641,23 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     }));
   }
 
+  getPlayLabelPointers(playId: number): PlayLabelPointers {
+    const row = this.#db
+      .prepare(
+        `SELECT label_resolution_id, artist_label_resolution_id,
+                label_classifier_version, label_unknown_reason
+         FROM play WHERE id = ?`,
+      )
+      .get(playId) as Record<string, number | string | null> | undefined;
+
+    return {
+      labelResolutionId: (row?.label_resolution_id ?? null) as number | null,
+      artistLabelResolutionId: (row?.artist_label_resolution_id ?? null) as number | null,
+      labelClassifierVersion: (row?.label_classifier_version ?? null) as number | null,
+      labelUnknownReason: (row?.label_unknown_reason ?? null) as UnknownReason | null,
+    };
+  }
+
   getCurrentLabelResolution(isrc: string): LabelResolution | null {
     // No is_current flag to maintain: a maintained flag can end up with two rows both claiming
     // to be current, and that reads as valid data. This query cannot go stale (BR-13.3).
@@ -797,11 +859,18 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
 
     const rows = this.#db
       .prepare(
+        // Three statuses, three lifetimes, because they mean three different things:
+        //   resolved  -> the FACT can change (an artist signs). Long TTL.
+        //   not-found -> MusicBrainz's COMPLETENESS can change. Shorter TTL.
+        //   error     -> the network failed on a Tuesday. Retry on the NEXT sweep; making it
+        //                wait 30 days would treat a transport blip as a finding about the
+        //                catalogue, which is the confusion BR-10.2 exists to prevent.
         `SELECT isrc AS key, status, resolved_at FROM label_resolution AS r
          WHERE r.resolved_at = (
                  SELECT MAX(resolved_at) FROM label_resolution WHERE isrc = r.isrc)
            AND ( (r.status = 'resolved'  AND r.resolved_at < ?)
-              OR (r.status <> 'resolved' AND r.resolved_at < ?) )
+              OR (r.status = 'not-found' AND r.resolved_at < ?)
+              OR  r.status = 'error' )
          ORDER BY r.resolved_at ASC
          LIMIT ?`,
       )

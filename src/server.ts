@@ -21,6 +21,21 @@ import {
   validateFilter,
 } from './export/ExportService.js';
 import { SnapshotScheduler } from './export/SnapshotScheduler.js';
+import { RequestQueue } from './musicbrainz/RequestQueue.js';
+import { MusicBrainzClient } from './musicbrainz/MusicBrainzClient.js';
+import { LabelCache } from './musicbrainz/LabelCache.js';
+import {
+  LABEL_CLASSIFIER_VERSION,
+  LabelEnrichmentService,
+} from './musicbrainz/LabelEnrichmentService.js';
+import { LabelBackfillJob } from './musicbrainz/LabelBackfillJob.js';
+import { LikedSetCache } from './spotify/LikedSetCache.js';
+import { buildTrace, summariseTrace } from './musicbrainz/resolutionTrace.js';
+import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
+import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
+import { loadMusicBrainzIdentity, userAgentFrom } from './config.js';
+import { readFileSync } from 'node:fs';
+import type { NewPlayRecord } from './history/types.js';
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -48,10 +63,30 @@ if (config.historyEnabled) {
     // play boundary, minutes after startup, behind a healthy-looking UI.
     repository.verifyWritable();
 
-    observer = new PlayObserver(repository, {
-      completionThreshold: config.completionThreshold,
-      jitterToleranceMs: config.jitterToleranceMs,
-    });
+    observer = new PlayObserver(
+      repository,
+      {
+        completionThreshold: config.completionThreshold,
+        jitterToleranceMs: config.jitterToleranceMs,
+      },
+      {
+        // BR-9.1 — sampled at play start because it cannot be recovered afterwards.
+        onPlayStarted: (sample) => {
+          likedAtStartByTrack.set(sample.trackId, likedSet?.isLiked(sample.trackId) ?? null);
+          // Resolve the label now so it can be SEEN while the track plays (US-08), not only
+          // after it ends. This costs nothing extra: a given ISRC is resolved at most once per
+          // TTL window either way (FR-14), so doing it at the start of the play rather than the
+          // end just moves when the same single request happens.
+          void resolveLabelForDisplay(sample);
+        },
+        // Enrichment happens AFTER the row is written, never before and never on the display
+        // path (NFR-16, BR-7.5): MusicBrainz latency was measured at 0.1-6.7s and can be
+        // minutes behind a backfill sweep.
+        onPlayRecorded: (playId, record) => {
+          void enrichRecordedPlay(playId, record);
+        },
+      },
+    );
     exportService = new ExportService(repository);
 
     if (config.snapshotsEnabled) {
@@ -68,6 +103,214 @@ if (config.historyEnabled) {
     repository = null;
     observer = null;
     exportService = null;
+  }
+}
+
+// -- U2: label enrichment ----------------------------------------------------
+//
+// Optional in exactly the way U1 is optional to U0. With MusicBrainz unreachable, or the contact
+// address missing, the display and recording are unaffected and only the label column is absent.
+// The whole subsystem therefore fails to a null rather than taking the process down.
+
+let labelQueue: RequestQueue | null = null;
+let labelEnrichment: LabelEnrichmentService | null = null;
+let labelBackfill: LabelBackfillJob | null = null;
+let likedSet: LikedSetCache | null = null;
+let labelUserAgent: string | null = null;
+let labelStartupError: string | null = null;
+let backfillTimer: NodeJS.Timeout | null = null;
+
+if (config.labelsEnabled && repository !== null) {
+  try {
+    // Fails closed: no anonymous User-Agent fallback. NFR-14 compliance is a choice this
+    // project made, and unidentified traffic sent while believing we are compliant is worse
+    // than refusing to start.
+    const identity = loadMusicBrainzIdentity((path) => readFileSync(path, 'utf8'));
+    labelUserAgent = userAgentFrom(identity);
+
+    labelQueue = new RequestQueue();
+    const client = new MusicBrainzClient({
+      queue: labelQueue,
+      userAgent: labelUserAgent,
+      baseUrl: config.musicbrainzBaseUrl,
+    });
+    const cache = new LabelCache({
+      repository,
+      unknownTtlDays: config.labelTtlUnknownDays,
+      resolvedTtlDays: config.labelTtlResolvedDays,
+    });
+    labelEnrichment = new LabelEnrichmentService({ client, cache });
+    labelBackfill = new LabelBackfillJob({
+      repository,
+      cache,
+      enrichment: labelEnrichment,
+      api: webApi,
+      batchSize: config.labelBackfillBatch,
+    });
+
+    likedSet = new LikedSetCache({
+      api: webApi,
+      ttlMs: config.likedRefreshMinutes * 60_000,
+      graceMs: config.likedGraceMs,
+    });
+  } catch (error) {
+    labelStartupError = error instanceof Error ? error.message : String(error);
+    console.error('[labels] unavailable; running without label enrichment:', labelStartupError);
+    labelQueue = null;
+    labelEnrichment = null;
+    labelBackfill = null;
+    likedSet = null;
+    labelUserAgent = null;
+  }
+}
+
+/**
+ * `likedAtStart`, captured when each play opened.
+ *
+ * Keyed by track rather than play id because the play id does not exist until the row is
+ * written — and the value has to be sampled before then (BR-9.1).
+ */
+const likedAtStartByTrack = new Map<string, boolean | null>();
+
+/**
+ * Label verdicts for display, keyed by track.
+ *
+ * Bounded: a listening session touches a few hundred distinct tracks at most, and the map is
+ * pruned to the most recent entries rather than growing for the lifetime of the process.
+ */
+const labelByTrack = new Map<string, DisplayLabel>();
+const MAX_DISPLAY_LABELS = 500;
+
+interface DisplayLabel {
+  verdict: string;
+  confidence: string | null;
+  contested: boolean;
+  names: string[];
+  artistVerdict: string | null;
+  artistNames: string[];
+}
+
+/**
+ * Resolve a label for the panel, off the display path.
+ *
+ * ⚠️ **Nothing here is ever awaited by a render** (NFR-16, BR-7.5). MusicBrainz latency was
+ * measured at 0.1–6.7 s and can be minutes behind a backfill sweep; the panel shows `pending`
+ * until this lands and then picks it up on the next tick.
+ */
+async function resolveLabelForDisplay(sample: {
+  trackId: string;
+  isrc: string | null;
+  artistName: string;
+  artistId: string | null;
+  albumName: string;
+  releaseDate: string | null;
+  title: string;
+}): Promise<void> {
+  if (labelEnrichment === null) return;
+
+  try {
+    const resolution = await labelEnrichment.resolveRelease(
+      {
+        isrc: sample.isrc,
+        artistName: sample.artistName,
+        artistId: sample.artistId,
+        albumName: sample.albumName,
+        releaseDate: sample.releaseDate,
+        title: sample.title,
+      },
+      'high',
+    );
+    const snapshot = labelEnrichment.toSnapshot(resolution, sample.isrc);
+    // Nothing to display yet: a transient failure leaves the panel showing `pending`, which is
+    // accurate -- the lookup will be retried.
+    if (snapshot === null) return;
+
+    let artistVerdict: string | null = null;
+    let artistNames: string[] = [];
+    if (sample.artistId !== null) {
+      const artist = await labelEnrichment.resolveArtist(sample.artistId, 'high');
+      const artistSnapshot = labelEnrichment.toArtistSnapshot(artist);
+      if (artistSnapshot !== null) {
+        artistVerdict = artistSnapshot.verdict;
+        artistNames = artistSnapshot.labelNames;
+      }
+    }
+
+    labelByTrack.set(sample.trackId, {
+      verdict: snapshot.verdict,
+      confidence: snapshot.confidence,
+      contested: snapshot.contested,
+      names: snapshot.labelNames,
+      artistVerdict,
+      artistNames,
+    });
+
+    while (labelByTrack.size > MAX_DISPLAY_LABELS) {
+      const oldest = labelByTrack.keys().next().value;
+      if (oldest === undefined) break;
+      labelByTrack.delete(oldest);
+    }
+  } catch (error) {
+    // A label is enrichment. Failing to get one must never affect the display (NFR-18).
+    console.error('[labels] display resolution failed:', error);
+  }
+}
+
+/**
+ * Enrich a play that has just been recorded.
+ *
+ * Runs **after** the row exists and is never awaited by anything on the display path. A failure
+ * here costs the label column on one row and nothing else (NFR-18).
+ */
+async function enrichRecordedPlay(playId: number, record: NewPlayRecord): Promise<void> {
+  const likedAtStart = likedAtStartByTrack.get(record.trackId) ?? null;
+  likedAtStartByTrack.delete(record.trackId);
+
+  // -- Liked status ----------------------------------------------------------
+  if (likedSet !== null && repository !== null) {
+    try {
+      const { likedAtEnd, likedAddedAt } = await likedSet.captureAtClose(
+        playId,
+        record.trackId,
+        record.startedAt,
+        likedAtStart,
+      );
+      repository.updateLikedEvidence(playId, { likedAtStart, likedAtEnd, likedAddedAt });
+    } catch (error) {
+      console.error('[labels] liked capture failed:', error);
+    }
+  }
+
+  // -- Label resolution ------------------------------------------------------
+  if (labelEnrichment === null || repository === null) return;
+
+  try {
+    // HIGH priority: this is the track the user just heard, and it jumps ahead of any backfill
+    // sweep. Priority affects ordering only -- it still waits its turn in the 1 req/sec cadence.
+    const resolution = await labelEnrichment.resolveRelease(
+      {
+        isrc: record.isrc,
+        artistName: record.artistName,
+        artistId: record.artistId,
+        albumName: record.albumName,
+        releaseDate: record.releaseDate,
+        title: record.title,
+      },
+      'high',
+    );
+    // A null snapshot means the lookup failed transiently. Writing nothing leaves the play
+    // `pending`, so it stays in the backfill work set and is retried; writing `unknown / error`
+    // would be permanent under BR-8.4a and one network blip would poison the row for good.
+    const snapshot = labelEnrichment.toSnapshot(resolution, record.isrc);
+    if (snapshot !== null) repository.applyLabelSnapshot(playId, snapshot);
+
+    if (record.artistId !== null) {
+      const artist = await labelEnrichment.resolveArtist(record.artistId, 'high');
+      const artistSnapshot = labelEnrichment.toArtistSnapshot(artist);
+      if (artistSnapshot !== null) repository.applyArtistLabelSnapshot(playId, artistSnapshot);
+    }
+  } catch (error) {
+    console.error('[labels] enrichment failed for play', playId, error);
   }
 }
 
@@ -117,13 +360,30 @@ app.get('/api/now-playing', (_req, res) => {
  * a failure localises the problem. Not cached — it exists to be run on demand.
  */
 app.get('/api/diagnostics', async (_req, res) => {
-  const report = await runDiagnostics(spotify, webApi, enrichment, {
-    repository,
-    observerStats: observer?.stats ?? null,
-    snapshotStatus: snapshots?.status ?? null,
-    startupError: historyStartupError,
-    dbPath: config.historyDbPath,
-  });
+  const report = await runDiagnostics(
+    spotify,
+    webApi,
+    enrichment,
+    {
+      repository,
+      observerStats: observer?.stats ?? null,
+      snapshotStatus: snapshots?.status ?? null,
+      startupError: historyStartupError,
+      dbPath: config.historyDbPath,
+    },
+    {
+      // `asOf` is required rather than decorative: under BR-13 the same coverage query run
+      // twice can legitimately differ, so a figure without a timestamp is not interpretable.
+      coverage: repository ? repository.labelCoverage(new Date().toISOString()) : null,
+      queueDepth: labelQueue?.depth ?? 0,
+      queuePaused: labelQueue?.paused ?? false,
+      likedSetSize: likedSet?.size ?? 0,
+      likedSetAvailable: likedSet?.available ?? false,
+      backfillRunning: labelBackfill?.running ?? false,
+      startupError: labelStartupError,
+      userAgent: labelUserAgent,
+    },
+  );
   res.status(report.ok ? 200 : 503).json(report);
 });
 
@@ -193,6 +453,104 @@ app.get('/api/history/coverage', (_req, res) => {
   res.json({ ...repository.coverage(), ...observer?.stats });
 });
 
+/**
+ * The resolution trace (BR-12) — how a track's label verdict was reached.
+ *
+ * A **separate route from `/api/diagnostics`** on purpose. Diagnostics runs a fixed system sweep
+ * that hits Spotify and MCP on every call; a trace must make **zero** upstream requests
+ * (BR-12.7). Folding it in would mean either a trace re-runs the live health check, or the
+ * endpoint grows a mode switch that changes whether it touches the network — the kind of switch
+ * that later gets set by accident.
+ *
+ * Works for **any play in history** (BR-12.4), not just the current one: the rule paths worth
+ * inspecting — `contested`, tier `all`, a search-fallback match — cannot be summoned on demand by
+ * playing a track.
+ *
+ * Behind the same `localGuard` as everything else. It reads data the machine already holds, so it
+ * adds a route, not exposure.
+ */
+app.get('/api/explain/:playId', (req, res) => {
+  if (repository === null) {
+    res.status(503).json({ error: 'History is unavailable.' });
+    return;
+  }
+
+  const playId = Number.parseInt(req.params.playId ?? '', 10);
+  if (Number.isNaN(playId)) {
+    res.status(400).json({ error: 'playId must be an integer.' });
+    return;
+  }
+
+  const play = repository.getPlay(playId);
+  if (play === null) {
+    res.status(404).json({ error: `No play with id ${playId}.` });
+    return;
+  }
+
+  const raw = repository.getPlayLabelPointers(playId);
+
+  const releaseResolution =
+    raw.labelResolutionId === null
+      ? null
+      : repository.getLabelResolutionById(raw.labelResolutionId);
+  const artistResolution =
+    raw.artistLabelResolutionId === null
+      ? null
+      : repository.getArtistLabelResolutionById(raw.artistLabelResolutionId);
+
+  const release = buildTrace({
+    playId,
+    resolution: releaseResolution,
+    scope: 'release',
+    storedClassifierVersion: raw.labelClassifierVersion,
+    runningClassifierVersion: LABEL_CLASSIFIER_VERSION,
+    majorRoots: MAJOR_ROOTS,
+    isrcVote: isrcPrefixVote(play.isrc),
+    unknownReason: raw.labelUnknownReason,
+  });
+
+  const artist = buildTrace({
+    playId,
+    resolution: artistResolution,
+    scope: 'artist',
+    storedClassifierVersion: raw.labelClassifierVersion,
+    runningClassifierVersion: LABEL_CLASSIFIER_VERSION,
+    majorRoots: MAJOR_ROOTS,
+    isrcVote: null,
+    capConfidenceAt: 'medium',
+  });
+
+  res.json({
+    play: {
+      id: playId,
+      title: play.title,
+      artistName: play.artistName,
+      albumName: play.albumName,
+      startedAt: play.startedAt,
+      isrc: play.isrc,
+    },
+    // Two levels, reported side by side and never merged (Q12). Token - Full Bag is
+    // `Never Too Different` at release level and `Atlantic` at artist level; both are true.
+    release: { ...release, summary: summariseTrace(release) },
+    artist: { ...artist, summary: summariseTrace(artist) },
+  });
+});
+
+/** The most recent plays, so the trace UI has something to offer without a search box. */
+app.get('/api/history/recent', (_req, res) => {
+  if (repository === null) {
+    res.status(503).json({ error: 'History is unavailable.' });
+    return;
+  }
+  const rows = [...repository.listPlays({ limit: 50 })].map((play) => ({
+    id: play.id,
+    title: play.title,
+    artistName: play.artistName,
+    startedAt: play.startedAt,
+  }));
+  res.json({ plays: rows });
+});
+
 app.use(express.static(publicDir));
 
 const server = createServer(app);
@@ -221,8 +579,25 @@ server.on('upgrade', (request, socket, head) => {
   wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
 });
 
+/**
+ * Attach the label to a snapshot, if one has resolved for this track.
+ *
+ * Carried on the existing snapshot rather than as a new message type, so a client that has not
+ * been updated simply ignores an extra field instead of trying to render an unknown message.
+ *
+ * ⚠️ **Absent means `pending`, and the client renders it that way** — never as `unknown`
+ * (BR-7.7). At 1 req/sec behind a backfill sweep, `pending` is a common state rather than a
+ * transient one, and collapsing it into `unknown` would corrupt what the coverage panel reports.
+ */
+function withLabel(snapshot: Snapshot): Snapshot & { label?: DisplayLabel } {
+  const trackId = (snapshot as { trackId?: string | null }).trackId ?? null;
+  if (trackId === null) return snapshot;
+  const label = labelByTrack.get(trackId);
+  return label === undefined ? snapshot : { ...snapshot, label };
+}
+
 function broadcast(snapshot: Snapshot): void {
-  const payload = JSON.stringify(snapshot);
+  const payload = JSON.stringify(withLabel(snapshot));
   for (const client of wss.clients) {
     if (client.readyState === client.OPEN) client.send(payload);
   }
@@ -230,7 +605,7 @@ function broadcast(snapshot: Snapshot): void {
 
 wss.on('connection', (ws) => {
   // Send current state immediately so a new tab isn't blank until the next poll.
-  ws.send(JSON.stringify(nowPlaying.current));
+  ws.send(JSON.stringify(withLabel(nowPlaying.current)));
 });
 
 nowPlaying.on('tick', broadcast);
@@ -271,6 +646,49 @@ server.listen(config.port, config.host, () => {
   nowPlaying.start();
   snapshots?.start();
 
+  // -- U2 background work ----------------------------------------------------
+  //
+  // All of it is fire-and-forget and none of it gates the listener: the app is already serving
+  // by the time any of this runs.
+  if (likedSet !== null) {
+    void likedSet
+      .refresh()
+      .then(() => console.log(`Liked tracks: ${likedSet!.size} cached`))
+      .catch((error: unknown) => console.error('[labels] saved-track refresh failed:', error));
+  }
+
+  if (labelBackfill !== null) {
+    // A startup sweep makes catch-up prompt rather than waiting for the first interval (Q3 = C).
+    // The work set is a query over the database, so a restart loses nothing (P-5).
+    void labelBackfill
+      .runOnce()
+      .then((report) => {
+        if (report.labelsResolved > 0 || report.refreshed > 0 || report.errors > 0) {
+          console.log(
+            `[labels] startup sweep: ${report.labelsResolved} resolved, ` +
+              `${report.refreshed} refreshed, ${report.errors} error(s)`,
+          );
+        }
+      })
+      .catch((error: unknown) => console.error('[labels] startup sweep failed:', error));
+
+    backfillTimer = setInterval(
+      () => {
+        void likedSet?.ensureFresh();
+        void labelBackfill!.runOnce().catch((error: unknown) => {
+          console.error('[labels] scheduled sweep failed:', error);
+        });
+      },
+      config.labelBackfillIntervalHours * 3_600_000,
+    );
+    // Never hold the process open for a background sweep.
+    backfillTimer.unref?.();
+  }
+
+  console.log(
+    `Labels: ${labelUserAgent === null ? `DISABLED${labelStartupError ? ` — ${labelStartupError}` : ''}` : labelUserAgent}`,
+  );
+
   // Backfill after the server is listening, so a slow or failing Spotify call never delays the
   // UI becoming available (BR-5.6).
   if (repository) {
@@ -292,11 +710,18 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     console.log(`\nReceived ${signal}, shutting down.`);
     nowPlaying.stop();
     snapshots?.stop();
+    if (backfillTimer !== null) clearInterval(backfillTimer);
 
     // Flush the in-progress play as `unknown` rather than discarding it (BR-2.6). Discarding
     // would lose a real listening event; asserting completed or skipped would claim something
     // unobserved. `unknown` records what actually happened: a play occurred, and its ending was
     // not seen.
+    // Pending grace-window checks are completed rather than dropped (P-8, Q7 = C). Liked state
+    // is point-in-time: unlike an observation trail it cannot be reconstructed afterwards.
+    void likedSet
+      ?.flushPending()
+      .catch((error: unknown) => console.error('[labels] grace-window flush failed:', error));
+
     try {
       observer?.flush();
       repository?.close();

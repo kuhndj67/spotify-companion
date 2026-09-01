@@ -12,6 +12,7 @@ dist/
 # The whole secrets/ directory is ignored, except the committed example template.
 secrets/*
 !secrets/spotify-config.example.json
+!secrets/musicbrainz.example.json
 spotify-config.json
 .env
 .env.local

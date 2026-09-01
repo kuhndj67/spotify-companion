@@ -63,7 +63,19 @@
             <div><dt>Release type</dt><dd id="album-type">&mdash;</dd></div>
             <div><dt>Track</dt><dd id="track-no">&mdash;</dd></div>
             <div><dt>Explicit</dt><dd id="explicit">&mdash;</dd></div>
+            <!--
+              U2. Two levels, shown side by side and never merged (Q12): a release's label is a
+              fact about a past pressing, an artist's is a fact about now. They can legitimately
+              disagree - Token's *Full Bag* is independent at release level and Atlantic at
+              artist level, and both are true.
+            -->
+            <div><dt>Label</dt><dd id="label-verdict" data-testid="label-verdict">&mdash;</dd></div>
+            <div><dt>Artist label</dt><dd id="artist-label-verdict">&mdash;</dd></div>
           </dl>
+          <div class="genres">
+            <dt>Label detail</dt>
+            <div id="label-names" class="tags"><span class="muted">&mdash;</span></div>
+          </div>
           <div class="genres">
             <dt>Genres</dt>
             <div id="genres" class="tags"><span class="muted">&mdash;</span></div>
@@ -97,6 +109,28 @@
       <div id="diag-body" class="diag-body">
         <p class="muted">Running&hellip;</p>
       </div>
+
+      <!--
+        Coverage is a MEASUREMENT, not a health check, so it gets its own section rather than
+        joining the ok/fail/skip step list. Rendering a 58% coverage rate as a green tick would
+        present the instrument R2 is measured with as a verdict about system health.
+      -->
+      <section class="diag-section">
+        <h3>Label coverage <span class="muted" id="coverage-asof"></span></h3>
+        <div id="coverage-body"><p class="muted">&mdash;</p></div>
+      </section>
+
+      <!--
+        The resolution trace (BR-12). Works for ANY play in history, not just the current one:
+        the rule paths worth inspecting - contested, tier `all`, a search-fallback match -
+        cannot be summoned on demand by playing a track.
+      -->
+      <section class="diag-section">
+        <h3>Why this label?</h3>
+        <label class="muted" for="trace-play">Play</label>
+        <select id="trace-play" data-testid="trace-play"></select>
+        <div id="trace-body"><p class="muted">Choose a play to see how its label was decided.</p></div>
+      </section>
       <footer class="diag-foot">
         <button id="diag-run" class="primary" type="button">Run again</button>
       </footer>

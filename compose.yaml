@@ -47,6 +47,39 @@ services:
       SNAPSHOT_INTERVAL_HOURS: 24
       SNAPSHOT_KEEP: 14
 
+      # -- U2: label enrichment -------------------------------------------------
+      # These values are the same as the code defaults, stated explicitly so the
+      # deployment is self-describing rather than implying the code says otherwise.
+      #
+      # The TTLs are MEASUREMENT parameters and belong beside COMPLETION_THRESHOLD:
+      # an `unknown` is retried because MusicBrainz's *completeness* changes, and a
+      # success because the underlying *fact* can change (an artist signs). Without
+      # the second, the version chain could only ever record unknown -> known and
+      # never independent -> major, which is the case it exists for.
+      LABEL_TTL_UNKNOWN_DAYS: 30
+      LABEL_TTL_RESOLVED_DAYS: 90
+
+      # Backfill pacing. Bounded per sweep so a backlog cannot monopolise the single
+      # 1 req/sec queue for hours; the next sweep resumes, because the work set is a
+      # query over the database rather than a stored cursor.
+      LABEL_BACKFILL_INTERVAL_HOURS: 6
+      LABEL_BACKFILL_BATCH: 25
+
+      # Overridable so BR-1.2's regression test can point at a fixture stub. The
+      # two-call chain must stay two calls: `inc=` is SILENTLY IGNORED on the ISRC
+      # endpoint, so a test asserting "no releases" would pass against the bug.
+      MUSICBRAINZ_BASE_URL: https://musicbrainz.org/ws/2
+
+      # NOTE: request spacing (1 req/sec, NFR-15) and the retry policy are NOT
+      # settings. There is no legitimate value other than one per second, so a knob
+      # here would exist only to violate the policy -- most likely while debugging,
+      # and then forgotten. They are constants in code.
+      #
+      # The NFR-14 contact address is NOT here either: this file is tracked in git
+      # and the repository is public. It lives in secrets/musicbrainz.json, mounted
+      # below, and the app fails to start without it rather than sending anonymous
+      # traffic.
+
     volumes:
       # Question 6, option A: authenticate once on the host, mount the token file in.
       # The MCP server rewrites this file when it refreshes the access token, so it is
@@ -59,5 +92,10 @@ services:
       # the database or crash recovery breaks — copying the single-file secrets mount pattern
       # above would be a subtle and hard-to-diagnose mistake.
       - ./data:/data:rw
+
+      # NFR-14 contact address (U2). Mounted READ-ONLY, unlike the Spotify config
+      # above: nothing rewrites this file, and copying the `rw` out of habit would
+      # grant a write capability with no use.
+      - ./secrets/musicbrainz.json:/app/secrets/musicbrainz.json:ro
 
     restart: unless-stopped

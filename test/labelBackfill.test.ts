@@ -172,7 +172,15 @@ describe('the enrichment service resolves and stores a version', () => {
     });
 
     assert.equal(resolution?.status, 'error');
-    assert.equal(enrichment.toSnapshot(resolution, 'USUM71903783').unknownReason, 'error');
+
+    // ⚠️ The snapshot is null, and that is the point. The play snapshot is immutable once
+    // written (BR-8.4a), so recording `unknown / error` would let ONE NETWORK BLIP permanently
+    // mark a play unresolvable -- it would never re-enter the backfill work set, because that
+    // set is "plays with no verdict". A transport failure is not an answer.
+    //
+    // Found by running the real system against an unreachable endpoint: 21 plays were written
+    // as `unknown / error` in a single sweep, every one of them permanently.
+    assert.equal(enrichment.toSnapshot(resolution, 'USUM71903783'), null);
     repository.close();
   });
 
@@ -212,7 +220,9 @@ describe('the enrichment service resolves and stores a version', () => {
 
     assert.equal(resolution, null);
     assert.equal(requests, 0);
-    assert.equal(enrichment.toSnapshot(null, null).unknownReason, 'noIsrc');
+    // No ISRC IS an answer -- there is nothing to look up and never will be, so unlike a
+    // transport failure this is safely recorded as a permanent verdict.
+    assert.equal(enrichment.toSnapshot(null, null)?.unknownReason, 'noIsrc');
     repository.close();
   });
 });
@@ -337,8 +347,39 @@ describe('backfill', () => {
     const job = new LabelBackfillJob({ repository, cache, enrichment, api: null });
     const report = await job.runOnce();
 
-    assert.equal(report.labelsResolved, 2, 'both plays get a snapshot, error included');
+    // One succeeded; the one that hit a transport failure is deliberately left `pending`.
+    assert.equal(report.labelsResolved, 1);
+    assert.equal(report.errors, 1);
+    assert.equal(
+      repository.listPlaysNeedingLabels(10).length,
+      1,
+      'the failed play stays in the work set so the next sweep retries it',
+    );
     repository.close();
+  });
+
+  it('retries an errored resolution on the next sweep, not in 30 days', async () => {
+    // Three statuses, three lifetimes. `error` is a fact about the network on a Tuesday, so
+    // making it wait out the 30-day `unknown` TTL would treat a transport blip as a finding
+    // about MusicBrainz's catalogue -- exactly the confusion BR-10.2 exists to prevent.
+    const store = new SqliteHistoryRepository(':memory:');
+    store.insertLabelResolution({
+      isrc: 'ISRC00000001',
+      recordingMbid: null,
+      matchMethod: 'none',
+      narrowingTier: 'none',
+      releaseCount: 0,
+      resolvedAt: '2026-08-31T00:00:00.000Z',
+      status: 'error',
+      candidates: [],
+      votes: [],
+    });
+
+    // One minute later: far inside every TTL, and still stale because it errored.
+    const stale = store.listStaleLabelResolutions('2026-08-31T00:01:00.000Z', 30, 90, 10);
+    assert.equal(stale.length, 1);
+    assert.equal(stale[0]?.status, 'error');
+    store.close();
   });
 
   it('does not run two sweeps concurrently', async () => {

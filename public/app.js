@@ -243,8 +243,58 @@ function render(data) {
   }
 
   renderEnrichment(data.enrichment, data.album);
+  renderLabel(data.label);
 
   ui.raw.textContent = data.raw ?? '';
+}
+
+/**
+ * Render the label verdict.
+ *
+ * ⚠️ **An absent label is `pending`, never `unknown`.** They are different facts: one means the
+ * lookup has not happened, the other that it happened and came back empty. At one request per
+ * second behind a backfill sweep, `pending` can persist for minutes, so this is a common state
+ * rather than a transient one — and collapsing the two would misreport the coverage the panel
+ * below is measuring.
+ */
+function renderLabel(label) {
+  const verdict = el('label-verdict');
+  const artistVerdict = el('artist-label-verdict');
+  const names = el('label-names');
+
+  if (!label) {
+    verdict.textContent = 'pending';
+    verdict.dataset.verdict = 'pending';
+    artistVerdict.textContent = DASH;
+    names.replaceChildren(muted(DASH));
+    return;
+  }
+
+  verdict.textContent = label.contested ? `${label.verdict} (contested)` : label.verdict;
+  verdict.dataset.verdict = label.verdict;
+  verdict.title = label.confidence ? `confidence: ${label.confidence}` : '';
+
+  artistVerdict.textContent = label.artistVerdict ?? DASH;
+  if (artistVerdict.dataset) artistVerdict.dataset.verdict = label.artistVerdict ?? '';
+
+  const all = [...(label.names ?? [])];
+  names.replaceChildren(
+    ...(all.length === 0
+      ? [muted(DASH)]
+      : all.map((name) => {
+          const tag = document.createElement('span');
+          tag.className = 'tag';
+          tag.textContent = name;
+          return tag;
+        })),
+  );
+}
+
+function muted(text) {
+  const span = document.createElement('span');
+  span.className = 'muted';
+  span.textContent = text;
+  return span;
 }
 
 // -- Diagnostics ------------------------------------------------------------
@@ -262,6 +312,8 @@ async function runDiagnostics() {
     ui.diagBody.querySelector('.warn').textContent = `Could not reach the backend: ${error}`;
     return;
   }
+
+  renderCoverage(report.coverage ?? null);
 
   ui.diagBody.replaceChildren(
     ...report.steps.map((step) => {
@@ -292,9 +344,171 @@ async function runDiagnostics() {
   );
 }
 
+/**
+ * Coverage (BR-10).
+ *
+ * Rendered as a table with no pass/fail status: it is a measurement, and the by-year breakdown
+ * is the part that matters. Measured coverage was 100% for pre-2022 releases and 43% for
+ * 2022-onward — a single aggregate would hide that the misses concentrate on recent independent
+ * releases, which is exactly the population the hypothesis is about.
+ */
+function renderCoverage(coverage) {
+  const body = el('coverage-body');
+  const asOf = el('coverage-asof');
+
+  if (!coverage) {
+    asOf.textContent = '';
+    body.replaceChildren(muted('Label enrichment is not running.'));
+    return;
+  }
+
+  // Required, not decorative: the same query run twice can legitimately differ, because a
+  // previously-unknown ISRC may have resolved in between.
+  asOf.textContent = `as of ${coverage.asOf}`;
+
+  const summary = document.createElement('p');
+  const pct = coverage.total === 0 ? 0 : Math.round((coverage.resolved / coverage.total) * 100);
+  summary.textContent =
+    `${coverage.resolved}/${coverage.total} resolved (${pct}%) · ` +
+    `${coverage.pending} pending · ` +
+    `unknown: ${Object.entries(coverage.unknownByReason)
+      .filter(([, n]) => n > 0)
+      .map(([reason, n]) => `${reason} ${n}`)
+      .join(', ') || 'none'}`;
+
+  const table = document.createElement('table');
+  table.className = 'coverage';
+  const head = document.createElement('tr');
+  for (const heading of ['Release year', 'Plays', 'Resolved']) {
+    const th = document.createElement('th');
+    th.textContent = heading;
+    head.append(th);
+  }
+  table.append(head);
+
+  for (const row of coverage.byReleaseYear ?? []) {
+    const tr = document.createElement('tr');
+    for (const value of [row.year, row.total, `${row.resolved}`]) {
+      const td = document.createElement('td');
+      td.textContent = String(value);
+      tr.append(td);
+    }
+    table.append(tr);
+  }
+
+  body.replaceChildren(summary, table);
+}
+
+/** Populate the play selector so the trace can address any play in history (BR-12.4). */
+async function loadTracePlays() {
+  const select = el('trace-play');
+  try {
+    const { plays } = await (await fetch('/api/history/recent')).json();
+    select.replaceChildren(
+      ...plays.map((play) => {
+        const option = document.createElement('option');
+        option.value = String(play.id);
+        option.textContent = `${play.title} — ${play.artistName}`;
+        return option;
+      }),
+    );
+  } catch {
+    select.replaceChildren();
+  }
+}
+
+/**
+ * Render one level of a resolution trace.
+ *
+ * The **suppressed** candidates are listed first and by name, because that is the part a reader
+ * would otherwise never learn: `unknown` because MusicBrainz knew nothing and `unknown` because a
+ * Publisher entry was found and refused are the same verdict with opposite meanings.
+ */
+function renderTraceLevel(title, trace) {
+  const section = document.createElement('div');
+  section.className = 'trace-level';
+
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+  section.append(heading);
+
+  if (trace.classifierVersion?.diverged) {
+    // R3 guarantees the classifier gets re-tuned. Without this warning the trace would present
+    // today's reasoning as the historical record — self-consistent, plausible, never run.
+    const warn = document.createElement('p');
+    warn.className = 'warn';
+    warn.textContent =
+      `⚠ Recomputed with classifier v${trace.classifierVersion.running}; ` +
+      `this play was classified by v${trace.classifierVersion.storedOnPlay}. ` +
+      'The derivation below is what today\u2019s rules would decide, not what ran at the time.';
+    section.append(warn);
+  }
+
+  const summary = document.createElement('p');
+  summary.className = 'trace-summary';
+  summary.textContent = trace.summary || '—';
+  section.append(summary);
+
+  if (trace.join) {
+    const join = document.createElement('p');
+    join.className = 'muted';
+    join.textContent =
+      `join ${trace.join.key} = ${trace.join.value} · match ${trace.join.matchMethod} · ` +
+      `tier ${trace.narrowingTier} · ${trace.releaseCount} release(s) · resolved ${trace.join.resolvedAt}`;
+    section.append(join);
+  }
+
+  if ((trace.candidates ?? []).length > 0) {
+    const list = document.createElement('ul');
+    list.className = 'trace-candidates';
+    for (const candidate of trace.candidates) {
+      const item = document.createElement('li');
+      item.dataset.eligible = String(candidate.eligible);
+      item.textContent = candidate.eligible
+        ? `✓ ${candidate.labelName} (${candidate.labelType ?? 'untyped'}, ${candidate.strength})`
+        : `✗ ${candidate.labelName} (${candidate.labelType ?? 'untyped'}) — refused by ${candidate.suppressedBy}`;
+      list.append(item);
+    }
+    section.append(list);
+  }
+
+  if ((trace.rulesFired ?? []).length > 0) {
+    const rules = document.createElement('p');
+    rules.className = 'muted';
+    rules.textContent = `rules fired: ${trace.rulesFired.join(', ')}`;
+    section.append(rules);
+  }
+
+  return section;
+}
+
+async function loadTrace() {
+  const body = el('trace-body');
+  const playId = el('trace-play').value;
+  if (!playId) return;
+
+  body.replaceChildren(muted('Loading…'));
+  try {
+    const trace = await (await fetch(`/api/explain/${playId}`)).json();
+    if (trace.error) {
+      body.replaceChildren(muted(trace.error));
+      return;
+    }
+    body.replaceChildren(
+      renderTraceLevel('Release level', trace.release),
+      renderTraceLevel('Artist level', trace.artist),
+    );
+  } catch (error) {
+    body.replaceChildren(muted(`Could not load the trace: ${error}`));
+  }
+}
+
+el('trace-play').addEventListener('change', loadTrace);
+
 el('diag-open').addEventListener('click', () => {
   ui.diag.showModal();
   runDiagnostics();
+  void loadTracePlays().then(loadTrace);
 });
 el('diag-close').addEventListener('click', () => ui.diag.close());
 el('diag-run').addEventListener('click', runDiagnostics);

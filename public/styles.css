@@ -353,3 +353,44 @@ dd { margin: 0.15rem 0 0; font-size: 0.9rem; overflow-wrap: anywhere; }
   white-space: pre-wrap;
   font-size: 0.75rem;
 }
+
+/* -- U2: label enrichment -------------------------------------------------- */
+
+/*
+ * `pending` is styled distinctly from `unknown` on purpose. They are different facts — one
+ * means the lookup has not happened, the other that it happened and came back empty — and at
+ * one request per second behind a backfill sweep, `pending` is a common state rather than a
+ * transient one.
+ */
+#label-verdict[data-verdict='major'] { color: var(--warn, #d08770); }
+#label-verdict[data-verdict='independent'] { color: var(--ok, #a3be8c); }
+#label-verdict[data-verdict='unknown'] { color: var(--muted, #7a8290); }
+#label-verdict[data-verdict='pending'] { color: var(--muted, #7a8290); font-style: italic; }
+
+/* Sections in the diagnostics dialog that are NOT ok/fail/skip step lists. */
+.diag-section {
+  border-top: 1px solid var(--line, #2a2f3a);
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+.diag-section h3 { font-size: 0.9rem; margin: 0 0 0.5rem; }
+.diag-section select { margin: 0 0 0.5rem 0.5rem; max-width: 24rem; }
+
+table.coverage { border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
+table.coverage th,
+table.coverage td { padding: 0.15rem 0.75rem 0.15rem 0; text-align: left; }
+table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
+
+.trace-level { margin-bottom: 1rem; }
+.trace-level h4 { font-size: 0.85rem; margin: 0 0 0.25rem; }
+.trace-summary { font-size: 0.85rem; margin: 0.25rem 0; }
+
+.trace-candidates { font-size: 0.85rem; list-style: none; margin: 0.5rem 0; padding: 0; }
+.trace-candidates li { padding: 0.1rem 0; }
+
+/*
+ * A refused candidate is dimmed but never hidden. The precision rule works by exclusion, and
+ * exclusion is invisible in a verdict: hiding the refusals would remove the one thing the trace
+ * exists to show.
+ */
+.trace-candidates li[data-eligible='false'] { color: var(--muted, #7a8290); }

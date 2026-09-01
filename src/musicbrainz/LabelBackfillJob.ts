@@ -143,20 +143,26 @@ export class LabelBackfillJob {
           'low',
         );
 
-        // Written once; a later version appends rather than revising (BR-8.4a).
-        const wrote = this.#repository.applyLabelSnapshot(
-          play.playId,
-          this.#enrichment.toSnapshot(resolution, play.isrc),
-        );
-        if (wrote) report.labelsResolved += 1;
+        // Written once; a later version appends rather than revising (BR-8.4a). A null
+        // snapshot means the lookup failed transiently -- the play stays `pending` and comes
+        // back round on the next sweep rather than being permanently marked unresolvable.
+        const snapshot = this.#enrichment.toSnapshot(resolution, play.isrc);
+        if (snapshot === null) {
+          report.errors += 1;
+        } else if (this.#repository.applyLabelSnapshot(play.playId, snapshot)) {
+          report.labelsResolved += 1;
+        }
 
         if (play.artistId !== null) {
           const artist = await this.#enrichment.resolveArtist(play.artistId, 'low');
-          const wroteArtist = this.#repository.applyArtistLabelSnapshot(
-            play.playId,
-            this.#enrichment.toArtistSnapshot(artist),
-          );
-          if (wroteArtist) report.artistsResolved += 1;
+          const artistSnapshot = this.#enrichment.toArtistSnapshot(artist);
+          if (artistSnapshot !== null) {
+            const wroteArtist = this.#repository.applyArtistLabelSnapshot(
+              play.playId,
+              artistSnapshot,
+            );
+            if (wroteArtist) report.artistsResolved += 1;
+          }
         }
       } catch {
         // A failure on one play must not stop the sweep. The row simply stays in the work set,

@@ -97,6 +97,35 @@ export interface ClassifierTolerances {
 }
 
 /** A single listening event, as persisted. */
+/**
+ * The as-of-play label snapshot, as read back for export and display.
+ *
+ * Two levels, side by side and **never merged** (Q12): a release's label is a fact about a past
+ * pressing, an artist's is a fact about now. Token — *Full Bag* is `Never Too Different`
+ * (independent) at release level and `Atlantic` at artist level, and both are true.
+ */
+export interface LabelFields {
+  verdict: string | null;
+  confidence: string | null;
+  contested: boolean | null;
+  /** Distinct label names that voted. */
+  names: string[] | null;
+  matchMethod: string | null;
+  narrowingTier: string | null;
+  unknownReason: string | null;
+  /** The exact resolution version this verdict came from (BR-13.4). */
+  resolutionId: number | null;
+  classifierVersion: number | null;
+  artistVerdict: string | null;
+  artistConfidence: string | null;
+  artistNames: string[] | null;
+  artistResolutionId: number | null;
+  likedAtStart: boolean | null;
+  likedAtEnd: boolean | null;
+  likedAddedAt: string | null;
+  likedTransition: string | null;
+}
+
 export interface PlayRecord {
   id: number;
   trackId: string;
@@ -121,6 +150,13 @@ export interface PlayRecord {
   provenance: Provenance;
   skipSource: SkipSource | null;
   contextType: string | null;
+  /**
+   * U2 label enrichment. Every field is `null` until resolved, and **`null` here means one of
+   * two different things**, which is why `labelUnknownReason` exists alongside `labelVerdict`:
+   * `null` verdict = pending (never looked up), `unknown` verdict = looked up and not known
+   * (BR-7.7). Collapsing them would corrupt the coverage metric R2 is measured with.
+   */
+  label?: LabelFields;
   /**
    * Which classifier produced `outcome`. Without it, a partially reclassified database is
    * indistinguishable from a consistent one — you could not tell which rows had been revisited.

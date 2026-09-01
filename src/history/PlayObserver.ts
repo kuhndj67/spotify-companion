@@ -64,18 +64,50 @@ interface InProgressPlay {
  */
 const MAX_TRAIL = 4000;
 
+/**
+ * Optional hooks for units built on top of recording (U2).
+ *
+ * Both are **fire-and-forget and individually guarded**: recording must never be affected by
+ * whatever a hook does. `onPlayStarted` exists because liked state is point-in-time — BR-9.1's
+ * `likedAtStart` cannot be recovered once the play has begun, unlike an observation trail.
+ */
+export interface PlayObserverHooks {
+  onPlayStarted?(sample: PlaybackSample): void;
+  onPlayRecorded?(playId: number, record: NewPlayRecord): void;
+}
+
 export class PlayObserver {
   #repo: HistoryRepository;
   #tolerances: ClassifierTolerances;
+  #hooks: PlayObserverHooks;
   #current: InProgressPlay | null = null;
   #degraded = false;
   #recorded = 0;
   #gaps = 0;
   #lastRecordedAt: string | null = null;
 
-  constructor(repo: HistoryRepository, tolerances: ClassifierTolerances) {
+  constructor(
+    repo: HistoryRepository,
+    tolerances: ClassifierTolerances,
+    hooks: PlayObserverHooks = {},
+  ) {
     this.#repo = repo;
     this.#tolerances = tolerances;
+    this.#hooks = hooks;
+  }
+
+  /**
+   * Run a hook without letting it affect recording.
+   *
+   * U1 works whether or not U2 exists, and a throw from label enrichment must not cost a play
+   * record — the same containment that keeps history from affecting the display.
+   */
+  #safely(what: string, run: () => void): void {
+    try {
+      run();
+    } catch (error) {
+      console.error(`[history] ${what} hook failed:`, error);
+    }
   }
 
   get stats(): {
@@ -111,6 +143,9 @@ export class PlayObserver {
 
     if (!this.#current) {
       this.#current = { sample, trail: [], startedAtMs: atMs };
+      // BR-9.1 — liked state is point-in-time and cannot be recovered once the play is under
+      // way, unlike an observation trail. It has to be sampled here or not at all.
+      this.#safely('onPlayStarted', () => this.#hooks.onPlayStarted?.(sample));
     } else {
       // Refresh the metadata: enrichment usually lands a moment after the track starts, so the
       // first sample of a play often has null isrc/following that later samples carry.
@@ -176,9 +211,10 @@ export class PlayObserver {
     };
 
     try {
-      this.#repo.recordPlay(record, play.trail);
+      const playId = this.#repo.recordPlay(record, play.trail);
       this.#recorded++;
       this.#lastRecordedAt = record.endedAt;
+      this.#safely('onPlayRecorded', () => this.#hooks.onPlayRecorded?.(playId, record));
       if (this.#degraded) {
         console.log('[history] recording recovered');
         this.#degraded = false;

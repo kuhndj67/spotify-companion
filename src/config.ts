@@ -118,4 +118,110 @@ export const config = {
   snapshotIntervalHours: int('SNAPSHOT_INTERVAL_HOURS', 24),
   snapshotKeep: int('SNAPSHOT_KEEP', 14),
   snapshotsEnabled: process.env.SNAPSHOTS_ENABLED !== 'false',
+
+  // -- U2: label enrichment ---------------------------------------------------
+
+  /** Set false to run without MusicBrainz entirely. Display and recording are unaffected. */
+  labelsEnabled: process.env.LABELS_ENABLED !== 'false',
+
+  /**
+   * Where the NFR-14 contact address lives.
+   *
+   * A separate file from `spotify-config.json`, and deliberately so: that file is written by
+   * `npm run auth` and **rewritten by the MCP server on every token refresh**, so a hand-added
+   * field there would be clobbered by a process we do not control — silently, and only
+   * sometimes.
+   *
+   * `secrets/` is already gitignored and already mounted into the container, which is why it
+   * beat a second `.env` convention: one place to check before publishing rather than two.
+   */
+  musicbrainzConfigPath:
+    process.env.MUSICBRAINZ_CONFIG_PATH ??
+    (inContainer
+      ? '/app/secrets/musicbrainz.json'
+      : join(projectRoot, 'secrets', 'musicbrainz.json')),
+
+  /** Overridable so BR-1.2's regression test can point at a fixture stub. */
+  musicbrainzBaseUrl: process.env.MUSICBRAINZ_BASE_URL ?? 'https://musicbrainz.org/ws/2',
+
+  /**
+   * TTLs are **measurement parameters** and belong beside `completionThreshold` — they shape
+   * what the dataset contains, and R2 guarantees they need revisiting once there is real
+   * coverage data.
+   *
+   * The two differ because they answer different questions: an `unknown` is re-tried because
+   * MusicBrainz's *completeness* changes, a success because the underlying *fact* can change.
+   * Without the second, the version chain could only ever record `unknown → known` and never
+   * `independent → major`, which is the case it exists for.
+   */
+  labelTtlUnknownDays: int('LABEL_TTL_UNKNOWN_DAYS', 30),
+  labelTtlResolvedDays: int('LABEL_TTL_RESOLVED_DAYS', 90),
+
+  labelBackfillIntervalHours: int('LABEL_BACKFILL_INTERVAL_HOURS', 6),
+  labelBackfillBatch: int('LABEL_BACKFILL_BATCH', 25),
+
+  /** How long after a play closes to re-check for a late like (BR-9.3). */
+  likedGraceMs: int('LIKED_GRACE_MS', 30_000),
+  likedRefreshMinutes: int('LIKED_REFRESH_MINUTES', 15),
+
+  // NOTE: the MusicBrainz request spacing (1 req/sec, NFR-15) and the retry policy are NOT
+  // settings. There is no legitimate value other than one per second, so a knob here would
+  // exist only to violate the policy -- most likely while debugging, and then forgotten.
 } as const;
+
+/** The `User-Agent` contact details MusicBrainz policy requires (NFR-14). */
+export interface MusicBrainzIdentity {
+  contact: string;
+  appName: string;
+  appVersion: string;
+}
+
+/**
+ * Load the MusicBrainz identity, **failing closed**.
+ *
+ * There is no anonymous fallback. NFR-14 compliance is a choice this project made deliberately,
+ * and sending unidentified traffic while believing we are compliant is worse than refusing to
+ * start — it is the kind of wrong that looks fine from the inside.
+ *
+ * Returns `null` only when labels are disabled outright, which is an explicit choice rather than
+ * an accident.
+ */
+export function loadMusicBrainzIdentity(readFileSync: (path: string) => string): MusicBrainzIdentity {
+  let raw: string;
+  try {
+    raw = readFileSync(config.musicbrainzConfigPath);
+  } catch {
+    throw new Error(
+      `MusicBrainz contact details not found at ${config.musicbrainzConfigPath}. ` +
+        'Copy secrets/musicbrainz.example.json and fill in a contact address — ' +
+        'MusicBrainz policy (NFR-14) requires requests to identify themselves. ' +
+        'Set LABELS_ENABLED=false to run without label enrichment.',
+    );
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${config.musicbrainzConfigPath} is not valid JSON.`);
+  }
+
+  const contact = typeof parsed.contact === 'string' ? parsed.contact.trim() : '';
+  if (contact === '' || contact.includes('example.com')) {
+    throw new Error(
+      `${config.musicbrainzConfigPath} needs a real "contact" address. ` +
+        'MusicBrainz policy requires a way to reach whoever is making the requests.',
+    );
+  }
+
+  return {
+    contact,
+    appName: typeof parsed.appName === 'string' ? parsed.appName : 'SpotifyNowPlaying',
+    appVersion: typeof parsed.appVersion === 'string' ? parsed.appVersion : '0.1.0',
+  };
+}
+
+/** The header MusicBrainz asks for: application, version, and a way to reach us. */
+export function userAgentFrom(identity: MusicBrainzIdentity): string {
+  return `${identity.appName}/${identity.appVersion} ( ${identity.contact} )`;
+}

@@ -73,7 +73,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## Current state (2026-08-31)
+## Current state (2026-09-01)
 
 **INCEPTION complete. CONSTRUCTION in progress — U1 of 5 units done.**
 
@@ -81,12 +81,12 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 |---|---|---|
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
-| U2 Label enrichment | 2 | ⬅️ **IN PROGRESS** — FD + NFR + Infrastructure Design complete. Next: **Code Generation** |
+| U2 Label enrichment | 2 | ✅ **Built, tested, live-verified** |
 | U3 Rule model (pure core) | 3 | Pending |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-193 tests passing · coverage 99.41% line / 93.00% branch · 71 plays recorded.
+399 tests passing · coverage 98.97% line / 92.14% branch · **120 plays recorded**, 21 with label verdicts.
 
 ### Phases are sequenced by risk containment
 
@@ -117,6 +117,16 @@ renders as the literal token `unknown`. Missing data here correlates with what i
 **Store observations; derive judgements.** Trails are retained so verdicts can be recomputed
 (FR-20). This has already paid off — see the threshold finding in
 `construction/u1-listening-history/live-verification.md`.
+
+**`error` is not `unknown`, and a transient failure must never become permanent.** Three separate
+U2 defects were all this same mistake, and **all three passed the full test suite** — they were
+only found by running the system and watching a real failure get *recorded*. A fixture failure is
+deterministic; it never shows you that the row is never retried. Anywhere a failure is written
+down, ask whether it can be un-written.
+
+**MusicBrainz throttles at 1 req/sec spacing.** Measured: 6 of 19 tracks took a `503` at 1200 ms —
+wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry
+goes back through the queue, so it spends time, never rate.
 
 **Check build exit codes directly.** `docker compose build | tail` reports the *pipe's* exit code.
 A failing build once read as success here.

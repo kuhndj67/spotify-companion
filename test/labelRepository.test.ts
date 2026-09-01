@@ -231,11 +231,22 @@ describe('the as-of-play snapshot is written once (BR-8.4a)', () => {
     store.close();
   });
 
-  it('removes the play from the backfill work set once written', () => {
+  it('removes the play from the backfill work set once BOTH levels are written', () => {
+    // Writing one level does not finish the play: the two resolve independently and can fail
+    // independently. See the dedicated test above for what that protects against.
     const store = repo();
     const playId = store.recordPlay(play(), trail);
     assert.equal(store.listPlaysNeedingLabels(10).length, 1);
+
     store.applyLabelSnapshot(playId, snapshot);
+    assert.equal(store.listPlaysNeedingLabels(10).length, 1, 'artist level still owed');
+
+    store.applyArtistLabelSnapshot(playId, {
+      verdict: 'major',
+      confidence: 'medium',
+      labelNames: ['Atlantic'],
+      resolutionId: null,
+    });
     assert.equal(store.listPlaysNeedingLabels(10).length, 0);
     store.close();
   });
@@ -250,6 +261,63 @@ describe('the backfill work set is derived from the database (P-5)', () => {
     const needing = store.listPlaysNeedingLabels(10);
     assert.equal(needing.length, 1);
     assert.equal(needing[0]?.trackId, 'a');
+    store.close();
+  });
+
+  it('keeps a play in the set when only the artist verdict is missing', () => {
+    // The two levels resolve independently -- release through the ISRC chain, artist through
+    // the Spotify-URL join -- and can fail independently. Keying the work set only on the
+    // release verdict leaves a play whose artist lookup failed permanently unfinished.
+    //
+    // Found live: 21 real plays sat with a release verdict, no artist verdict, and a work set
+    // reporting zero rows remaining.
+    const store = repo();
+    const playId = store.recordPlay(play(), trail);
+
+    store.applyLabelSnapshot(playId, {
+      verdict: 'major',
+      confidence: 'high',
+      contested: false,
+      labelNames: ['Atlantic'],
+      matchMethod: 'isrc',
+      narrowingTier: 'title-date',
+      unknownReason: null,
+      resolutionId: null,
+      classifierVersion: 1,
+    });
+
+    assert.equal(
+      store.listPlaysNeedingLabels(10).length,
+      1,
+      'the artist level is still owed, so the play is not finished',
+    );
+
+    store.applyArtistLabelSnapshot(playId, {
+      verdict: 'major',
+      confidence: 'medium',
+      labelNames: ['Atlantic'],
+      resolutionId: null,
+    });
+
+    assert.equal(store.listPlaysNeedingLabels(10).length, 0, 'now both levels are written');
+    store.close();
+  });
+
+  it('does not hold a play open for an artist verdict when it has no artist id', () => {
+    const store = repo();
+    const playId = store.recordPlay(play({ artistId: null }), trail);
+    store.applyLabelSnapshot(playId, {
+      verdict: 'independent',
+      confidence: 'high',
+      contested: false,
+      labelNames: ['Sub Pop'],
+      matchMethod: 'isrc',
+      narrowingTier: 'title-date',
+      unknownReason: null,
+      resolutionId: null,
+      classifierVersion: 1,
+    });
+    assert.equal(store.listPlaysNeedingLabels(10).length, 0);
     store.close();
   });
 

@@ -57,8 +57,17 @@ export interface MusicBrainzClientOptions {
   userAgent: string;
   baseUrl?: string;
   timeoutMs?: number;
+  /**
+   * Attempts per request before giving up (P-4, Q2 = D). Each attempt goes back through the
+   * queue, so retrying never raises the request rate.
+   */
+  maxAttempts?: number;
+  /** Extra delay before a retry, doubled each time. On top of the queue's own spacing. */
+  retryBackoffMs?: number;
   /** Injected for tests; defaults to global `fetch`. */
   fetchImpl?: typeof fetch;
+  /** Injected for tests, so a backoff costs no real time. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 interface RecordingLookup {
@@ -70,26 +79,74 @@ export class MusicBrainzClient {
   readonly #userAgent: string;
   readonly #baseUrl: string;
   readonly #timeoutMs: number;
+  readonly #maxAttempts: number;
+  readonly #retryBackoffMs: number;
   readonly #fetch: typeof fetch;
+  readonly #sleep: (ms: number) => Promise<void>;
 
   constructor(options: MusicBrainzClientOptions) {
     this.#queue = options.queue;
     this.#userAgent = options.userAgent;
     this.#baseUrl = (options.baseUrl ?? 'https://musicbrainz.org/ws/2').replace(/\/+$/, '');
     this.#timeoutMs = options.timeoutMs ?? 15_000;
+    this.#maxAttempts = options.maxAttempts ?? 3;
+    this.#retryBackoffMs = options.retryBackoffMs ?? 2_000;
     this.#fetch = options.fetchImpl ?? fetch;
+    this.#sleep =
+      options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   /**
-   * One request, through the queue, with failures classified before they are returned.
+   * One request, with **bounded retry** on transient failures (P-4, Q2 = D).
    *
-   * The classification matters more than the retry count: `not-found` is a fact about the
-   * catalogue and is cacheable, while `throttled`/`timeout`/`network` are facts about the network
-   * on a particular Tuesday. Both render as `unknown` to a reader, but folding the second into the
+   * Failures stay classified through the retry: `not-found` is a fact about the catalogue and is
+   * cacheable, while `throttled` / `timeout` / `network` are facts about the network on a
+   * particular Tuesday. Both render as `unknown` to a reader, but folding the second into the
    * first would inflate the apparent coverage gap with transport noise — and that gap is the
    * measurement R2 depends on (BR-10.2).
+   *
+   * ## Why this is not optional, measured
+   *
+   * A live run over the 19 real ISRCs at 1.2 s spacing — wider than the 1 req/sec policy floor,
+   * and the same spacing an earlier research probe used without rejection — still took a `503`
+   * on **6 of 19** tracks. Without a retry each one became an `error` resolution, so a third of
+   * the corpus failed on a single pass for reasons that had nothing to do with MusicBrainz's
+   * catalogue.
+   *
+   * That matters beyond convenience: `error` and `notFound` are meant to say different things
+   * about coverage (BR-10.2), and a transport failure rate that high would swamp the coverage
+   * signal R2 is measured with.
+   *
+   * ⚠️ **Each attempt goes back through the queue**, so retrying never raises the request rate —
+   * it only spends more time. The backoff is *additional* delay on top of the queue's spacing,
+   * and the queue's own pause-after-repeated-`503`s (P-4) still applies on top of both.
    */
   async #request<T>(path: string, params: Record<string, string>, priority: Priority): Promise<T> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= this.#maxAttempts; attempt += 1) {
+      try {
+        return await this.#attempt<T>(path, params, priority);
+      } catch (error) {
+        lastError = error;
+
+        // A 404 is an ANSWER, not a failure. Retrying it would waste the only budget there is
+        // and could not change the outcome.
+        const retryable =
+          error instanceof ThrottledError ||
+          (error instanceof MusicBrainzError &&
+            (error.kind === 'timeout' || error.kind === 'network'));
+
+        if (!retryable || attempt === this.#maxAttempts) throw error;
+
+        await this.#sleep(this.#retryBackoffMs * 2 ** (attempt - 1));
+      }
+    }
+
+    throw lastError;
+  }
+
+  async #attempt<T>(path: string, params: Record<string, string>, priority: Priority): Promise<T> {
     const url = new URL(`${this.#baseUrl}${path}`);
     url.searchParams.set('fmt', 'json');
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);

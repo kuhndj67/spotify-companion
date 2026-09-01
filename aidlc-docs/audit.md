@@ -1670,3 +1670,86 @@ Carried five verification items forward into Build and Test explicitly so they a
 stages, including that BR-1.2's fixture must be a known-non-empty case."
 **Context**: CONSTRUCTION — U2 Functional, NFR and Infrastructure Design all complete.
 Awaiting approval. Next: Code Generation. Open item 1 deliberately still open
+
+---
+
+## U2 Build and Test Complete — Three Defects Found by Running, Not by Testing
+**Timestamp**: 2026-09-01
+**User Input**: "lets build and test" · authorised creating `secrets/musicbrainz.json` with
+kuhndj67@gmail.com, and attempting the container egress check
+**AI Response**: "Ran the stage against the real service rather than against fixtures, which is
+where all of its value turned out to be.
+
+FOUND THREE DEFECTS, EVERY ONE OF WHICH PASSED THE FULL TEST SUITE. None was reachable from a
+fixture, and all three are the same underlying mistake: a transient failure becoming permanent.
+
+FIRST, a transport error wrote an IMMUTABLE verdict. Running the server against an unreachable
+endpoint recorded 21 plays as unknown/error in a single sweep. The play snapshot is immutable under
+BR-8.4a and the backfill work set is 'plays with no verdict', so every one of those rows would have
+stayed unresolvable forever -- from one network blip, in the dependent variable of the experiment.
+Fixed by making toSnapshot return null for a transient failure, so it CANNOT be written; changing
+the return type forced every caller to handle it rather than trusting anyone to remember the rule.
+
+SECOND, and this one hid inside the fix for the first: LabelCache.isFresh still gave an errored
+resolution the full 30-day unknown TTL. I had corrected the SQL sweep to treat error as
+always-stale and stopped there -- but THE LIVE PATH NEVER CONSULTS THE SWEEP. It calls isFresh.
+Surfaced by noticing 17 artist resolutions left over from the unreachable-endpoint run, each of
+which would have suppressed retries for a month. Three statuses now genuinely have three lifetimes.
+
+THIRD, the backfill work set keyed only on the release verdict. The two levels resolve
+independently -- release through the ISRC chain, artist through the Spotify-URL join -- and can
+fail independently, so a play whose artist lookup failed was permanently unfinished and invisible.
+Observed live: 21 real plays sat with a release verdict, no artist verdict, and the work set
+reported ZERO rows remaining. Fixed so either level missing puts the play back; the next run picked
+all 21 up automatically.
+
+The common thread is worth recording as a rule rather than three bug fixes. The design was careful
+that `unknown` and `pending` stay distinct. It was not careful that `error` stays distinct from
+both. A fixture failure is deterministic, so it can prove the failure is HANDLED but never that the
+resulting row is never RETRIED -- you have to watch a real failure be recorded.
+
+DISCOVERED THAT P-4's BOUNDED RETRY HAD NEVER BEEN IMPLEMENTED. Only the queue-wide pause was, and
+I had not noticed the gap between the design and my own code. The live run made it obvious: at 1200
+ms spacing -- WIDER than the 1 req/sec policy floor, and the same spacing an earlier research probe
+used without rejection -- 6 of 19 tracks took a 503. Without a retry, a third of the corpus failed
+on one pass for reasons that said nothing about MusicBrainz's catalogue, which would have swamped
+the coverage signal R2 is measured with. With retry added: 0 errors, 0.46 req/sec. Each attempt
+goes back through the queue, so retrying spends time and never rate.
+
+VERIFIED THAT THE SHIPPED CODE REPRODUCES THE RESEARCH MEASUREMENT EXACTLY: 13/19, 68.4%,
+identical to the 2026-08-26 ad-hoc probe. That is the strongest available evidence that the
+implementation matches what the design was reasoning about. BR-1.2 passed with Slipknot returning
+50 releases and Audioslave 44 -- a single-call form would have returned zero with a 200, and a test
+asserting 'no releases' would have passed against the bug.
+
+EVERY MEASURED CLASSIFIER CASE REPRODUCED ON REAL DATA: Audioslave contested across Epic and
+Interscope with confidence capped to low, Faouzia unknown because the Publisher entry was refused,
+Imminence unknown because [no label] was refused, NF major-high and correctly NOT contested because
+Capitol and Caroline are both Universal, Spinefarm caught as Universal despite its distribution
+pointing at an independent, broke voting independent at reduced confidence as a Distributor.
+
+THE TWO-LEVEL SPLIT EARNED ITS KEEP: 8 plays have release and artist verdicts that disagree. That
+is the Token case at scale -- an artist signed to a major releasing a particular track
+independently -- and merging the levels would have silently picked one. Artist confidence never
+exceeded medium across all 19, so that cap holds in production.
+
+DEMONSTRATED BR-12.3 ON REAL DATA rather than asserting it. The trace for Imminence reads 'refused
+1: [no label] (BR-3.2) - unknown by BR-4.6'. Without it that unknown is indistinguishable from
+'MusicBrainz knew nothing', and this is the very artist whose [no label] handling was wrong in the
+first round of design.
+
+VERIFIED CONTAINER EGRESS rather than assuming it: HTTP 200 in 0.373s from inside a container on
+the default bridge, no networks configuration needed. Deferring this to Build and Test was the
+right call precisely because the container has produced one silent networking failure already.
+
+PROTECTED THE DATA THROUGHOUT. Migration 002 was rehearsed against a copy before touching the real
+database. Every destructive cleanup was preceded by a backup and followed by a row-count check --
+120 plays and 1,296 observations verified intact each time. A bare delete of artist resolutions was
+refused by a foreign key because plays pointed at them, which is the constraint doing exactly what
+the test I wrote for it says it should.
+
+REPORTED WHAT IS STILL OWED rather than declaring completion: liked-status capture has never fired
+against real listening, the search fallback path never triggered live, 2 plays remain in the
+bounded work set, and localGuard still blocks the container UI even though egress now works."
+**Context**: CONSTRUCTION — U2 complete: built, tested, live-verified. 399 tests, 98.97% line
+coverage, 120 plays. Next: the Phase 2 hypothesis gate (BR-11), then U3

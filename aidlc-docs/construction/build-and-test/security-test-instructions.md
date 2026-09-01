@@ -59,6 +59,24 @@ is a download over the existing loopback listener.
 
 ---
 
+## U2 — outbound posture  ✅ **VERIFIED 2026-09-01**
+
+U2 is the first traffic to leave the machine other than Spotify's. What was checked:
+
+| Check | Result |
+|---|---|
+| New inbound ports or listeners | **None.** `/api/explain/:playId` and `/api/history/recent` sit on the existing loopback listener behind `localGuard` |
+| Contact address committed | **No.** `secrets/musicbrainz.json` is gitignored; `git check-ignore` confirms. Only `musicbrainz.example.json` is tracked |
+| Anonymous fallback | **None.** A missing or placeholder contact is a startup error; the app runs display-and-record-only rather than sending unidentified traffic |
+| Mount permissions | `musicbrainz.json` is mounted **`:ro`** — unlike `spotify-config.json`, nothing writes it |
+| NFR-01–07 | **Unchanged.** No control was relaxed |
+
+**What actually leaves the machine**, per *distinct* track and only once, because resolutions are
+cached: the ISRC or Spotify artist ID, and a `User-Agent` naming the app and the contact address.
+Closer to *the distinct library* than *the listening timeline*.
+
+---
+
 ## ⚠️ Open security decision — the guard blocks the container
 
 ### What was found

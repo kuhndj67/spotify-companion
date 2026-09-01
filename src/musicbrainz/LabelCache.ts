@@ -61,6 +61,16 @@ export class LabelCache {
    * ninety days — and so this class stays trivially deterministic.
    */
   isFresh(resolution: { resolvedAt: string; status: string }, now: string): boolean {
+    // ⚠️ An `error` is NEVER fresh. It is a fact about the network on a Tuesday, not an answer,
+    // so caching it would let one transient failure suppress every retry for the whole TTL.
+    //
+    // Found in Build and Test: 17 artist resolutions written during a deliberate
+    // unreachable-endpoint run would have been treated as valid cache entries for THIRTY DAYS.
+    // The equivalent hole in the SQL sweep had already been fixed; this one had not, and only
+    // running the real system surfaced it -- the live path consults `isFresh` and never reaches
+    // the sweep at all.
+    if (resolution.status === 'error') return false;
+
     const ageMs = Date.parse(now) - Date.parse(resolution.resolvedAt);
     const ttlDays =
       resolution.status === 'resolved' ? this.#resolvedTtlDays : this.#unknownTtlDays;

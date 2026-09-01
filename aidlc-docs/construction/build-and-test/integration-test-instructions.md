@@ -128,6 +128,68 @@ loopback and the guard behaves as designed.
 
 ---
 
+## U2 — live MusicBrainz  ✅ **VERIFIED 2026-09-01**
+
+Run against the real service with the shipped code, over the 19 distinct ISRCs actually in
+`history.db`. Full results in [`u2-build-and-test-summary.md`](u2-build-and-test-summary.md).
+
+### BR-1.2 — the chain must stay two calls
+
+```bash
+# Any recording KNOWN to have many releases. A "no releases" assertion would pass against the
+# inc=-silently-ignored bug, so the fixture must be one where the answer cannot be zero.
+curl -s -A "SpotifyNowPlaying/0.1.0 ( you@example.com )" \
+  "https://musicbrainz.org/ws/2/isrc/USSM10211587?fmt=json"      # -> recording id
+curl -s -A "SpotifyNowPlaying/0.1.0 ( you@example.com )" \
+  "https://musicbrainz.org/ws/2/release?recording=<id>&inc=labels&limit=100&fmt=json"
+```
+
+**Result**: 44 releases for Audioslave, 50 for Slipknot. ✅
+
+### Rate limiting
+
+**Result**: 0.46 req/sec measured; 0 throttles **after** bounded retry was added. Before it, 6 of
+19 tracks took a `503` at 1200 ms spacing — wider than the policy floor. ⚠️ **Do not assume 1
+req/sec spacing alone is sufficient; the retry is load-bearing.**
+
+### End-to-end through the running app
+
+```bash
+npm start
+# watch: "Labels: SpotifyNowPlaying/0.1.0 ( … )" then "[labels] startup sweep: N resolved"
+curl -s localhost:3000/api/diagnostics | jq '.coverage'
+curl -s localhost:3000/api/explain/<playId> | jq '.release.summary'
+```
+
+**Result**: 13 resolutions, 15 artist resolutions, 0 errors, 3 contested, **8 plays where the
+release and artist verdicts legitimately disagree**. ✅
+
+### Container egress ✅ **VERIFIED 2026-09-01**
+
+```bash
+docker run --rm --network bridge curlimages/curl -s -o /dev/null -w "%{http_code}\n" \
+  -A "SpotifyNowPlaying/0.1.0 ( you@example.com )" \
+  "https://musicbrainz.org/ws/2/isrc/USSM10211587?fmt=json"
+```
+
+**Result**: `HTTP 200 in 0.373s`. No `networks:` configuration needed. ✅
+
+### ⏳ Still owed — liked-status capture
+
+The saved-track set loads (600 tracks cached), but **no play has closed during a session with
+labels enabled**, so the 30-second grace window has never fired against real listening and no
+`liked_transition` has been written. Verify by playing a track to completion with `npm start`
+running, then:
+
+```sql
+SELECT liked_at_start, liked_at_end, liked_added_at, liked_transition
+FROM play ORDER BY started_at DESC LIMIT 5;
+```
+
+`NULL` must never appear as `0` — an unavailable saved-track set records `unknown`, not a choice.
+
+---
+
 ## Cleanup
 
 ```bash

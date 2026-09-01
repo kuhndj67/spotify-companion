@@ -812,11 +812,24 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   listPlaysNeedingLabels(limit: number): PlayNeedingLabels[] {
     // The database is the queue of record (P-5): a restart loses the in-memory queue and
     // nothing else, because this query re-derives exactly what remains to be done.
+    //
+    // ⚠️ **Either verdict missing puts a play back in the set.** The two levels resolve
+    // independently and can fail independently -- release-level goes through the ISRC chain,
+    // artist-level through the Spotify-URL join -- so keying only on `label_verdict IS NULL`
+    // leaves a play whose artist lookup failed permanently unfinished, invisible to every later
+    // sweep.
+    //
+    // Found in Build and Test: 21 real plays had a release verdict and no artist verdict, and
+    // the work set reported ZERO rows remaining. Writing one level does not mean the play is
+    // done. `applyLabelSnapshot` refuses to overwrite the level that is already written
+    // (BR-8.4a), so re-visiting a partially-resolved play is safe.
     const rows = this.#db
       .prepare(
         `SELECT id, track_id, isrc, artist_id, album_name, release_date
          FROM play
-         WHERE isrc IS NOT NULL AND label_verdict IS NULL
+         WHERE isrc IS NOT NULL
+           AND ( label_verdict IS NULL
+              OR (artist_id IS NOT NULL AND artist_label_verdict IS NULL) )
          ORDER BY started_at DESC
          LIMIT ?`,
       )

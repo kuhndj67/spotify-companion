@@ -69,6 +69,26 @@ docker compose build
 
 ---
 
+## U2 — the one extra prerequisite
+
+MusicBrainz policy (NFR-14) requires every request to identify the application and carry a contact
+address. **The app will not enable label enrichment without one**, and does not fall back to
+anonymous traffic:
+
+```bash
+cp secrets/musicbrainz.example.json secrets/musicbrainz.json
+# edit "contact" to a real address
+```
+
+`secrets/` is gitignored; only the example template is tracked. Without the file the app still
+starts and records — it logs an actionable error and runs display-and-record-only. To run without
+labels deliberately, set `LABELS_ENABLED=false`.
+
+**Verified 2026-09-01**: both paths. Missing file → clear message, app healthy. Present file →
+`Labels: SpotifyNowPlaying/0.1.0 ( … )` at startup.
+
+---
+
 ## Build artifacts
 
 | Artifact | Location |

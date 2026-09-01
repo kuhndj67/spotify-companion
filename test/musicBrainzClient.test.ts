@@ -49,12 +49,15 @@ function stubFetch(routes: (url: URL) => { status?: number; body?: unknown; raw?
   return { impl, calls };
 }
 
-function makeClient(fetchImpl: typeof fetch) {
+function makeClient(fetchImpl: typeof fetch, over = {}) {
   return new MusicBrainzClient({
     queue: instantQueue(),
     userAgent: 'SpotifyNowPlaying/0.1 ( test@example.com )',
     baseUrl: 'https://stub.invalid/ws/2',
     fetchImpl,
+    // Retry is exercised, but its backoff costs no wall-clock time here.
+    sleep: async () => undefined,
+    ...over,
   });
 }
 
@@ -309,5 +312,111 @@ describe('label mapping', () => {
 
     const releases = await makeClient(impl).listReleasesForRecording('recording-mbid');
     assert.equal(releases[0]?.labels[0]?.labelType, 'Publisher');
+  });
+});
+
+describe('bounded retry on transient failures (P-4, Q2 = D)', () => {
+  // Measured, not assumed: a live run over the 19 real ISRCs at 1.2s spacing -- WIDER than the
+  // 1 req/sec policy floor -- still took a 503 on 6 of 19 tracks. Without a retry, a third of
+  // the corpus failed on one pass for reasons that said nothing about MusicBrainz's catalogue,
+  // which would swamp the coverage signal R2 is measured with.
+  it('recovers from a 503 on a later attempt', async () => {
+    let calls = 0;
+    const { impl } = stubFetch(() => {
+      calls += 1;
+      return calls === 1 ? { status: 503 } : { body: { recordings: [{ id: 'recovered' }] } };
+    });
+
+    const result = await makeClient(impl).lookupRecordingByIsrc('USSM10211357');
+    assert.equal(result.recordingMbid, 'recovered');
+    assert.equal(calls, 2);
+  });
+
+  it('recovers from a network failure on a later attempt', async () => {
+    let calls = 0;
+    const impl = (async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('ECONNRESET');
+      return { ok: true, status: 200, json: async () => ({ recordings: [{ id: 'ok' }] }) } as Response;
+    }) as unknown as typeof fetch;
+
+    assert.equal((await makeClient(impl).lookupRecordingByIsrc('USSM10211357')).recordingMbid, 'ok');
+    assert.equal(calls, 2);
+  });
+
+  it('gives up after the attempt limit rather than retrying forever', async () => {
+    let calls = 0;
+    const { impl } = stubFetch(() => {
+      calls += 1;
+      return { status: 503 };
+    });
+
+    await assert.rejects(makeClient(impl).lookupRecordingByIsrc('USSM10211357'));
+    assert.equal(calls, 3, 'three attempts, then the failure is recorded');
+  });
+
+  it('never retries a 404, because it is an answer', async () => {
+    // Retrying it would spend the only budget there is and could not change the outcome.
+    let calls = 0;
+    const { impl } = stubFetch(() => {
+      calls += 1;
+      return { status: 404 };
+    });
+
+    await assert.rejects(makeClient(impl).lookupRecordingByIsrc('QZXXX2312345'));
+    assert.equal(calls, 1);
+  });
+
+  it('never retries a malformed response', async () => {
+    // A 200 that will not parse is our problem or a contract change, not a transient blip.
+    let calls = 0;
+    const { impl } = stubFetch(() => {
+      calls += 1;
+      return { raw: 'not json' };
+    });
+
+    await assert.rejects(makeClient(impl).lookupRecordingByIsrc('USSM10211357'));
+    assert.equal(calls, 1);
+  });
+
+  it('sends every retry back through the queue, so the rate never rises', async () => {
+    // The whole point: retrying spends more TIME, never more requests per second.
+    const startedAt: number[] = [];
+    let now = 0;
+    const queue = new RequestQueue({
+      minIntervalMs: 1_000,
+      now: () => now,
+      sleep: async (ms) => {
+        now += ms;
+      },
+    });
+
+    let calls = 0;
+    const impl = (async () => {
+      startedAt.push(now);
+      calls += 1;
+      return calls < 3
+        ? ({ ok: false, status: 503, json: async () => ({}) } as Response)
+        : ({ ok: true, status: 200, json: async () => ({ recordings: [] }) } as Response);
+    }) as unknown as typeof fetch;
+
+    const client = new MusicBrainzClient({
+      queue,
+      userAgent: 'test',
+      baseUrl: 'https://stub.invalid/ws/2',
+      fetchImpl: impl,
+      sleep: async (ms) => {
+        now += ms;
+      },
+    });
+
+    await client.lookupRecordingByIsrc('USSM10211357');
+
+    for (let i = 1; i < startedAt.length; i += 1) {
+      assert.ok(
+        startedAt[i]! - startedAt[i - 1]! >= 1_000,
+        `retry ${i} started only ${startedAt[i]! - startedAt[i - 1]!}ms after the previous attempt`,
+      );
+    }
   });
 });

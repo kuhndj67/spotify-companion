@@ -4,56 +4,76 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 Infrastructure Design COMPLETE** (2026-08-31).
-  Functional Design, NFR Design and Infrastructure Design are all done. Artifacts at
-  [`construction/u2-label-enrichment/`](construction/u2-label-enrichment/).
-  **Awaiting user approval.** Next: **Code Generation**.
-  Two live MusicBrainz probes done — Parts 5 and 6 of `research-findings.md`.
-  U1 complete and live-verified: 193/193 tests, 99.41% line / 93.00% branch, **71 plays, 0 gaps**.
+- **Current Stage**: CONSTRUCTION — **U2 BUILD AND TEST COMPLETE** (2026-09-01).
+  **399 tests · 98.97% line / 92.14% branch · live-verified against the real MusicBrainz.**
+  Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
+  **Awaiting user approval.** Next: the **Phase 2 hypothesis gate** (BR-11), then U3.
+  Database at schema v2, **120 plays**, 21 with label verdicts.
 
-## 🏗️ U2 Infrastructure Design (2026-08-31)
+## ✅ U2 delivered and live-verified (2026-09-01)
 
-**The whole delta: a way out of the machine, plus one secret that is not a credential.**
-No new inbound port, no new listener, no new process, no broker.
+| | |
+|---|---|
+| Tests | **399** (193 before U2), 0 failing |
+| Coverage | 98.97% line · 92.14% branch · 96.88% function |
+| Live MusicBrainz | ✅ real service, shipped code, 19 real ISRCs |
+| Container egress | ✅ HTTP 200 from inside a container |
+| Errors in the full live run | **0** |
 
-| Q | Decision | Source |
+### 🔴 Three defects, all found by RUNNING it — none reachable from fixtures
+
+Every one passed the full suite first.
+
+| # | Defect | Why fixtures could not catch it |
 |---|---|---|
-| Q1 Contact address | **B** — `secrets/musicbrainz.json`, read by `config.ts`, **fails closed** | **User** |
-| Q2 Deployment target | **A** — host `npm start` stays real; `compose.yaml` kept correct but unverified | **User** |
-| Q3 Container egress | **A** — verify at Build and Test, do not assume | default |
-| Q4 Config surface | **D** — TTLs/backfill tunable, **rate limit and retry fixed**, base URL configurable | default |
-| Q5 Coverage metrics | **A** — a `coverage` block in `/api/diagnostics`, its own dialog section | default |
+| 1 | A transient network error wrote an **immutable** `unknown/error` verdict. 21 plays would have been permanently unresolvable from one blip | A fixture failure is deterministic; you must watch a real failure be *recorded* to see it is never retried |
+| 2 | `LabelCache.isFresh` gave an `error` the full **30-day** TTL. The SQL sweep had been fixed; the **live path never consults the sweep** | Hid *inside* the fix for #1 |
+| 3 | The work set keyed only on the release verdict, so a play whose **artist** lookup failed was permanently unfinished — 21 real plays, work set reporting **zero remaining** | Needs two levels failing independently against a real service |
 
-### ⭐ Measurement parameters are tunable; compliance values are not
+> **What they share**: all three are *a transient failure becoming permanent*. The design was
+> careful that `unknown` and `pending` stay distinct; it was **not** careful that `error` stays
+> distinct from both.
 
-`LABEL_TTL_UNKNOWN_DAYS` (30) and `LABEL_TTL_RESOLVED_DAYS` (90) sit beside `COMPLETION_THRESHOLD`
-— they shape what the dataset contains, and R2 guarantees they need revisiting. The **1 req/sec
-spacing stays a constant in code**: there is no legitimate value other than 1, so a setting there
-would exist only to violate NFR-15.
+### ⚠️ P-4's bounded retry had never been implemented
 
-`MUSICBRAINZ_BASE_URL` is configurable for one reason — BR-1.2's regression test needs a fixture
-with a **known non-empty** answer, because a test asserting "no releases" would pass against the
-`inc=`-silently-ignored bug.
+Only the queue-wide pause was. At 1200 ms spacing — **wider** than the policy floor — **6 of 19
+tracks took a `503`**. With retry added: **0 errors**, 0.46 req/sec. Each retry goes back through
+the queue, so retrying spends **time, never rate**.
 
-### Why `secrets/` and not `.env`
+### The shipped code reproduces the research measurement exactly
 
-`node --env-file-if-exists=.env` was **verified working** on Node 22.17.0 (prints a notice and
-continues when absent). Rejected anyway: the project already has exactly one place for uncommittable
-things, and two places means two to check before publishing. Extending `spotify-config.json` was
-rejected because **the MCP server rewrites that file on every token refresh** — a hand-added field
-would be clobbered silently and intermittently.
+| | Research probe (ad-hoc, 2026-08-26) | Shipped code (2026-09-01) |
+|---|---|---|
+| ISRC → recording | 13/19 — **68.4%** | 13/19 — **68.4%** |
 
-### Why the container guard was still not fixed
+Audioslave 44 releases · Slipknot 50 · Faouzia `unknown` (Publisher refused) · Imminence `unknown`
+(`[no label]` refused) · NF `major high` and **not** contested · Spinefarm caught as Universal.
 
-U2 is the first unit wanting a long-running unattended process, which makes `restart:
-unless-stopped` genuinely attractive — **and that is exactly why the change was not bundled in**.
-Relaxing the single control NFR-07's no-authentication decision rests on, inside a unit about label
-enrichment, is how a security posture changes as a side effect. **Open item 1 stays open.**
+### ⭐ The two-level split earned its keep: **8 plays disagree**
 
-Consequence accepted: on the host, scheduled work runs only while the terminal is open. Backfill is
-built for this (P-5, startup sweep) — intermittent running degrades **timeliness, not correctness**.
+Release and artist verdicts differ on 8 of the resolved plays — the Token case at scale, an artist
+signed to a major releasing a particular track independently. Merging them would have silently
+picked one. **Artist confidence never exceeded `medium`** across all 19.
 
-### 🎯 Rancher Desktop packaging is a stated goal (user, 2026-08-31)
+### BR-12.3 demonstrated on real data
+
+```
+Imminence — God Fearing Man
+  refused 1: [no label] (BR-3.2) · unknown by BR-4.6
+```
+
+Without the trace this `unknown` is indistinguishable from "MusicBrainz knew nothing" — and this
+is the very artist whose `[no label]` handling was wrong in round 1 of the design.
+
+### Still owed
+
+- **Liked capture unobserved live** — the set loads (600 tracks) but no play has closed with
+  labels enabled, so the grace window has never fired
+- **Search fallback never fired** — fixture-tested only
+- 2 plays still in the work set; the sweep is bounded per run and finishes on the next
+- `localGuard` still blocks the container **UI** (egress is verified; serving is not)
+
+## 🎯 Rancher Desktop packaging is a stated goal (user, 2026-08-31)
 
 > *"I do eventually want the entire app to be packaged and deployable in Rancher Desktop, but for
 > now we can continue using host deployment for dev/test."*

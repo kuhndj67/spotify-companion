@@ -34,6 +34,7 @@ import type {
   StaleResolution,
 } from '../musicbrainz/LabelRepository.js';
 import type {
+  ArtistGenre,
   ArtistLabelResolution,
   LabelCandidate,
   LabelResolution,
@@ -168,6 +169,7 @@ function toLabelFields(row: Record<string, unknown>): LabelFields {
     likedAtEnd: bool(row.liked_at_end),
     likedAddedAt: (row.liked_added_at ?? null) as string | null,
     likedTransition: (row.liked_transition ?? null) as string | null,
+    artistGenres: parseGenres(row.artist_genres),
   };
 }
 
@@ -504,8 +506,8 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
         .prepare(
           `INSERT INTO artist_label_resolution
              (spotify_artist_id, artist_mbid, release_count, named_label_count,
-              resolved_at, status, supersedes_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              resolved_at, status, supersedes_id, genres)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           resolution.spotifyArtistId,
@@ -515,6 +517,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
           resolution.resolvedAt,
           resolution.status,
           previous?.id ?? null,
+          resolution.genres === null ? null : JSON.stringify(resolution.genres),
         );
 
       const id = Number(info.lastInsertRowid);
@@ -721,6 +724,8 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       supersedesId: (row.supersedes_id ?? null) as number | null,
       candidates: this.#loadArtistCandidates(id),
       votes: this.#loadVotes('artist_label_signal_vote', id),
+      // NULL means we never asked or the lookup failed; [] means MusicBrainz has none.
+      genres: parseGenres(row.genres),
     };
   }
 
@@ -760,7 +765,8 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       .prepare(
         `UPDATE play SET
            artist_label_verdict = ?, artist_label_confidence = ?,
-           artist_label_names = ?, artist_label_resolution_id = ?
+           artist_label_names = ?, artist_label_resolution_id = ?,
+           artist_genres = ?
          WHERE id = ? AND artist_label_verdict IS NULL`,
       )
       .run(
@@ -768,6 +774,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
         snapshot.confidence,
         snapshot.labelNames.length > 0 ? JSON.stringify(snapshot.labelNames) : null,
         snapshot.resolutionId,
+        snapshot.genres === null ? null : JSON.stringify(snapshot.genres),
         playId,
       );
     return info.changes > 0;
@@ -896,6 +903,44 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     }));
   }
 
+  listArtistsNeedingGenres(limit: number): string[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT spotify_artist_id FROM artist_label_resolution AS r
+         WHERE r.resolved_at = (
+                 SELECT MAX(resolved_at) FROM artist_label_resolution
+                 WHERE spotify_artist_id = r.spotify_artist_id)
+           AND r.status = 'resolved'
+           AND r.genres IS NULL
+         LIMIT ?`,
+      )
+      .all(limit) as { spotify_artist_id: string }[];
+    return rows.map((row) => row.spotify_artist_id);
+  }
+
+  fillMissingArtistGenres(limit: number): number {
+    // Only ever fills NULL, and only the genres column. The verdict, its confidence and its
+    // resolution pointer are untouched -- this completes a record rather than revising one.
+    const info = this.#db
+      .prepare(
+        `UPDATE play SET artist_genres = (
+           SELECT r.genres FROM artist_label_resolution AS r
+           WHERE r.spotify_artist_id = play.artist_id
+             AND r.genres IS NOT NULL
+           ORDER BY r.resolved_at DESC LIMIT 1)
+         WHERE id IN (
+           SELECT id FROM play
+           WHERE artist_genres IS NULL
+             AND artist_id IS NOT NULL
+             AND EXISTS (
+               SELECT 1 FROM artist_label_resolution AS r2
+               WHERE r2.spotify_artist_id = play.artist_id AND r2.genres IS NOT NULL)
+           LIMIT ?)`,
+      )
+      .run(limit);
+    return Number(info.changes);
+  }
+
   labelCoverage(now: string): LabelCoverage {
     const count = (sql: string, ...params: (string | number)[]): number => {
       const row = this.#db.prepare(sql).get(...params) as { n: number } | undefined;
@@ -947,6 +992,21 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
 
   close(): void {
     this.#db.close();
+  }
+}
+
+/**
+ * Genres are stored as JSON so a name containing a comma survives the round trip, and so the vote
+ * count travels with the name. A parse failure yields `null` rather than a partial list: a
+ * truncated genre list is a plausible-looking wrong answer.
+ */
+function parseGenres(value: unknown): ArtistGenre[] | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as ArtistGenre[]) : null;
+  } catch {
+    return null;
   }
 }
 

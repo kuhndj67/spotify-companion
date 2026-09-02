@@ -23,6 +23,7 @@ import { isrcPrefixVote } from './isrcPrefix.js';
 import { narrowReleases } from './releaseNarrowing.js';
 import { MAJOR_ROOTS } from './majorRootList.js';
 import type {
+  ArtistGenre,
   ArtistLabelResolution,
   LabelResolution,
   ResolutionStatus,
@@ -171,14 +172,19 @@ export class LabelEnrichmentService {
   async resolveArtist(
     spotifyArtistId: string,
     priority: Priority = 'low',
+    // `force` exists for one narrowly-scoped case: a resolution that is still fresh but predates
+    // a field we have since started collecting (genres, migration 003). It bypasses the TTL, not
+    // the append-only rule -- the result is still a new version.
+    options: { force?: boolean } = {},
   ): Promise<ArtistLabelResolution | null> {
     const now = this.#now();
     const cached = this.#cache.getArtist(spotifyArtistId);
-    if (cached !== null && this.#cache.isFresh(cached, now)) return cached;
+    if (!options.force && cached !== null && this.#cache.isFresh(cached, now)) return cached;
 
     let artistMbid: string | null = null;
     let status: ResolutionStatus = 'resolved';
     let releases: Awaited<ReturnType<MusicBrainzClient['listReleasesForArtist']>> = [];
+    let genres: ArtistGenre[] | null = null;
 
     try {
       artistMbid = await this.#client.lookupArtistBySpotifyId(spotifyArtistId, priority);
@@ -189,6 +195,18 @@ export class LabelEnrichmentService {
       }
     } catch (error) {
       status = error instanceof MusicBrainzError && error.kind === 'not-found' ? 'not-found' : 'error';
+    }
+
+    // Genres are a separate, optional lookup: Spotify returns none at all, so MusicBrainz is the
+    // only source. Failing to get them must never downgrade the LABEL verdict -- they answer a
+    // different question and are the reason for their own try/catch rather than sharing the one
+    // above. `null` stays `null` on failure, which reads as unknown rather than "no genres".
+    if (artistMbid !== null) {
+      try {
+        genres = await this.#client.lookupArtistGenres(artistMbid, priority);
+      } catch {
+        genres = null;
+      }
     }
 
     // Bootlegs and regional licensees inflate an artist's set and say nothing about a signing
@@ -224,6 +242,7 @@ export class LabelEnrichmentService {
       status,
       candidates,
       votes: classification.votes,
+      genres,
     });
 
     return {
@@ -237,6 +256,7 @@ export class LabelEnrichmentService {
       supersedesId: cached?.id ?? null,
       candidates,
       votes: classification.votes,
+      genres,
     };
   }
 
@@ -302,7 +322,13 @@ export class LabelEnrichmentService {
     if (resolution !== null && resolution.status === 'error') return null;
 
     if (resolution === null) {
-      return { verdict: 'unknown', confidence: 'low', labelNames: [], resolutionId: null };
+      return {
+        verdict: 'unknown',
+        confidence: 'low',
+        labelNames: [],
+        resolutionId: null,
+        genres: null,
+      };
     }
 
     const classification = classify(resolution.candidates, {
@@ -317,6 +343,7 @@ export class LabelEnrichmentService {
       confidence: classification.confidence,
       labelNames: classification.labelNames,
       resolutionId: resolution.id,
+      genres: resolution.genres,
     };
   }
 }

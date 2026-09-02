@@ -259,6 +259,29 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    description: 'artist genres from MusicBrainz (Spotify no longer supplies them)',
+    up(db) {
+      db.exec(`
+        -- Spotify's GET /artists/{id} returns NO genres field at all -- one of this project's
+        -- four documentation-vs-reality catches. MusicBrainz has them, and we are already
+        -- talking to it for labels, so a genre is one extra request per distinct artist per
+        -- TTL window rather than a new integration.
+        --
+        -- Stored as a JSON array of {name, count}. The count is MusicBrainz's vote tally, kept
+        -- rather than discarded because it separates "four people agree this is hard rock"
+        -- from one person's opinion -- and because U3's rules will want to threshold on it.
+        --
+        -- NULL means unknown, as everywhere else. An empty array means "we asked and there are
+        -- none", which is a different fact.
+        ALTER TABLE artist_label_resolution ADD COLUMN genres TEXT;
+
+        -- The as-of-play snapshot, same immutability rule as the label columns (BR-8.4a).
+        ALTER TABLE play ADD COLUMN artist_genres TEXT;
+      `);
+    },
+  },
 ];
 
 /**

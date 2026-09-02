@@ -10,6 +10,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SqliteHistoryRepository } from '../src/history/SqliteHistoryRepository.js';
+import { MIGRATIONS } from '../src/history/migrations.js';
 import type { NewPlayRecord, Observation } from '../src/history/types.js';
 import type { LabelCandidate, SignalVote } from '../src/musicbrainz/types.js';
 
@@ -87,10 +88,12 @@ function resolution(isrc: string, resolvedAt: string, labels: string[]) {
   };
 }
 
-describe('migration 002', () => {
-  it('brings a fresh database to schema version 2', () => {
+describe('label migrations', () => {
+  it('brings a fresh database to the newest schema', () => {
+    // Asserted against MIGRATIONS rather than a literal: the schema grows per phase, and a
+    // hardcoded number turns every future migration into a spurious failure here.
     const store = repo();
-    assert.equal(store.schemaVersion, 2);
+    assert.equal(store.schemaVersion, MIGRATIONS[MIGRATIONS.length - 1]!.version);
     store.close();
   });
 
@@ -246,6 +249,7 @@ describe('the as-of-play snapshot is written once (BR-8.4a)', () => {
       confidence: 'medium',
       labelNames: ['Atlantic'],
       resolutionId: null,
+      genres: null,
     });
     assert.equal(store.listPlaysNeedingLabels(10).length, 0);
     store.close();
@@ -297,6 +301,7 @@ describe('the backfill work set is derived from the database (P-5)', () => {
       confidence: 'medium',
       labelNames: ['Atlantic'],
       resolutionId: null,
+      genres: null,
     });
 
     assert.equal(store.listPlaysNeedingLabels(10).length, 0, 'now both levels are written');
@@ -379,6 +384,109 @@ describe('TTL sweeps (P-3)', () => {
       0,
       'an old version must not keep re-triggering once a newer one exists',
     );
+    store.close();
+  });
+});
+
+describe('genres (migration 003)', () => {
+  function artistResolution(resolvedAt: string, genres: { name: string; count: number }[] | null) {
+    return {
+      spotifyArtistId: 'artist-1',
+      artistMbid: 'mbid-a',
+      releaseCount: 10,
+      namedLabelCount: 2,
+      resolvedAt,
+      status: 'resolved' as const,
+      candidates: [],
+      votes: [],
+      genres,
+    };
+  }
+
+  it('round-trips genres with their vote counts', () => {
+    // The count is the only quality signal MusicBrainz provides — eleven people agreeing beats
+    // one person's opinion — so it travels with the name rather than being discarded.
+    const store = repo();
+    const id = store.insertArtistLabelResolution(
+      artistResolution('2026-09-02T00:00:00.000Z', [
+        { name: 'alternative rock', count: 11 },
+        { name: 'hard rock', count: 6 },
+      ]),
+    );
+    const back = store.getArtistLabelResolutionById(id);
+    assert.deepEqual(back?.genres, [
+      { name: 'alternative rock', count: 11 },
+      { name: 'hard rock', count: 6 },
+    ]);
+    store.close();
+  });
+
+  it('keeps null (never asked) distinct from empty (asked, none)', () => {
+    const store = repo();
+    const unknown = store.insertArtistLabelResolution(artistResolution('2026-09-02T00:00:00.000Z', null));
+    const none = store.insertArtistLabelResolution(artistResolution('2026-09-02T00:00:01.000Z', []));
+
+    assert.equal(store.getArtistLabelResolutionById(unknown)?.genres, null);
+    assert.deepEqual(store.getArtistLabelResolutionById(none)?.genres, []);
+    store.close();
+  });
+
+  it('lists artists whose newest resolution predates genre collection', () => {
+    // Those resolutions are `resolved` and so fresh for the full 90-day TTL. Without this they
+    // would carry no genres for a quarter.
+    const store = repo();
+    store.insertArtistLabelResolution(artistResolution('2026-09-02T00:00:00.000Z', null));
+    assert.deepEqual(store.listArtistsNeedingGenres(10), ['artist-1']);
+
+    store.insertArtistLabelResolution(
+      artistResolution('2026-09-02T00:00:01.000Z', [{ name: 'rock', count: 3 }]),
+    );
+    assert.deepEqual(store.listArtistsNeedingGenres(10), [], 'the newer version has genres');
+    store.close();
+  });
+
+  it('fills a play’s genres without touching its verdict (not a BR-8.4a violation)', () => {
+    // BR-8.4a protects the VERDICT — a judgement that must reflect what was believed at the
+    // time. Genres are descriptive metadata about the artist, not a judgement about this play.
+    const store = repo();
+    const playId = store.recordPlay(play(), trail);
+
+    store.applyArtistLabelSnapshot(playId, {
+      verdict: 'independent',
+      confidence: 'medium',
+      labelNames: ['Sub Pop'],
+      resolutionId: null,
+      genres: null,
+    });
+    store.insertArtistLabelResolution(
+      artistResolution('2026-09-02T00:00:00.000Z', [{ name: 'grunge', count: 4 }]),
+    );
+
+    assert.equal(store.fillMissingArtistGenres(10), 1);
+
+    const after = store.getPlay(playId);
+    assert.deepEqual(after?.label?.artistGenres, [{ name: 'grunge', count: 4 }]);
+    assert.equal(after?.label?.artistVerdict, 'independent', 'the verdict is untouched');
+    assert.deepEqual(after?.label?.artistNames, ['Sub Pop']);
+    store.close();
+  });
+
+  it('never overwrites genres a play already has', () => {
+    const store = repo();
+    const playId = store.recordPlay(play(), trail);
+    store.applyArtistLabelSnapshot(playId, {
+      verdict: 'independent',
+      confidence: 'medium',
+      labelNames: ['Sub Pop'],
+      resolutionId: null,
+      genres: [{ name: 'original', count: 9 }],
+    });
+    store.insertArtistLabelResolution(
+      artistResolution('2026-09-02T00:00:00.000Z', [{ name: 'different', count: 1 }]),
+    );
+
+    assert.equal(store.fillMissingArtistGenres(10), 0, 'nothing to fill');
+    assert.deepEqual(store.getPlay(playId)?.label?.artistGenres, [{ name: 'original', count: 9 }]);
     store.close();
   });
 });

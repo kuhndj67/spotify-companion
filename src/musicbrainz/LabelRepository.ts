@@ -28,6 +28,7 @@
  */
 
 import type {
+  ArtistGenre,
   ArtistLabelResolution,
   Confidence,
   LabelCandidate,
@@ -62,6 +63,8 @@ export interface NewArtistLabelResolution {
   status: ResolutionStatus;
   candidates: LabelCandidate[];
   votes: SignalVote[];
+  /** `null` = never asked or the lookup failed; `[]` = asked, MusicBrainz has none. */
+  genres: ArtistGenre[] | null;
 }
 
 /**
@@ -88,6 +91,7 @@ export interface ArtistLabelSnapshot {
   confidence: Confidence;
   labelNames: string[];
   resolutionId: number | null;
+  genres: ArtistGenre[] | null;
 }
 
 /**
@@ -207,6 +211,26 @@ export interface LabelRepository {
     resolvedTtlDays: number,
     limit: number,
   ): StaleResolution[];
+
+  /**
+   * Artist ids whose newest resolution predates genre collection.
+   *
+   * Genres arrived in migration 003, after artists had already been resolved. Those resolutions
+   * are `resolved` and therefore fresh for the full 90-day TTL, so without this they would carry
+   * no genres for a quarter. Re-resolving **appends a version** (BR-13.1) rather than editing the
+   * old one — the chain then records that the genres were learned on a later date, which is true.
+   */
+  listArtistsNeedingGenres(limit: number): string[];
+
+  /**
+   * Copy genres onto plays that have none, from the newest resolution for their artist.
+   *
+   * ⚠️ **This is not a BR-8.4a violation, and the distinction matters.** That rule protects the
+   * *verdict* — a judgement that must reflect what was believed at the time. Genres are
+   * descriptive metadata about the artist, not a judgement about this play, and the column is
+   * only ever filled when it is `NULL`. No verdict is touched.
+   */
+  fillMissingArtistGenres(limit: number): number;
 
   labelCoverage(now: string): LabelCoverage;
 }

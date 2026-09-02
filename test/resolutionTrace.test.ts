@@ -232,6 +232,7 @@ describe('artist-level traces', () => {
     supersedesId: null,
     candidates: [candidate('Atlantic')],
     votes: [],
+    genres: [{ name: 'alternative rock', count: 11 }],
   };
 
   it('uses the exact Spotify-URL join as its key', () => {

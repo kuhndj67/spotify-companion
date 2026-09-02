@@ -70,6 +70,7 @@ export const CSV_COLUMNS = [
   'liked_at_end',
   'liked_added_at',
   'liked_transition',
+  'artist_genres',
 ] as const;
 
 /**
@@ -83,6 +84,19 @@ export const PENDING_TOKEN = 'pending';
 
 function renderVerdict(value: string | null | undefined): string {
   return value === null || value === undefined ? PENDING_TOKEN : value;
+}
+
+/**
+ * Genres, joined with their vote counts kept.
+ *
+ * `alternative rock:11; hard rock:6` rather than a bare name list: the count is the only quality
+ * signal MusicBrainz gives, separating a genre eleven people agreed on from one person's opinion.
+ * Dropping it in the export would throw away information the database has.
+ */
+function renderGenres(genres: { name: string; count: number }[] | null | undefined): string {
+  if (genres === null || genres === undefined) return UNKNOWN_TOKEN;
+  if (genres.length === 0) return 'none';
+  return genres.map((genre) => `${genre.name}:${genre.count}`).join('; ');
 }
 
 /** Label name lists are joined rather than nested, so a CSV cell stays one value. */
@@ -160,6 +174,7 @@ export function toCsvRow(play: PlayRecord): string {
     play.label?.likedAtEnd ?? null,
     play.label?.likedAddedAt ?? null,
     play.label?.likedTransition ?? null,
+    renderGenres(play.label?.artistGenres),
   ];
   return values.map((value) => csvEscape(renderMaybe(value))).join(',');
 }
@@ -226,6 +241,8 @@ export function toJsonObject(play: PlayRecord): Record<string, unknown> {
       added_at: renderMaybe(play.label?.likedAddedAt),
       transition: renderMaybe(play.label?.likedTransition),
     },
+    // Structured in JSON rather than flattened, so the vote counts stay machine-readable.
+    artist_genres: play.label?.artistGenres ?? UNKNOWN_TOKEN,
   };
 }
 

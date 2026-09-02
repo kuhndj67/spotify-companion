@@ -124,6 +124,13 @@ only found by running the system and watching a real failure get *recorded*. A f
 deterministic; it never shows you that the row is never retried. Anywhere a failure is written
 down, ask whether it can be un-written.
 
+**A proportional threshold over a constant-time effect is a confound generator.** The completion
+ratio divides by track duration, so anything that removes a fixed number of seconds — a
+crossfade, a fade-out, an early track change — costs a short track more ratio than a long one.
+If track length correlates with the variable being measured, that is bias rather than noise.
+Measured here: majors run ~30% longer than independents. Watch for this shape anywhere a rate
+or ratio is thresholded.
+
 **MusicBrainz throttles at 1 req/sec spacing.** Measured: 6 of 19 tracks took a `503` at 1200 ms —
 wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry
 goes back through the queue, so it spends time, never rate.
@@ -141,8 +148,9 @@ A failing build once read as success here.
 | 2 | **Liked-status transitions — agreed for U2.** Four states + `unknown`; `kept-unliked` is the reference level, not an observed choice. Design in `research-findings.md` Part 4b | U2 |
 | 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`. They *do* carry `track_id`, so ISRC is recoverable at **47 one-off `GET /tracks/{id}` calls**. Spend them or not → U2 FD **Q7** | U2 |
 | 3b | **MusicBrainz label coverage is 58%, and the misses are recency-biased** (pre-2022 100%, 2022+ 43%) — i.e. concentrated on the recent independent releases R1 is about. Measured 2026-08-26, `research-findings.md` Part 5 | U2 |
-| 4 | **Completion threshold may misclassify outro skips.** 6 of 17 live plays sit within ±0.03 of 0.90. Retroactively correctable. Revisit with a few hundred plays | Later |
+| 4 | **⚠️ The completion threshold is a possible CONFOUND, not just noise.** User listens via Spotify's **AI DJ**, which crossfades. Crossfade removes roughly *constant seconds*; a *proportional* threshold converts that into a penalty scaling inversely with track length. Measured 2026-09-02: **13 of 27** track-change plays sit within ±0.05 of 0.90, and **major tracks are longer** (median 248s) than independent (191s), so an identical crossfade costs independents **~1.3× more ratio**. That biases the *outcome* variable by the *independent* variable. ⚠️ n=10/11, so the duration gap may be chance — the mechanism is not. **User chose to keep 0.90** (2026-09-02); fully correctable retroactively because trails are retained. Revisit once the duration difference is confirmed or dissolved | Later |
 | 5 | R11 — queue lookahead unverified during playback | U5 |
+| 7 | **Playback context is never recorded for live plays.** `context_type` is NULL on all 35: the MCP `getNowPlaying` returns no context field. Spotify's `/me/player/currently-playing` **does** — probed 2026-09-02, returning `spotify:playlist:37i9dQZF1EYkqdzj48dyYq` (the AI DJ). A DJ play is therefore indistinguishable from a playlist play, and the DJ is algorithmic selection into the feed — arguably the closest available proxy for what R1 calls *promoted*. **User declined for now** (2026-09-02) | Later |
 | 6 | ~~`label_resolved_at` missing~~ — **closed 2026-08-31.** Superseded by BR-13: resolutions are versioned append-only, and a play stores `label_resolution_id`, the exact version its verdict came from | ✅ |
 
 ---

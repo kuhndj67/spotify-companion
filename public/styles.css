@@ -221,8 +221,9 @@ h1 {
 
 /* Enrichment arrives a beat after the track; fade rather than pop. */
 #enrichment[data-loading="true"] .meta,
-#enrichment[data-loading="true"] .genres { opacity: 0.4; }
-#enrichment .meta, #enrichment .genres { transition: opacity 200ms ease; }
+#enrichment[data-loading="true"] .genres,
+#enrichment[data-loading="true"] .tag-block { opacity: 0.4; }
+#enrichment .meta, #enrichment .genres, #enrichment .tag-block { transition: opacity 200ms ease; }
 
 .meta {
   display: grid;
@@ -236,7 +237,7 @@ h1 {
 dd[data-flag="yes"] { color: var(--accent); font-weight: 600; }
 dd[data-flag="no"] { color: var(--muted); }
 
-.genres { margin-top: 0.9rem; }
+.genres, .tag-block { margin-top: 0.9rem; }
 
 .tags {
   display: flex;
@@ -394,3 +395,25 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
  * exists to show.
  */
 .trace-candidates li[data-eligible='false'] { color: var(--muted, #7a8290); }
+
+/*
+ * "Label detail" and "Genres" sit next to each other and previously read as one block -- with an
+ * empty label list, the genres note appeared to belong to the label heading. A rule between them
+ * makes the boundary explicit rather than relying on spacing alone.
+ */
+.tag-block + .genres {
+  border-top: 1px solid var(--line, #2a2f3a);
+  padding-top: 0.9rem;
+}
+.tag-block > dt,
+.genres > dt {
+  color: var(--muted, #7a8290);
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+/* A genre with a single MusicBrainz vote is one person's opinion. Dimmed, never hidden. */
+.tag[data-weak='true'] { opacity: 0.55; }

@@ -1753,3 +1753,66 @@ against real listening, the search fallback path never triggered live, 2 plays r
 bounded work set, and localGuard still blocks the container UI even though egress now works."
 **Context**: CONSTRUCTION — U2 complete: built, tested, live-verified. 399 tests, 98.97% line
 coverage, 120 plays. Next: the Phase 2 hypothesis gate (BR-11), then U3
+
+---
+
+## Genres from MusicBrainz; Crossfade Identified as a Possible Confound
+**Timestamp**: 2026-09-02
+**User Input**: reported the Artist label field always showing "—" and the Spotify-genres notice
+appearing under Label detail; asked for genres "if available from any source"; then noted *"I'm
+using the Spotify AI DJ feature and that does a crossfade between old/new tracks"* and asked
+whether it affects completion detection. Declined context capture; chose to keep the 0.90 ratio.
+**AI Response**: "Three pieces of work, and the last one is the one that matters.
+
+FIXED A REAL DEFECT BEHIND THE 'ARTIST LABEL ALWAYS DASH' REPORT. The code was running; it was
+resolving from the WRONG SAMPLE. `snapshot.enrichment` is null on the first tick of a new track --
+U1's own PlayObserver says so in as many words -- so resolving from the play-start hook meant
+resolving with no ISRC and no artist id, caching a permanent noIsrc answer, and never looking
+again. Moved the trigger to the tick, gated on enrichment having landed, with an in-flight guard
+and no caching of failures. Same family as the three Build-and-Test defects: a premature answer
+becoming sticky.
+
+ADDED GENRES FROM MUSICBRAINZ. Probed before building, per the standing rule, and the probe earned
+its keep: `inc=genres` and `inc=tags` look interchangeable and are not. Tags is the raw folksonomy
+and returned `supergroup` for Audioslave and `2008 universal fire victim` for Dolly Parton; genres
+is the curated subset. Kept MusicBrainz's vote count rather than discarding it -- it is the only
+quality signal the source gives, and U3's rules will want to threshold on it. Migration 003,
+rehearsed on a copy first. Existing artist resolutions predated genre collection and were cached
+fresh for 90 days, so added a one-off sweep; 26 artists and 101 plays now carry genres. Recorded
+explicitly that filling `artist_genres` on old plays is NOT a BR-8.4a violation: that rule protects
+the VERDICT, a judgement that must reflect what was believed at the time, whereas genres are
+descriptive metadata and the column is only written when NULL.
+
+ANSWERED THE CROSSFADE QUESTION WITH MEASUREMENT RATHER THAN REASSURANCE, and the answer was not
+the expected one. The DJ does NOT truncate observation -- eight plays ended within two seconds of
+the track end, so there is no systematic early switch. But the interaction it exposes is worse than
+truncation would have been.
+
+A crossfade removes roughly CONSTANT SECONDS. The completion ratio DIVIDES BY TRACK DURATION. So a
+fixed-time effect becomes a penalty that scales inversely with track length. Measured: 13 of 27
+track-change plays sit within +/-0.05 of the 0.90 threshold, and major-label tracks are longer
+(median 248s) than independent ones (191s), so an identical crossfade costs independents about 1.3
+times more ratio than majors.
+
+That is the shape that matters: the OUTCOME variable is biased by track length, and track length
+correlates with the INDEPENDENT variable U2 exists to measure. It would make independents look more
+skipped than they were, which could mask a real effect or manufacture the appearance of none.
+Stated the caveat plainly rather than burying it -- n=10 and n=11, so the duration gap itself could
+be chance. The mechanism is deterministic regardless of whether this sample demonstrates it.
+
+DID NOT CHANGE THE THRESHOLD. The user chose to keep 0.90, and deferring costs nothing here because
+trails are retained (FR-20) and all 120 plays can be reclassified retroactively. That is the second
+time the store-observations-derive-judgements decision has paid for itself. Logged the confound as
+open item 4 with the measurement, and generalised the lesson into CLAUDE.md's non-obvious section:
+a proportional threshold over a constant-time effect is a confound generator wherever the divisor
+correlates with what is being measured.
+
+ALSO FOUND, WHILE INVESTIGATING: context_type is NULL on all 35 live plays because the MCP
+getNowPlaying returns no context field at all. Spotify's /me/player/currently-playing does -- probed
+live, returning spotify:playlist:37i9dQZF1EYkqdzj48dyYq, the AI DJ. So a DJ play is currently
+indistinguishable from a playlist play, and the DJ is algorithmic selection into the feed, which is
+arguably the closest available proxy for what R1 calls promoted. Surfaced it rather than building
+it; user declined for now. Recorded as open item 7 so the gap is not silently inherited."
+**Context**: CONSTRUCTION — U2 complete and live-verified. Genres added (migration 003). Two
+findings logged for later: the crossfade/ratio confound (item 4) and unrecorded playback context
+(item 7)

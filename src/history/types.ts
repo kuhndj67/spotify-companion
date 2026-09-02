@@ -124,6 +124,11 @@ export interface LabelFields {
   likedAtEnd: boolean | null;
   likedAddedAt: string | null;
   likedTransition: string | null;
+  /**
+   * Artist genres from MusicBrainz, with vote counts. Spotify stopped returning genres entirely,
+   * so this is the only source. `null` = unknown, `[]` = asked and there are none.
+   */
+  artistGenres: { name: string; count: number }[] | null;
 }
 
 export interface PlayRecord {

@@ -39,6 +39,7 @@ export interface BackfillReport {
   labelsResolved: number;
   artistsResolved: number;
   refreshed: number;
+  genresFilled: number;
   errors: number;
 }
 
@@ -74,7 +75,14 @@ export class LabelBackfillJob {
    */
   async runOnce(): Promise<BackfillReport> {
     if (this.#running) {
-      return { isrcsRecovered: 0, labelsResolved: 0, artistsResolved: 0, refreshed: 0, errors: 0 };
+      return {
+        isrcsRecovered: 0,
+        labelsResolved: 0,
+        artistsResolved: 0,
+        refreshed: 0,
+        genresFilled: 0,
+        errors: 0,
+      };
     }
     this.#running = true;
 
@@ -83,6 +91,7 @@ export class LabelBackfillJob {
       labelsResolved: 0,
       artistsResolved: 0,
       refreshed: 0,
+      genresFilled: 0,
       errors: 0,
     };
 
@@ -90,6 +99,7 @@ export class LabelBackfillJob {
       await this.#recoverIsrcs(report);
       await this.#resolveLabels(report);
       await this.#refreshStale(report);
+      await this.#collectGenres(report);
     } finally {
       this.#running = false;
     }
@@ -170,6 +180,24 @@ export class LabelBackfillJob {
         report.errors += 1;
       }
     }
+  }
+
+  /**
+   * Collect genres for artists resolved before migration 003 added them.
+   *
+   * Those resolutions are `resolved` and therefore fresh for the full 90-day TTL, so they would
+   * otherwise carry no genres for a quarter. Re-resolving appends a version (BR-13.1); the chain
+   * then records that the genres were learned on a later date, which is exactly what happened.
+   */
+  async #collectGenres(report: BackfillReport): Promise<void> {
+    for (const artistId of this.#repository.listArtistsNeedingGenres(this.#batchSize)) {
+      try {
+        await this.#enrichment.resolveArtist(artistId, 'low', { force: true });
+      } catch {
+        report.errors += 1;
+      }
+    }
+    report.genresFilled = this.#repository.fillMissingArtistGenres(this.#batchSize * 20);
   }
 
   /**

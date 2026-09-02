@@ -256,6 +256,34 @@ export class MusicBrainzClient {
     return null;
   }
 
+  /**
+   * An artist's genres.
+   *
+   * ⚠️ **`inc=genres`, not `inc=tags`.** They look interchangeable and are not: `tags` is the raw
+   * free-text folksonomy and carries non-genre noise — a live probe returned `supergroup` for
+   * Audioslave and `2008 universal fire victim` for Dolly Parton. `genres` is the curated subset
+   * MusicBrainz has mapped to actual genre entities.
+   *
+   * The vote `count` is kept rather than discarded: it separates a genre four people agree on
+   * from one person's opinion, and U3's rules will want to threshold on it.
+   */
+  async lookupArtistGenres(
+    artistMbid: string,
+    priority: Priority = 'low',
+  ): Promise<{ name: string; count: number }[]> {
+    const body = await this.#request<{ genres?: { name?: string; count?: number }[] }>(
+      `/artist/${encodeURIComponent(artistMbid)}`,
+      { inc: 'genres' },
+      priority,
+    );
+
+    return (body.genres ?? [])
+      .filter((genre): genre is { name: string; count?: number } => typeof genre.name === 'string')
+      .map((genre) => ({ name: genre.name, count: genre.count ?? 0 }))
+      // Most-agreed first, so a display that truncates keeps the useful ones.
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }
+
   /** An artist's releases with labels, for the artist-level verdict. */
   async listReleasesForArtist(
     artistMbid: string,

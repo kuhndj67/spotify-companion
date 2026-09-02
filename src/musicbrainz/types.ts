@@ -149,6 +149,18 @@ export interface LabelResolution {
 }
 
 /**
+ * One genre, with MusicBrainz's vote count.
+ *
+ * The count is evidence, not decoration: `count: 11` is a genre eleven people agreed on, `count:
+ * 1` is one person's opinion, and collapsing them would throw away the only quality signal the
+ * source provides.
+ */
+export interface ArtistGenre {
+  name: string;
+  count: number;
+}
+
+/**
  * The artist-level equivalent, resolved through an **exact** Spotify-URL join rather than by name.
  *
  * MusicBrainz stores streaming links as first-class `url` entities, so the Spotify artist ID the
@@ -171,6 +183,11 @@ export interface ArtistLabelResolution {
   supersedesId: number | null;
   candidates: LabelCandidate[];
   votes: SignalVote[];
+  /**
+   * `null` means we never asked or the lookup failed; `[]` means we asked and MusicBrainz has
+   * none. Different facts, kept different.
+   */
+  genres: ArtistGenre[] | null;
 }
 
 /**

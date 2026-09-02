@@ -72,12 +72,9 @@ if (config.historyEnabled) {
       {
         // BR-9.1 — sampled at play start because it cannot be recovered afterwards.
         onPlayStarted: (sample) => {
+          // BR-9.1 — liked state is point-in-time and needs only the track id, which is present
+          // on the very first sample. Unlike the label below, it cannot wait.
           likedAtStartByTrack.set(sample.trackId, likedSet?.isLiked(sample.trackId) ?? null);
-          // Resolve the label now so it can be SEEN while the track plays (US-08), not only
-          // after it ends. This costs nothing extra: a given ISRC is resolved at most once per
-          // TTL window either way (FR-14), so doing it at the start of the play rather than the
-          // end just moves when the same single request happens.
-          void resolveLabelForDisplay(sample);
         },
         // Enrichment happens AFTER the row is written, never before and never on the display
         // path (NFR-16, BR-7.5): MusicBrainz latency was measured at 0.1-6.7s and can be
@@ -179,15 +176,64 @@ const likedAtStartByTrack = new Map<string, boolean | null>();
  * pruned to the most recent entries rather than growing for the lifetime of the process.
  */
 const labelByTrack = new Map<string, DisplayLabel>();
+const labelInFlight = new Set<string>();
 const MAX_DISPLAY_LABELS = 500;
 
 interface DisplayLabel {
+  /** `pending` when only the artist level resolved — never `unknown`, which is an answer. */
   verdict: string;
   confidence: string | null;
   contested: boolean;
   names: string[];
   artistVerdict: string | null;
   artistNames: string[];
+  /**
+   * Artist genres from MusicBrainz. Spotify's `GET /artists/{id}` returns no genres field at all
+   * — one of this project's documentation-vs-reality catches — so this is the only source.
+   */
+  genres: { name: string; count: number }[] | null;
+}
+
+/**
+ * Decide whether to resolve a label for the track on screen.
+ *
+ * ⚠️ **Driven by the tick, not by the play-start hook, and the reason is subtle.**
+ *
+ * `snapshot.enrichment` is `null` on the first tick of a new track — U1's `PlayObserver` says so
+ * in as many words: *"enrichment usually lands a moment after the track starts, so the first
+ * sample of a play often has null isrc/following that later samples carry."* Resolving from that
+ * first sample means resolving with **no ISRC and no artist id**, which yields a permanent
+ * `noIsrc` answer that is then cached for the whole track and never revisited.
+ *
+ * That was a real defect: the Label row read `unknown` and the Artist label row read `—` for
+ * every track, for the entire play. Same family as the three Build-and-Test defects — a premature
+ * answer becoming sticky.
+ *
+ * So: wait until enrichment has actually landed, and until there is at least one usable key.
+ */
+function maybeResolveLabelForDisplay(snapshot: Snapshot): void {
+  if (labelEnrichment === null) return;
+  if ('error' in snapshot || !snapshot.playing || !snapshot.trackId) return;
+
+  const trackId = snapshot.trackId;
+  if (labelByTrack.has(trackId) || labelInFlight.has(trackId)) return;
+
+  const enrichmentData = snapshot.enrichment;
+  if (enrichmentData === null) return;
+
+  // Nothing to look anything up with. Not cached, so a later tick can still try.
+  if (enrichmentData.isrc === null && enrichmentData.primaryArtistId === null) return;
+
+  labelInFlight.add(trackId);
+  void resolveLabelForDisplay({
+    trackId,
+    isrc: enrichmentData.isrc ?? null,
+    artistName: snapshot.artist ?? '',
+    artistId: enrichmentData.primaryArtistId ?? null,
+    albumName: snapshot.album ?? '',
+    releaseDate: enrichmentData.releaseDate ?? null,
+    title: snapshot.track ?? '',
+  }).finally(() => labelInFlight.delete(trackId));
 }
 
 /**
@@ -220,29 +266,36 @@ async function resolveLabelForDisplay(sample: {
       },
       'high',
     );
+    // A null snapshot means the release lookup failed transiently. That must not suppress the
+    // ARTIST level too -- the two resolve independently, through different endpoints, and the
+    // same conflation cost 21 real plays their artist verdict during Build and Test.
     const snapshot = labelEnrichment.toSnapshot(resolution, sample.isrc);
-    // Nothing to display yet: a transient failure leaves the panel showing `pending`, which is
-    // accurate -- the lookup will be retried.
-    if (snapshot === null) return;
 
     let artistVerdict: string | null = null;
     let artistNames: string[] = [];
+    let genres: { name: string; count: number }[] | null = null;
     if (sample.artistId !== null) {
       const artist = await labelEnrichment.resolveArtist(sample.artistId, 'high');
       const artistSnapshot = labelEnrichment.toArtistSnapshot(artist);
       if (artistSnapshot !== null) {
         artistVerdict = artistSnapshot.verdict;
         artistNames = artistSnapshot.labelNames;
+        genres = artistSnapshot.genres;
       }
     }
 
+    // Nothing at all resolved -- leave it uncached so a later tick tries again, rather than
+    // pinning `pending` on the panel for the rest of the track.
+    if (snapshot === null && artistVerdict === null) return;
+
     labelByTrack.set(sample.trackId, {
-      verdict: snapshot.verdict,
-      confidence: snapshot.confidence,
-      contested: snapshot.contested,
-      names: snapshot.labelNames,
+      verdict: snapshot?.verdict ?? 'pending',
+      confidence: snapshot?.confidence ?? null,
+      contested: snapshot?.contested ?? false,
+      names: snapshot?.labelNames ?? [],
       artistVerdict,
       artistNames,
+      genres,
     });
 
     while (labelByTrack.size > MAX_DISPLAY_LABELS) {
@@ -303,6 +356,7 @@ async function enrichRecordedPlay(playId: number, record: NewPlayRecord): Promis
     // would be permanent under BR-8.4a and one network blip would poison the row for good.
     const snapshot = labelEnrichment.toSnapshot(resolution, record.isrc);
     if (snapshot !== null) repository.applyLabelSnapshot(playId, snapshot);
+
 
     if (record.artistId !== null) {
       const artist = await labelEnrichment.resolveArtist(record.artistId, 'high');
@@ -610,6 +664,17 @@ wss.on('connection', (ws) => {
 
 nowPlaying.on('tick', broadcast);
 
+// Label resolution for the panel. On the tick rather than on play start, because enrichment --
+// and therefore the ISRC -- lands a moment after a track begins. Guarded so it runs once per
+// track; failures are not cached, so a later tick can retry.
+nowPlaying.on('tick', (snapshot: Snapshot) => {
+  try {
+    maybeResolveLabelForDisplay(snapshot);
+  } catch (error) {
+    console.error('[labels] display trigger failed:', error);
+  }
+});
+
 /**
  * History capture consumes `tick`, never `change`.
  *
@@ -663,10 +728,11 @@ server.listen(config.port, config.host, () => {
     void labelBackfill
       .runOnce()
       .then((report) => {
-        if (report.labelsResolved > 0 || report.refreshed > 0 || report.errors > 0) {
+        if (report.labelsResolved > 0 || report.refreshed > 0 || report.genresFilled > 0 || report.errors > 0) {
           console.log(
             `[labels] startup sweep: ${report.labelsResolved} resolved, ` +
-              `${report.refreshed} refreshed, ${report.errors} error(s)`,
+              `${report.refreshed} refreshed, ${report.genresFilled} genres, ` +
+              `${report.errors} error(s)`,
           );
         }
       })

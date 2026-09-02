@@ -73,6 +73,7 @@ function labels(over: Partial<LabelFields> = {}): LabelFields {
     likedAtEnd: null,
     likedAddedAt: null,
     likedTransition: null,
+    artistGenres: null,
     ...over,
   };
 }

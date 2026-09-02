@@ -171,22 +171,8 @@ function renderEnrichment(data, albumName) {
   ui.trackNo.textContent = formatTrackPosition(data.trackNumber, data.totalTracks);
   ui.explicit.textContent = data.explicit === null ? DASH : data.explicit ? 'Yes' : 'No';
 
-  // Build via DOM rather than innerHTML — this text comes from an API response.
-  if (data.genres?.length) {
-    ui.genres.replaceChildren(
-      ...data.genres.map((genre) => {
-        const tag = document.createElement('span');
-        tag.className = 'tag';
-        tag.textContent = genre;
-        return tag;
-      }),
-    );
-  } else {
-    const note = document.createElement('span');
-    note.className = 'muted';
-    note.textContent = data.genresUnavailableReason ?? 'none listed';
-    ui.genres.replaceChildren(note);
-  }
+  // Genres are rendered by renderGenres() from the snapshot, not from enrichment: Spotify
+  // stopped returning them entirely, so the source is MusicBrainz.
 
   if (data.warnings?.length) {
     ui.enrichWarn.textContent = data.warnings.join(' · ');
@@ -244,6 +230,7 @@ function render(data) {
 
   renderEnrichment(data.enrichment, data.album);
   renderLabel(data.label);
+  renderGenres(data.label);
 
   ui.raw.textContent = data.raw ?? '';
 }
@@ -287,6 +274,46 @@ function renderLabel(label) {
           tag.textContent = name;
           return tag;
         })),
+  );
+}
+
+/**
+ * Genres.
+ *
+ * ⚠️ **The source is MusicBrainz, not Spotify.** `GET /artists/{id}` returns no `genres` field at
+ * all — one of this project's documentation-vs-reality catches — so the old "Spotify no longer
+ * returns artist genres" note was permanent furniture. It is now shown only when we genuinely
+ * have nothing from any source.
+ *
+ * The vote count is rendered as a tooltip rather than inline: it is the only quality signal
+ * MusicBrainz gives (eleven people agreeing beats one person's opinion), but it would clutter the
+ * tag row.
+ */
+function renderGenres(label) {
+  const genres = label?.genres ?? null;
+
+  if (genres === null) {
+    // Unknown, not empty. Distinguished for the same reason `pending` is distinguished from
+    // `unknown` elsewhere: we have not asked, or the lookup failed.
+    ui.genres.replaceChildren(muted(label ? 'not yet resolved' : DASH));
+    return;
+  }
+
+  if (genres.length === 0) {
+    ui.genres.replaceChildren(muted('MusicBrainz lists none for this artist'));
+    return;
+  }
+
+  ui.genres.replaceChildren(
+    ...genres.slice(0, 10).map((genre) => {
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = genre.name;
+      tag.title = `${genre.count} MusicBrainz vote${genre.count === 1 ? '' : 's'}`;
+      // One vote is one person's opinion; dim it rather than hiding it.
+      if (genre.count <= 1) tag.dataset.weak = 'true';
+      return tag;
+    }),
   );
 }
 

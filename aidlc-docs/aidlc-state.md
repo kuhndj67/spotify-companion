@@ -5,18 +5,44 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
 - **Current Stage**: CONSTRUCTION — **U2 APPROVED by the user 2026-09-05.**
-  **415 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
+  **486 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
   Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
   The **Phase 2 hypothesis gate** (BR-11) has been pre-registered and run:
   **INSUFFICIENT DATA**, recorded per BR-11.5 —
   [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
   **U3 is deliberately PAUSED (user, 2026-09-05) to collect data** — the gate needs listening
   more than it needs code, and there is no time constraint.
-  Database at schema **v3**, **149 plays** after the `played_at` repair of 2026-09-06
-  (41 duplicate backfill rows removed, 84 re-timed), 72 with label verdicts.
+  Database at schema **v3**, **164 plays** (84 backfilled / 80 live) after the `played_at` repair
+  of 2026-09-06 — 41 duplicate backfill rows removed, 84 re-timed. 72 with label verdicts.
   A **listening-statistics panel** was added 2026-09-06 (see below) — display only, no migration.
-  **483 tests** · 99.12% line · 92.70% branch. Routes extracted to `api.ts` and tested over real
+  **486 tests** · 99.12% line · 92.70% branch. Routes extracted to `api.ts` and tested over real
   HTTP; `noOrphanModules.test.ts` closes the coverage blind spot that hid them.
+
+### ▶ Where to pick up (2026-09-06, end of session)
+
+**Nothing is half-finished.** Working tree clean, container healthy and recording, six commits
+today, all documented in `audit.md`. **25 commits are unpushed** — code only exists on this
+machine until `git push`.
+
+The instrument is now collecting properly for the first time: before today every restart
+duplicated recent plays, and the corpus mixed "the app was off" with "the app could not tell".
+Both are fixed, so **the plays recorded from here are clean** — which matters, because the
+hypothesis gate needs roughly 215 more live plays and only live ones count.
+
+Open threads, none blocking:
+
+1. **Three modules are knowingly untested** and now listed in `noOrphanModules.test.ts`'s
+   `ALLOWED_ORPHANS`: `diagnostics.ts`, `export/SnapshotScheduler.ts`, `mcp/spotifyMcpClient.ts`.
+   Each is constructed only by `server.ts` and would need the same injection treatment `api.ts`
+   got.
+2. **`public/app.js` has no tests at all** and is not covered by the orphan check, which walks
+   `src/` only. Two real defects were found there today by *clicking* — the liked-refresh race
+   and the "every axis tick says Aug" bug.
+3. **A database backup sits in `data/`** (`history.db.backup-2026-09-06T02-07-53-966Z`, 704 KB)
+   from the `played_at` repair. Delete it once the repaired data has been trusted for a while.
+4. **Watch `Inconclusive` on the weekly chart.** With the container on autostart it should stay
+   near zero; today's 17 live-unknowns are mostly container rebuilds. A rising count with the app
+   running continuously would be a real classifier finding.
 
 ### 🚢 The container is now the running deployment — open item 1 CLOSED
 

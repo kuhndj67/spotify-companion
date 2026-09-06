@@ -42,8 +42,24 @@ export interface BackfillReport {
   error: string | null;
 }
 
-/** Two plays of the same track within this window are treated as the same event (BR-5.4). */
+/** Two plays of the same track ending within this window are the same event (BR-5.4). */
 const DEDUP_TOLERANCE_MS = 60_000;
+
+/**
+ * The start of a play, derived from the end Spotify reports and the track's length.
+ *
+ * Approximate by construction: it assumes the track ran without a pause. Validated against 41
+ * plays observed live — median error 5.7 s, and 38 of 41 inside the one-minute dedup window. The
+ * three outliers are longer than the track, which is what a pause looks like from here.
+ *
+ * A bad `duration_ms` must not produce a start *after* the end, which would be an impossible row.
+ */
+function startedAtFrom(playedAt: string, durationMs: number | undefined): string {
+  const end = Date.parse(playedAt);
+  const duration = typeof durationMs === 'number' && durationMs > 0 ? durationMs : 0;
+  if (Number.isNaN(end)) return playedAt;
+  return new Date(end - duration).toISOString();
+}
 
 export class RecentlyPlayedBackfill {
   #api: SpotifyWebApiClient;
@@ -80,7 +96,10 @@ export class RecentlyPlayedBackfill {
       const track = item.track;
       if (!track?.id || !item.played_at) continue;
 
-      if (this.#repo.hasPlayNear(track.id, item.played_at, DEDUP_TOLERANCE_MS)) {
+      // Dedup on the END, because that is what `played_at` is -- see the comment on startedAt
+      // below. Comparing it against stored *starts* put a whole track duration between the two
+      // instants, so every play already recorded live looked new and was inserted a second time.
+      if (this.#repo.hasPlayNearEnd(track.id, item.played_at, DEDUP_TOLERANCE_MS)) {
         report.duplicates++;
         continue;
       }
@@ -98,7 +117,15 @@ export class RecentlyPlayedBackfill {
         // play that happened hours ago would be a small fabrication in a dataset whose value
         // depends on not making any.
         following: null,
-        startedAt: item.played_at,
+        // ⚠️ `played_at` is when the track **FINISHED**, not when it started. The docs do not say
+        // so; the live data does. Across 41 plays this app had itself observed start and end,
+        // `played_at` matched the recorded END with a median error of 3.0 s and a maximum of
+        // 8.8 s, and matched a start exactly once (by 177 s, itself about a track length).
+        //
+        // Storing it as the start put every backfilled row roughly one track duration late AND
+        // defeated deduplication, so each restart re-inserted plays already recorded live as
+        // fresh `unknown` rows. The start is therefore derived; the end is the measured value.
+        startedAt: startedAtFrom(item.played_at, track.duration_ms),
         endedAt: item.played_at,
         outcome: 'unknown',
         closeReason: 'playback-stopped',

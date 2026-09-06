@@ -169,7 +169,7 @@ describe('degraded operation (BR-3.8, BR-3.9)', () => {
       listPlays: function* () {},
       getTrail: () => [],
       updateOutcome: () => {},
-      hasPlayNear: () => false,
+      hasPlayNearEnd: () => false,
       coverage: () => {
         throw new Error('unused');
       },

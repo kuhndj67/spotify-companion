@@ -2255,3 +2255,89 @@ because the cached set can be six hours stale and `/me/tracks/contains` is 403.
 **Context**: CONSTRUCTION — U3 still paused to collect data. Display-only changes; the recording
 path, the classifier and the hypothesis gate are untouched. **438 tests**, typecheck clean,
 schema v3, container rebuilt and live on `http://localhost:3010`
+
+---
+
+## `played_at` Is the END of a Play — the Backfill Duplicated Every Restart
+**Timestamp**: 2026-09-06
+**User Input**: *"There's something odd going on with the 'Unknown' number on Weekly plays... it
+seems to be increasing when it really shouldn't be. The 'completed' number seems accurate
+though."*
+**AI Response**: "The user was right, and the asymmetry they noticed — unknown climbing, completed
+accurate — was the diagnosis. `completed` can only come from a live observation trail. `unknown`
+is what the backfill writes. So a number that inflates *only* in the unknown column points at the
+backfill, not at the classifier.
+
+**`GET /me/player/recently-played` RETURNS `played_at`, AND IT IS WHEN THE TRACK FINISHED.** The
+documentation does not say so. `RecentlyPlayedBackfill` stored it as **both** `startedAt` and
+`endedAt` since U1.
+
+**MEASURED, NOT INFERRED — AND THE APP HAD THE EVIDENCE ALL ALONG.** For 41 plays this app had
+itself observed start *and* end, `played_at` was compared against both:
+
+```
+closer to a live play START:  n=1   median 176.9s
+closer to a live play END  :  n=41  median 3.0s   max 8.8s
+```
+
+One match to a start, off by 177 s — itself about a track length, so almost certainly an
+end-match assigned to the wrong instance. **The project's own recorded data was the probe.**
+
+**TWO CONSEQUENCES, AND THE SECOND IS THE ONE THAT COMPOUNDED.**
+
+1. Every backfilled row started about one track duration late, with `started_at == ended_at` —
+   a zero-span play.
+2. Dedup (`hasPlayNear`) compared that end-timestamp against stored **starts**, putting a whole
+   track between the two instants being compared, with a 60 s tolerance. A play already recorded
+   live therefore never matched, and **every restart re-inserted it as a fresh `unknown` row**.
+
+⚠️ **THE DUPLICATES GO BACK TO 26 AUGUST, NOT TO THIS SESSION.** 41 of 125 backfilled rows —
+**33%** — duplicate a play already recorded live. Four container rebuilds during this session
+added 11 of them, which is what made the number move fast enough for the user to notice, but the
+mechanism has run on every restart since the beginning.
+
+**WHY IT SURVIVED: `RecentlyPlayedBackfill` HAD NO TESTS. NONE.** 438 tests were green. The
+integration test exercises the observer, not this. The class that writes a third of the corpus was
+covered by nothing, and the defect it contained was invisible in every way except as a number on a
+chart that a human recognised as wrong. Same family as the three U2 defects and the WebSocket 403:
+**green for the wrong reason.**
+
+**FIXED IN TWO PLACES, BECAUSE ONE WOULD HAVE LEFT THE TRAP.** `startedAt` is now derived as
+`played_at - duration_ms` (validated against the same 41 plays: median error 5.7 s, 38 of 41
+inside the dedup window), and `endedAt` is `played_at`, the value Spotify actually reports.
+Dedup was rekeyed onto the **end** — `hasPlayNear` became `hasPlayNearEnd`, replaced rather than
+supplemented, so the start-based version cannot be reached for this purpose again. Deduping on a
+derived value when an exact one is available would have been the same mistake one layer down.
+
+**WROTE THE TESTS, THEN RE-INTRODUCED THE DEFECT TO CHECK THEY CATCH IT.** 9 new tests in
+`recentlyPlayedBackfill.test.ts`. With the original code restored, 3 fail — including the one that
+matters, *does NOT re-insert a play the observer already recorded live*, and *is idempotent across
+repeated runs, which is what a restart is*. A regression test never run against the regression is
+an assumption.
+
+**VERIFIED LIVE, WHICH IS THE ONLY PROOF THAT COUNTS HERE.** Rebuilt and restarted the container:
+`[backfill] 0 inserted, 33 already known`, and the backfilled row count stayed at 125. The same
+restart before the fix added rows every time.
+
+**THE HYPOTHESIS GATE IS UNAFFECTED, AND THIS WAS CHECKED RATHER THAN ASSUMED.** All 125
+backfilled rows have `observation_count = 0`; the gate requires a trail. `SELECT ... GROUP BY
+provenance, outcome` confirms no backfilled row has ever carried one. The gate's INSUFFICIENT DATA
+result stands.
+
+**WHAT IS INFLATED**: play counts (including the new statistics panel), `coverage()`, and exports
+— by 41 rows, 22% of the corpus. **What is not**: anything derived from observation trails.
+
+**THE DATA REPAIR IS NOT MINE TO RUN.** `scripts/repair-backfill-timestamps.mjs` is written,
+dry-run by default, refuses to run without taking its own backup, and refuses outright if any row
+marked for deletion turns out to carry a trail. It reports 84 rows to re-time and 41 to delete.
+**Deleting rows from the one artefact in this project that cannot be regenerated is a user
+decision**, so it is presented, not executed.
+
+**447 tests** (438 + 9), typecheck clean, schema unchanged."
+
+**Decision**: `played_at` semantics corrected — start derived, end measured; deduplication rekeyed
+onto the end timestamp and the start-based method removed. `RecentlyPlayedBackfill` has tests for
+the first time, verified against the reintroduced defect. Data repair **written but not run**,
+awaiting the user: 84 rows to re-time, 41 duplicates to delete.
+**Context**: CONSTRUCTION — U3 still paused. Hypothesis gate verified unaffected (no backfilled
+row has ever had a trail). **447 tests**, typecheck clean, schema v3, container rebuilt and live

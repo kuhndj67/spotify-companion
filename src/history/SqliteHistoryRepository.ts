@@ -395,16 +395,16 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       );
   }
 
-  hasPlayNear(trackId: string, startedAt: string, toleranceMs: number): boolean {
-    const target = Date.parse(startedAt);
+  hasPlayNearEnd(trackId: string, endedAt: string, toleranceMs: number): boolean {
+    const target = Date.parse(endedAt);
     if (Number.isNaN(target)) return false;
 
     const rows = this.#db
-      .prepare('SELECT started_at FROM play WHERE track_id = ?')
-      .all(trackId) as { started_at: string }[];
+      .prepare('SELECT ended_at FROM play WHERE track_id = ?')
+      .all(trackId) as { ended_at: string }[];
 
     return rows.some((row) => {
-      const existing = Date.parse(row.started_at);
+      const existing = Date.parse(row.ended_at);
       return !Number.isNaN(existing) && Math.abs(existing - target) <= toleranceMs;
     });
   }

@@ -86,7 +86,9 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-438 tests passing · typecheck clean · **176 plays recorded**, 72 with label verdicts · schema v3.
+447 tests passing · typecheck clean · **187 plays recorded**, 72 with label verdicts · schema v3.
+⚠️ **41 of those plays are duplicates** — see the `played_at` warning below; repair is written but
+not run.
 
 ### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
 
@@ -227,6 +229,26 @@ that cannot be regenerated. Probed on both C: and D: in a real container: `journ
 `integrity_check: ok` with the container as the writer. **Documentation said no; the probe said
 yes.** If this ever needs revisiting, re-probe rather than reasoning.
 
+**`played_at` from `recently-played` is when the track FINISHED, not when it started.** The docs
+are silent; the data is not. Across 41 plays this app had observed start *and* end itself,
+`played_at` matched the recorded **end** with a median error of 3.0 s, and matched a start once —
+by 177 s, itself about a track length. The backfill stored it as `startedAt` **and** `endedAt`
+from U1 until 2026-09-06, which put every backfilled row a track-duration late *and* defeated
+deduplication: dedup compared that end against stored **starts**, so a play already recorded live
+never matched and **every restart re-inserted it as a fresh `unknown` row**. 41 of 125 backfilled
+rows are duplicates, going back to 26 August.
+
+⚠️ **It survived because `RecentlyPlayedBackfill` had NO TESTS AT ALL** — the class writing a third
+of the corpus, covered by nothing, while 438 tests stayed green. It was found by a human noticing
+that one number on a chart moved when it should not have. The asymmetry was the diagnosis:
+`completed` can only come from a live trail, `unknown` is what the backfill writes, so inflation
+confined to `unknown` points at the backfill and not at the classifier.
+
+**Dedup is keyed on the END, and must stay that way.** `hasPlayNearEnd` replaced `hasPlayNear`
+rather than joining it, so the start-based version cannot be reached for this again. `played_at`
+is the one value Spotify reports exactly — deduping on a start *derived* from it would repeat the
+mistake one layer down.
+
 **`artist_id` is the PRIMARY artist, and grouping by it undercounts.** The schema stores one id
 per play — `track.artists[0]` — while `artist_name` is the joined display string
 (`"Inpatient, Ren, Chris Webby"`). A feature credit is therefore filed under the *lead* artist and
@@ -294,11 +316,14 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 438 tests
+npm test           # 447 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 
 node scripts/hypothesis-gate.mjs   # the Phase 2 gate (BR-11). Read-only; writes nothing
+
+# The played_at repair. Dry run by default; --apply takes its own backup first.
+node scripts/repair-backfill-timestamps.mjs
 ```
 
 ⚠️ The gate's thresholds are **pre-registered constants, not parameters**. Change them by amending

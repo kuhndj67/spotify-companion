@@ -165,17 +165,38 @@ describe('updateOutcome — FR-20', () => {
   });
 });
 
-describe('hasPlayNear — backfill deduplication', () => {
+describe('hasPlayNearEnd — backfill deduplication', () => {
   it('matches within the tolerance window and not outside it', () => {
+    const repo = makeRepo();
+    // samplePlay ends at 10:03:00.
+    repo.recordPlay(samplePlay({ startedAt: '2026-08-25T10:00:00.000Z' }), []);
+
+    assert.equal(
+      repo.hasPlayNearEnd('abcdefghijklmnopqrstuv', '2026-08-25T10:03:30.000Z', 60_000),
+      true,
+    );
+    assert.equal(
+      repo.hasPlayNearEnd('abcdefghijklmnopqrstuv', '2026-08-25T11:00:00.000Z', 60_000),
+      false,
+    );
+    repo.close();
+  });
+
+  it('keys on the END, not the start — the defect that duplicated every restart', () => {
+    // `played_at` from recently-played is the moment the track FINISHED. A play recorded live
+    // from 10:00 to 10:03 is therefore reported as 10:03. Matching that against the stored START
+    // compares two instants a whole track apart, so the row looked new every single time.
     const repo = makeRepo();
     repo.recordPlay(samplePlay({ startedAt: '2026-08-25T10:00:00.000Z' }), []);
 
     assert.equal(
-      repo.hasPlayNear('abcdefghijklmnopqrstuv', '2026-08-25T10:00:30.000Z', 60_000),
+      repo.hasPlayNearEnd('abcdefghijklmnopqrstuv', '2026-08-25T10:03:00.000Z', 60_000),
       true,
+      'a play already recorded live must be recognised from its end timestamp',
     );
+    // And the start must NOT match, or the tolerance is simply swallowing the whole track.
     assert.equal(
-      repo.hasPlayNear('abcdefghijklmnopqrstuv', '2026-08-25T11:00:00.000Z', 60_000),
+      repo.hasPlayNearEnd('abcdefghijklmnopqrstuv', '2026-08-25T10:00:00.000Z', 60_000),
       false,
     );
     repo.close();

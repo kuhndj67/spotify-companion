@@ -56,8 +56,17 @@ export interface HistoryRepository {
     classifierVersion: number,
   ): void;
 
-  /** Deduplication for backfill (BR-5.4): was this track already recorded at about this time? */
-  hasPlayNear(trackId: string, startedAt: string, toleranceMs: number): boolean;
+  /**
+   * Deduplication for backfill (BR-5.4): has this track already been recorded ending here?
+   *
+   * ⚠️ **Keyed on the END of the play, and that is the whole point.** `recently-played` gives one
+   * timestamp per item, `played_at`, and it is the moment the track **finished** — measured
+   * against 41 plays this app had itself observed start and end, it matched the end with a median
+   * error of 3.0 s. Matching it against a stored *start* compares two instants a whole track
+   * apart, so every already-recorded play looked new and was inserted again. The end timestamp is
+   * the one value Spotify reports exactly; dedup uses it rather than one derived from it.
+   */
+  hasPlayNearEnd(trackId: string, endedAt: string, toleranceMs: number): boolean;
 
   /** Coverage counts for export (FR-51) and diagnostics. */
   coverage(): CoverageStats;

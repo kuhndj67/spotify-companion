@@ -29,3 +29,6 @@ data/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Ops baseline for the reboot check (scripts/post-boot-check.ps1) — disposable
+.boot-check-baseline.json

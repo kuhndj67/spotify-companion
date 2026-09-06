@@ -115,6 +115,26 @@ Before resuming U3, check the corpus: `node scripts/hypothesis-gate.mjs`. ⚠️
 running it is fine below the minimum but any run *at or above* it is the single confirmatory
 evaluation — treat that one deliberately.
 
+### 👉 FIRST THING IN A NEW SESSION: was the reboot test run?
+
+A reboot test of the autostart chain was set up on **2026-09-05** and its result may still be
+unrecorded. If `.boot-check-baseline.json` exists at the repo root, **run this before anything
+else** and report the verdict:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/post-boot-check.ps1
+```
+
+Exit codes: **0** confirmed · **1** something broke · **2** inconclusive (no reboot yet, or the
+container was started by hand). It checks Rancher Desktop, dockerd, container auto-start timing
+against the host boot clock, startup-log errors, the UI, that the Origin guard survived, and
+database integrity. Record the outcome in `audit.md` and delete the baseline file once the
+question is settled.
+
+⚠️ **`unless-stopped` does not restart a container that was explicitly stopped.** If someone ran
+`docker stop`, the container will stay down through a reboot and that is *correct* behaviour, not
+a failure of the chain — the script says so rather than reporting a false negative.
+
 ### Phases are sequenced by risk containment
 
 The rules engine (U3/U4) is the largest, least-certain component; playback control (U5) is the

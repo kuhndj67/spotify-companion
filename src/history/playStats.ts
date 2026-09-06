@@ -22,20 +22,58 @@
  * trend the panel exists to show.
  */
 
-import type { PlayOutcome, PlayTimePoint } from './types.js';
+import type { PlayTimePoint } from './types.js';
 
 export type { PlayTimePoint };
+
+/**
+ * What a play contributes to the chart.
+ *
+ * ⚠️ **`not-observed` and `inconclusive` are separated deliberately, and merging them is the
+ * defect this type exists to prevent.** Both were `unknown` until 2026-09-06, and the result was
+ * that a chart of *listening* was silently reporting the *app's uptime*:
+ *
+ * - `not-observed` — the play came from `recently-played` because the app was not running.
+ *   There is no observation trail, there never can be, and nothing about how the track was
+ *   listened to is known. On this corpus that was **84 of 149 plays**, from the seven days before
+ *   the container deployment existed.
+ * - `inconclusive` — the app *was* watching and could not classify: a pause, a stop, a shutdown
+ *   mid-track. A real measurement that happens to be indeterminate.
+ *
+ * Rendering both as one "unknown" bar made 74% completion on the days the instrument was running
+ * look like 38% completion overall. That is the `null` ≠ `0` rule applied to a chart: the absence
+ * of a measurement is not a measurement with an absent value.
+ */
+export type PlayBucket = 'completed' | 'skipped' | 'inconclusive' | 'not-observed';
+
+/** The four display buckets, in stack order: real observations first, absence last. */
+export const PLAY_BUCKETS: readonly PlayBucket[] = [
+  'completed',
+  'skipped',
+  'inconclusive',
+  'not-observed',
+];
+
+/** Which bucket a play falls in. Provenance decides first — it is the stronger fact. */
+export function bucketOf(play: PlayTimePoint): PlayBucket {
+  if (play.provenance === 'backfilled') return 'not-observed';
+  return play.outcome === 'unknown' ? 'inconclusive' : play.outcome;
+}
+
+function emptyCounts(): Record<PlayBucket, number> {
+  return { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 };
+}
 
 /** How far back the artist trend can reach: 26 weeks ≈ 6 months. */
 export const MAX_TREND_WEEKS = 26;
 
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
-/** One column of the trend. `total` is the sum of `byOutcome`, kept so the view need not re-add. */
+/** One column of the trend. `total` is the sum of `byBucket`, kept so the view need not re-add. */
 export interface WeekBucket {
   /** ISO date (`YYYY-MM-DD`) of the Monday that opens the week, UTC. */
   weekStart: string;
-  byOutcome: Record<PlayOutcome, number>;
+  byBucket: Record<PlayBucket, number>;
   total: number;
 }
 
@@ -112,10 +150,8 @@ export function weekStarts(window: TrendWindow): string[] {
 /**
  * Count plays into weekly buckets.
  *
- * Outcomes are kept apart rather than summed. `unknown` is not zero and it is not a skip: for a
- * backfilled play it means there was never an observation trail to classify, and folding it into
- * either of the others would report a judgement the data cannot support (the `null` ≠ `false`
- * rule, applied to a chart).
+ * Buckets are kept apart rather than summed — see `PlayBucket`. In particular a play the app
+ * never watched is never counted alongside one it watched and could not classify.
  */
 export function weeklyBuckets(
   plays: readonly PlayTimePoint[],
@@ -123,11 +159,7 @@ export function weeklyBuckets(
 ): WeekBucket[] {
   const buckets = new Map<string, WeekBucket>();
   for (const weekStart of weekStarts(window)) {
-    buckets.set(weekStart, {
-      weekStart,
-      byOutcome: { completed: 0, skipped: 0, unknown: 0 },
-      total: 0,
-    });
+    buckets.set(weekStart, { weekStart, byBucket: emptyCounts(), total: 0 });
   }
 
   for (const play of plays) {
@@ -135,7 +167,7 @@ export function weeklyBuckets(
     // Plays outside the window are dropped rather than clamped into the edge bucket, which would
     // pile six months of history onto one column and read as a listening spike.
     if (bucket === undefined) continue;
-    bucket.byOutcome[play.outcome] += 1;
+    bucket.byBucket[bucketOf(play)] += 1;
     bucket.total += 1;
   }
 

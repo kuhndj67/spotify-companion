@@ -455,29 +455,40 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   // ==========================================================================
 
   trackPlayStats(trackId: string): TrackPlayStats {
+    // Grouped by provenance as well as outcome: a backfilled play is `unknown` because nothing
+    // watched it, and folding that in with a live `unknown` would report the app's downtime as
+    // though it were something about the listening.
     const rows = this.#db
       .prepare(
-        `SELECT outcome, COUNT(*) AS n, MIN(started_at) AS first_at, MAX(started_at) AS last_at
-           FROM play WHERE track_id = ? GROUP BY outcome`,
+        `SELECT outcome, provenance, COUNT(*) AS n,
+                MIN(started_at) AS first_at, MAX(started_at) AS last_at
+           FROM play WHERE track_id = ? GROUP BY outcome, provenance`,
       )
-      .all(trackId) as { outcome: string; n: number; first_at: string; last_at: string }[];
+      .all(trackId) as {
+      outcome: string;
+      provenance: string;
+      n: number;
+      first_at: string;
+      last_at: string;
+    }[];
 
     const stats: TrackPlayStats = {
       trackId,
       totalPlays: 0,
-      byOutcome: { completed: 0, skipped: 0, unknown: 0 },
+      byBucket: { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 },
       firstPlayedAt: null,
       lastPlayedAt: null,
     };
 
     for (const row of rows) {
-      // An outcome outside the three known values would mean a migration wrote something this
-      // build does not understand. Counting it into `totalPlays` but not into a bucket would
-      // make the parts stop summing to the whole silently, so it is skipped from both.
-      if (row.outcome !== 'completed' && row.outcome !== 'skipped' && row.outcome !== 'unknown') {
-        continue;
-      }
-      stats.byOutcome[row.outcome] = row.n;
+      const bucket =
+        row.provenance === 'backfilled'
+          ? 'not-observed'
+          : row.outcome === 'completed' || row.outcome === 'skipped'
+            ? row.outcome
+            : 'inconclusive';
+
+      stats.byBucket[bucket] += row.n;
       stats.totalPlays += row.n;
       if (stats.firstPlayedAt === null || row.first_at < stats.firstPlayedAt) {
         stats.firstPlayedAt = row.first_at;
@@ -493,15 +504,20 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   listPlayTimesForArtist(artistId: string, sinceIso: string): PlayTimePoint[] {
     const rows = this.#db
       .prepare(
-        `SELECT started_at, outcome FROM play
+        `SELECT started_at, outcome, provenance FROM play
           WHERE artist_id = ? AND started_at >= ?
           ORDER BY started_at`,
       )
-      .all(artistId, sinceIso) as { started_at: string; outcome: string }[];
+      .all(artistId, sinceIso) as {
+      started_at: string;
+      outcome: string;
+      provenance: string;
+    }[];
 
     return rows.map((row) => ({
       startedAt: row.started_at,
       outcome: row.outcome as PlayOutcome,
+      provenance: row.provenance as Provenance,
     }));
   }
 

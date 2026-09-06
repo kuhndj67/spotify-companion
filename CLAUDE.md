@@ -86,7 +86,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-483 tests passing · 99.12% line · 92.70% branch · typecheck clean · **149 plays recorded** (47 completed, 5 skipped, 97 unknown)
+486 tests passing · 99.12% line · 92.70% branch · typecheck clean · **149 plays recorded** (47 completed, 5 skipped, 97 unknown)
 · schema v3. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
 `integrity_check: ok`, all 65 live trails intact. Backup kept in `data/`.
 
@@ -229,6 +229,16 @@ that cannot be regenerated. Probed on both C: and D: in a real container: `journ
 `integrity_check: ok` with the container as the writer. **Documentation said no; the probe said
 yes.** If this ever needs revisiting, re-probe rather than reasoning.
 
+**`unknown` is TWO facts, and merging them makes the app's downtime look like your listening.**
+A backfilled play is `unknown` because the app was not running -- `recently-played` reports no
+progress, so there is no trail and never can be. A live play is `unknown` because the app watched
+and could not classify. The chart stacked both into one bar until 2026-09-06, and completion read
+as **38% of the corpus where it was 74% of what was actually measured**: the app has only ever
+*run* on 3 of the corpus's 17 days. Split into `inconclusive` and `not-observed`, decided by
+`bucketOf` in `playStats.ts`, where **provenance decides first**. Do not "fix" a future version
+of this by filtering backfilled rows out -- their volume is real information about the corpus,
+and R2 depends on it being visible.
+
 **A coverage percentage cannot see a file no test imports.** V8 coverage only reports modules
 that were actually *loaded*, so an untested file is missing from the **denominator** rather than
 counted as 0% — it cannot drag the average down. On 2026-09-06 the suite reported **98.96%** while
@@ -335,7 +345,7 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 483 tests
+npm test           # 486 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 

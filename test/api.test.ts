@@ -233,9 +233,33 @@ describe('/api/history/stats', () => {
     assert.equal(artistOnly.artist.playsInWindow, 3);
   });
 
-  it('splits by outcome and never folds unknown into either', async () => {
+  it('separates "the app was off" from "the app could not tell"', async () => {
+    // The fixture holds one completed, one skipped, and one BACKFILLED play. The backfilled row
+    // must land in `not-observed`, never in `inconclusive`: it came from recently-played, which
+    // reports no progress, so nothing about it was ever measured.
     const body: Body = await (await fetch(`${base}/api/history/stats?trackId=${TRACK}`)).json();
-    assert.deepEqual(body.track.byOutcome, { completed: 1, skipped: 1, unknown: 1 });
+    assert.deepEqual(body.track.byBucket, {
+      completed: 1,
+      skipped: 1,
+      inconclusive: 0,
+      'not-observed': 1,
+    });
+  });
+
+  it('reports the same split on the weekly buckets', async () => {
+    const body: Body = await (await fetch(`${base}/api/history/stats?artistId=${ARTIST}`)).json();
+    const totals = body.artist.weeks.reduce(
+      (sum: Record<string, number>, week: Body) => {
+        for (const [key, value] of Object.entries(week.byBucket)) {
+          sum[key] = (sum[key] ?? 0) + (value as number);
+        }
+        return sum;
+      },
+      {} as Record<string, number>,
+    );
+    assert.equal(totals['not-observed'], 1);
+    assert.equal(totals.inconclusive, 0);
+    assert.equal(totals.completed, 1);
   });
 
   it('ends the window on the week containing now', async () => {

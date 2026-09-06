@@ -2437,3 +2437,86 @@ allowlist. Three files remain knowingly untested (`diagnostics.ts`, `SnapshotSch
 `spotifyMcpClient.ts`) — now recorded rather than invisible.
 **Context**: CONSTRUCTION — U3 still paused. **483 tests**, 99.12% line, 92.70% branch, typecheck
 clean, schema v3, container rebuilt and live on `http://localhost:3010`
+
+---
+
+## The Chart Was Reporting the App's UPTIME as Though It Were Listening
+**Timestamp**: 2026-09-06
+**User Input**: *"So I've seen a number of different artists play and it looks like the Weekly
+plays data is still off. I see a LOT of 'unknown' entries and I've been pretty careful to not quit
+in the middle of tracks so there should be few or no unknowns. (and only a few skips... most plays
+in the database should resolve to completed but most are resolving to Unknown)"*
+**AI Response**: "The user was right that the display was wrong, and wrong about the cause — which
+is the useful kind of report, because it pointed at a defect neither of us had named.
+
+**THE DATA IS CORRECT. THE CLASSIFIER IS CORRECT. THE CHART WAS LYING.**
+
+Live plays, the ones the app actually watched:
+
+```
+completed  track-change       50   ratio 0.90-1.00
+skipped    track-change        5
+completed  playback-stopped    5
+unknown    app-shutdown        8   <- MY container rebuilds today
+unknown    playback-stopped    5
+unknown    pause-idle          2
+```
+
+**56 of 76 live plays complete — 74%, exactly what the user expected.** The classifier never had
+a problem.
+
+**THE 84 'UNKNOWN' ROWS ARE DAYS THE APP WAS NOT RUNNING.**
+
+```
+app ran on 3 days   ->  76 live  + 14 backfilled
+app off on 7 days   ->  70 backfilled  (all necessarily unknown)
+```
+
+The corpus spans 17 days; the app has only ever *run* on three of them, because the container
+autostart deployment is one day old. Everything else came from `recently-played`, which reports
+**no progress data at all**, so `unknown` is the only honest verdict those rows can carry — and
+they can never become anything else.
+
+⚠️ **THE DEFECT: `unknown` MERGED TWO COMPLETELY DIFFERENT FACTS, AND I BUILT IT THAT WAY.**
+
+- **not observed** — the app was off. No trail, none possible. 84 rows.
+- **observed, inconclusive** — the app *was* watching and could not classify: a pause, a stop, a
+  shutdown mid-track. A real measurement that happens to be indeterminate. 15 rows, 8 of them
+  caused by my own rebuilds today.
+
+Stacked into one bar, **a chart of listening was silently reporting the instrument's uptime**.
+Completion read as 38% of the corpus where it is 74% of what was actually measured. This is the
+project's own `null` ≠ `0` rule, which I quoted while designing this panel and then broke in the
+same commit: **the absence of a measurement is not a measurement with an absent value.**
+
+It is also the third member of the family already on the record — the `inc=releases` 200, the
+28%→12% denominator, and now this. All three produce a plausible number that reads as a finding.
+
+**FIXED BY SPLITTING THE SERIES, NOT BY FILTERING.** Four buckets — `completed`, `skipped`,
+`inconclusive`, `not-observed` — decided in the pure module by `bucketOf`, where **provenance
+decides first** because it is the stronger fact: a backfilled row has no trail, so no outcome it
+carries could have been measured. Hiding the backfilled rows instead would have been the other
+error, since "the app was not running" is real information about the corpus and matters directly
+to R2.
+
+`not-observed` keeps the low-chroma hatched neutral: it is an absence, not an outcome.
+`inconclusive` gets a real hue — validated, not eyeballed: the three-hue set passes the lightness
+band, chroma floor, CVD separation (worst adjacent ΔE 9.2 light / 9.4 dark) and the normal-vision
+floor in both modes. The track panel got the same treatment — `Times played 6 · 5 not recorded,
+1 completed` rather than a bare 6.
+
+**486 tests.** The regression is pinned by name: *NEVER merges "the app was off" with "the app
+could not tell"*, and *files a backfilled play as not-observed even if its outcome were somehow
+set*.
+
+**VERIFIED LIVE.** Rebuilt; Inpatient's trend now reads `2026-08-31: 8 completed, 1 not-recorded`
+against older weeks that are almost entirely `not-recorded` — which is the true story of when the
+instrument was running. Browser confirms four series, four legend counts, four table columns, no
+console errors."
+
+**Decision**: `unknown` split into `inconclusive` (observed, indeterminate) and `not-observed`
+(the app was not running) across the pure bucketing module, the repository, the API and both the
+chart and the track panel. Backfilled plays are shown, never filtered — their volume is real
+information about the corpus.
+**Context**: CONSTRUCTION — U3 still paused. Display-only; no schema change, no data change.
+**486 tests**, typecheck clean, schema v3, container rebuilt and live

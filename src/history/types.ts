@@ -210,14 +210,20 @@ export interface CoverageStats {
  * `evidence.completionRatio` exceeding 1.0, which is exactly why that value is never clamped.
  * Reading this number as "times listened" would undercount the repeat-listen signal.
  *
- * Outcomes are reported separately and never summed into a single "interest" figure. 116 of the
- * first 163 plays are backfilled and therefore `unknown` — not skipped, not completed, but never
- * observed. Collapsing them would invent a judgement.
+ * Counts are split into display buckets, never summed into a single "interest" figure — and
+ * `not-observed` is kept apart from `inconclusive`, because "the app was off" and "the app could
+ * not tell" are different facts. See `PlayBucket`.
  */
 export interface TrackPlayStats {
   trackId: string;
   totalPlays: number;
-  byOutcome: Record<PlayOutcome, number>;
+  /** Keyed by `PlayBucket`. Declared structurally to keep this module free of imports. */
+  byBucket: {
+    completed: number;
+    skipped: number;
+    inconclusive: number;
+    'not-observed': number;
+  };
   /** ISO 8601, or null when the track has never been recorded. */
   firstPlayedAt: string | null;
   lastPlayedAt: string | null;
@@ -233,4 +239,10 @@ export interface TrackPlayStats {
 export interface PlayTimePoint {
   startedAt: string;
   outcome: PlayOutcome;
+  /**
+   * Required, not optional. A backfilled play is `unknown` because the app was not watching, and
+   * a live play is `unknown` because it watched and could not tell — the chart must never merge
+   * those, so it cannot be given the outcome without the provenance.
+   */
+  provenance: Provenance;
 }

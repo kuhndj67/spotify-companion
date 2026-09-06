@@ -698,10 +698,26 @@ el('export-open').addEventListener('click', () => {
  * verdict would assert a judgement the data does not contain.
  */
 
+/**
+ * ⚠️ **`Not recorded` and `Inconclusive` are separate series, and merging them was a real defect.**
+ *
+ * Both rendered as one "Unknown" bar until 2026-09-06, so a chart of *listening* was silently
+ * reporting the *app's uptime*. On this corpus 84 of 149 plays came from the seven days before the
+ * container deployment existed — days the app never ran — and they sat in the same bar as a
+ * genuine mid-track shutdown. Completion read as 38% overall where it was **74% on the days the
+ * instrument was actually watching**.
+ *
+ * - `Not recorded` — the app was off. From `recently-played`, which reports no progress at all,
+ *   so there is no trail and there never can be. Drawn as a hatched neutral because it is an
+ *   absence, not an outcome.
+ * - `Inconclusive` — the app was watching and could not classify: a pause, a stop, a shutdown
+ *   mid-track. A real measurement that happens to be indeterminate, so it gets a real hue.
+ */
 const SERIES = [
   { key: 'completed', label: 'Completed', fill: 'var(--series-completed)' },
   { key: 'skipped', label: 'Skipped', fill: 'var(--series-skipped)' },
-  { key: 'unknown', label: 'Unknown', fill: 'url(#hatch-unknown)' },
+  { key: 'inconclusive', label: 'Inconclusive', fill: 'var(--series-inconclusive)' },
+  { key: 'not-observed', label: 'Not recorded', fill: 'url(#hatch-unknown)' },
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -765,7 +781,7 @@ function trendSvg(weeks, maxTotal) {
     const drawn = [];
     let cumulative = 0;
     for (const series of SERIES) {
-      const value = week.byOutcome[series.key] ?? 0;
+      const value = week.byBucket[series.key] ?? 0;
       if (value === 0) continue;
       const yBottom = baseline - (cumulative / maxTotal) * PLOT_HEIGHT;
       cumulative += value;
@@ -838,7 +854,7 @@ function renderLegend(totals) {
       // The hatch is an SVG paint server, so the legend swatch restates it as a CSS gradient of
       // the same two colours rather than trying to reuse the pattern.
       swatch.style.background =
-        series.key === 'unknown'
+        series.key === 'not-observed'
           ? 'repeating-linear-gradient(45deg, var(--series-unknown) 0 2px,' +
             ' var(--series-unknown-line) 2px 4px)'
           : series.fill;
@@ -862,7 +878,7 @@ function renderTrendTable(weeks, totals) {
 
   const table = document.createElement('table');
   const head = table.createTHead().insertRow();
-  for (const heading of ['Week of', 'Completed', 'Skipped', 'Unknown', 'Total']) {
+  for (const heading of ['Week of', 'Completed', 'Skipped', 'Inconcl.', 'Not rec.', 'Total']) {
     const cell = document.createElement('th');
     cell.textContent = heading;
     head.append(cell);
@@ -875,9 +891,10 @@ function renderTrendTable(weeks, totals) {
     first.textContent = formatWeek(week.weekStart);
     row.append(first);
     for (const value of [
-      week.byOutcome.completed,
-      week.byOutcome.skipped,
-      week.byOutcome.unknown,
+      week.byBucket.completed,
+      week.byBucket.skipped,
+      week.byBucket.inconclusive,
+      week.byBucket['not-observed'],
       week.total,
     ]) {
       row.insertCell().textContent = value;
@@ -888,11 +905,13 @@ function renderTrendTable(weeks, totals) {
   const label = document.createElement('th');
   label.textContent = 'Total';
   foot.append(label);
+  const grand = SERIES.reduce((sum, series) => sum + totals[series.key], 0);
   for (const value of [
     totals.completed,
     totals.skipped,
-    totals.unknown,
-    totals.completed + totals.skipped + totals.unknown,
+    totals.inconclusive,
+    totals['not-observed'],
+    grand,
   ]) {
     foot.insertCell().textContent = value;
   }
@@ -920,7 +939,7 @@ function attachTrendTooltip(weeks) {
       const name = document.createElement('span');
       name.textContent = series.label;
       const value = document.createElement('span');
-      value.textContent = week.byOutcome[series.key];
+      value.textContent = week.byBucket[series.key];
       row.append(name, value);
       tip.append(row);
     }
@@ -967,10 +986,10 @@ function renderTrend(artist, artistName) {
     ? 'last 26 weeks'
     : `all history, from ${formatWeek(artist.window.start)}`;
 
-  const totals = { completed: 0, skipped: 0, unknown: 0 };
+  const totals = { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 };
   let maxTotal = 0;
   for (const week of artist.weeks) {
-    for (const key of Object.keys(totals)) totals[key] += week.byOutcome[key] ?? 0;
+    for (const key of Object.keys(totals)) totals[key] += week.byBucket[key] ?? 0;
     if (week.total > maxTotal) maxTotal = week.total;
   }
 
@@ -1012,8 +1031,20 @@ function clearStats() {
 function renderStats(payload, artistName) {
   ui.stats.dataset.state = 'ready';
   const track = payload.track;
-  ui.statPlays.textContent = track === null ? DASH : String(track.totalPlays);
-  ui.statFirst.textContent = track === null ? DASH : formatDay(track.firstPlayedAt);
+  if (track === null) {
+    ui.statPlays.textContent = DASH;
+    ui.statFirst.textContent = DASH;
+  } else {
+    // The breakdown rides the count, because the count alone invites the same misreading the
+    // chart used to: six plays of which five predate the app is not six observed listens.
+    const parts = SERIES.filter((series) => track.byBucket[series.key] > 0).map(
+      (series) => `${track.byBucket[series.key]} ${series.label.toLowerCase()}`,
+    );
+    ui.statPlays.textContent = parts.length
+      ? `${track.totalPlays} · ${parts.join(', ')}`
+      : String(track.totalPlays);
+    ui.statFirst.textContent = formatDay(track.firstPlayedAt);
+  }
   renderTrend(payload.artist, artistName);
 }
 

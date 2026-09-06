@@ -255,7 +255,12 @@ describe('listening statistics', () => {
 
     const stats = repo.trackPlayStats('abcdefghijklmnopqrstuv');
     assert.equal(stats.totalPlays, 3);
-    assert.deepEqual(stats.byOutcome, { completed: 1, skipped: 1, unknown: 1 });
+    assert.deepEqual(stats.byBucket, {
+      completed: 1,
+      skipped: 1,
+      inconclusive: 1,
+      'not-observed': 0,
+    });
     // MIN/MAX across outcome groups, not within one — an implementation that took them from a
     // single group would be right whenever the first and last play happen to share an outcome.
     assert.equal(stats.firstPlayedAt, '2026-08-24T10:00:00.000Z');
@@ -269,7 +274,12 @@ describe('listening statistics', () => {
     const repo = makeRepo();
     const stats = repo.trackPlayStats('neverplayedaaaaaaaaaaa');
     assert.equal(stats.totalPlays, 0);
-    assert.deepEqual(stats.byOutcome, { completed: 0, skipped: 0, unknown: 0 });
+    assert.deepEqual(stats.byBucket, {
+      completed: 0,
+      skipped: 0,
+      inconclusive: 0,
+      'not-observed': 0,
+    });
     assert.equal(stats.firstPlayedAt, null);
     assert.equal(stats.lastPlayedAt, null);
     repo.close();
@@ -289,9 +299,12 @@ describe('listening statistics', () => {
     );
 
     const points = repo.listPlayTimesForArtist('artist1234567890123456', '2026-08-17T00:00:00.000Z');
+    // Provenance travels with the point. Without it the caller cannot tell a play the app never
+    // watched from one it watched and could not classify, which is the whole reason the chart
+    // was reporting uptime as though it were listening.
     assert.deepEqual(points, [
-      { startedAt: '2026-08-25T10:00:00.000Z', outcome: 'skipped' },
-      { startedAt: '2026-08-27T10:00:00.000Z', outcome: 'completed' },
+      { startedAt: '2026-08-25T10:00:00.000Z', outcome: 'skipped', provenance: 'live' },
+      { startedAt: '2026-08-27T10:00:00.000Z', outcome: 'completed', provenance: 'live' },
     ]);
     repo.close();
   });

@@ -19,8 +19,17 @@ import {
 } from '../src/history/playStats.js';
 import type { PlayTimePoint } from '../src/history/types.js';
 
-function play(startedAt: string, outcome: PlayTimePoint['outcome'] = 'completed'): PlayTimePoint {
-  return { startedAt, outcome };
+function play(
+  startedAt: string,
+  outcome: PlayTimePoint['outcome'] = 'completed',
+  provenance: PlayTimePoint['provenance'] = 'live',
+): PlayTimePoint {
+  return { startedAt, outcome, provenance };
+}
+
+/** A play from `recently-played`: the app was not running, so nothing about it was observed. */
+function notObserved(startedAt: string): PlayTimePoint {
+  return { startedAt, outcome: 'unknown', provenance: 'backfilled' };
 }
 
 describe('startOfWeekUtc', () => {
@@ -104,7 +113,7 @@ describe('weeklyBuckets', () => {
     );
   });
 
-  it('keeps the three outcomes apart and never folds unknown into either', () => {
+  it('keeps the outcomes apart and never folds one into another', () => {
     const buckets = weeklyBuckets(
       [
         play('2026-08-18T09:00:00.000Z', 'completed'),
@@ -114,8 +123,41 @@ describe('weeklyBuckets', () => {
       ],
       window,
     );
-    assert.deepEqual(buckets[0]!.byOutcome, { completed: 1, skipped: 1, unknown: 2 });
+    assert.deepEqual(buckets[0]!.byBucket, {
+      completed: 1,
+      skipped: 1,
+      inconclusive: 2,
+      'not-observed': 0,
+    });
     assert.equal(buckets[0]!.total, 4);
+  });
+
+  it('NEVER merges "the app was off" with "the app could not tell"', () => {
+    // The defect this split exists to prevent. Both were `unknown` until 2026-09-06, so a chart
+    // of listening was silently reporting the app's uptime: 84 of 149 plays on the real corpus
+    // came from days the app never ran, and they sat in the same bar as a genuine mid-track
+    // shutdown. The absence of a measurement is not a measurement with an absent value.
+    const buckets = weeklyBuckets(
+      [
+        play('2026-08-18T09:00:00.000Z', 'unknown'),
+        notObserved('2026-08-19T09:00:00.000Z'),
+        notObserved('2026-08-20T09:00:00.000Z'),
+      ],
+      window,
+    );
+    assert.equal(buckets[0]!.byBucket.inconclusive, 1);
+    assert.equal(buckets[0]!.byBucket['not-observed'], 2);
+  });
+
+  it('files a backfilled play as not-observed even if its outcome were somehow set', () => {
+    // Provenance decides first: it is the stronger fact. A backfilled row has no trail, so no
+    // outcome it carries could have been measured.
+    const buckets = weeklyBuckets(
+      [{ startedAt: '2026-08-18T09:00:00.000Z', outcome: 'completed', provenance: 'backfilled' }],
+      window,
+    );
+    assert.equal(buckets[0]!.byBucket['not-observed'], 1);
+    assert.equal(buckets[0]!.byBucket.completed, 0);
   });
 
   it('total is always the sum of the parts', () => {
@@ -128,8 +170,7 @@ describe('weeklyBuckets', () => {
       window,
     );
     for (const bucket of buckets) {
-      const sum =
-        bucket.byOutcome.completed + bucket.byOutcome.skipped + bucket.byOutcome.unknown;
+      const sum = Object.values(bucket.byBucket).reduce((a, b) => a + b, 0);
       assert.equal(bucket.total, sum, `week ${bucket.weekStart} does not add up`);
     }
   });

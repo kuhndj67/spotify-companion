@@ -10,6 +10,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import './fc-config.js'; // seed selection and reporting (PBT-08)
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import type { Request, Response, NextFunction } from 'express';
 import {
   isLoopbackAddress,
@@ -394,5 +397,73 @@ describe('localGuard — property-based', () => {
       }),
       RUNS,
     );
+  });
+});
+
+/**
+ * The WebSocket upgrade path must obey the SAME rule as HTTP.
+ *
+ * ## Why this test exists
+ *
+ * `server.ts`'s `upgrade` handler cannot use Express middleware — `ws` does not run it — so the
+ * admission rule has to be invoked explicitly there. For a long time it was invoked by being
+ * *rewritten inline*, and on 2026-09-05 the two copies diverged: option B added
+ * `trustPublishedPort` to `applyAccessPolicy` only. The container deployment then served every
+ * page with `200` and refused every WebSocket handshake with `403`, so the UI loaded and sat on
+ * "Disconnected — reconnecting…" indefinitely.
+ *
+ * **The entire suite passed throughout.** Every option-B test exercised the policy function; not
+ * one exercised the upgrade handler, and no test asserted the two agreed. That is the same shape
+ * as the U2 defects — green for the wrong reason, found only by running the system.
+ *
+ * A behavioural test would have to boot the real server (MCP client, SQLite, poll loop), so this
+ * is a static check in the idiom of `purity.test.ts`: it pins the *structure* that makes
+ * divergence impossible rather than the behaviour that divergence broke. It is deliberately
+ * strict — the handler must delegate, and must not name the underlying predicates at all.
+ */
+describe('access policy — single source of truth across HTTP and WebSocket', () => {
+  const serverSource = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'server.ts'),
+    'utf8',
+  );
+
+  /** The `server.on('upgrade', …)` handler body. */
+  const upgradeHandler = (() => {
+    const start = serverSource.indexOf("server.on('upgrade'");
+    assert.notEqual(start, -1, "server.ts no longer has a server.on('upgrade', …) handler");
+    const end = serverSource.indexOf('\n});', start);
+    assert.notEqual(end, -1, 'could not find the end of the upgrade handler');
+    return serverSource.slice(start, end);
+  })();
+
+  it('routes the upgrade handshake through decideAccess', () => {
+    assert.match(
+      upgradeHandler,
+      /decideAccess\(/,
+      'The upgrade handler must call decideAccess, the same rule localGuard uses.',
+    );
+  });
+
+  it('passes both policy flags, so trustPublishedPort cannot apply to HTTP alone', () => {
+    assert.match(upgradeHandler, /localOnly:\s*config\.localOnly/);
+    assert.match(
+      upgradeHandler,
+      /trustPublishedPort:\s*config\.trustPublishedPort/,
+      'Omitting trustPublishedPort here is exactly the 2026-09-05 defect: HTTP admitted, WS 403.',
+    );
+  });
+
+  it('does not re-implement the rule with the underlying predicates', () => {
+    for (const predicate of ['isLoopbackAddress', 'isLoopbackHostHeader', 'isAllowedOrigin']) {
+      assert.ok(
+        !upgradeHandler.includes(predicate),
+        `The upgrade handler references ${predicate} directly. That is a second copy of the ` +
+          'admission rule, and second copies drift out of step with the first one silently.',
+      );
+    }
+  });
+
+  it('still refuses any URL other than /ws', () => {
+    assert.match(upgradeHandler, /request\.url !== '\/ws'/);
   });
 });

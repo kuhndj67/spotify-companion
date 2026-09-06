@@ -5,7 +5,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
 - **Current Stage**: CONSTRUCTION — **U2 APPROVED by the user 2026-09-05.**
-  **404 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
+  **415 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
   Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
   The **Phase 2 hypothesis gate** (BR-11) has been pre-registered and run:
   **INSUFFICIENT DATA**, recorded per BR-11.5 —
@@ -19,12 +19,22 @@
 The app runs **unattended** on Rancher Desktop: `application.autoStart` +
 `startInBackground` (set via `rdctl`), plus `restart: unless-stopped` in `compose.yaml`.
 Chain: Windows login → Rancher Desktop (no window) → dockerd → app container.
+**Proven end to end by a real reboot on 2026-09-05** — `scripts/post-boot-check.ps1` passed every
+check; the container started 82s after the host boot clock, by itself.
 UI at **`http://localhost:3010`** (3000 was taken on this machine by another project).
 
 **Open item 1 closed** by user decision: `localGuard` option **B**, implemented as opt-in
 `TRUST_PUBLISHED_PORT`, set only in `compose.yaml`. It disables the peer-address check **and
 nothing else** — Host/Origin validation, the DNS-rebinding defence, stays in force. Verified live:
 UI `200`, cross-site `Origin` still `403`. 7 new tests, 411 total.
+
+⚠️ **That verification was HTTP-only, and it hid a defect for the life of the deployment.** The
+WebSocket upgrade handler held a *second copy* of the admission rule and never learned about
+`trustPublishedPort`, so in the container every page load succeeded and every handshake got `403`
+— the UI loaded and sat on "Disconnected — reconnecting…", which reads as a Spotify outage.
+Found 2026-09-05 by opening the page; fixed by routing both paths through one `decideAccess`.
+Now verified on **both** surfaces: WS same-origin `101`, WS cross-site `403`, non-`/ws` upgrade
+`403`. **415 tests.**
 
 **Recording does not need the UI.** The poll loop is a server-side `setInterval` started at boot;
 the WebSocket only pushes to whoever is connected. That is why option B was a convenience

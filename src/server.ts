@@ -9,7 +9,7 @@ import { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
 import { runDiagnostics } from './diagnostics.js';
-import { localGuard, isLoopbackAddress, isAllowedOrigin, isLoopbackHostHeader } from './localGuard.js';
+import { localGuard, decideAccess } from './localGuard.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
@@ -611,20 +611,27 @@ const server = createServer(app);
 
 // -- WebSocket push (Q5) ----------------------------------------------------
 // noServer + manual upgrade handling, so the same local-only rules apply to the
-// WebSocket handshake as to HTTP. `ws` does not run Express middleware.
+// WebSocket handshake as to HTTP. `ws` does not run Express middleware, so the policy has to be
+// invoked explicitly here — but via `decideAccess`, the SAME function `localGuard` uses.
+//
+// ⚠️ This used to inline its own copy of the rule, and the copies diverged. Option B
+// (`trustPublishedPort`) was added to the HTTP path only, so in the container every page load
+// succeeded and every WebSocket handshake got a 403 — the UI loaded and then sat on
+// "Disconnected — reconnecting…" forever. Do not re-inline the conditions here.
 const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  // The upgrade socket is typed as Duplex, but for an HTTP server it is always a net.Socket.
-  const remoteAddress = (socket as import('node:net').Socket).remoteAddress;
+  const decision = decideAccess(
+    {
+      // The upgrade socket is typed as Duplex, but for an HTTP server it is always a net.Socket.
+      remoteAddress: (socket as import('node:net').Socket).remoteAddress,
+      host: request.headers.host,
+      origin: request.headers.origin,
+    },
+    { localOnly: config.localOnly, trustPublishedPort: config.trustPublishedPort },
+  );
 
-  const allowed =
-    !config.localOnly ||
-    (isLoopbackAddress(remoteAddress) &&
-      isLoopbackHostHeader(request.headers.host) &&
-      isAllowedOrigin(request.headers.origin));
-
-  if (!allowed || request.url !== '/ws') {
+  if (!decision.ok || request.url !== '/ws') {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
     return;

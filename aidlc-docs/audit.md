@@ -1996,3 +1996,94 @@ dependent variable of the experiment."
 **Context**: CONSTRUCTION — **U3 paused by user decision** to accumulate the ~215 live plays the
 hypothesis gate needs. Container deployment **live and unattended**; **open item 1 CLOSED**.
 411 tests. 155 plays and growing
+
+---
+
+## Reboot Test Run — Autostart Chain CONFIRMED End to End
+**Timestamp**: 2026-09-05
+**User Input**: *"Ok I restarted the computer... now you should be able to check to determine if
+rancher desktop started and if the app started. (it appears one or both did not)"*
+**AI Response**: "Ran `scripts/post-boot-check.ps1`. **Every check passed; exit code 0.** The
+user's impression that something had not started was wrong, and the check is the reason we can say
+that rather than guess.
+
+THE OPEN QUESTION FROM THE PREVIOUS SESSION IS NOW CLOSED. That session verified the *settings*
+were written and the restart policy was `unless-stopped`, and said explicitly that the chain itself
+was unproven because proving it would have taken down the user's unrelated containers. This is the
+missing half. Measured, not inferred:
+
+- Host booted 2026-09-05 20:52:52, 2.9 min before the check.
+- Rancher Desktop running, started automatically.
+- dockerd up and responding.
+- Container **started 82s after boot, by itself** — after the boot clock, so it was the autostart
+  chain and not a hand start. This is the check that actually distinguishes a working chain from a
+  coincidence, and it is why the baseline file was needed.
+- Healthcheck healthy; no errors in the startup logs.
+- UI `200` on `http://localhost:3010`; cross-site `Origin` still `403`. **The option-B relaxation
+  survived a cold start** — it is set in `compose.yaml`, so it had to.
+- Database opened through the bind mount, schema v3, `integrity_check: ok`. WAL over the bind mount
+  survived a real power cycle, which the earlier probe could not show.
+
+WHY THE USER THOUGHT IT HAD FAILED — the likely cause is the port. `opencodetest-frontend` holds
+host **3000**, and this app is on **3010**. Opening `localhost:3000` after a reboot shows a
+different app that is *also* up, which reads as 'the wrong thing started'. Recorded because it will
+recur: the port move was forced by a collision, so the intuitive URL now belongs to something else.
+
+`+0 PLAYS SINCE THE BASELINE, AND THAT IS NOT A FAILURE.` Most recent play start is
+2026-09-03T12:34:55Z; nothing has been played since. The poll loop is running (backfill ran,
+603 liked tracks cached). An empty result from a working instrument looks identical to a broken
+instrument if you only look at the count — the startup log is what separates them.
+
+DELETED `.boot-check-baseline.json` and removed the 'FIRST THING IN A NEW SESSION' block from
+CLAUDE.md. A standing instruction to run a check whose question has been answered trains the next
+session to ignore standing instructions.
+
+THEN THE USER OPENED THE PAGE AND FOUND A REAL DEFECT THE CHECK HAD MISSED. The UI showed
+'Disconnected - reconnecting...'. The user read that as 'it cannot connect to Spotify'. It was not
+Spotify: `/api/health` did a real MCP round-trip and returned `mcp: connected, toolCount: 30`. It
+was the browser's own WebSocket to the app, and the handshake was being refused with 403.
+
+CAUSE: THE ADMISSION RULE EXISTED TWICE AND THE COPIES DIVERGED. `ws` does not run Express
+middleware, so `server.ts`'s `upgrade` handler invoked the local-access policy explicitly -- by
+re-implementing it inline. Option B (`trustPublishedPort`) was added to `applyAccessPolicy` only.
+In the container the peer is always the Docker bridge gateway, so the HTTP path admitted
+everything and the WebSocket path refused everything. The comment above the handler asserted 'the
+same local-only rules apply to the WebSocket handshake as to HTTP' -- true when written, silently
+false the moment option B landed.
+
+THE PREVIOUS SESSION'S OWN VERIFICATION IS WHAT MISSED IT, AND THE REASON IS INSTRUCTIVE. It
+verified option B live, against the running container, in both directions -- `GET /` returned 200,
+and `GET /` with a cross-site Origin returned 403. Both correct. Both HTTP. The relaxation was
+verified on the surface it was written on, not on every surface it governed. 'Verified live'
+constrains only the paths actually exercised.
+
+ALL 411 TESTS PASSED THROUGHOUT, including the seven written specifically for option B. They
+exercised the policy function; the upgrade handler was covered by nothing, and no test asserted
+the two agreed. Same shape as the three U2 defects: green for the wrong reason.
+
+FIXED BY MAKING DIVERGENCE IMPOSSIBLE RATHER THAN BY MAKING THE COPIES MATCH. Extracted
+`decideAccess(AccessRequest, AccessPolicy)` as the single source of truth; `applyAccessPolicy` now
+delegates to it and maps the refusal reason back to its distinct 403 body, and the upgrade handler
+calls the same function. Patching the second copy would have fixed today's bug and left the
+mechanism that produced it in place.
+
+WROTE THE TEST AND THEN CHECKED THAT IT ACTUALLY CATCHES THE BUG. Four structural tests, in the
+idiom of `purity.test.ts`: the handler must call `decideAccess`, must pass BOTH policy flags, must
+not name `isLoopbackAddress`/`isLoopbackHostHeader`/`isAllowedOrigin` at all, and must still refuse
+any URL but `/ws`. A behavioural test would have to boot MCP, SQLite and the poll loop. Then
+stashed the fix and re-ran them against the original `server.ts`: 3 of 4 failed. A regression test
+never run against the regression is an assumption.
+
+VERIFIED LIVE, ON EVERY SURFACE THIS TIME. Rebuilt (checking `PIPESTATUS[0]`, not the pipe's exit
+code) and restarted. WebSocket same-origin -> **101 Switching Protocols**, and the socket
+immediately streamed real now-playing frames. Cross-site Origin on the WebSocket -> 403. Cross-site
+Origin on HTTP -> 403. Upgrade to a URL other than `/ws` -> 403. Normal HTTP -> 200. The
+relaxation is still scoped to exactly the peer check.
+
+WHY THE POST-BOOT CHECK PASSED ANYWAY, WHICH IS WORTH KEEPING: it asserts the UI returns 200 and
+that cross-site Origin is refused. Both were true. **Recording never depended on the WebSocket** --
+the poll loop is server-side, and the socket only pushes to a connected browser. So the instrument
+was collecting correctly the whole time and only the display was broken. That is the deployment
+working as designed, and it is also why nothing flagged it."
+**Context**: CONSTRUCTION — U3 still paused to collect data. Autostart chain **proven**. WebSocket
+admission defect found by opening the page and fixed. **415 tests** (411 + 4), typecheck clean

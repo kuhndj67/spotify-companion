@@ -86,7 +86,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-404 tests passing · typecheck clean · **145 plays recorded**, 41 with label verdicts · schema v3.
+415 tests passing · typecheck clean · **155 plays recorded**, 41 with label verdicts · schema v3.
 
 ### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
 
@@ -115,25 +115,22 @@ Before resuming U3, check the corpus: `node scripts/hypothesis-gate.mjs`. ⚠️
 running it is fine below the minimum but any run *at or above* it is the single confirmatory
 evaluation — treat that one deliberately.
 
-### 👉 FIRST THING IN A NEW SESSION: was the reboot test run?
+### ✅ The autostart chain is PROVEN — reboot test passed 2026-09-05
 
-A reboot test of the autostart chain was set up on **2026-09-05** and its result may still be
-unrecorded. If `.boot-check-baseline.json` exists at the repo root, **run this before anything
-else** and report the verdict:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/post-boot-check.ps1
-```
-
-Exit codes: **0** confirmed · **1** something broke · **2** inconclusive (no reboot yet, or the
-container was started by hand). It checks Rancher Desktop, dockerd, container auto-start timing
-against the host boot clock, startup-log errors, the UI, that the Origin guard survived, and
-database integrity. Record the outcome in `audit.md` and delete the baseline file once the
-question is settled.
+`scripts/post-boot-check.ps1` ran after a real reboot and every check passed: Rancher Desktop and
+dockerd came up on their own, and the container **started 82s after the host boot clock, by
+itself**. UI `200`, cross-site Origin `403`, `integrity_check: ok`, WAL over the bind mount intact
+through a power cycle. The baseline file is gone and the question is closed; the script is kept
+because it is the cheapest way to re-check the chain after any Rancher Desktop upgrade.
 
 ⚠️ **`unless-stopped` does not restart a container that was explicitly stopped.** If someone ran
 `docker stop`, the container will stay down through a reboot and that is *correct* behaviour, not
 a failure of the chain — the script says so rather than reporting a false negative.
+
+⚠️ **The app is on `http://localhost:3010`, and `localhost:3000` is a DIFFERENT app.**
+`opencodetest-frontend` holds host port 3000. Opening 3000 after a reboot shows something that is
+also running, which reads as "the wrong thing started" rather than "wrong URL". This has already
+caused one false alarm.
 
 ### Phases are sequenced by risk containment
 
@@ -199,6 +196,18 @@ yes.** If this ever needs revisiting, re-probe rather than reasoning.
 wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry
 goes back through the queue, so it spends time, never rate.
 
+**One admission rule, invoked twice — never written twice.** `ws` does not run Express
+middleware, so the WebSocket upgrade handler in `server.ts` has to invoke the local-access policy
+explicitly. It used to do that by *re-implementing* it, and on 2026-09-05 the copies diverged:
+option B (`TRUST_PUBLISHED_PORT`) was added to the HTTP path only. In the container every page
+load returned `200` and every handshake returned `403`, so the UI loaded and sat on
+"Disconnected — reconnecting…" forever, which reads as *Spotify is down* rather than *the guard
+refused my socket*. **All 411 tests passed** — the option-B tests exercised the policy function,
+and nothing exercised the upgrade handler. Both paths now go through `decideAccess`, and
+`localGuard.test.ts` pins that structurally. Diagnose this class with
+`curl -i -H "Connection: Upgrade" -H "Upgrade: websocket" … http://localhost:3010/ws`, and check
+`/api/health` to see whether Spotify is actually implicated: it does a real MCP round-trip.
+
 **Check build exit codes directly.** `docker compose build | tail` reports the *pipe's* exit code.
 A failing build once read as success here.
 
@@ -233,7 +242,7 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 411 tests
+npm test           # 415 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 

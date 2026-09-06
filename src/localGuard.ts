@@ -105,34 +105,71 @@ export interface AccessPolicy {
 }
 
 /**
- * The admission rule, as a function of the request and the policy.
+ * The fields admission actually depends on, lifted out of `Request` so that the WebSocket
+ * upgrade path — which has an `IncomingMessage` and a raw socket, not an Express `Request` —
+ * can be judged by the *same* function rather than by a second copy of the rule.
+ *
+ * ⚠️ It was a second copy, in `server.ts`'s `upgrade` handler, and the copies diverged: option B
+ * added `trustPublishedPort` to the HTTP path only, so in the container every HTTP request was
+ * admitted while every WebSocket handshake was refused. The whole test suite passed, because the
+ * tests exercised the policy function and the upgrade handler was not covered by any of them.
+ * Keep exactly one rule.
+ */
+export interface AccessRequest {
+  remoteAddress: string | undefined;
+  host: string | undefined;
+  origin: string | undefined;
+}
+
+/** Why a request was refused, so callers can keep their own distinct 403 bodies. */
+export type AccessDecision = { ok: true } | { ok: false; reason: 'peer' | 'host-or-origin' };
+
+/**
+ * The admission rule. **The single source of truth** — HTTP and WebSocket both route here.
  *
  * ⚠️ Host/Origin validation is **not** conditional. It is the DNS-rebinding defence, it is the
  * check that caught a real bypass (see `isLoopbackHostHeader`), and under
  * `trustPublishedPort` it is the *only* remaining check — so it must never be skipped.
  */
+export function decideAccess(req: AccessRequest, policy: AccessPolicy): AccessDecision {
+  if (!policy.localOnly) return { ok: true };
+
+  if (!policy.trustPublishedPort && !isLoopbackAddress(req.remoteAddress)) {
+    return { ok: false, reason: 'peer' };
+  }
+
+  if (!isLoopbackHostHeader(req.host) || !isAllowedOrigin(req.origin)) {
+    return { ok: false, reason: 'host-or-origin' };
+  }
+
+  return { ok: true };
+}
+
 export function applyAccessPolicy(
   req: Request,
   res: Response,
   next: NextFunction,
   policy: AccessPolicy,
 ): void {
-  if (!policy.localOnly) {
+  const decision = decideAccess(
+    {
+      remoteAddress: req.socket.remoteAddress,
+      host: req.headers.host,
+      origin: req.headers.origin,
+    },
+    policy,
+  );
+
+  if (decision.ok) {
     next();
     return;
   }
 
-  if (!policy.trustPublishedPort && !isLoopbackAddress(req.socket.remoteAddress)) {
-    res.status(403).type('text/plain').send('This application only accepts local connections.');
-    return;
-  }
-
-  if (!isLoopbackHostHeader(req.headers.host) || !isAllowedOrigin(req.headers.origin)) {
-    res.status(403).type('text/plain').send('Invalid Host or Origin.');
-    return;
-  }
-
-  next();
+  const body =
+    decision.reason === 'peer'
+      ? 'This application only accepts local connections.'
+      : 'Invalid Host or Origin.';
+  res.status(403).type('text/plain').send(body);
 }
 
 export function localGuard(req: Request, res: Response, next: NextFunction): void {

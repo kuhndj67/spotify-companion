@@ -417,3 +417,191 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 
 /* A genre with a single MusicBrainz vote is one person's opinion. Dimmed, never hidden. */
 .tag[data-weak='true'] { opacity: 0.55; }
+
+/* ==========================================================================
+   Listening statistics (U-stats)
+
+   The three series colours were chosen by running the data-viz validator, not by eye:
+   completed/skipped pass the lightness band, chroma floor, CVD separation (ΔE 9.2 light,
+   9.4 dark) and the normal-vision floor in both modes. `unknown` is deliberately a
+   low-chroma NEUTRAL and deliberately fails the chroma floor — it is not a third outcome,
+   it is the absence of an observation trail, and it must not compete with the two real
+   verdicts. It carries a 45° hatch so it stays distinguishable without hue.
+
+   Light-mode contrast for the green and the neutral is below 3:1, which obliges relief:
+   the legend prints every count and there is a table view. Both are present.
+   ========================================================================== */
+:root {
+  --series-completed: #1baf7a;
+  --series-skipped: #eb6834;
+  --series-unknown: #b4b4ae;
+  --series-unknown-line: #8c8c86;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-completed: #199e70;
+    --series-skipped: #d95926;
+    --series-unknown: #4f545b;
+    --series-unknown-line: #797f88;
+  }
+}
+
+.stats .stat-note {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.trend {
+  margin: 1.1rem 0 0;
+}
+
+.trend figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+
+.trend-plot {
+  position: relative;
+}
+
+.trend-plot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* Recessive: a hairline one step off the surface, never dashed. */
+.trend-plot .grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.trend-plot .axis-text {
+  fill: var(--muted);
+  font-size: 9px;
+  font-family: inherit;
+}
+
+.trend-plot .hit {
+  fill: transparent;
+}
+
+.trend-plot .week:hover .hit,
+.trend-plot .week[data-active='true'] .hit {
+  fill: var(--line);
+  opacity: 0.45;
+}
+
+.trend-empty {
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding: 1.2rem 0;
+  text-align: center;
+}
+
+/* Tooltip. Positioned against .trend-plot, never clipped by the SVG. */
+.trend-tip {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  min-width: 8.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.14);
+}
+
+.trend-tip[hidden] {
+  display: none;
+}
+
+.trend-tip .tip-week {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.trend-tip .tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Identity rides the swatch, never the text: the text keeps its ink token. */
+.legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.legend .count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-table {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+}
+
+.trend-table summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.trend-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-table th,
+.trend-table td {
+  text-align: right;
+  padding: 0.15rem 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.trend-table th:first-child,
+.trend-table td:first-child {
+  text-align: left;
+}
+
+.trend-table thead th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.stats[data-state='unavailable'] .trend,
+.stats[data-state='unavailable'] .stat-note {
+  display: none;
+}

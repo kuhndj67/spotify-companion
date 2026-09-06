@@ -2087,3 +2087,100 @@ was collecting correctly the whole time and only the display was broken. That is
 working as designed, and it is also why nothing flagged it."
 **Context**: CONSTRUCTION — U3 still paused to collect data. Autostart chain **proven**. WebSocket
 admission defect found by opening the page and fixed. **415 tests** (411 + 4), typecheck clean
+
+---
+
+## Listening Statistics Panel — Play Count and a Weekly Artist Trend
+**Timestamp**: 2026-09-06
+**User Input**: *"Ok restart looks good. As I use the app one thing I think would be interesting
+would be to display some statistics. One would be the play count from the database for the track
+being played and maybe a small chart showing the weekly play count for the artist over the last 6
+months. (showing a view of my interest trend)"*
+**AI Response**: "Built it, read-only over `history.db`. Three design questions were put to the
+user first, because the live data contradicted parts of the request in ways that changed the work.
+
+PROBED THE DATABASE BEFORE DESIGNING, AND IT CHANGED ALL THREE ANSWERS. The request assumed six
+months of history; the corpus is **17 days** (2026-08-20 → 2026-09-06, 163 plays, 98 tracks, 53
+artists). A fixed 26-week axis would have been 23 empty bars.
+
+THE FINDING THAT MATTERED: `artist_id` IS THE PRIMARY ARTIST, AND THAT IS A KNOWN UNDERCOUNT.
+The schema stores one id per play — `track.artists[0]` — while `artist_name` is the joined display
+string. Measured on the corpus:
+
+```
+Ren                            23   artist_id 0Repe2Ei…
+Ren, Eden Nash                  2   same id
+Ren, The Skinner Brothers       1   same id
+Inpatient, Ren, Chris Webby     7   filed under INPATIENT
+Prof, Ren                       1   filed under PROF
+```
+
+Ren is on **34** plays; a chart keyed on `artist_id` shows **26**. The 8 feature credits appear on
+someone else's trend line. Across the corpus only 14 of 163 plays are multi-artist, but it
+concentrates precisely on the artist a user would look up. **This is the denominator family
+again** — a plausible number that reads as a listening pattern rather than as a limitation of the
+schema.
+
+USER CHOSE PRIMARY-ARTIST ONLY (option A of three), over recording every artist id (schema change,
+not retroactive) or that plus a 98-call backfill. **So the panel says `(as primary artist)` on
+every render**, not in a footnote. A repository test pins the limitation rather than the fix: if a
+later unit records every artist, that test is what should fail.
+
+WINDOW: ADAPTIVE, CAPPED AT 26 WEEKS. Anchored on the **corpus** first play, not the artist's, so
+every artist's chart shares one x-axis and two can be compared; anchoring per artist would rescale
+the axis silently between track changes. `capped` is returned as a distinct flag because 'the axis
+stopped at the limit' and 'the axis stopped because there is no more history' are different facts
+— the caption reads *all history, from 17 Aug* or *last 26 weeks* accordingly.
+
+BARS STACKED BY OUTCOME, WITH `unknown` KEPT SEPARATE. 116 of the 163 plays are backfilled and
+therefore `unknown` — not skipped, not completed, never observed. Filtering to `completed` would
+have erased 71% of the history and drawn listening as beginning the day live recording started;
+summing them would assert a judgement the data does not contain. `unknown` is drawn as a
+low-chroma **neutral with a 45° hatch**, not a third hue: it is the absence of an observation
+trail, and must not compete with the two real verdicts.
+
+WEEK BUCKETING IS PURE AND IN JAVASCRIPT, NOT SQL, ON PURPOSE. SQLite's `%W` counts from the
+first Sunday and `%U` from the first Monday, and neither is the ISO week; at a year boundary they
+produce a week `00` that is sometimes partial and sometimes fused with December. That is one wrong
+week in fifty-two, rendered as a listening pattern rather than as an error — the `inc=releases`
+shape. `history/playStats.ts` is registered in `purity.test.ts`; `now` is a parameter, so the week
+seam is testable, and the tests cover Sunday-at-23:59, the Monday boundary, and 2026-12-28 →
+2027-01-04.
+
+NO MIGRATION WAS NEEDED. Both queries are already covered: `idx_play_track` from v1 and
+`idx_play_artist_id` from v2. Schema stays at **v3**.
+
+THE PANEL COSTS NOTHING UPSTREAM. `/api/history/stats` makes zero external requests, like
+`/api/explain` and for the same reason: the display calls it on every track change, and a route
+that could reach Spotify or MusicBrainz would put a third-party outage in the path of a local
+count.
+
+THE SETTLE PASS IS NOT BELT-AND-BRACES. `PlayObserver` writes the previous play on the same track
+change that triggers the fetch, so an immediate read can beat the write and report a count one too
+low — most visibly on a repeat, where the panel would then sit on the stale number for the whole
+track. The client re-reads once at +6s.
+
+COLOURS WERE COMPUTED, NOT CHOSEN. `#1baf7a` / `#eb6834` (light) and `#199e70` / `#d95926` (dark)
+pass the lightness band, chroma floor, CVD separation (ΔE 9.2 light, 9.4 dark) and normal-vision
+floor in both modes. Light-mode contrast for the green is 2.82:1, below 3:1, which obliges relief:
+the legend prints every count and there is a table view. Both shipped.
+
+VERIFIED BY RUNNING IT, NOT ONLY BY TESTING IT. Rebuilt the container (checking the build's own
+exit code, not a pipe's) and probed live: `Madhouse` → 6 plays, 2 completed / 4 unknown, matching
+a direct SQL count; Inpatient → 23 plays across three weeks summing to the reported total; no
+params → 400; an unplayed track → zeros rather than null. Then opened the page in both colour
+schemes: panel renders, no console errors, table view correct. The first render exposed a real
+defect no test would have — every axis tick read `Aug`, because a 17-day window is entirely within
+one month. Fixed: the ends are always labelled with week dates, month ticks appear only once the
+window spans months.
+
+**438 tests** (415 + 23), typecheck clean, schema unchanged at v3."
+
+**Decision**: Statistics panel delivered — per-track play count split by outcome, and a weekly
+stacked trend for the primary artist, adaptive up to 26 weeks. Read-only, no migration, no
+upstream calls. Primary-artist attribution accepted as a **documented undercount** rather than
+fixed, per user choice; the alternative (recording every artist id) remains available and is not
+retroactive.
+**Context**: CONSTRUCTION — U3 still paused to collect data; this is a display addition outside
+the unit plan and does not touch the recording path or the hypothesis gate. **438 tests**,
+typecheck clean, schema v3, container rebuilt and live on `http://localhost:3010`

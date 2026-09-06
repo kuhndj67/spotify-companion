@@ -83,6 +83,44 @@
           <p class="warn" id="enrich-warn" hidden></p>
         </section>
 
+        <!--
+          U-stats. Read-only over history.db: no upstream request, so a Spotify or MusicBrainz
+          outage cannot take the panel down with it.
+
+          "Primary artist" is said out loud on purpose. The schema stores ONE artist id per play
+          (track.artists[0]), so a feature credit is filed under the lead artist. Measured on this
+          corpus, that makes a heavily-featuring artist read about 24% low. Labelling it "Artist"
+          would present a known undercount as a total.
+        -->
+        <section class="panel stats" id="stats" data-state="loading">
+          <h2>Listening history</h2>
+          <dl class="meta">
+            <div><dt>Times played</dt><dd id="stat-plays" data-testid="stat-plays">&mdash;</dd></div>
+            <div><dt>First heard</dt><dd id="stat-first">&mdash;</dd></div>
+          </dl>
+          <p class="stat-note" id="stat-note">
+            Counted when a play ends, so this one is not in the total yet.
+          </p>
+
+          <figure class="trend" id="trend">
+            <figcaption>
+              <span id="trend-title">Weekly plays</span>
+              <span class="muted" id="trend-span">&mdash;</span>
+            </figcaption>
+            <div class="trend-plot" id="trend-plot"></div>
+            <ul class="legend" id="trend-legend"></ul>
+            <!--
+              The table view is not decoration. Two of the three series sit below 3:1 contrast
+              against the light surface, and `unknown` is deliberately a low-chroma neutral, so
+              the numbers have to be readable without relying on the fills.
+            -->
+            <details class="trend-table">
+              <summary>Table view</summary>
+              <div id="trend-table-body"></div>
+            </details>
+          </figure>
+        </section>
+
         <section class="panel">
           <h2>Playback</h2>
           <dl class="meta">

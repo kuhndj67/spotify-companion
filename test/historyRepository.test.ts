@@ -217,3 +217,98 @@ describe('verifyWritable', () => {
     repo.close();
   });
 });
+
+describe('listening statistics', () => {
+  it('counts a track by outcome and reports its first and last play', () => {
+    const repo = makeRepo();
+    repo.recordPlay(samplePlay({ startedAt: '2026-08-25T10:00:00.000Z' }), []);
+    repo.recordPlay(
+      samplePlay({ startedAt: '2026-08-26T10:00:00.000Z', outcome: 'skipped' }),
+      [],
+    );
+    repo.recordPlay(
+      samplePlay({ startedAt: '2026-08-24T10:00:00.000Z', outcome: 'unknown' }),
+      [],
+    );
+    repo.recordPlay(samplePlay({ trackId: 'someothertrackid000000' }), []);
+
+    const stats = repo.trackPlayStats('abcdefghijklmnopqrstuv');
+    assert.equal(stats.totalPlays, 3);
+    assert.deepEqual(stats.byOutcome, { completed: 1, skipped: 1, unknown: 1 });
+    // MIN/MAX across outcome groups, not within one — an implementation that took them from a
+    // single group would be right whenever the first and last play happen to share an outcome.
+    assert.equal(stats.firstPlayedAt, '2026-08-24T10:00:00.000Z');
+    assert.equal(stats.lastPlayedAt, '2026-08-26T10:00:00.000Z');
+    repo.close();
+  });
+
+  it('reports zero for a track never played, rather than null', () => {
+    // "Played nought times" is the right answer for a track being heard for the first time, and
+    // it is a different statement from "history is unavailable" — which is a 503, not a zero.
+    const repo = makeRepo();
+    const stats = repo.trackPlayStats('neverplayedaaaaaaaaaaa');
+    assert.equal(stats.totalPlays, 0);
+    assert.deepEqual(stats.byOutcome, { completed: 0, skipped: 0, unknown: 0 });
+    assert.equal(stats.firstPlayedAt, null);
+    assert.equal(stats.lastPlayedAt, null);
+    repo.close();
+  });
+
+  it('lists play times for one artist, in order, from a cutoff', () => {
+    const repo = makeRepo();
+    repo.recordPlay(samplePlay({ startedAt: '2026-08-01T10:00:00.000Z' }), []);
+    repo.recordPlay(
+      samplePlay({ startedAt: '2026-08-25T10:00:00.000Z', outcome: 'skipped' }),
+      [],
+    );
+    repo.recordPlay(samplePlay({ startedAt: '2026-08-27T10:00:00.000Z' }), []);
+    repo.recordPlay(
+      samplePlay({ startedAt: '2026-08-26T10:00:00.000Z', artistId: 'otherartist0000000000' }),
+      [],
+    );
+
+    const points = repo.listPlayTimesForArtist('artist1234567890123456', '2026-08-17T00:00:00.000Z');
+    assert.deepEqual(points, [
+      { startedAt: '2026-08-25T10:00:00.000Z', outcome: 'skipped' },
+      { startedAt: '2026-08-27T10:00:00.000Z', outcome: 'completed' },
+    ]);
+    repo.close();
+  });
+
+  it('attributes a play to the PRIMARY artist only — the documented undercount', () => {
+    // The schema stores one artist id. A feature credit is filed under the lead artist, so the
+    // guest's trend does not contain it. This test pins the limitation rather than the fix:
+    // if a later unit records every artist, this is the test that should fail and be rewritten.
+    const repo = makeRepo();
+    repo.recordPlay(
+      samplePlay({
+        artistName: 'Inpatient, Ren, Chris Webby',
+        artistId: 'inpatient00000000000',
+        startedAt: '2026-08-25T10:00:00.000Z',
+      }),
+      [],
+    );
+    assert.equal(repo.listPlayTimesForArtist('inpatient00000000000', '2026-01-01T00:00:00.000Z').length, 1);
+    assert.equal(repo.listPlayTimesForArtist('ren000000000000000000', '2026-01-01T00:00:00.000Z').length, 0);
+    repo.close();
+  });
+
+  it('excludes plays before the cutoff', () => {
+    const repo = makeRepo();
+    repo.recordPlay(samplePlay({ startedAt: '2026-02-01T10:00:00.000Z' }), []);
+    assert.deepEqual(
+      repo.listPlayTimesForArtist('artist1234567890123456', '2026-08-17T00:00:00.000Z'),
+      [],
+    );
+    repo.close();
+  });
+
+  it('firstPlayStartedAt is the oldest play in the corpus, not the newest insert', () => {
+    const repo = makeRepo();
+    assert.equal(repo.firstPlayStartedAt(), null);
+    repo.recordPlay(samplePlay({ startedAt: '2026-08-25T10:00:00.000Z' }), []);
+    repo.recordPlay(samplePlay({ startedAt: '2026-08-20T10:00:00.000Z' }), []);
+    assert.equal(repo.firstPlayStartedAt(), '2026-08-20T10:00:00.000Z');
+    repo.close();
+  });
+});

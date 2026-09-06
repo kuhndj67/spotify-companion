@@ -12,7 +12,9 @@
   [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
   **U3 is deliberately PAUSED (user, 2026-09-05) to collect data** — the gate needs listening
   more than it needs code, and there is no time constraint.
-  Database at schema **v3**, **155 plays**, 41 with label verdicts.
+  Database at schema **v3**, **176 plays**, 72 with label verdicts.
+  A **listening-statistics panel** was added 2026-09-06 (see below) — display only, no migration.
+  **438 tests.**
 
 ### 🚢 The container is now the running deployment — open item 1 CLOSED
 
@@ -43,6 +45,29 @@ every browser.
 
 ⚠️ **Never run the container and `npm start` together** — two pollers, two writers, one SQLite
 file, every play recorded twice.
+
+### 📊 Listening statistics panel (2026-09-06) — display only
+
+Play count for the current track split by outcome, and a weekly stacked trend for its primary
+artist. `GET /api/history/stats` is read-only over `history.db` and makes **zero** upstream
+requests, so it cannot put a Spotify or MusicBrainz outage in the path of a local count. No
+migration was needed — `idx_play_track` and `idx_play_artist_id` already exist.
+
+Three constraints were measured before designing, and each changed the result:
+
+- The corpus is **17 days**, not six months, so the window is adaptive and capped at 26 weeks.
+  `capped` is reported as a distinct flag: "stopped at the limit" and "stopped because there is no
+  more history" are different facts, and the caption says which.
+- `artist_id` is the **primary** artist only. Ren is on 34 plays and owns the primary id on 26, so
+  the panel labels itself `(as primary artist)` rather than presenting a known undercount as a
+  total. Fixing it properly needs every artist id recorded per play — a schema change, and **not
+  retroactive**. User chose the documented undercount (2026-09-06).
+- 116 of 163 plays are backfilled and therefore `unknown`. Bars are stacked by outcome with
+  `unknown` kept visibly separate as a hatched neutral; filtering to `completed` would have drawn
+  listening as beginning the day live recording started.
+
+⚠️ **This does not touch the recording path, the classifier, or the hypothesis gate.** It reads
+rows that already exist.
 
 ### 🔒 The hypothesis gate is pre-registered and still open
 

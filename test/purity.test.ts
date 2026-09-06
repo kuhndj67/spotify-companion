@@ -29,6 +29,9 @@ const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
 const PURE_MODULES = [
   'history/outcomeClassifier.ts',
   'history/types.ts',
+  // The trend window is a function of `now` — passed in, never read. A Date.now() here would
+  // make the chart untestable at exactly the boundary that goes wrong, the week seam.
+  'history/playStats.ts',
   'export/serialisers.ts',
   'mcp/parseNowPlaying.ts',
   // U2. labelClassifier decides the independent variable the promotion hypothesis rests on:

@@ -52,8 +52,10 @@ import type {
   OutcomeEvidence,
   PlayOutcome,
   PlayRecord,
+  PlayTimePoint,
   Provenance,
   SkipSource,
+  TrackPlayStats,
 } from './types.js';
 
 interface PlayRow {
@@ -441,6 +443,73 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       // If the gap counter itself cannot be written the database is unusable; the caller has
       // already degraded to display-only, and throwing here would add nothing.
     }
+  }
+
+  // ==========================================================================
+  // Listening statistics — read-only, and read on every track change.
+  //
+  // Both queries are covered by indexes created in schema v1/v2 (`idx_play_track`,
+  // `idx_play_artist_id`), so this feature needed no migration. That matters more than it
+  // sounds: the display must never be the reason a write is waiting, and an unindexed scan
+  // over a year of plays (~73k rows) on every track change would eventually become one.
+  // ==========================================================================
+
+  trackPlayStats(trackId: string): TrackPlayStats {
+    const rows = this.#db
+      .prepare(
+        `SELECT outcome, COUNT(*) AS n, MIN(started_at) AS first_at, MAX(started_at) AS last_at
+           FROM play WHERE track_id = ? GROUP BY outcome`,
+      )
+      .all(trackId) as { outcome: string; n: number; first_at: string; last_at: string }[];
+
+    const stats: TrackPlayStats = {
+      trackId,
+      totalPlays: 0,
+      byOutcome: { completed: 0, skipped: 0, unknown: 0 },
+      firstPlayedAt: null,
+      lastPlayedAt: null,
+    };
+
+    for (const row of rows) {
+      // An outcome outside the three known values would mean a migration wrote something this
+      // build does not understand. Counting it into `totalPlays` but not into a bucket would
+      // make the parts stop summing to the whole silently, so it is skipped from both.
+      if (row.outcome !== 'completed' && row.outcome !== 'skipped' && row.outcome !== 'unknown') {
+        continue;
+      }
+      stats.byOutcome[row.outcome] = row.n;
+      stats.totalPlays += row.n;
+      if (stats.firstPlayedAt === null || row.first_at < stats.firstPlayedAt) {
+        stats.firstPlayedAt = row.first_at;
+      }
+      if (stats.lastPlayedAt === null || row.last_at > stats.lastPlayedAt) {
+        stats.lastPlayedAt = row.last_at;
+      }
+    }
+
+    return stats;
+  }
+
+  listPlayTimesForArtist(artistId: string, sinceIso: string): PlayTimePoint[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT started_at, outcome FROM play
+          WHERE artist_id = ? AND started_at >= ?
+          ORDER BY started_at`,
+      )
+      .all(artistId, sinceIso) as { started_at: string; outcome: string }[];
+
+    return rows.map((row) => ({
+      startedAt: row.started_at,
+      outcome: row.outcome as PlayOutcome,
+    }));
+  }
+
+  firstPlayStartedAt(): string | null {
+    const row = this.#db.prepare('SELECT MIN(started_at) AS first_at FROM play').get() as
+      | { first_at: string | null }
+      | undefined;
+    return row?.first_at ?? null;
   }
 
   // ==========================================================================

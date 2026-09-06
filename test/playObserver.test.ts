@@ -176,6 +176,15 @@ describe('degraded operation (BR-3.8, BR-3.9)', () => {
       recordGap: () => {
         gaps++;
       },
+      trackPlayStats: () => {
+        throw new Error('unused');
+      },
+      listPlayTimesForArtist: () => {
+        throw new Error('unused');
+      },
+      firstPlayStartedAt: () => {
+        throw new Error('unused');
+      },
       close: () => {},
     };
     return { repo, gaps: () => gaps };

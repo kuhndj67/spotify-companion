@@ -86,7 +86,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-415 tests passing · typecheck clean · **155 plays recorded**, 41 with label verdicts · schema v3.
+438 tests passing · typecheck clean · **176 plays recorded**, 72 with label verdicts · schema v3.
 
 ### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
 
@@ -133,6 +133,19 @@ a failure of the chain — the script says so rather than reporting a false nega
 `opencodetest-frontend` holds host port 3000. Opening 3000 after a reboot shows something that is
 also running, which reads as "the wrong thing started" rather than "wrong URL". This has already
 caused one false alarm.
+
+### 📊 Listening statistics panel added 2026-09-06
+
+Per-track play count split by outcome, plus a weekly stacked trend for the primary artist —
+adaptive, capped at 26 weeks and anchored on the **corpus** first play so every artist's chart
+shares one axis. `GET /api/history/stats?trackId=&artistId=` is read-only and makes **zero**
+upstream requests, like `/api/explain`. No migration: `idx_play_track` (v1) and
+`idx_play_artist_id` (v2) already cover both queries.
+
+`unknown` is drawn as a hatched neutral, never as a third outcome — 116 of the first 163 plays are
+backfilled and have no observation trail, so summing them into `completed` or `skipped` would
+assert a judgement the data does not contain. See the two warnings below on artist attribution and
+week bucketing before changing anything here.
 
 ### Phases are sequenced by risk containment
 
@@ -194,6 +207,23 @@ that cannot be regenerated. Probed on both C: and D: in a real container: `journ
 `integrity_check: ok` with the container as the writer. **Documentation said no; the probe said
 yes.** If this ever needs revisiting, re-probe rather than reasoning.
 
+**`artist_id` is the PRIMARY artist, and grouping by it undercounts.** The schema stores one id
+per play — `track.artists[0]` — while `artist_name` is the joined display string
+(`"Inpatient, Ren, Chris Webby"`). A feature credit is therefore filed under the *lead* artist and
+is absent from the guest's totals. Measured 2026-09-06: Ren appears on **34** plays but owns the
+primary id on **26**, so any per-artist figure is ~24% low for someone who guests often. Only 14 of
+176 plays are multi-artist, but it concentrates on exactly the artist a person would look up. The
+statistics panel says `(as primary artist)` on every render for this reason, and
+`historyRepository.test.ts` pins the limitation — if a later unit records every artist id, that
+test is what should fail. Same family as the denominator trap: it reads as a listening pattern,
+not as a schema limit.
+
+**Week buckets are built in JavaScript, never in SQL.** SQLite's `%W` counts weeks from the first
+Sunday and `%U` from the first Monday, and neither is the ISO week; at a year boundary they emit a
+week `00` that is sometimes partial and sometimes fused with December. That is one wrong week in
+fifty-two, drawn as a listening pattern rather than raised as an error. `history/playStats.ts` is
+pure and takes `now` as a parameter, which is the only reason the week seam is testable at all.
+
 **MusicBrainz throttles at 1 req/sec spacing.** Measured: 6 of 19 tracks took a `503` at 1200 ms —
 wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry
 goes back through the queue, so it spends time, never rate.
@@ -244,7 +274,7 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 415 tests
+npm test           # 438 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 

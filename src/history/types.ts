@@ -201,3 +201,36 @@ export interface CoverageStats {
   /** Plays not written because persistence was failing (BR-3.9). */
   countedGaps: number;
 }
+
+/**
+ * Per-track counts for the now-playing statistics panel.
+ *
+ * ⚠️ **`totalPlays` counts times the track came up, not times it was heard.** A track replayed
+ * twice inside one uninterrupted play is one row here; the repeat shows up in
+ * `evidence.completionRatio` exceeding 1.0, which is exactly why that value is never clamped.
+ * Reading this number as "times listened" would undercount the repeat-listen signal.
+ *
+ * Outcomes are reported separately and never summed into a single "interest" figure. 116 of the
+ * first 163 plays are backfilled and therefore `unknown` — not skipped, not completed, but never
+ * observed. Collapsing them would invent a judgement.
+ */
+export interface TrackPlayStats {
+  trackId: string;
+  totalPlays: number;
+  byOutcome: Record<PlayOutcome, number>;
+  /** ISO 8601, or null when the track has never been recorded. */
+  firstPlayedAt: string | null;
+  lastPlayedAt: string | null;
+}
+
+/**
+ * One play reduced to what a trend needs.
+ *
+ * Deliberately not a `PlayRecord`: the trend reads a few hundred rows on every track change, and
+ * hydrating the full record — evidence, label snapshot, genres — to count two columns would make
+ * a display feature the most expensive query in the app.
+ */
+export interface PlayTimePoint {
+  startedAt: string;
+  outcome: PlayOutcome;
+}

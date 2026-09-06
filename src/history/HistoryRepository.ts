@@ -18,6 +18,8 @@ import type {
   OutcomeEvidence,
   PlayOutcome,
   PlayRecord,
+  PlayTimePoint,
+  TrackPlayStats,
 } from './types.js';
 
 export interface HistoryRepository {
@@ -62,6 +64,35 @@ export interface HistoryRepository {
 
   /** Plays lost to a persistence failure (BR-3.9) — counted, never silently dropped. */
   recordGap(): void;
+
+  /**
+   * How often a track has come up, split by outcome. Backs the now-playing statistics panel.
+   *
+   * Returns a zeroed record rather than null for a track with no history: "played nought times"
+   * is the correct answer for a track being heard for the first time, and it is a different
+   * statement from "history is unavailable", which is the caller's 503.
+   */
+  trackPlayStats(trackId: string): TrackPlayStats;
+
+  /**
+   * Play times for one artist since a moment, for the weekly trend.
+   *
+   * ⚠️ **Matches on the PRIMARY artist only** — `artistId` is `track.artists[0]`, the single id
+   * this schema stores. A feature credit is therefore attributed to the lead artist and is absent
+   * from the guest's trend. Measured on the corpus: Ren appears on 34 plays but owns the primary
+   * id on 26 of them, so the number is ~24% low for a heavily-featuring artist. The panel says
+   * "primary artist" for exactly this reason; fixing it properly needs every artist id recorded
+   * per play, which is a schema change and is not retroactive.
+   */
+  listPlayTimesForArtist(artistId: string, sinceIso: string): PlayTimePoint[];
+
+  /**
+   * The oldest `startedAt` in the corpus, or null when empty.
+   *
+   * Anchors the trend's x-axis for *every* artist, so two artists' charts can be compared. See
+   * `trendWindow` — anchoring per artist would rescale the axis between tracks.
+   */
+  firstPlayStartedAt(): string | null;
 
   close(): void;
 }

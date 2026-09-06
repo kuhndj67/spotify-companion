@@ -14,6 +14,12 @@ import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
 import {
+  trendWindow,
+  weeklyBuckets,
+  type TrendWindow,
+  type WeekBucket,
+} from './history/playStats.js';
+import {
   ExportService,
   ExportValidationError,
   parseFormat,
@@ -587,6 +593,70 @@ app.get('/api/explain/:playId', (req, res) => {
     // `Never Too Different` at release level and `Atlantic` at artist level; both are true.
     release: { ...release, summary: summariseTrace(release) },
     artist: { ...artist, summary: summariseTrace(artist) },
+  });
+});
+
+/**
+ * Listening statistics for the now-playing panel: how often this track has come up, and the
+ * weekly trend for its artist.
+ *
+ * **Zero upstream requests**, like `/api/explain` and for the same reason — it reads rows the
+ * machine already holds. The display calls it on every track change, and a route that could
+ * reach Spotify or MusicBrainz would put a third-party outage in the path of a local statistic.
+ *
+ * Both parameters are optional and answered independently: a track with no `artistId` (Spotify
+ * occasionally supplies no artist) still gets its play count rather than an error.
+ */
+app.get('/api/history/stats', (req, res) => {
+  if (repository === null) {
+    res.status(503).json({ error: 'History is unavailable.', detail: historyStartupError });
+    return;
+  }
+
+  const readId = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    // Spotify ids are 22-char base62; the bound is a sanity check, not a format assertion.
+    return trimmed.length > 0 && trimmed.length <= 64 ? trimmed : null;
+  };
+
+  const trackId = readId(req.query.trackId);
+  const artistId = readId(req.query.artistId);
+  if (trackId === null && artistId === null) {
+    res.status(400).json({ error: 'Supply trackId, artistId, or both.' });
+    return;
+  }
+
+  // `asOf` is required for the same reason it is on the coverage figures: these counts move as
+  // plays are recorded, so a number without a timestamp is not interpretable later.
+  const asOf = new Date().toISOString();
+
+  let artist: {
+    artistId: string;
+    playsInWindow: number;
+    firstPlayedAt: string | null;
+    window: TrendWindow;
+    weeks: WeekBucket[];
+  } | null = null;
+
+  if (artistId !== null) {
+    // Anchored on the CORPUS start, not this artist's first play, so every artist's chart shares
+    // one x-axis and two of them can be compared.
+    const window = trendWindow(repository.firstPlayStartedAt(), asOf);
+    const plays = repository.listPlayTimesForArtist(artistId, `${window.start}T00:00:00.000Z`);
+    artist = {
+      artistId,
+      playsInWindow: plays.length,
+      firstPlayedAt: plays[0]?.startedAt ?? null,
+      window,
+      weeks: weeklyBuckets(plays, window),
+    };
+  }
+
+  res.json({
+    asOf,
+    track: trackId === null ? null : repository.trackPlayStats(trackId),
+    artist,
   });
 });
 

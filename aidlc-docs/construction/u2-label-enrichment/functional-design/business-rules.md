@@ -290,6 +290,9 @@ recoverable by re-analysis.
 | **BR-11.4** | Rule-initiated skips are excluded from the comparison | FR-23 |
 | **BR-11.5** | The result is recorded in `audit.md` **either way** — support or disconfirmation | U2 exit criterion |
 | **BR-11.6** | A minimum sample is stated in advance; below it the gate reports *"insufficient data"* rather than a verdict | Q9 |
+| **BR-11.6a** | **The minimum is `n ≥ 50` eligible plays in *each* of the `major` and `independent` groups, **and** `≥ 10` skips in the combined eligible set.** Below either, the output is `"insufficient data"` — there is no intermediate category. Basis and power calculation: [`hypothesis-gate/pre-registration.md`](../hypothesis-gate/pre-registration.md) §3 | Pre-registered 2026-09-05 |
+| **BR-11.7** | The gate is evaluated **once**, when the minimum is first met. Any later evaluation is labelled **exploratory** and cannot discharge the Phase 2 gate. Running it *below* the minimum does not consume that single run — the output is fixed at `"insufficient data"` by BR-11.6a | Pre-registered 2026-09-05 |
+| **BR-11.8** | The robustness checks are **fixed in advance** (pre-registration §5): R-A alternative verdict readings, **R-B the crossfade-confound recomputation**, R-C distinct-track clustering, R-D the `unknown` group. If **R-B** materially changes the answer, the primary result **does not stand** | Pre-registered 2026-09-05, open item 4 |
 
 > ### BR-11.2 is not a formality
 >

@@ -188,6 +188,58 @@ describe('backfilled rows stay honest', () => {
     repo.close();
   });
 
+  it('fills every optional field with a default when Spotify omits it', async () => {
+    // Not hypothetical: this endpoint has been seen to return items with no `external_ids` at
+    // all, which is why backfilled plays carry no ISRC (open item 3). The remaining fields are
+    // optional in the same way, and a missing one must become a documented default rather than
+    // `undefined` reaching the schema.
+    const repo = new SqliteHistoryRepository(':memory:');
+    await new RecentlyPlayedBackfill(
+      fakeApi([
+        {
+          played_at: '2026-08-25T10:03:00.000Z',
+          track: { id: TRACK_ID, name: 'Bare Track', duration_ms: DURATION_MS },
+        },
+      ]),
+      repo,
+    ).run();
+
+    const row = [...repo.listPlays()][0]!;
+    assert.equal(row.artistName, '');
+    assert.equal(row.artistId, null);
+    assert.equal(row.albumName, '');
+    assert.equal(row.releaseDate, null);
+    assert.equal(row.isrc, null, 'a missing ISRC is null, never an empty string');
+    assert.equal(row.contextType, null);
+    repo.close();
+  });
+
+  it('skips an item with no track or no timestamp instead of writing a partial row', async () => {
+    const repo = new SqliteHistoryRepository(':memory:');
+    const report = await new RecentlyPlayedBackfill(
+      fakeApi([
+        { played_at: '2026-08-25T10:03:00.000Z' },
+        { track: { id: TRACK_ID, name: 'No Timestamp', duration_ms: DURATION_MS } },
+        { played_at: '2026-08-25T11:03:00.000Z', track: { name: 'No Id', duration_ms: 1000 } },
+      ]),
+      repo,
+    ).run();
+
+    assert.equal(report.fetched, 3);
+    assert.equal(report.inserted, 0);
+    assert.equal([...repo.listPlays()].length, 0);
+    repo.close();
+  });
+
+  it('tolerates a response with no items at all', async () => {
+    const repo = new SqliteHistoryRepository(':memory:');
+    const report = await new RecentlyPlayedBackfill(fakeApi([]), repo).run();
+    assert.equal(report.fetched, 0);
+    assert.equal(report.inserted, 0);
+    assert.equal(report.error, null);
+    repo.close();
+  });
+
   it('reports an upstream failure without throwing', async () => {
     const repo = new SqliteHistoryRepository(':memory:');
     const failing = {

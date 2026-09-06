@@ -86,7 +86,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-447 tests passing · typecheck clean · **149 plays recorded** (47 completed, 5 skipped, 97 unknown)
+483 tests passing · 99.12% line · 92.70% branch · typecheck clean · **149 plays recorded** (47 completed, 5 skipped, 97 unknown)
 · schema v3. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
 `integrity_check: ok`, all 65 live trails intact. Backup kept in `data/`.
 
@@ -229,6 +229,23 @@ that cannot be regenerated. Probed on both C: and D: in a real container: `journ
 `integrity_check: ok` with the container as the writer. **Documentation said no; the probe said
 yes.** If this ever needs revisiting, re-probe rather than reasoning.
 
+**A coverage percentage cannot see a file no test imports.** V8 coverage only reports modules
+that were actually *loaded*, so an untested file is missing from the **denominator** rather than
+counted as 0% — it cannot drag the average down. On 2026-09-06 the suite reported **98.96%** while
+`server.ts` (952 lines, nine routes, and the home of the WebSocket `403`) had **no tests at all**.
+`--test-coverage-include` does not help; it filters the report and cannot conjure coverage for a
+module that never ran — probed with both a directory glob and a file glob. Same family as the
+denominator traps below, and the most dangerous of them, because it reads as good news.
+`test/noOrphanModules.test.ts` now fails on any module nothing executes unless it is in
+`ALLOWED_ORPHANS` **with a reason**. Three files are knowingly untested — `diagnostics.ts`,
+`export/SnapshotScheduler.ts`, `mcp/spotifyMcpClient.ts` — all constructed only by `server.ts`.
+
+**Routes live in `api.ts`, not `server.ts`, so they can be tested.** `createApi(ApiDeps)` takes
+every collaborator by injection, including `now` — `/api/history/stats` anchors a 26-week window
+on the current week, and with an ambient clock that behaviour is untestable. `server.ts` keeps
+wiring, startup and the `upgrade` handler; **leave the upgrade handler there** — `localGuard.test.ts`
+pins it to that file structurally, and it exists because of the `403`.
+
 **`played_at` from `recently-played` is when the track FINISHED, not when it started.** The docs
 are silent; the data is not. Across 41 plays this app had observed start *and* end itself,
 `played_at` matched the recorded **end** with a median error of 3.0 s, and matched a start once —
@@ -318,7 +335,7 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 447 tests
+npm test           # 483 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 

@@ -10,22 +10,11 @@ import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
 import { runDiagnostics } from './diagnostics.js';
 import { localGuard, decideAccess } from './localGuard.js';
+import { createApi, type DisplayLiked } from './api.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
-import {
-  trendWindow,
-  weeklyBuckets,
-  type TrendWindow,
-  type WeekBucket,
-} from './history/playStats.js';
-import {
-  ExportService,
-  ExportValidationError,
-  parseFormat,
-  suggestedFilename,
-  validateFilter,
-} from './export/ExportService.js';
+import { ExportService } from './export/ExportService.js';
 import { SnapshotScheduler } from './export/SnapshotScheduler.js';
 import { RequestQueue } from './musicbrainz/RequestQueue.js';
 import { MusicBrainzClient } from './musicbrainz/MusicBrainzClient.js';
@@ -36,9 +25,6 @@ import {
 } from './musicbrainz/LabelEnrichmentService.js';
 import { LabelBackfillJob } from './musicbrainz/LabelBackfillJob.js';
 import { LikedSetCache } from './spotify/LikedSetCache.js';
-import { buildTrace, summariseTrace } from './musicbrainz/resolutionTrace.js';
-import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
-import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { loadMusicBrainzIdentity, userAgentFrom } from './config.js';
 import { readFileSync } from 'node:fs';
 import type { NewPlayRecord } from './history/types.js';
@@ -405,22 +391,40 @@ const app = express();
 app.disable('x-powered-by');
 app.use(localGuard);
 
-/** REST snapshot. The UI uses the WebSocket; this stays for scripting and debugging. */
-app.get('/api/now-playing', (_req, res) => {
-  const snapshot = nowPlaying.current;
-  if ('error' in snapshot) {
-    res.status(502).json(snapshot);
-    return;
-  }
-  res.json(snapshot);
-});
+/**
+ * The API lives in `api.ts`, built from injected dependencies.
+ *
+ * The routes moved out so they could be tested. Importing this file starts the MCP client, opens
+ * SQLite, starts the poll loop and calls `listen()`, so nothing could import it and nothing did
+ * — nine routes at zero coverage while the suite reported 98.96%, because a file no test loads is
+ * absent from the coverage denominator rather than counted as zero. This file keeps the wiring;
+ * `api.ts` keeps the decisions.
+ */
+app.use(
+  createApi({
+    repository,
+    historyStartupError,
+    exportService,
+    likedSet,
+    labelStartupError,
+    observerStats: observer?.stats ?? null,
+    nowPlaying,
+    listToolNames: () => spotify.listToolNames(),
+    diagnostics: runDiagnosticsReport,
+    likedFor,
+    now: () => new Date().toISOString(),
+  }),
+);
 
 /**
- * End-to-end check of the connect / auth / query cycle. Each step reports independently so
- * a failure localises the problem. Not cached — it exists to be run on demand.
+ * The diagnostics sweep, wired here because its collaborators are all module state.
+ *
+ * `asOf` on the coverage figures is required rather than decorative: under BR-13 the same
+ * coverage query run twice can legitimately differ, so a figure without a timestamp is not
+ * interpretable.
  */
-app.get('/api/diagnostics', async (_req, res) => {
-  const report = await runDiagnostics(
+async function runDiagnosticsReport() {
+  return runDiagnostics(
     spotify,
     webApi,
     enrichment,
@@ -432,8 +436,6 @@ app.get('/api/diagnostics', async (_req, res) => {
       dbPath: config.historyDbPath,
     },
     {
-      // `asOf` is required rather than decorative: under BR-13 the same coverage query run
-      // twice can legitimately differ, so a figure without a timestamp is not interpretable.
       coverage: repository ? repository.labelCoverage(new Date().toISOString()) : null,
       queueDepth: labelQueue?.depth ?? 0,
       queuePaused: labelQueue?.paused ?? false,
@@ -444,270 +446,7 @@ app.get('/api/diagnostics', async (_req, res) => {
       userAgent: labelUserAgent,
     },
   );
-  res.status(report.ok ? 200 : 503).json(report);
-});
-
-/** Liveness plus a real MCP round-trip, which is what actually tends to break. */
-app.get('/api/health', async (_req, res) => {
-  try {
-    const tools = await spotify.listToolNames();
-    res.json({ status: 'ok', mcp: 'connected', toolCount: tools.length });
-  } catch (error) {
-    res.status(503).json({
-      status: 'degraded',
-      mcp: 'disconnected',
-      detail: error instanceof Error ? error.message : String(error),
-    });
-  }
-});
-
-/**
- * Export download (FR-49–54, US-25).
- *
- * Streams rather than buffering — a year of history is ~73k rows, and materialising that would
- * stall the event loop and with it the display. The filter is validated *before* the first byte
- * is written, because once output has begun there is no status code left to change.
- *
- * Served on the existing loopback listener behind `localGuard`: no new port, no new exposure.
- * That is the §3.5 download-only decision, and it is why U1 needed no security review.
- */
-app.get('/api/history/export', async (req, res) => {
-  if (!exportService) {
-    res.status(503).json({ error: 'History is unavailable.', detail: historyStartupError });
-    return;
-  }
-
-  let format: ReturnType<typeof parseFormat>;
-  let filter;
-  try {
-    format = parseFormat(req.query.format);
-    filter = validateFilter(req.query as Record<string, unknown>);
-  } catch (error) {
-    if (error instanceof ExportValidationError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    throw error;
-  }
-
-  const filename = suggestedFilename(format, new Date().toISOString());
-  res.setHeader('Content-Type', exportService.contentType(format));
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-  try {
-    await exportService.writeTo(res, { format, filter });
-    res.end();
-  } catch (error) {
-    // Headers are already sent, so there is no status code to change. Terminate and log.
-    console.error('[export] stream failed:', error);
-    res.destroy();
-  }
-});
-
-/** Coverage counts without downloading anything — cheap enough for the UI to poll. */
-app.get('/api/history/coverage', (_req, res) => {
-  if (!repository) {
-    res.status(503).json({ error: 'History is unavailable.', detail: historyStartupError });
-    return;
-  }
-  res.json({ ...repository.coverage(), ...observer?.stats });
-});
-
-/**
- * The resolution trace (BR-12) — how a track's label verdict was reached.
- *
- * A **separate route from `/api/diagnostics`** on purpose. Diagnostics runs a fixed system sweep
- * that hits Spotify and MCP on every call; a trace must make **zero** upstream requests
- * (BR-12.7). Folding it in would mean either a trace re-runs the live health check, or the
- * endpoint grows a mode switch that changes whether it touches the network — the kind of switch
- * that later gets set by accident.
- *
- * Works for **any play in history** (BR-12.4), not just the current one: the rule paths worth
- * inspecting — `contested`, tier `all`, a search-fallback match — cannot be summoned on demand by
- * playing a track.
- *
- * Behind the same `localGuard` as everything else. It reads data the machine already holds, so it
- * adds a route, not exposure.
- */
-app.get('/api/explain/:playId', (req, res) => {
-  if (repository === null) {
-    res.status(503).json({ error: 'History is unavailable.' });
-    return;
-  }
-
-  const playId = Number.parseInt(req.params.playId ?? '', 10);
-  if (Number.isNaN(playId)) {
-    res.status(400).json({ error: 'playId must be an integer.' });
-    return;
-  }
-
-  const play = repository.getPlay(playId);
-  if (play === null) {
-    res.status(404).json({ error: `No play with id ${playId}.` });
-    return;
-  }
-
-  const raw = repository.getPlayLabelPointers(playId);
-
-  const releaseResolution =
-    raw.labelResolutionId === null
-      ? null
-      : repository.getLabelResolutionById(raw.labelResolutionId);
-  const artistResolution =
-    raw.artistLabelResolutionId === null
-      ? null
-      : repository.getArtistLabelResolutionById(raw.artistLabelResolutionId);
-
-  const release = buildTrace({
-    playId,
-    resolution: releaseResolution,
-    scope: 'release',
-    storedClassifierVersion: raw.labelClassifierVersion,
-    runningClassifierVersion: LABEL_CLASSIFIER_VERSION,
-    majorRoots: MAJOR_ROOTS,
-    isrcVote: isrcPrefixVote(play.isrc),
-    unknownReason: raw.labelUnknownReason,
-  });
-
-  const artist = buildTrace({
-    playId,
-    resolution: artistResolution,
-    scope: 'artist',
-    storedClassifierVersion: raw.labelClassifierVersion,
-    runningClassifierVersion: LABEL_CLASSIFIER_VERSION,
-    majorRoots: MAJOR_ROOTS,
-    isrcVote: null,
-    capConfidenceAt: 'medium',
-  });
-
-  res.json({
-    play: {
-      id: playId,
-      title: play.title,
-      artistName: play.artistName,
-      albumName: play.albumName,
-      startedAt: play.startedAt,
-      isrc: play.isrc,
-    },
-    // Two levels, reported side by side and never merged (Q12). Token - Full Bag is
-    // `Never Too Different` at release level and `Atlantic` at artist level; both are true.
-    release: { ...release, summary: summariseTrace(release) },
-    artist: { ...artist, summary: summariseTrace(artist) },
-  });
-});
-
-/**
- * Listening statistics for the now-playing panel: how often this track has come up, and the
- * weekly trend for its artist.
- *
- * **Zero upstream requests**, like `/api/explain` and for the same reason — it reads rows the
- * machine already holds. The display calls it on every track change, and a route that could
- * reach Spotify or MusicBrainz would put a third-party outage in the path of a local statistic.
- *
- * Both parameters are optional and answered independently: a track with no `artistId` (Spotify
- * occasionally supplies no artist) still gets its play count rather than an error.
- */
-app.get('/api/history/stats', (req, res) => {
-  if (repository === null) {
-    res.status(503).json({ error: 'History is unavailable.', detail: historyStartupError });
-    return;
-  }
-
-  const readId = (value: unknown): string | null => {
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    // Spotify ids are 22-char base62; the bound is a sanity check, not a format assertion.
-    return trimmed.length > 0 && trimmed.length <= 64 ? trimmed : null;
-  };
-
-  const trackId = readId(req.query.trackId);
-  const artistId = readId(req.query.artistId);
-  if (trackId === null && artistId === null) {
-    res.status(400).json({ error: 'Supply trackId, artistId, or both.' });
-    return;
-  }
-
-  // `asOf` is required for the same reason it is on the coverage figures: these counts move as
-  // plays are recorded, so a number without a timestamp is not interpretable later.
-  const asOf = new Date().toISOString();
-
-  let artist: {
-    artistId: string;
-    playsInWindow: number;
-    firstPlayedAt: string | null;
-    window: TrendWindow;
-    weeks: WeekBucket[];
-  } | null = null;
-
-  if (artistId !== null) {
-    // Anchored on the CORPUS start, not this artist's first play, so every artist's chart shares
-    // one x-axis and two of them can be compared.
-    const window = trendWindow(repository.firstPlayStartedAt(), asOf);
-    const plays = repository.listPlayTimesForArtist(artistId, `${window.start}T00:00:00.000Z`);
-    artist = {
-      artistId,
-      playsInWindow: plays.length,
-      firstPlayedAt: plays[0]?.startedAt ?? null,
-      window,
-      weeks: weeklyBuckets(plays, window),
-    };
-  }
-
-  res.json({
-    asOf,
-    track: trackId === null ? null : repository.trackPlayStats(trackId),
-    artist,
-  });
-});
-
-/**
- * Re-read the saved-track set on demand.
- *
- * Exists because the set is otherwise refreshed at startup and on the 6-hourly backfill tick, so
- * a track liked a minute ago still reads as not liked — and a *stale* `false` is the one wrong
- * answer this indicator can give that matters. `GET /me/tracks/contains` is **403** in
- * Development Mode, so there is no single-track check to fall back on; re-reading the list is
- * the only way to be current.
- *
- * User-initiated only. Nothing polls this, because ~12 requests on a timer to keep a badge warm
- * would spend the rate limit that label resolution actually needs.
- */
-app.post('/api/liked/refresh', async (req, res) => {
-  if (likedSet === null) {
-    res.status(503).json({ error: 'Saved-track status is unavailable.', detail: labelStartupError });
-    return;
-  }
-
-  try {
-    await likedSet.refresh();
-  } catch (error) {
-    // A refresh failure leaves the previous set in place by design, so the honest response is
-    // the status we still hold rather than an error that would blank the badge.
-    console.error('[liked] manual refresh failed:', error);
-  }
-
-  const trackId = typeof req.query.trackId === 'string' ? req.query.trackId : null;
-  res.json({
-    size: likedSet.size,
-    available: likedSet.available,
-    liked: trackId === null ? null : (likedFor(trackId) ?? null),
-  });
-});
-
-/** The most recent plays, so the trace UI has something to offer without a search box. */
-app.get('/api/history/recent', (_req, res) => {
-  if (repository === null) {
-    res.status(503).json({ error: 'History is unavailable.' });
-    return;
-  }
-  const rows = [...repository.listPlays({ limit: 50 })].map((play) => ({
-    id: play.id,
-    title: play.title,
-    artistName: play.artistName,
-    startedAt: play.startedAt,
-  }));
-  res.json({ plays: rows });
-});
+}
 
 app.use(express.static(publicDir));
 
@@ -767,12 +506,6 @@ server.on('upgrade', (request, socket, head) => {
  * `GET /me/tracks/contains` returns **403** in Development Mode, which is why this is a cached
  * set rather than a membership check in the first place.
  */
-interface DisplayLiked {
-  isLiked: boolean | null;
-  addedAt: string | null;
-  asOf: string | null;
-}
-
 function likedFor(trackId: string): DisplayLiked | undefined {
   if (likedSet === null) return undefined;
   const isLiked = likedSet.isLiked(trackId);

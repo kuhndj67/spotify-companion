@@ -2350,3 +2350,90 @@ observations**, all **65 live rows still carrying their trails**, zero backfille
 `started_at >= ended_at`, and **zero remaining duplicates** by the same criterion. Container
 restarted: `[backfill] 0 inserted, 35 already known`. The symptom the user reported is gone —
 Inpatient's current week went from `completed 7 / unknown 8` to `completed 7 / unknown 1`.
+
+---
+
+## Coverage Evaluation — 98.96% Was Computed Over a Denominator That Excluded the Untested Code
+**Timestamp**: 2026-09-06
+**User Input**: *"Do we need to do a full test coverage evaluation and update our tests? (I know
+we've made a number of changes so testing being out of date is to be expected)."*
+**AI Response**: "Ran it rather than guessed, and the report contained the answer — as a trap
+this project has already met twice.
+
+**THE HEADLINE FIGURE COULD NOT SEE THE UNTESTED CODE.** 447 tests, **98.96% line / 92.17%
+branch**. But `src/server.ts` — **952 lines, nine HTTP routes** — was **absent from the report
+entirely**, not reported as 0%. V8 coverage only reports modules that were actually *loaded*, so a
+file no test imports is missing from the **denominator** rather than dragging the average down.
+Confirmed: no test imports `server.ts`, and the string appears nowhere in the report (the single
+grep hit was `PlayObserver.ts`).
+
+**IT IS NOT FIXABLE WITH A FLAG, AND THAT WAS PROBED RATHER THAN ASSUMED.** Both
+`--test-coverage-include` with a directory glob and with a `.ts` file glob **narrowed** the report
+instead of widening it. Coverage cannot be conjured for a module that never executed.
+
+> This is the same shape as the `inc=releases` 200 and the 28%→12% label-coverage figure, and it
+> is the most dangerous of the three, because the other two looked like findings and this one
+> looks like good news.
+
+**THE USER'S ACTUAL QUESTION HAD A NARROWER ANSWER: NO, THE TESTED CODE IS NOT OUT OF DATE.**
+Everything changed in this session that a test could reach was already covered — `playStats.ts`
+100%, the repository statistics methods, the dedup rekey verified against the reintroduced defect.
+The gap was never staleness. It was four files that had never had tests at all, dominated by the
+one with the worst defect history here: the WebSocket `403` lived in `server.ts` and passed all
+411 tests.
+
+**USER CHOSE THE FULL EXTRACTION** over testing only the logic, structural tests, or deferring.
+That was the right call for a specific reason: the WebSocket `403` was a **wiring** bug, and the
+two cheaper options would not have caught it either.
+
+**`createApi(deps)` — 302 LINES OF ROUTES MOVED OUT OF `server.ts` INTO `api.ts`.** Everything the
+routes need arrives through `ApiDeps`; nothing in the module reaches for module state, a clock or
+the network. `server.ts` keeps the wiring, the startup sequence and the `upgrade` handler — the
+last deliberately, because `localGuard.test.ts` structurally pins that handler to `server.ts` and
+moving it would have silently voided the test that exists *because* of the `403`.
+
+**`now` IS INJECTED, AND THAT IS THE POINT, NOT TIDINESS.** `/api/history/stats` anchors its
+26-week window on the current week. With an ambient clock the one assertion worth making — that
+the window ends on the week containing now, and reports whether it was clipped by the cap or by
+the start of the corpus — cannot be written at all.
+
+**30 ROUTE TESTS, OVER REAL HTTP ON AN EPHEMERAL PORT.** Not handler calls: the defect this is
+answering was wiring, and a handler-level test would have missed it again. They cover the 503
+degradation path on every history route (NFR-13), `502` for an unreachable MCP on `/api/now-playing`
+versus `503` on `/api/health`, `400` before the first byte on export, `404`/`400` on `/api/explain`,
+the window-end and capped/uncapped distinction, `asOf` being stamped, and — the rule that matters
+most — **`/api/liked/refresh` returning `null` rather than `false` when no track is named**, and
+still answering with the set it holds when the refresh itself throws.
+
+**THE BLIND SPOT ITSELF IS NOW A TEST.** `noOrphanModules.test.ts` walks `src/`, builds the
+runtime import graph from the tests and closes over it, and fails on any module nothing executes
+unless it is in `ALLOWED_ORPHANS` **with a written reason**. Type-only imports are excluded
+deliberately — `import type` is erased at compile time, and counting it would have made
+`diagnostics.ts` look reached while running zero lines. Verified load-bearing: deleting one
+allowlist entry fails the test and names the file.
+
+Four entries remain, each now explicit rather than invisible: `server.ts` (cannot be imported
+without starting the process), `diagnostics.ts`, `export/SnapshotScheduler.ts` and
+`mcp/spotifyMcpClient.ts` (constructed only by `server.ts`). Four more are interface/type-only,
+where absence is correct.
+
+**`RecentlyPlayedBackfill` BRANCH COVERAGE 69.70% → 92.11%**, by testing what Spotify actually
+omits: an item with no `artists`, `album`, `external_ids` or `context`. Not hypothetical — the
+missing `external_ids` is why backfilled plays carry no ISRC (open item 3).
+
+**483 tests · 99.12% line · 92.70% branch.** `api.ts` went from *invisible* to 98.90%.
+
+**VERIFIED LIVE, BECAUSE THIS REFACTORED THE DEPLOYMENT-CRITICAL FILE.** Rebuilt and restarted;
+all nine routes probed against the running container — `200/400/404/503` each where expected — and
+the admission guard still enforced on **both** surfaces (cross-site HTTP `403`, cross-site WS
+`403`). Browser: WebSocket connected and streaming (`Playing`, not `Disconnected —
+reconnecting…`), no console errors. The page also showed real artist-level label names for the
+first time — *The Bearded Man*, *Ineffable* — the `artistNames` that had been broadcast and
+dropped since U2."
+
+**Decision**: Routes extracted to `src/api.ts` behind `createApi(ApiDeps)` and tested over real
+HTTP; coverage's structural blind spot closed by `noOrphanModules.test.ts` with a reasoned
+allowlist. Three files remain knowingly untested (`diagnostics.ts`, `SnapshotScheduler.ts`,
+`spotifyMcpClient.ts`) — now recorded rather than invisible.
+**Context**: CONSTRUCTION — U3 still paused. **483 tests**, 99.12% line, 92.70% branch, typecheck
+clean, schema v3, container rebuilt and live on `http://localhost:3010`

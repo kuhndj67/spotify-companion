@@ -15,7 +15,8 @@
   Database at schema **v3**, **149 plays** after the `played_at` repair of 2026-09-06
   (41 duplicate backfill rows removed, 84 re-timed), 72 with label verdicts.
   A **listening-statistics panel** was added 2026-09-06 (see below) — display only, no migration.
-  **447 tests.**
+  **483 tests** · 99.12% line · 92.70% branch. Routes extracted to `api.ts` and tested over real
+  HTTP; `noOrphanModules.test.ts` closes the coverage blind spot that hid them.
 
 ### 🚢 The container is now the running deployment — open item 1 CLOSED
 

@@ -12,6 +12,10 @@ const ui = {
   card: el('card'),
   status: el('status'),
   title: el('title'),
+  titleText: el('title-text'),
+  liked: el('liked'),
+  likedBadge: el('liked-badge'),
+  likedGlyph: el('liked-glyph'),
   artist: el('artist'),
   album: el('album'),
   fill: el('fill'),
@@ -127,12 +131,15 @@ function clearEnrichment() {
     ui[key].textContent = DASH;
   }
   ui.genres.innerHTML = `<span class="muted">${DASH}</span>`;
+  ui.liked.textContent = DASH;
+  ui.likedBadge.dataset.liked = 'unknown';
+  ui.likedGlyph.textContent = '?';
   ui.enrichWarn.hidden = true;
   ui.enrichment.dataset.loading = 'true';
 }
 
 function clearTrack() {
-  ui.title.textContent = DASH;
+  ui.titleText.textContent = DASH;
   ui.artist.textContent = DASH;
   ui.album.textContent = DASH;
   renderArt(null, null);
@@ -208,7 +215,9 @@ function render(data) {
 
   setState(data.isPlaying ? 'playing' : 'paused', data.isPlaying ? 'Playing' : 'Paused');
 
-  ui.title.textContent = data.track ?? DASH;
+  // Into the inner span: the heading also contains the liked badge, and writing textContent on
+  // the heading itself would delete it on the first push.
+  ui.titleText.textContent = data.track ?? DASH;
   ui.artist.textContent = data.artist ?? DASH;
   ui.album.textContent = data.album ?? DASH;
   ui.total.textContent = data.duration ?? '0:00';
@@ -238,6 +247,7 @@ function render(data) {
   }
 
   renderEnrichment(data.enrichment, data.album);
+  renderLiked(data.liked ?? null);
   renderLabel(data.label);
   renderGenres(data.label);
   refreshStats(data.trackId ?? null, data.enrichment?.primaryArtistId ?? null,
@@ -264,7 +274,10 @@ function renderLabel(label) {
     verdict.textContent = 'pending';
     verdict.dataset.verdict = 'pending';
     artistVerdict.textContent = DASH;
-    names.replaceChildren(muted(DASH));
+    // Pending, not unknown: the lookup has not happened. At one request per second behind a
+    // backfill sweep this state can last minutes, so it is common rather than transient.
+    renderLabelNames(names, null, 'pending');
+    renderLabelNames(el('artist-label-names'), null, 'pending');
     return;
   }
 
@@ -275,18 +288,115 @@ function renderLabel(label) {
   artistVerdict.textContent = label.artistVerdict ?? DASH;
   if (artistVerdict.dataset) artistVerdict.dataset.verdict = label.artistVerdict ?? '';
 
-  const all = [...(label.names ?? [])];
-  names.replaceChildren(
-    ...(all.length === 0
-      ? [muted(DASH)]
-      : all.map((name) => {
-          const tag = document.createElement('span');
-          tag.className = 'tag';
-          tag.textContent = name;
-          return tag;
-        })),
+  renderLabelNames(names, label.names, label.verdict);
+  renderLabelNames(el('artist-label-names'), label.artistNames, label.artistVerdict);
+}
+
+/**
+ * The label names behind one verdict.
+ *
+ * ⚠️ **Empty is explained, never left as a bare dash.** `pending` and `unknown` are different
+ * facts — not looked up yet, versus looked up and MusicBrainz has no label — and a dash asserts
+ * neither. MusicBrainz's coverage on recent releases is about 44%, so empty is the common case
+ * here and it needs to read as a measurement rather than as a broken field.
+ */
+function renderLabelNames(target, names, verdict) {
+  if (!target) return;
+
+  if (names === null || names === undefined || names.length === 0) {
+    target.replaceChildren(
+      muted(
+        verdict === 'unknown'
+          ? 'MusicBrainz lists no label'
+          : verdict === null || verdict === 'pending'
+            ? 'not yet resolved'
+            : DASH,
+      ),
+    );
+    return;
+  }
+
+  target.replaceChildren(
+    ...names.map((name) => {
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = name;
+      return tag;
+    }),
   );
 }
+
+/**
+ * Saved-track ("liked") status.
+ *
+ * ⚠️ **`null` is unknown and renders as the word, never as "No".** The set can be unavailable, and
+ * a `false` shown in its place would be an observed choice that was never observed — the same
+ * rule the recorded `likedAtStart` column follows.
+ *
+ * The badge carries the age of the answer in its tooltip, because it is a cached set refreshed at
+ * startup and every six hours: a `No` can be hours old, and the moment that matters is right after
+ * someone has liked the track. Clicking re-reads the set.
+ */
+function renderLiked(liked) {
+  if (!liked) {
+    ui.liked.textContent = DASH;
+    ui.likedBadge.dataset.liked = 'unknown';
+    ui.likedGlyph.textContent = '?';
+    ui.likedBadge.title = 'Saved-track status is unavailable.';
+    ui.likedBadge.setAttribute('aria-label', 'Liked status unknown');
+    return;
+  }
+
+  const asOf = liked.asOf ? `as of ${new Date(liked.asOf).toLocaleTimeString()}` : 'never loaded';
+
+  if (liked.isLiked === null) {
+    ui.liked.textContent = 'unknown';
+    ui.likedBadge.dataset.liked = 'unknown';
+    ui.likedGlyph.textContent = '?';
+  } else if (liked.isLiked) {
+    ui.liked.textContent = liked.addedAt ? `Yes · ${formatDay(liked.addedAt)}` : 'Yes';
+    ui.likedBadge.dataset.liked = 'yes';
+    ui.likedGlyph.textContent = '♥';
+  } else {
+    ui.liked.textContent = 'No';
+    ui.likedBadge.dataset.liked = 'no';
+    ui.likedGlyph.textContent = '♡';
+  }
+
+  const state =
+    liked.isLiked === null ? 'Liked status unknown' : liked.isLiked ? 'Liked' : 'Not liked';
+  ui.likedBadge.title = `${state}, ${asOf}. Click to re-read your saved tracks.`;
+  ui.likedBadge.setAttribute('aria-label', `${state}. Click to refresh.`);
+}
+
+let likedRefreshing = false;
+
+ui.likedBadge.addEventListener('click', async () => {
+  if (likedRefreshing) return;
+  likedRefreshing = true;
+  ui.likedBadge.dataset.busy = 'true';
+  // Pinned at click time. A full re-read is ~12 requests and takes seconds, which is long
+  // enough for the track to change underneath it — and applying the answer anyway would show
+  // one track's liked status under another track's name.
+  const askedFor = lastTrackId;
+
+  try {
+    const params = askedFor ? `?trackId=${encodeURIComponent(askedFor)}` : '';
+    const response = await fetch(`/api/liked/refresh${params}`, { method: 'POST' });
+    if (response.ok) {
+      const body = await response.json();
+      // The next tick would carry this anyway, but three seconds of an unchanged badge after a
+      // deliberate click reads as the click having done nothing.
+      if (body.liked && askedFor === lastTrackId) renderLiked(body.liked);
+    }
+  } catch {
+    // Leave the badge showing what it had. A failed refresh means the answer is older than we
+    // hoped, not that it is unknown.
+  } finally {
+    likedRefreshing = false;
+    delete ui.likedBadge.dataset.busy;
+  }
+});
 
 /**
  * Genres.

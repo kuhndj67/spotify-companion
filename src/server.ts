@@ -660,6 +660,40 @@ app.get('/api/history/stats', (req, res) => {
   });
 });
 
+/**
+ * Re-read the saved-track set on demand.
+ *
+ * Exists because the set is otherwise refreshed at startup and on the 6-hourly backfill tick, so
+ * a track liked a minute ago still reads as not liked — and a *stale* `false` is the one wrong
+ * answer this indicator can give that matters. `GET /me/tracks/contains` is **403** in
+ * Development Mode, so there is no single-track check to fall back on; re-reading the list is
+ * the only way to be current.
+ *
+ * User-initiated only. Nothing polls this, because ~12 requests on a timer to keep a badge warm
+ * would spend the rate limit that label resolution actually needs.
+ */
+app.post('/api/liked/refresh', async (req, res) => {
+  if (likedSet === null) {
+    res.status(503).json({ error: 'Saved-track status is unavailable.', detail: labelStartupError });
+    return;
+  }
+
+  try {
+    await likedSet.refresh();
+  } catch (error) {
+    // A refresh failure leaves the previous set in place by design, so the honest response is
+    // the status we still hold rather than an error that would blank the badge.
+    console.error('[liked] manual refresh failed:', error);
+  }
+
+  const trackId = typeof req.query.trackId === 'string' ? req.query.trackId : null;
+  res.json({
+    size: likedSet.size,
+    available: likedSet.available,
+    liked: trackId === null ? null : (likedFor(trackId) ?? null),
+  });
+});
+
 /** The most recent plays, so the trace UI has something to offer without a search box. */
 app.get('/api/history/recent', (_req, res) => {
   if (repository === null) {
@@ -720,15 +754,55 @@ server.on('upgrade', (request, socket, head) => {
  * (BR-7.7). At 1 req/sec behind a backfill sweep, `pending` is a common state rather than a
  * transient one, and collapsing it into `unknown` would corrupt what the coverage panel reports.
  */
-function withLabel(snapshot: Snapshot): Snapshot & { label?: DisplayLabel } {
+/**
+ * Saved-track status as the display needs it.
+ *
+ * ⚠️ **`isLiked === null` means unknown and is never `false`.** The set can be unavailable
+ * (Spotify unreachable at startup), and rendering that as "No" would show an observed choice
+ * that was never observed — the same rule the recorded `likedAtStart` column follows.
+ *
+ * `asOf` is not decoration. The set is refreshed at startup and then on the label-backfill
+ * interval, so a `false` here can be hours old — and the case that matters is someone who has
+ * just liked the track and wants to see it register. There is no cheaper way to be current:
+ * `GET /me/tracks/contains` returns **403** in Development Mode, which is why this is a cached
+ * set rather than a membership check in the first place.
+ */
+interface DisplayLiked {
+  isLiked: boolean | null;
+  addedAt: string | null;
+  asOf: string | null;
+}
+
+function likedFor(trackId: string): DisplayLiked | undefined {
+  if (likedSet === null) return undefined;
+  const isLiked = likedSet.isLiked(trackId);
+  return {
+    isLiked,
+    addedAt: isLiked === true ? likedSet.addedAt(trackId) : null,
+    asOf: likedSet.loadedAt === null ? null : new Date(likedSet.loadedAt).toISOString(),
+  };
+}
+
+/** Attach everything the panel shows but the poll loop does not carry: label verdict, liked. */
+function decorate(
+  snapshot: Snapshot,
+): Snapshot & { label?: DisplayLabel; liked?: DisplayLiked } {
   const trackId = (snapshot as { trackId?: string | null }).trackId ?? null;
   if (trackId === null) return snapshot;
+
   const label = labelByTrack.get(trackId);
-  return label === undefined ? snapshot : { ...snapshot, label };
+  const liked = likedFor(trackId);
+  if (label === undefined && liked === undefined) return snapshot;
+
+  return {
+    ...snapshot,
+    ...(label === undefined ? {} : { label }),
+    ...(liked === undefined ? {} : { liked }),
+  };
 }
 
 function broadcast(snapshot: Snapshot): void {
-  const payload = JSON.stringify(withLabel(snapshot));
+  const payload = JSON.stringify(decorate(snapshot));
   for (const client of wss.clients) {
     if (client.readyState === client.OPEN) client.send(payload);
   }
@@ -736,7 +810,7 @@ function broadcast(snapshot: Snapshot): void {
 
 wss.on('connection', (ws) => {
   // Send current state immediately so a new tab isn't blank until the next poll.
-  ws.send(JSON.stringify(withLabel(nowPlaying.current)));
+  ws.send(JSON.stringify(decorate(nowPlaying.current)));
 });
 
 nowPlaying.on('tick', broadcast);

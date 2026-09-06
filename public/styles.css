@@ -605,3 +605,68 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 .stats[data-state='unavailable'] .stat-note {
   display: none;
 }
+
+/* ==========================================================================
+   Saved-track ("liked") badge and the two-level label detail
+   ========================================================================== */
+
+/* Sits inside the h1, so the heading needs to lay its two children out. */
+.track h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.liked-badge {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+.liked-badge:hover {
+  border-color: var(--muted);
+}
+
+/* Liked is the only state that gets a colour. "No" and "unknown" stay recessive: neither is an
+   event, and colouring them would give a cached negative the weight of a finding. */
+.liked-badge[data-liked='yes'] {
+  color: #e0245e;
+  border-color: #e0245e;
+}
+
+.liked-badge[data-liked='unknown'] {
+  opacity: 0.55;
+}
+
+.liked-badge[data-busy='true'] {
+  opacity: 0.4;
+  cursor: progress;
+}
+
+.label-level {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.label-level .level-name {
+  flex: none;
+  min-width: 3.6rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

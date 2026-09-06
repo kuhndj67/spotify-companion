@@ -39,7 +39,22 @@
             <span class="art-fallback" aria-hidden="true">♪</span>
           </div>
           <div class="track">
-            <h1 id="title">&mdash;</h1>
+            <h1 id="title">
+              <span id="title-text">&mdash;</span>
+              <!--
+                Saved-track status. A button, not an ornament: the set is refreshed at startup and
+                then 6-hourly, so a track liked a moment ago still reads as not liked. Clicking
+                re-reads it. There is no cheaper way to be current -- GET /me/tracks/contains is
+                403 in Development Mode, which is why this is a cached set at all.
+              -->
+              <button
+                id="liked-badge"
+                class="liked-badge"
+                type="button"
+                data-liked="unknown"
+                data-testid="liked-badge"
+              ><span id="liked-glyph" aria-hidden="true">?</span></button>
+            </h1>
             <p class="artist" id="artist">&mdash;</p>
             <p class="album" id="album">&mdash;</p>
           </div>
@@ -60,6 +75,7 @@
             <div><dt>Released</dt><dd id="released">&mdash;</dd></div>
             <div><dt>Age</dt><dd id="age">&mdash;</dd></div>
             <div><dt>Following artist</dt><dd id="following">&mdash;</dd></div>
+            <div><dt>Liked</dt><dd id="liked" data-testid="liked-value">&mdash;</dd></div>
             <div><dt>Release type</dt><dd id="album-type">&mdash;</dd></div>
             <div><dt>Track</dt><dd id="track-no">&mdash;</dd></div>
             <div><dt>Explicit</dt><dd id="explicit">&mdash;</dd></div>
@@ -72,9 +88,27 @@
             <div><dt>Label</dt><dd id="label-verdict" data-testid="label-verdict">&mdash;</dd></div>
             <div><dt>Artist label</dt><dd id="artist-label-verdict">&mdash;</dd></div>
           </dl>
+          <!--
+            The label NAMES behind the two verdicts above. Not redundant with them: the verdict is
+            a classification, these are the labels that voted for it, and a verdict of `major` is
+            worth very little without being able to see it was Spinefarm resolving to Universal.
+
+            Both levels appear, separately labelled and never merged (Q12) -- Token's *Full Bag*
+            is `Never Too Different` at release level and `Atlantic` at artist level, and both are
+            true. Empty is explained rather than left as a bare dash, because `pending` (not
+            looked up yet) and `unknown` (looked up, MusicBrainz has none) are different facts and
+            a dash asserts neither.
+          -->
           <div class="tag-block">
             <dt>Label detail</dt>
-            <div id="label-names" class="tags"><span class="muted">&mdash;</span></div>
+            <div class="label-level">
+              <span class="level-name">Release</span>
+              <div id="label-names" class="tags"><span class="muted">&mdash;</span></div>
+            </div>
+            <div class="label-level">
+              <span class="level-name">Artist</span>
+              <div id="artist-label-names" class="tags"><span class="muted">&mdash;</span></div>
+            </div>
           </div>
           <div class="genres">
             <dt>Genres</dt>

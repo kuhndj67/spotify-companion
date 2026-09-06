@@ -158,6 +158,18 @@ export class LikedSetCache {
     return this.#saved.has(trackId);
   }
 
+  /**
+   * When the set was last loaded successfully, in ms, or `null` if it never has been.
+   *
+   * Exposed for the display. The set is refreshed at startup and then on the label-backfill
+   * interval (6 h by default), so an answer can be hours old — and the harmful case is a stale
+   * `false` shown to someone who has just liked the track. The UI shows this timestamp rather
+   * than presenting a cached answer as a current one.
+   */
+  get loadedAt(): number | null {
+    return this.#loadedAt === Number.NEGATIVE_INFINITY ? null : this.#loadedAt;
+  }
+
   /** `added_at` for a liked track, which is what makes attribution provable. */
   addedAt(trackId: string): string | null {
     return this.#saved.get(trackId) ?? null;

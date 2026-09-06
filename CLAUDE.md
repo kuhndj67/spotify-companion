@@ -147,6 +147,26 @@ backfilled and have no observation trail, so summing them into `completed` or `s
 assert a judgement the data does not contain. See the two warnings below on artist attribution and
 week bucketing before changing anything here.
 
+### ♥ Liked indicator and label-detail fix — 2026-09-06
+
+The liked badge beside the track title is a **button**, and that is not decoration. The saved-track
+set is refreshed at startup and then on the **6-hourly** backfill tick (`ensureFresh` hangs off
+that timer, not off its own 15-minute TTL), so a `No` can be hours old — and the moment that
+matters is right after someone likes a track. `GET /me/tracks/contains` is **403** in Development
+Mode, so there is no single-track check to fall back on; clicking re-reads the whole list
+(`POST /api/liked/refresh`). Nothing polls it: ~12 requests on a timer to keep a badge warm would
+spend rate limit that label resolution needs. The badge's tooltip carries the age of its answer.
+
+⚠️ **`Label detail` looked dead and was not.** It renders the label *names* behind a verdict, and
+36 of 177 plays have them; it is empty ~80% of the time because **MusicBrainz coverage on recent
+releases is ~44%** (open item 3b). It used to render a bare `—`, which is indistinguishable from a
+broken field, and was nearly deleted on that basis. It now says `not yet resolved` or `MusicBrainz
+lists no label`. **An empty state that does not explain itself will eventually be removed by
+someone who assumes it is broken.**
+
+`artistNames` had been broadcast by the server and silently dropped by the client since U2 — two
+verdicts, one set of names. Both levels now render, separately labelled and never merged (Q12).
+
 ### Phases are sequenced by risk containment
 
 The rules engine (U3/U4) is the largest, least-certain component; playback control (U5) is the

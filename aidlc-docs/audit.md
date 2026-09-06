@@ -2184,3 +2184,74 @@ retroactive.
 **Context**: CONSTRUCTION — U3 still paused to collect data; this is a display addition outside
 the unit plan and does not touch the recording path or the hypothesis gate. **438 tests**,
 typecheck clean, schema v3, container rebuilt and live on `http://localhost:3010`
+
+---
+
+## Liked Indicator Added; "Label Detail" Kept — It Was Never Blank, Only Unexplained
+**Timestamp**: 2026-09-06
+**User Input**: *"Couple other style items... not sure what the 'Label Details ---' item is supposed
+to show but it's always blank so perhaps it can be removed. Also I don't see any indicator that
+the track has been favorited?"*
+**AI Response**: "Both premises turned out to be wrong in useful ways, and checking before acting
+is what kept a working field from being deleted.
+
+**'LABEL DETAIL' IS NOT ALWAYS BLANK — IT IS BLANK 80% OF THE TIME, WHICH IS A MEASUREMENT.** It
+renders the label *names* behind the verdict, and **36 of 177 plays have them** (Inpatient →
+`EightyHD`, `Sick Boi`). It is empty whenever the verdict is `unknown` or `pending`, and that is
+the common case precisely because **MusicBrainz label coverage on recent releases is ~44%** — open
+item 3b, the recency bias R2 measures. Deleting the field would have deleted the only place the
+user can see *which* labels produced a verdict, and `major` is worth very little without being
+able to see that it was Spinefarm resolving to Universal.
+
+WHY IT READ AS BROKEN: it rendered a bare `—`. A dash asserts nothing, so an empty field is
+indistinguishable from a dead one. Now it explains itself the way the genres row already did:
+`not yet resolved` for pending, `MusicBrainz lists no label` for unknown. Same distinction the
+verdict row has always made — **`pending` is not `unknown`** — applied to the place the user
+actually looks.
+
+**FOUND A REAL GAP WHILE LOOKING: `artistNames` WAS IN THE PAYLOAD AND SILENTLY DROPPED.** The
+server has computed and broadcast artist-level label names all along; the client rendered only the
+release level. So the panel showed two verdicts and one set of names. Both levels now appear,
+separately labelled and **never merged** (Q12) — Token's *Full Bag* is `Never Too Different` at
+release level and `Atlantic` at artist level, and both are true.
+
+**THE LIKED INDICATOR WAS GENUINELY MISSING FROM THE DISPLAY, THOUGH NOT FROM THE DATA.**
+`LikedSetCache` has been live since U2 and every play records `likedAtStart` / `likedAtEnd` /
+`likedTransition`. Nothing ever put it on screen. Added: a ♥/♡/? badge beside the track title, and
+a `Liked` row showing `Yes · 6 Sep 2026` from `added_at`.
+
+**`null` RENDERS AS THE WORD `unknown`, NEVER AS `No`.** If the saved-track set is unavailable the
+answer is unknown, and a `No` in its place would be an observed choice that was never observed —
+the same rule the recorded column follows, applied to the display.
+
+⚠️ **THE STALENESS IS THE INTERESTING PART, AND IT IS WHY THE BADGE IS A BUTTON.** The set is
+refreshed at startup and then on the **6-hourly** label-backfill tick (`ensureFresh` is called
+from that timer, not on the 15-minute TTL). So a `No` can be hours old — and the moment that
+matters is right after someone has liked the track and wants to see it register. There is no
+cheap fix available: **`GET /me/tracks/contains` is 403** in Development Mode, which is why this
+is a cached set and not a membership check. So: the badge carries the age of its answer in its
+tooltip, and clicking it re-reads the list. Nothing polls it — ~12 requests on a timer to keep a
+badge warm would spend the rate limit label resolution needs.
+
+**A RACE WAS FOUND BY CLICKING THE BUTTON, NOT BY TESTING IT.** A full re-read takes seconds, long
+enough for the track to change underneath it. The first version applied whatever came back, which
+would have shown one track's liked status under another track's name — the failure this project
+keeps meeting in other forms. The request now pins the track id at click time and discards the
+answer if the track has moved on.
+
+VERIFIED LIVE, ALL THREE STATES. `♥ Yes · 6 Sep 2026` on a liked track; clicking mid-session
+picked up **two likes made during the session** (607 → 609 cached) and the badge flipped to `♡ Not
+liked` when the track changed; `POST /api/liked/refresh` returns correct payloads with a trackId,
+without one, and for an unliked id. Label detail verified showing the explained-empty state live
+and the two-level tag layout by injection. No console errors.
+
+**438 tests**, typecheck clean, schema unchanged."
+
+**Decision**: `Label detail` **kept** — the premise that it is always blank was wrong; it is empty
+80% of the time because MusicBrainz coverage is, and it now says so instead of showing a dash.
+Artist-level label names surfaced (already in the payload, never rendered). Liked indicator added
+as a badge plus a Track detail row, with the age of the answer exposed and an on-demand re-read,
+because the cached set can be six hours stale and `/me/tracks/contains` is 403.
+**Context**: CONSTRUCTION — U3 still paused to collect data. Display-only changes; the recording
+path, the classifier and the hypothesis gate are untouched. **438 tests**, typecheck clean,
+schema v3, container rebuilt and live on `http://localhost:3010`

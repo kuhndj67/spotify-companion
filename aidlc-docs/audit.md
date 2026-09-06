@@ -1816,3 +1816,100 @@ it; user declined for now. Recorded as open item 7 so the gap is not silently in
 **Context**: CONSTRUCTION — U2 complete and live-verified. Genres added (migration 003). Two
 findings logged for later: the crossfade/ratio confound (item 4) and unrecorded playback context
 (item 7)
+
+---
+
+## U2 Approved; the Phase 2 Hypothesis Gate Pre-Registered and Run — INSUFFICIENT DATA
+**Timestamp**: 2026-09-05
+**User Input**: asked to pick up where we left off; chose to review U2 before approving, then
+approved it; chose to pre-register the BR-11 gate and run it now rather than defer or peek first.
+**AI Response**: "Two gates closed, and the second one produced a result worth having even though
+it is not a verdict.
+
+APPROVED U2 AFTER VERIFYING RATHER THAN RELAYING. Ran the suite (404 passing, not the 399 the docs
+claimed -- the genres commit added 5) and the typecheck, then read the three defect fixes in the
+shipped code rather than trusting the summary that described them.
+
+The verification found something better than agreement with the documents. A REAL TRANSIENT
+FAILURE HAD OCCURRED IN PRODUCTION since sign-off: artist_label_resolution id 40 errored at
+20:54:23 on 2026-09-02. Zero plays point at it, and id 41 for the same artist resolved 38 seconds
+later. That is all three Build-and-Test fixes firing at once against a live failure -- the error
+was never written to a play, was never treated as a fresh cache entry, and the work set now reports
+zero remaining across both levels. The U2 summary said these fixes were only provable by watching a
+real failure be recorded. One has now occurred and was correctly UN-recorded. A lone `error` row
+that had not existed on 2026-09-01 turned out to be evidence FOR the fixes rather than against
+them.
+
+Two owed items had also closed on their own since sign-off: liked capture has now fired live (9
+kept-liked, 8 kept-unliked, 1 liked-during, 2 unknown) and the work set is empty. The claims
+re-checked on the grown corpus all held or strengthened -- artist confidence still never exceeds
+medium, and release-vs-artist disagreement has gone from 8 plays to 20.
+
+PRE-REGISTERED THE GATE BEFORE COMPUTING ANYTHING, AND COMMITTED IT SEPARATELY SO THE ORDERING IS A
+FACT ON THE RECORD RATHER THAN A CLAIM IN PROSE (fd09ad7). Only marginals had been queried at that
+point -- group sizes, verdict counts, coverage by year, the corpus-wide skip count. The skip rate
+BY VERDICT GROUP, which is the quantity the gate turns on, was not known.
+
+BR-11.6 had always required a minimum sample stated in advance and one had never been stated. Fixed
+it at n >= 50 per group AND >= 10 skips (BR-11.6a), from a power calculation run on no project
+data: at n=50 and a ~15% baseline, the smallest detectable difference is about 15% vs 40%. Recorded
+plainly what that admits -- this instrument can find a strong effect or nothing. Detecting 15% vs
+25% would need 250 per group. If R1's effect is subtle, this instrument will never resolve it.
+Better stated now than discovered afterwards. Added a stopping rule (BR-11.7) so the gate is
+evaluated once rather than repeatedly as data accrues, and fixed the robustness checks in advance
+(BR-11.8) so a disagreeing primary result cannot be re-cut until it agrees.
+
+R-B is the robustness check that matters, and pre-registering it was only possible because the
+crossfade confound was identified on 2026-09-02, BEFORE any result was seen, and only actionable
+because FR-20 retains the trails. Third time store-observations-derive-judgements has paid for
+itself. Stated in advance that if R-B materially changes the answer, the primary result does not
+stand.
+
+THE RESULT IS INSUFFICIENT DATA, and that was foreseeable from the marginals alone: 4 skips in the
+entire eligible corpus, major n=8, independent n=13 against a required 50 each. Recorded the three
+skip rates anyway, because BR-11.2 and BR-11.3 make them unconditional and concealing them would be
+worse than reporting them with the caveat attached -- major 25.0%, independent 15.4%, unknown 7.1%.
+The ordering is nominally the direction R1 predicts and it is worth nothing; two skips against two
+skips is indistinguishable from a coin. Quoted no test statistic, because at these counts a p-value
+would lend arithmetic authority to noise. Writing the numbers down now is what stops a later run
+claiming the criterion was met all along.
+
+ONE OBSERVATION DID NOT GO AS THE PRE-REGISTRATION ANTICIPATED. BR-11.2 reasoned that if the
+unknown group's skip rate RESEMBLED the independent group's, that would be evidence the unknowns
+are predominantly uncatalogued independent releases. It sits below BOTH named groups. At n=14 with
+a single skip that is evidence of nothing, but it is the first observation pointing away from the
+assumed composition of the unknowns, and it is the check the pre-registration named as the most
+informative available on R2.
+
+CAUGHT A DENOMINATOR TRAP IN MY OWN FIRST COVERAGE TABLE. It folded two different causes of a
+missing verdict into one number: no ISRC (a Spotify artefact -- recently-played returns no
+external_ids, so all 104 backfilled plays lack one) and ISRC present but MusicBrainz has no label
+(the actual R2 measure). Because the backfill is weighted to recent releases, the conflated version
+reported coverage as 28% pre-2022 falling to 12% for 2022+. The corrected measure, taken only over
+ISRC-bearing plays, is 86% and 44%.
+
+That is the inc=releases shape again -- the one CLAUDE.md warns is the dangerous one. It would have
+been recorded as 'MusicBrainz coverage has collapsed to 12% on recent music' and believed, because
+it reads as a coverage finding rather than a bug. A wrong DENOMINATOR is as indistinguishable from
+absent data as a wrong request shape.
+
+Corrected, it independently confirms open item 3b: the shipped code on a larger, differently
+composed corpus reproduces the 2026-08-26 ad-hoc probe almost exactly for 2022+ (43% then, 44%
+now). The recency-biased coverage gap is real and stable, not an artefact of the original probe's
+sample, and it remains concentrated on exactly the recent independent releases R1 is about.
+
+QUANTIFIED WHAT REACHING THE THRESHOLD WOULD TAKE rather than leaving 'more data' as a gesture:
+about 215 more live plays, with the major group binding, which is on the order of 11 more listening
+sessions. The real bottleneck is session count, not listening -- live capture has run on exactly
+two days because the app only records while running. Also established that spending the 47
+GET /tracks/{id} calls from open item 3 would improve label coverage statistics and add ZERO
+eligible plays to this gate, because what the backfill lacks for the gate is the observation trail,
+not the ISRC. Worth knowing before spending the calls.
+
+Recorded explicitly that this does not gate U3. The rules engine evaluates user-authored rules and
+its value does not depend on R1 being true. The execution plan asks that Phase 3 be designed AFTER
+the gate, which it now has been -- with the honest input that the hypothesis is untested and the
+instrument is months of listening from testing it. That is itself a design constraint for U3: rules
+must be authorable and valuable without R1 being settled."
+**Context**: CONSTRUCTION — U2 **approved**. Phase 2 hypothesis gate pre-registered (`fd09ad7`)
+and run: **INSUFFICIENT DATA**, still open under BR-11.7. Next: **U3 — Rule Model & Evaluation**

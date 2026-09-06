@@ -4,11 +4,38 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 BUILD AND TEST COMPLETE** (2026-09-01).
-  **399 tests · 98.97% line / 92.14% branch · live-verified against the real MusicBrainz.**
+- **Current Stage**: CONSTRUCTION — **U2 APPROVED by the user 2026-09-05.**
+  **404 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
   Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
-  **Awaiting user approval.** Next: the **Phase 2 hypothesis gate** (BR-11), then U3.
-  Database at schema v2, **120 plays**, 21 with label verdicts.
+  The **Phase 2 hypothesis gate** (BR-11) has been pre-registered and run:
+  **INSUFFICIENT DATA**, recorded per BR-11.5 —
+  [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
+  **Next: U3 — Rule Model & Evaluation (pure core).**
+  Database at schema **v3**, **145 plays**, 41 with label verdicts.
+
+### 🔒 The hypothesis gate is pre-registered and still open
+
+The comparison, the minimum sample and the robustness checks were fixed in
+[`hypothesis-gate/pre-registration.md`](construction/u2-label-enrichment/hypothesis-gate/pre-registration.md)
+and committed at **`fd09ad7`** *before* any result was computed. **BR-11.6a**: `n ≥ 50` per group
+**and** `≥ 10` skips. Actual: `major` **8**, `independent` **13**, skips **4** → **insufficient
+data**. Under **BR-11.7** this run is *not* the single confirmatory evaluation; the gate remains
+open and its criterion is already on the record.
+
+> **R1 is currently untested, and the instrument is roughly 215 more live plays — on the order of
+> 11 listening sessions — from being able to test it.** The binding constraint is the `major`
+> group. Only 21 of 145 plays (14%) can enter the gate at all, and the 104 backfilled plays never
+> will: they lack both the trail and the ISRC, neither recoverable from `recently-played`.
+>
+> **This is a design input for U3, not a blocker.** Rules must be authorable and valuable to the
+> user *without* R1 being settled.
+
+⚠️ **A denominator trap was caught during the run** — folding "no ISRC" (a Spotify artefact) in
+with "MusicBrainz has no label" (the R2 measure) reported coverage as 28% → 12% instead of the
+correct **86% → 44%**. Same shape as the `inc=releases` bug: a wrong denominator produces a
+plausible number that reads as a finding. Corrected, the shipped code **reproduces the 2026-08-26
+research probe** (2022+: 43% then, **44%** now) on a larger corpus — the recency-biased coverage
+gap of open item 3b is **real and stable**.
 
 ## ✅ U2 delivered and live-verified (2026-09-01)
 
@@ -65,13 +92,30 @@ Imminence — God Fearing Man
 Without the trace this `unknown` is indistinguishable from "MusicBrainz knew nothing" — and this
 is the very artist whose `[no label]` handling was wrong in round 1 of the design.
 
-### Still owed
+### Still owed — reviewed at the 2026-09-05 approval
 
-- **Liked capture unobserved live** — the set loads (600 tracks) but no play has closed with
-  labels enabled, so the grace window has never fired
-- **Search fallback never fired** — fixture-tested only
-- 2 plays still in the work set; the sweep is bounded per run and finishes on the next
-- `localGuard` still blocks the container **UI** (egress is verified; serving is not)
+- ✅ **Liked capture has now fired live** — closed. 9 `kept-liked`, 8 `kept-unliked`,
+  1 `liked-during`, 2 `unknown` written across the 2026-09-02 session
+- ✅ **Work set empty** — closed. 0 plays remain missing either level
+- **Search fallback still never fired** — fixture-tested only. Still owed
+- `localGuard` still blocks the container **UI** (egress is verified; serving is not) — open item 1
+
+### ⭐ The three defect fixes are now demonstrated on production data
+
+A real transient failure occurred during the 2026-09-02 session and was handled correctly, which
+is the evidence fixtures structurally cannot provide:
+
+```
+artist_label_resolution id 40   2026-09-02T20:54:23Z   status=error
+  → plays pointing at it:                 0            (fix #1 — never written)
+  → id 41, same artist, 20:55:01Z         resolved     (fix #2 — error never fresh, retried in 38s)
+  → work set remaining:                   0            (fix #3 — both levels tracked)
+```
+
+Claims re-checked on the grown corpus (145 plays): artist confidence still never exceeds `medium`
+(13 `low`, 28 `medium`, **zero** `high`); release ≠ artist verdict now on **20** plays, up from 8 —
+the two-level split is earning more, not less; **zero** `error` values leaked into
+`label_unknown_reason` (15 `notFound`, 2 `noEligibleCandidate`).
 
 ## 🎯 Rancher Desktop packaging is a stated goal (user, 2026-08-31)
 
@@ -706,7 +750,7 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
 ### 🟢 CONSTRUCTION PHASE
 *Runs once per delivery phase, not all up front (execution plan).*
 - [x] Functional Design — **U1 complete** 2026-08-25, approved. **U2 complete** 2026-08-26,
-      awaiting approval. U3–U5 pending.
+      **approved 2026-09-05**. U3–U5 pending.
 - [x] NFR Requirements — **SKIPPED** (27 NFRs already agreed in requirements.md §4)
 - [x] NFR Design — **U1 complete** 2026-08-25 (narrow: persistence only), awaiting approval
 - [x] Infrastructure Design — **U1 complete** 2026-08-25 (narrow: storage + R7), approved
@@ -714,6 +758,11 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       184/184 tests passing. Awaiting approval. U2–U5 pending.
 - [x] Build and Test — **U1 complete** 2026-08-26. Build ✅, 193/193 tests, container verified.
       **One open decision blocks container use** (see below). Awaiting approval.
+      **U2 complete** 2026-09-01, **approved 2026-09-05** after a verification pass:
+      404/404 tests, typecheck clean, three defect fixes confirmed against production data.
+- [x] **Phase 2 hypothesis gate (BR-11)** — pre-registered `fd09ad7`, run 2026-09-05.
+      **INSUFFICIENT DATA**; gate remains open under BR-11.7. Runner:
+      `scripts/hypothesis-gate.mjs`
 - [ ] NFR Requirements
 - [ ] NFR Design
 - [ ] Infrastructure Design

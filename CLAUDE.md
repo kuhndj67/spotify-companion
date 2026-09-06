@@ -73,20 +73,35 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## Current state (2026-09-01)
+## Current state (2026-09-05)
 
-**INCEPTION complete. CONSTRUCTION in progress — U1 of 5 units done.**
+**INCEPTION complete. CONSTRUCTION in progress — U2 of 5 units approved. Next: U3.**
 
 | Unit | Phase | Status |
 |---|---|---|
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
-| U2 Label enrichment | 2 | ✅ **Built, tested, live-verified** |
-| U3 Rule model (pure core) | 3 | Pending |
+| **U2 Label enrichment** | 2 | ✅ **Approved 2026-09-05** |
+| **U3 Rule model (pure core)** | 3 | ⬅️ **Next** |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-399 tests passing · coverage 98.97% line / 92.14% branch · **120 plays recorded**, 21 with label verdicts.
+404 tests passing · typecheck clean · **145 plays recorded**, 41 with label verdicts · schema v3.
+
+### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
+
+Pre-registration committed at `fd09ad7` **before** the comparison was computed;
+result in `construction/u2-label-enrichment/hypothesis-gate/`. **BR-11.6a**: `n ≥ 50` per group and
+`≥ 10` skips. Actual: `major` 8, `independent` 13, **4 skips**. The gate stays open under BR-11.7 —
+this run was not the single confirmatory evaluation.
+
+> **R1 is untested, and roughly 215 more live plays (~11 listening sessions) away from being
+> testable.** Only 21 of 145 plays can enter the gate; the 104 backfilled plays never will, because
+> they lack the observation trail as well as the ISRC. **The instrument can find a strong effect or
+> nothing** — detecting 15% vs 25% would need 250 per group.
+>
+> **This does not gate U3.** Rules are user-authored; they must be valuable *without* R1 being
+> settled. Design U3 on that assumption.
 
 ### Phases are sequenced by risk containment
 
@@ -131,6 +146,15 @@ If track length correlates with the variable being measured, that is bias rather
 Measured here: majors run ~30% longer than independents. Watch for this shape anywhere a rate
 or ratio is thresholded.
 
+**A wrong denominator is as indistinguishable from absent data as a wrong request shape.** Caught
+on 2026-09-05 in the hypothesis gate's own coverage table: it averaged *two different causes* of a
+missing label — "no ISRC", a Spotify artefact affecting every backfilled play, and "MusicBrainz has
+no label", the actual R2 measure. Because the backfill skews recent, the conflated number read
+**28% → 12%** where the truth is **86% → 44%**. It would have been recorded as a coverage collapse
+and believed, because it looks like a finding, not a bug. **Before reporting any rate, ask what is
+in the denominator and whether every row in it could have been a success.** Same family as the
+`inc=releases` 200 — it is the *plausible* wrong answers that get written down.
+
 **MusicBrainz throttles at 1 req/sec spacing.** Measured: 6 of 19 tracks took a `503` at 1200 ms —
 wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry
 goes back through the queue, so it spends time, never rate.
@@ -146,8 +170,8 @@ A failing build once read as success here.
 |---|---|---|
 | 1 | **Container deployment is blocked**, and full Rancher Desktop packaging is a **stated goal** (user, 2026-08-31) — so this is a *when*, not an *if*. Host `npm start` is the dev/test deployment meanwhile. **New code must stay container-compatible: no host-only assumptions.** — `localGuard` requires a loopback peer, but published-port traffic arrives from the Docker bridge gateway, so every request is refused. Pre-existing U0 defect. **Security-posture decision for the user**; options in `construction/build-and-test/security-test-instructions.md`. Works today via `npm start` on the host | User |
 | 2 | **Liked-status transitions — agreed for U2.** Four states + `unknown`; `kept-unliked` is the reference level, not an observed choice. Design in `research-findings.md` Part 4b | U2 |
-| 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`. They *do* carry `track_id`, so ISRC is recoverable at **47 one-off `GET /tracks/{id}` calls**. Spend them or not → U2 FD **Q7** | U2 |
-| 3b | **MusicBrainz label coverage is 58%, and the misses are recency-biased** (pre-2022 100%, 2022+ 43%) — i.e. concentrated on the recent independent releases R1 is about. Measured 2026-08-26, `research-findings.md` Part 5 | U2 |
+| 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`. They *do* carry `track_id`, so ISRC is recoverable at **47 one-off `GET /tracks/{id}` calls**. ⚠️ **Established 2026-09-05: spending them adds ZERO eligible plays to the hypothesis gate.** What the backfill lacks for the gate is the **observation trail** (`outcome` is `unknown`), not the ISRC, and no API returns that retroactively. The calls would improve label-coverage statistics only. Decide on that basis → U2 FD **Q7** | Later |
+| 3b | **MusicBrainz label coverage is recency-biased, and this is now CONFIRMED TWICE.** Ad-hoc probe 2026-08-26: pre-2022 100%, 2022+ **43%**. Shipped code on a larger corpus 2026-09-05: **86%** / **44%**. The gap is real and stable, not an artefact of the first sample, and stays concentrated on the recent independent releases R1 is about. ⚠️ Measure it **only over ISRC-bearing plays** — see the denominator warning above | ✅ confirmed |
 | 4 | **⚠️ The completion threshold is a possible CONFOUND, not just noise.** User listens via Spotify's **AI DJ**, which crossfades. Crossfade removes roughly *constant seconds*; a *proportional* threshold converts that into a penalty scaling inversely with track length. Measured 2026-09-02: **13 of 27** track-change plays sit within ±0.05 of 0.90, and **major tracks are longer** (median 248s) than independent (191s), so an identical crossfade costs independents **~1.3× more ratio**. That biases the *outcome* variable by the *independent* variable. ⚠️ n=10/11, so the duration gap may be chance — the mechanism is not. **User chose to keep 0.90** (2026-09-02); fully correctable retroactively because trails are retained. Revisit once the duration difference is confirmed or dissolved | Later |
 | 5 | R11 — queue lookahead unverified during playback | U5 |
 | 7 | **Playback context is never recorded for live plays.** `context_type` is NULL on all 35: the MCP `getNowPlaying` returns no context field. Spotify's `/me/player/currently-playing` **does** — probed 2026-09-02, returning `spotify:playlist:37i9dQZF1EYkqdzj48dyYq` (the AI DJ). A DJ play is therefore indistinguishable from a playlist play, and the DJ is algorithmic selection into the feed — arguably the closest available proxy for what R1 calls *promoted*. **User declined for now** (2026-09-02) | Later |
@@ -165,10 +189,16 @@ Remote is `origin` (GitHub). Push when asked.
 
 ```bash
 npm start          # run on the host — the working deployment today
-npm test           # 193 tests
+npm test           # 404 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
+
+node scripts/hypothesis-gate.mjs   # the Phase 2 gate (BR-11). Read-only; writes nothing
 ```
+
+⚠️ The gate's thresholds are **pre-registered constants, not parameters**. Change them by amending
+`hypothesis-gate/pre-registration.md`, never by editing the script — the point of a
+pre-registration is that it cannot be adjusted once results are visible.
 
 Data lives in `data/` (gitignored): `history.db` plus `snapshots/`.
 

@@ -2341,3 +2341,12 @@ the first time, verified against the reintroduced defect. Data repair **written 
 awaiting the user: 84 rows to re-time, 41 duplicates to delete.
 **Context**: CONSTRUCTION — U3 still paused. Hypothesis gate verified unaffected (no backfilled
 row has ever had a trail). **447 tests**, typecheck clean, schema v3, container rebuilt and live
+
+**Addendum — repair APPLIED 2026-09-06.** User chose the full repair. `docker compose down` first,
+because two writers on one SQLite file is the failure this project warns about. Backup taken
+automatically (`data/history.db.backup-2026-09-06T02-07-53-966Z`). **84 re-timed, 41 deleted;
+187 -> 149 plays.** Verified after: `integrity_check: ok`, no foreign-key violations, **no orphan
+observations**, all **65 live rows still carrying their trails**, zero backfilled rows with
+`started_at >= ended_at`, and **zero remaining duplicates** by the same criterion. Container
+restarted: `[backfill] 0 inserted, 35 already known`. The symptom the user reported is gone —
+Inpatient's current week went from `completed 7 / unknown 8` to `completed 7 / unknown 1`.

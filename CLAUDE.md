@@ -86,9 +86,9 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-447 tests passing · typecheck clean · **187 plays recorded**, 72 with label verdicts · schema v3.
-⚠️ **41 of those plays are duplicates** — see the `played_at` warning below; repair is written but
-not run.
+447 tests passing · typecheck clean · **149 plays recorded** (47 completed, 5 skipped, 97 unknown)
+· schema v3. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
+`integrity_check: ok`, all 65 live trails intact. Backup kept in `data/`.
 
 ### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
 
@@ -236,7 +236,9 @@ by 177 s, itself about a track length. The backfill stored it as `startedAt` **a
 from U1 until 2026-09-06, which put every backfilled row a track-duration late *and* defeated
 deduplication: dedup compared that end against stored **starts**, so a play already recorded live
 never matched and **every restart re-inserted it as a fresh `unknown` row**. 41 of 125 backfilled
-rows are duplicates, going back to 26 August.
+rows are duplicates, going back to 26 August. **Repaired 2026-09-06** by
+`scripts/repair-backfill-timestamps.mjs` (user-approved): 84 re-timed, 41 deleted, zero remaining
+by the same criterion, and every live observation trail untouched.
 
 ⚠️ **It survived because `RecentlyPlayedBackfill` had NO TESTS AT ALL** — the class writing a third
 of the corpus, covered by nothing, while 438 tests stayed green. It was found by a human noticing

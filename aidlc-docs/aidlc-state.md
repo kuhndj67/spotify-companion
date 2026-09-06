@@ -12,9 +12,10 @@
   [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
   **U3 is deliberately PAUSED (user, 2026-09-05) to collect data** — the gate needs listening
   more than it needs code, and there is no time constraint.
-  Database at schema **v3**, **176 plays**, 72 with label verdicts.
+  Database at schema **v3**, **149 plays** after the `played_at` repair of 2026-09-06
+  (41 duplicate backfill rows removed, 84 re-timed), 72 with label verdicts.
   A **listening-statistics panel** was added 2026-09-06 (see below) — display only, no migration.
-  **438 tests.**
+  **447 tests.**
 
 ### 🚢 The container is now the running deployment — open item 1 CLOSED
 

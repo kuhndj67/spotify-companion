@@ -10,8 +10,29 @@
   The **Phase 2 hypothesis gate** (BR-11) has been pre-registered and run:
   **INSUFFICIENT DATA**, recorded per BR-11.5 —
   [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
-  **Next: U3 — Rule Model & Evaluation (pure core).**
-  Database at schema **v3**, **145 plays**, 41 with label verdicts.
+  **U3 is deliberately PAUSED (user, 2026-09-05) to collect data** — the gate needs listening
+  more than it needs code, and there is no time constraint.
+  Database at schema **v3**, **155 plays**, 41 with label verdicts.
+
+### 🚢 The container is now the running deployment — open item 1 CLOSED
+
+The app runs **unattended** on Rancher Desktop: `application.autoStart` +
+`startInBackground` (set via `rdctl`), plus `restart: unless-stopped` in `compose.yaml`.
+Chain: Windows login → Rancher Desktop (no window) → dockerd → app container.
+UI at **`http://localhost:3010`** (3000 was taken on this machine by another project).
+
+**Open item 1 closed** by user decision: `localGuard` option **B**, implemented as opt-in
+`TRUST_PUBLISHED_PORT`, set only in `compose.yaml`. It disables the peer-address check **and
+nothing else** — Host/Origin validation, the DNS-rebinding defence, stays in force. Verified live:
+UI `200`, cross-site `Origin` still `403`. 7 new tests, 411 total.
+
+**Recording does not need the UI.** The poll loop is a server-side `setInterval` started at boot;
+the WebSocket only pushes to whoever is connected. That is why option B was a convenience
+decision, not a prerequisite — the container would have collected data while returning 403 to
+every browser.
+
+⚠️ **Never run the container and `npm start` together** — two pollers, two writers, one SQLite
+file, every play recorded twice.
 
 ### 🔒 The hypothesis gate is pre-registered and still open
 

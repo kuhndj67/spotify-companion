@@ -16,6 +16,7 @@ import {
   isLoopbackHostHeader,
   isAllowedOrigin,
   localGuard,
+  applyAccessPolicy,
 } from '../src/localGuard.js';
 
 /** Minimal Express request/response doubles — the guard only touches these fields. */
@@ -55,6 +56,20 @@ function runGuard(request: Request) {
   localGuard(request, response, next);
   return { admitted, ...state };
 }
+
+/** Runs the guard under an explicit policy, without touching global config. */
+function runPolicy(request: Request, policy: { localOnly: boolean; trustPublishedPort: boolean }) {
+  const { response, state } = fakeResponse();
+  let admitted = false;
+  const next: NextFunction = () => {
+    admitted = true;
+  };
+  applyAccessPolicy(request, response, next, policy);
+  return { admitted, ...state };
+}
+
+const CONTAINER = { localOnly: true, trustPublishedPort: true };
+const HOST = { localOnly: true, trustPublishedPort: false };
 
 describe('localGuard — example-based', () => {
   describe('isLoopbackAddress', () => {
@@ -213,6 +228,69 @@ describe('localGuard middleware', () => {
   });
 });
 
+/**
+ * Open item 1, option B (user decision 2026-09-05). Inside a container the peer check can never
+ * see loopback, because published-port traffic arrives from the Docker bridge gateway. These
+ * tests pin BOTH halves of that decision: the check is relaxed, and Host/Origin is not.
+ */
+describe('localGuard — container policy (trustPublishedPort)', () => {
+  // The exact request shape that returned 403 for every container request, which is what made
+  // the container UI unusable. 172.17.0.1 is the default Docker bridge gateway.
+  it('admits the Docker bridge gateway when the published port is trusted', () => {
+    const result = runPolicy(
+      fakeRequest({ address: '172.17.0.1', host: 'localhost:3010' }),
+      CONTAINER,
+    );
+    assert.equal(result.admitted, true);
+  });
+
+  // The relaxation must be SCOPED. The host deployment can genuinely satisfy the peer check,
+  // so it must keep it — otherwise enabling this for the container silently weakens the host.
+  it('still rejects that same request under the host policy', () => {
+    const result = runPolicy(fakeRequest({ address: '172.17.0.1', host: 'localhost:3010' }), HOST);
+
+    assert.equal(result.admitted, false);
+    assert.equal(result.status, 403);
+    assert.match(result.body, /local connections/i);
+  });
+
+  // ⚠️ With the peer check gone, Host/Origin is the ENTIRE remaining defence. If these three
+  // ever fail, option B has become option "no guard at all".
+  it('still rejects a foreign Host header', () => {
+    const result = runPolicy(fakeRequest({ address: '172.17.0.1', host: 'evil.com' }), CONTAINER);
+
+    assert.equal(result.admitted, false);
+    assert.equal(result.status, 403);
+    assert.match(result.body, /Host or Origin/i);
+  });
+
+  it('still rejects a cross-site Origin', () => {
+    const result = runPolicy(
+      fakeRequest({ address: '172.17.0.1', host: 'localhost:3010', origin: 'http://evil.com' }),
+      CONTAINER,
+    );
+
+    assert.equal(result.admitted, false);
+    assert.equal(result.status, 403);
+  });
+
+  it('still rejects a subdomain-suffixed loopback Host — the bypass that was found once', () => {
+    const result = runPolicy(
+      fakeRequest({ address: '172.17.0.1', host: '[::1].evil.com' }),
+      CONTAINER,
+    );
+    assert.equal(result.admitted, false);
+  });
+
+  it('admits everything only when localOnly is off — deliberate LAN exposure', () => {
+    const result = runPolicy(fakeRequest({ address: '192.168.1.50', host: 'evil.com' }), {
+      localOnly: false,
+      trustPublishedPort: false,
+    });
+    assert.equal(result.admitted, true);
+  });
+});
+
 describe('localGuard — property-based', () => {
   const RUNS = { numRuns: 500 };
 
@@ -259,6 +337,46 @@ describe('localGuard — property-based', () => {
       fc.property(fc.constantFrom('localhost', '127.0.0.1', '[::1]'), labelArb, (base, label) => {
         assert.equal(isLoopbackHostHeader(`${base}.${label}.com`), false);
         assert.equal(isAllowedOrigin(`http://${base}.${label}.com`), false);
+      }),
+      RUNS,
+    );
+  });
+
+  /**
+   * The invariant that replaces PBT-03 for the container deployment.
+   *
+   * Under `trustPublishedPort` the peer address is no longer consulted at all, so the range
+   * invariant "nothing outside loopback is ever admitted" is deliberately no longer true of the
+   * PEER. It must still be true of the HOST header — otherwise relaxing the peer check would
+   * have removed the guard rather than relocated it.
+   */
+  it('admits any peer under the container policy, but only with a loopback Host', () => {
+    const anyAddress = fc
+      .tuple(
+        fc.integer({ min: 0, max: 255 }),
+        fc.integer({ min: 0, max: 255 }),
+        fc.integer({ min: 0, max: 255 }),
+        fc.integer({ min: 0, max: 255 }),
+      )
+      .map(([a, b, c, d]) => `${a}.${b}.${c}.${d}`);
+
+    const foreignHost = fc
+      .string({ unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'), minLength: 1, maxLength: 12 })
+      .filter((s) => s.length > 0)
+      .map((s) => `${s}.com`);
+
+    fc.assert(
+      fc.property(anyAddress, foreignHost, (address, host) => {
+        assert.equal(
+          runPolicy(fakeRequest({ address, host: 'localhost:3010' }), CONTAINER).admitted,
+          true,
+          `peer ${address} should be admitted with a loopback Host`,
+        );
+        assert.equal(
+          runPolicy(fakeRequest({ address, host }), CONTAINER).admitted,
+          false,
+          `peer ${address} must NOT be admitted with Host ${host}`,
+        );
       }),
       RUNS,
     );

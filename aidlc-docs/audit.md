@@ -1913,3 +1913,86 @@ instrument is months of listening from testing it. That is itself a design const
 must be authorable and valuable without R1 being settled."
 **Context**: CONSTRUCTION — U2 **approved**. Phase 2 hypothesis gate pre-registered (`fd09ad7`)
 and run: **INSUFFICIENT DATA**, still open under BR-11.7. Next: **U3 — Rule Model & Evaluation**
+
+---
+
+## U3 Paused to Collect Data; Container Deployment Live; Open Item 1 Closed
+**Timestamp**: 2026-09-05
+**User Input**: *"We are not in any sort of time constraint so maybe it makes sense to pause and
+run the app for some time in order to collect the needed test data? To do this can we configure
+Rancher Desktop to run on startup and also make sure the app starts automatically when rancher
+desktop starts?"* Then chose `localGuard` **option B** and host port **3010**.
+**AI Response**: "The right call, and the investigation changed what the request even required.
+
+FOUND THAT RECORDING DOES NOT DEPEND ON THE UI, which reframed the whole task. The poll loop is a
+server-side setInterval started at boot; the PlayObserver is fed from `tick`; the WebSocket only
+pushes to whoever happens to be connected. So localGuard -- open item 1, blocking every container
+request for weeks -- blocks VIEWING, not COLLECTING. The container would have collected data
+perfectly while returning 403 to every browser. That made option B a convenience decision rather
+than a prerequisite, which is a much easier decision to take honestly.
+
+PROBED THE RISK THAT COULD HAVE COST THE IRREPLACEABLE ARTEFACT INSTEAD OF REASONING ABOUT IT.
+SQLite in WAL mode needs shared-memory mapping, and the standard advice is that this is unsafe on
+network or virtualised filesystems -- which is exactly what a Windows bind mount through WSL2 is.
+Believing the documentation would have blocked container deployment of `data/`. Probed on both C:
+and D: in a real container: journal_mode -> wal, 200 rows, wal_checkpoint(TRUNCATE) clean, reopened
+and read back. Documentation said no; the probe said yes. Fifth time the standing rule has paid,
+and the first time it went in the permissive direction.
+
+FOUND AN IMMEDIATE BLOCKER BY LOOKING RATHER THAN ASSUMING: host port 3000 was already held by the
+user's own opencodetest-frontend container, published on 0.0.0.0. Neither the container NOR
+`npm start` could have bound it. Moved the Spotify publish to 127.0.0.1:3010; container-internal
+port unchanged.
+
+MEASUREMENT MADE THE SECURITY DECISION EASIER THAN THE DOCUMENT HAD IT. The written
+counter-argument to option B was that any container on the same bridge network could reach the
+app. Checked: the default bridge is EMPTY, the machine's other compose projects are on their own
+networks, and the app came up on its own network spotify_default (gateway 172.20.0.1). With the
+127.0.0.1 publish, no container can reach it -- container-to-container would have to route through
+host loopback, which containers cannot reach. Residual exposure is host-local processes, which is
+precisely what the host `npm start` deployment already exposed and which was accepted there.
+
+IMPLEMENTED OPTION B AS OPT-IN RATHER THAN INFERRED. TRUST_PUBLISHED_PORT defaults false and is set
+only in compose.yaml. It was tempting to key it off the existing `inContainer` detection, and that
+would have been wrong: a security relaxation that switches on silently depending on where the
+process happens to run is one nobody reviews. Set explicitly in the deployment file, it is visible
+where it can be argued with, and the host deployment keeps the strict check it can genuinely
+satisfy.
+
+PINNED BOTH HALVES OF THE DECISION, not just the half that was asked for. Seven new tests, and the
+one that matters is a property replacing PBT-03 for this deployment: under trustPublishedPort ANY
+peer is admitted, but ONLY with a loopback Host. Host/Origin is now the entire remaining defence,
+so if that property ever fails, option B has silently become 'no guard at all'. Also pinned that
+the same request is still REJECTED under the host policy, because a relaxation that leaks across
+deployments is not scoped.
+
+VERIFIED LIVE RATHER THAN TRUSTING THE TESTS: GET / returned 200 where every request used to
+return 403, and GET / with Origin: http://evil.com still returned 403. Both halves, against the
+running container.
+
+BACKED UP THE DATABASE BEFORE LETTING A NEW WRITER TOUCH IT. First time a container has written
+data/. Afterwards: 145 -> 155 plays, integrity_check ok, and the startup logs show the system
+working end to end from inside the container -- 10 plays backfilled, 10 label resolutions with ZERO
+errors against real MusicBrainz, 603 liked tracks cached, and the OAuth access token refreshed
+headlessly, which is what unattended running depends on.
+
+ADDED A .dockerignore, which did not exist. The build context was shipping node_modules, .git and
+data/ to the daemon on every build.
+
+DID NOT RE-RUN THE HYPOTHESIS GATE after the corpus grew to 155. Under BR-11.7 a run at or above
+the minimum is the single confirmatory evaluation, and casually re-running it to see the new
+numbers is exactly the repeated peeking the stopping rule exists to prevent. Counted rows directly
+instead.
+
+DID NOT RESTART RANCHER DESKTOP to prove the login-boot chain end to end, because that would have
+taken down the user's unrelated immich and opencodetest containers. Settings are verified read-back
+true and the restart policy is verified unless-stopped; the boot test happens at the next login.
+Said so rather than implying it was proven.
+
+RECORDED THE HAZARD THE NEW DEPLOYMENT CREATES: the container now runs unattended, so `npm start`
+is no longer a free action. Two pollers, two SQLite writers, every play recorded twice. Warned in
+CLAUDE.md, README and the state file, because the failure mode is silent duplication in the
+dependent variable of the experiment."
+**Context**: CONSTRUCTION — **U3 paused by user decision** to accumulate the ~215 live plays the
+hypothesis gate needs. Container deployment **live and unattended**; **open item 1 CLOSED**.
+411 tests. 155 plays and growing

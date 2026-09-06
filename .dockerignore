@@ -1,0 +1,21 @@
+# Keep the build context small and free of things that must never be baked into an image.
+#
+# The Dockerfile COPYs only package.json, tsconfig.json and src/, so nothing here would have
+# reached the image anyway — but the whole context is still transferred to the daemon on every
+# build, and `data/` plus `node_modules/` make that needlessly slow.
+
+node_modules
+dist
+.git
+.gitignore
+
+# ⚠️ The irreplaceable artefact. It is bind-mounted at runtime, never copied in.
+data
+
+# Mounted at runtime (compose.yaml), never built in. The repository is public.
+secrets
+
+aidlc-docs
+test
+*.md
+!README.md

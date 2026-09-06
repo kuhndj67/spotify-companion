@@ -103,6 +103,18 @@ this run was not the single confirmatory evaluation.
 > **This does not gate U3.** Rules are user-authored; they must be valuable *without* R1 being
 > settled. Design U3 on that assumption.
 
+### ⏸️ Deliberately paused to collect data (user, 2026-09-05)
+
+U3 is **on hold, not abandoned**. There is no time constraint, and the gate needs listening more
+than it needs code. The app now runs **unattended in a container** on Rancher Desktop autostart
+(`application.autoStart` + `startInBackground`, plus `restart: unless-stopped`), so the chain is
+Windows login → Rancher Desktop → dockerd → app. **Recording does not need the UI** — the poll
+loop is a server-side timer, not something a browser drives.
+
+Before resuming U3, check the corpus: `node scripts/hypothesis-gate.mjs`. ⚠️ Under **BR-11.7**,
+running it is fine below the minimum but any run *at or above* it is the single confirmatory
+evaluation — treat that one deliberately.
+
 ### Phases are sequenced by risk containment
 
 The rules engine (U3/U4) is the largest, least-certain component; playback control (U5) is the
@@ -155,6 +167,14 @@ and believed, because it looks like a finding, not a bug. **Before reporting any
 in the denominator and whether every row in it could have been a success.** Same family as the
 `inc=releases` 200 — it is the *plausible* wrong answers that get written down.
 
+**SQLite WAL over the Rancher Desktop bind mount works — probed 2026-09-05, don't re-derive it.**
+The general advice is that WAL is unsafe on network/virtualised filesystems, because it needs
+shared-memory mapping. That advice would have blocked container deployment of the one artefact
+that cannot be regenerated. Probed on both C: and D: in a real container: `journal_mode -> wal`,
+200 rows written, `wal_checkpoint(TRUNCATE)` clean, reopened and read back. Live since:
+`integrity_check: ok` with the container as the writer. **Documentation said no; the probe said
+yes.** If this ever needs revisiting, re-probe rather than reasoning.
+
 **MusicBrainz throttles at 1 req/sec spacing.** Measured: 6 of 19 tracks took a `503` at 1200 ms —
 wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry
 goes back through the queue, so it spends time, never rate.
@@ -168,7 +188,7 @@ A failing build once read as success here.
 
 | # | Item | Owner |
 |---|---|---|
-| 1 | **Container deployment is blocked**, and full Rancher Desktop packaging is a **stated goal** (user, 2026-08-31) — so this is a *when*, not an *if*. Host `npm start` is the dev/test deployment meanwhile. **New code must stay container-compatible: no host-only assumptions.** — `localGuard` requires a loopback peer, but published-port traffic arrives from the Docker bridge gateway, so every request is refused. Pre-existing U0 defect. **Security-posture decision for the user**; options in `construction/build-and-test/security-test-instructions.md`. Works today via `npm start` on the host | User |
+| 1 | ~~Container deployment is blocked~~ — **CLOSED 2026-09-05.** User chose **option B**: `TRUST_PUBLISHED_PORT` disables the peer check *only*, keeping Host/Origin. Verified live — UI `200` on `http://localhost:3010`, cross-site Origin still `403`. **The container is now the running deployment**, on Rancher Desktop autostart. Decision and measurements in `construction/build-and-test/security-test-instructions.md` | ✅ |
 | 2 | **Liked-status transitions — agreed for U2.** Four states + `unknown`; `kept-unliked` is the reference level, not an observed choice. Design in `research-findings.md` Part 4b | U2 |
 | 3 | Backfilled plays carry no ISRC — `recently-played` returns no `external_ids`. They *do* carry `track_id`, so ISRC is recoverable at **47 one-off `GET /tracks/{id}` calls**. ⚠️ **Established 2026-09-05: spending them adds ZERO eligible plays to the hypothesis gate.** What the backfill lacks for the gate is the **observation trail** (`outcome` is `unknown`), not the ISRC, and no API returns that retroactively. The calls would improve label-coverage statistics only. Decide on that basis → U2 FD **Q7** | Later |
 | 3b | **MusicBrainz label coverage is recency-biased, and this is now CONFIRMED TWICE.** Ad-hoc probe 2026-08-26: pre-2022 100%, 2022+ **43%**. Shipped code on a larger corpus 2026-09-05: **86%** / **44%**. The gap is real and stable, not an artefact of the first sample, and stays concentrated on the recent independent releases R1 is about. ⚠️ Measure it **only over ISRC-bearing plays** — see the denominator warning above | ✅ confirmed |
@@ -188,8 +208,12 @@ Remote is `origin` (GitHub). Push when asked.
 ## Commands
 
 ```bash
-npm start          # run on the host — the working deployment today
-npm test           # 404 tests
+docker compose up -d          # THE DEPLOYMENT since 2026-09-05 — http://localhost:3010
+docker compose down           # stop it before running on the host
+docker logs -f spotify-now-playing
+
+npm start          # host deployment — port 3000. See the warning below before using it
+npm test           # 411 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 
@@ -199,6 +223,11 @@ node scripts/hypothesis-gate.mjs   # the Phase 2 gate (BR-11). Read-only; writes
 ⚠️ The gate's thresholds are **pre-registered constants, not parameters**. Change them by amending
 `hypothesis-gate/pre-registration.md`, never by editing the script — the point of a
 pre-registration is that it cannot be adjusted once results are visible.
+
+> ⚠️ **Never run the container and `npm start` at the same time.** Both poll Spotify and both
+> write `data/history.db`. Together they double-record every play and put two writers on one
+> SQLite file. The container runs unattended now, so **assume it is running** and
+> `docker compose down` first.
 
 Data lives in `data/` (gitignored): `history.db` plus `snapshots/`.
 

@@ -84,6 +84,17 @@ export const config = {
    */
   localOnly: process.env.LOCAL_ONLY !== 'false',
 
+  /**
+   * Skip the peer-address check while keeping Host/Origin validation (open item 1, option B,
+   * chosen by the user 2026-09-05). Set only in `compose.yaml`.
+   *
+   * ⚠️ Defaults to **false**, and is deliberately NOT inferred from `inContainer`. Enabling it
+   * must be a visible deployment decision, not something that switches on silently depending on
+   * where the process happens to be running. See `localGuard.ts` for why the peer check is inert
+   * inside a container.
+   */
+  trustPublishedPort: process.env.TRUST_PUBLISHED_PORT === 'true',
+
   // -- U1: listening history --------------------------------------------------
 
   /**

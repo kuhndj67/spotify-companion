@@ -121,6 +121,43 @@ and playback data without authentication.
 **Recommended**: A for now, since it works and costs nothing. Decide B or C when containerised
 deployment is actually wanted.
 
+### ✅ DECIDED 2026-09-05 — **option B**, by the user
+
+Containerised deployment became actually wanted: the user asked for unattended data collection
+(the hypothesis gate needs roughly 215 more live plays) via Rancher Desktop at login.
+
+Implemented as **`TRUST_PUBLISHED_PORT`**, opt-in and set only in `compose.yaml`. It disables the
+peer-address check **and nothing else**. It is deliberately *not* inferred from `inContainer`, so
+enabling it stays a visible deployment decision rather than something that switches on depending
+on where the process happens to run — and the host deployment keeps the strict check it can
+genuinely satisfy.
+
+**Measured before deciding, rather than assumed** — and the measurement made the counter-argument
+weaker than it reads above:
+
+| Claim in the counter-argument | Measured 2026-09-05 |
+|---|---|
+| "any container on the same bridge network could reach the app" | The default bridge is **empty**. The machine's other compose projects (`imagelens-immich-eval`, `opencodetest`) are on their own networks |
+| — | The app runs on its **own** network `spotify_default` (gateway 172.20.0.1), reachable from no other container |
+| — | The publish is `127.0.0.1:3010`, so container-to-container access would have to route through host loopback, which containers cannot reach |
+
+Residual exposure is therefore **host-local processes only** — which is exactly what the host
+`npm start` deployment already exposed, and which was accepted there.
+
+**Verified live after the change**, not just in tests:
+
+```
+GET http://localhost:3010/            -> HTTP 200     (was 403 for every request)
+GET /api/now-playing                  -> HTTP 200
+GET / with Origin: http://evil.com    -> HTTP 403     (DNS-rebinding defence intact)
+```
+
+Pinned by 7 new tests, including a property asserting the invariant that replaces PBT-03 for this
+deployment: **under `trustPublishedPort`, any peer is admitted, but only with a loopback `Host`.**
+If that ever fails, option B has silently become "no guard at all".
+
+**Open item 1 is closed.**
+
 ---
 
 ## Dependency scanning

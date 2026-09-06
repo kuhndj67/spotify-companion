@@ -20,8 +20,16 @@ services:
 
     ports:
       # 127.0.0.1 binding keeps this localhost-only (Question 7, option A).
-      # Drop the prefix to "3000:3000" to expose it on the LAN.
-      - "127.0.0.1:3000:3000"
+      # Drop the prefix to "3010:3000" to expose it on the LAN.
+      #
+      # ⚠️ This binding is now LOAD-BEARING, not just tidy. With TRUST_PUBLISHED_PORT enabled
+      # below, the peer-address check no longer constrains reachability — this does. Removing
+      # the 127.0.0.1 prefix would put an unauthenticated view of listening history and playback
+      # control on the LAN.
+      #
+      # Host port 3010, not 3000: 3000 is taken on this machine by another project
+      # (opencodetest-frontend). The container-internal port stays 3000.
+      - "127.0.0.1:3010:3000"
 
     environment:
       PORT: 3000
@@ -30,6 +38,19 @@ services:
       # anything non-loopback that arrives anyway (Q7/Q9).
       HOST: 0.0.0.0
       LOCAL_ONLY: "true"
+      # Open item 1, CLOSED 2026-09-05 by user decision: security-test-instructions.md option B.
+      #
+      # Published-port traffic arrives from the Docker bridge gateway, never from loopback, so
+      # the peer check refused EVERY request and the container UI was unusable. This disables
+      # that check ONLY. Host/Origin validation — the DNS-rebinding defence — stays in force.
+      #
+      # Measured before choosing it: the default bridge network is empty and this machine's
+      # other compose projects are on their own networks, so no container can reach this app.
+      # The residual exposure is host-local processes, which is equally true of `npm start`.
+      #
+      # It is opt-in rather than inferred from being in a container, so it stays visible here
+      # rather than switching on silently. The host deployment keeps the strict check.
+      TRUST_PUBLISHED_PORT: "true"
       POLL_INTERVAL_MS: 3000
       # Shared with the MCP server: `npm run auth` writes it, the MCP server refreshes it,
       # this app reads it. The app never writes, to avoid racing the MCP server's rewrites.

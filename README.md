@@ -98,14 +98,32 @@ Re-run `npm run mcp:setup` after `npm run auth` — it refreshes the credential 
 server reads. (It needs its own copy because it resolves `spotify-config.json` relative to
 its script location, not the working directory.)
 
-### 3b. Run on Rancher Desktop
+### 3b. Run on Rancher Desktop — the unattended deployment
 
 ```bash
-docker compose up --build     # dockerd (moby) engine
-nerdctl compose up --build    # containerd engine
+docker compose up -d --build   # dockerd (moby) engine
+nerdctl compose up -d --build  # containerd engine
 ```
 
-Open <http://127.0.0.1:3000>.
+Open <http://127.0.0.1:3010>.
+
+**The container publishes on host port 3010, not 3000** — 3000 was already taken on this machine
+by another project. The container-internal port is still 3000; only the host side moved.
+
+⚠️ **Run the host and the container deployments one at a time, never together.** Both poll
+Spotify and both write `data/history.db`, so running both double-records every play and puts two
+writers on the same SQLite file. `docker compose down` before `npm start`, and vice versa.
+
+#### Starting automatically at login
+
+```bash
+rdctl set --application.auto-start=true --application.start-in-background=true
+```
+
+That plus `restart: unless-stopped` in [`compose.yaml`](compose.yaml) gives the whole chain:
+Windows login → Rancher Desktop (no window) → dockerd → the app container. Nothing else is
+needed, and the app records plays whether or not a browser is ever opened — the poll loop is a
+server-side timer, not something the UI drives.
 
 ### Running without a container (faster iteration)
 

@@ -121,7 +121,9 @@ evaluation — treat that one deliberately.
 dockerd came up on their own, and the container **started 82s after the host boot clock, by
 itself**. UI `200`, cross-site Origin `403`, `integrity_check: ok`, WAL over the bind mount intact
 through a power cycle. The baseline file is gone and the question is closed; the script is kept
-because it is the cheapest way to re-check the chain after any Rancher Desktop upgrade.
+because it is the cheapest way to re-check the chain after any Rancher Desktop upgrade. It now
+also probes the **WebSocket handshake** in both directions — that surface was its blind spot, and
+a `200` on `/` does not imply the live display works.
 
 ⚠️ **`unless-stopped` does not restart a container that was explicitly stopped.** If someone ran
 `docker stop`, the container will stay down through a reboot and that is *correct* behaviour, not

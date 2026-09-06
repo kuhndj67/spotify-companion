@@ -71,6 +71,52 @@ console.log(JSON.stringify(o));
   return ($out | ConvertFrom-Json)
 }
 
+function Get-WsHandshakeStatus {
+  <#
+    The WebSocket handshake, done with a raw socket so it works on PowerShell 5.1 without
+    async plumbing. Returns the HTTP status code from the response line, or $null.
+
+    Why this exists: on 2026-09-05 the upgrade handler in server.ts held a SECOND copy of the
+    local-access rule, which never learned about TRUST_PUBLISHED_PORT. In the container every
+    page load returned 200 and every handshake returned 403, so the UI loaded and sat on
+    "Disconnected - reconnecting..." forever -- and this script reported all-green, because
+    a 200 on / does not prove the browser can open its socket. Check the surface the UI uses.
+  #>
+  param(
+    [int]$Port,
+    [string]$Path = '/ws',
+    [string]$Origin = ''
+  )
+  $client = $null
+  try {
+    $client = New-Object System.Net.Sockets.TcpClient
+    $client.Connect('127.0.0.1', $Port)
+    $stream = $client.GetStream()
+    $stream.ReadTimeout = 5000
+    $req  = "GET $Path HTTP/1.1`r`n"
+    $req += "Host: localhost:$Port`r`n"
+    $req += "Upgrade: websocket`r`n"
+    $req += "Connection: Upgrade`r`n"
+    $req += "Sec-WebSocket-Version: 13`r`n"
+    $req += "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==`r`n"
+    if ($Origin) { $req += "Origin: $Origin`r`n" }
+    $req += "`r`n"
+    $bytes = [System.Text.Encoding]::ASCII.GetBytes($req)
+    $stream.Write($bytes, 0, $bytes.Length)
+    $stream.Flush()
+    $buf = New-Object byte[] 256
+    $n = $stream.Read($buf, 0, $buf.Length)
+    if ($n -le 0) { return $null }
+    $head = [System.Text.Encoding]::ASCII.GetString($buf, 0, $n)
+    if ($head -match 'HTTP/1\.1 (\d{3})') { return [int]$Matches[1] }
+    return $null
+  } catch {
+    return $null
+  } finally {
+    if ($client) { $client.Close() }
+  }
+}
+
 $docker = Get-DockerCli
 
 # ---------------------------------------------------------------- baseline ---
@@ -246,6 +292,26 @@ try {
   } else {
     $info += "Cross-site Origin check returned $($_.Exception.Response.StatusCode.value__), expected 403"
   }
+}
+
+# The socket the UI actually depends on. A 200 on / does NOT imply this works -- see
+# Get-WsHandshakeStatus for the defect that taught us so.
+$wsStatus = Get-WsHandshakeStatus -Port $Port -Origin "http://localhost:$Port"
+if ($wsStatus -eq 101) {
+  $pass += "WebSocket handshake accepted (101) - the live display updates, not just the page load"
+} elseif ($null -eq $wsStatus) {
+  $fail += "WebSocket handshake got no response - the UI will sit on 'Disconnected - reconnecting...'"
+} else {
+  $fail += "WebSocket handshake refused with $wsStatus - the UI loads but never updates. Check that the upgrade handler in server.ts still routes through decideAccess"
+}
+
+$wsCrossSite = Get-WsHandshakeStatus -Port $Port -Origin 'http://evil.com'
+if ($wsCrossSite -eq 403) {
+  $pass += "Cross-site Origin rejected on the WebSocket too (403)"
+} elseif ($wsCrossSite -eq 101) {
+  $fail += "SECURITY: a cross-site Origin was ACCEPTED on the WebSocket upgrade"
+} else {
+  $info += "WebSocket cross-site Origin check returned '$wsCrossSite', expected 403"
 }
 
 # 6. The data ------------------------------------------------------------------

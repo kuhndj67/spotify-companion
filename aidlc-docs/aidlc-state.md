@@ -7,13 +7,15 @@
 - **Current Stage**: CONSTRUCTION — **U2 APPROVED by the user 2026-09-05.**
   **486 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
   Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
-  The **Phase 2 hypothesis gate** (BR-11) has been pre-registered and run:
-  **INSUFFICIENT DATA**, recorded per BR-11.5 —
-  [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
-  **U3 is deliberately PAUSED (user, 2026-09-05) to collect data** — the gate needs listening
-  more than it needs code, and there is no time constraint.
-  Database at schema **v4**, **181 plays** after the `played_at` repair of 2026-09-06 — 41
-  duplicate backfill rows removed, 84 re-timed.
+  🔒 The **Phase 2 hypothesis gate** (BR-11) was **DISCHARGED 2026-09-10**: the
+  confirmatory evaluation ran and **R1 IS NOT SUPPORTED** — `major` 9.2% (7/76) vs
+  `independent` 8.6% (10/116), +0.6pp, 95% CI [−7.7%, +8.9%], p = 0.888 —
+  [`hypothesis-gate/gate-result-2026-09-10.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-10.md).
+  ⚠️ Not *disproven*: the CI rules out ~±8pp and nothing smaller. Under **BR-11.7 the single
+  confirmatory run is spent** — any further run is exploratory and cannot re-open the gate.
+  **The 2026-09-05 pause of U3 is therefore over**: it existed to let the gate reach its minimum,
+  which it has. **U3 is the next unit**, and was always designed not to depend on R1.
+  Database at schema **v4**, **427 plays**.
   A **listening-statistics panel** was added 2026-09-06 (see below) — display only, no migration.
   ⚠️ **The artist-level LABEL verdict was removed 2026-09-06 (migration 004) and Q12 is
   withdrawn.** It was classified over `browse /release?artist=`, which counts releases the artist
@@ -34,7 +36,7 @@ in `audit.md`. **Commits are unpushed** — code only exists on this machine unt
 The instrument is now collecting properly for the first time: before today every restart
 duplicated recent plays, and the corpus mixed "the app was off" with "the app could not tell".
 Both are fixed, so **the plays recorded from here are clean** — which matters, because the
-hypothesis gate needs roughly 215 more live plays and only live ones count.
+hypothesis gate was discharged 2026-09-10 — R1 not supported; see above.
 
 Open threads, none blocking:
 
@@ -109,22 +111,46 @@ Three constraints were measured before designing, and each changed the result:
 ⚠️ **This does not touch the recording path, the classifier, or the hypothesis gate.** It reads
 rows that already exist.
 
-### 🔒 The hypothesis gate is pre-registered and still open
+### 🔒 The hypothesis gate is DISCHARGED — R1 NOT SUPPORTED (2026-09-10)
 
 The comparison, the minimum sample and the robustness checks were fixed in
 [`hypothesis-gate/pre-registration.md`](construction/u2-label-enrichment/hypothesis-gate/pre-registration.md)
-and committed at **`fd09ad7`** *before* any result was computed. **BR-11.6a**: `n ≥ 50` per group
-**and** `≥ 10` skips. Actual: `major` **8**, `independent` **13**, skips **4** → **insufficient
-data**. Under **BR-11.7** this run is *not* the single confirmatory evaluation; the gate remains
-open and its criterion is already on the record.
+and committed at **`fd09ad7`** *before* any result was computed — five days and 240 plays before.
+**BR-11.6a** (`n ≥ 50` per group **and** `≥ 10` skips) was **first met on 2026-09-10**, making that
+run the single confirmatory evaluation permitted by **BR-11.7**. It was run with the user's
+explicit decision, and **it is now spent**.
 
-> **R1 is currently untested, and the instrument is roughly 215 more live plays — on the order of
-> 11 listening sessions — from being able to test it.** The binding constraint is the `major`
-> group. Only 21 of 145 plays (14%) can enter the gate at all, and the 104 backfilled plays never
-> will: they lack both the trail and the ISRC, neither recoverable from `recently-played`.
+| Group | n | skipped | skip rate |
+|---|---|---|---|
+| `major` | 76 | 7 | **9.2%** |
+| `independent` | 116 | 10 | **8.6%** |
+| `unknown` (BR-11.2) | 125 | 13 | 10.4% |
+
+**Difference +0.6pp · 95% CI [−7.7%, +8.9%] · z = 0.141 · p = 0.888 · NOT SIGNIFICANT.**
+
+> ⚠️ **NOT SUPPORTED is not DISPROVEN.** The CI rules out roughly ±8pp — about 2× against a ~9%
+> baseline — and **nothing smaller**. 8.6% vs 12% remains entirely possible and would need several
+> hundred plays per group to resolve. The pre-registration stated this limit in advance.
 >
-> **This is a design input for U3, not a blocker.** Rules must be authorable and valuable to the
-> user *without* R1 being settled.
+> ⚠️ **Do not re-run the gate hoping for a different answer.** BR-11.7 forbids it; a further run is
+> **exploratory** and cannot discharge or re-open the gate.
+>
+> **U3 was never gated on this**, and that was written down before the result. Rules must be
+> authorable and valuable to the user *without* R1 being settled. U2's label enrichment stays a
+> legitimate rule *input* — simply not one backed by evidence that it predicts this listener's skips.
+
+⚠️ **BR-11.2's most informative check also returned nothing.** The `unknown` group was expected to
+resemble `independent` if unknowns are uncatalogued independents; all three groups sit within 1.8
+points of each other.
+
+⚠️ **Open item 4 rides along and is unresolved.** 12 of the 30 skips sit at ratio 0.80–0.90. The
+crossfade confound inflates the *independent* skip rate, so correcting it could only move the result
+**toward** R1, never further away. Retroactively correctable — trails are retained.
+
+⚠️ **The runner had no significance test until this run.** Earlier revisions stopped at the
+sufficiency check because the answer was fixed at "insufficient data". The §2 test was added
+**after** the group rates were visible — thresholds, eligibility and grouping untouched, formula
+with no free parameters. Recorded rather than hidden.
 
 ⚠️ **A denominator trap was caught during the run** — folding "no ISRC" (a Spotify artefact) in
 with "MusicBrainz has no label" (the R2 measure) reported coverage as 28% → 12% instead of the
@@ -865,8 +891,9 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       **One open decision blocks container use** (see below). Awaiting approval.
       **U2 complete** 2026-09-01, **approved 2026-09-05** after a verification pass:
       404/404 tests, typecheck clean, three defect fixes confirmed against production data.
-- [x] **Phase 2 hypothesis gate (BR-11)** — pre-registered `fd09ad7`, run 2026-09-05.
-      **INSUFFICIENT DATA**; gate remains open under BR-11.7. Runner:
+- [x] **Phase 2 hypothesis gate (BR-11)** — pre-registered `fd09ad7`; ran 2026-09-05
+      (insufficient data) and **DISCHARGED 2026-09-10 by the confirmatory run: R1 NOT SUPPORTED**
+      (p = 0.888, 95% CI [−7.7%, +8.9%]). BR-11.7's single evaluation is **spent**. Runner:
       `scripts/hypothesis-gate.mjs`
 - [ ] NFR Requirements
 - [ ] NFR Design

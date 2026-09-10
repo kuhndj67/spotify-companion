@@ -2725,3 +2725,100 @@ corpus's ten days exist only in those rows and `recently-played` cannot return t
 **Context**: CONSTRUCTION — U3 still paused. View-only change; no schema change, no data change.
 **486 tests**, typecheck clean, schema v4, container rebuilt and live
 
+---
+
+## 2026-09-10 — 🔒 THE PHASE 2 HYPOTHESIS GATE, RUN CONFIRMATORY: **R1 IS NOT SUPPORTED**
+
+**Trigger**: user asked for a status check on data collection. The corpus had reached **427 plays**
+(from 187 on 2026-09-06, +240 in four days), and the BR-11.6a minimum was met for the first time:
+`major` **76**, `independent` **116**, eligible skips **17**. Under BR-11.7 the next run was
+therefore the single confirmatory evaluation, so it was **not run on discovery** — the readiness
+check deliberately computed group sizes and the *combined* skip count only, never the per-group
+rates, and the decision to spend the one run was put to the user. The user chose to run it.
+
+**Result** — full document at `construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-10.md`:
+
+| Group | n | skipped | skip rate |
+|---|---|---|---|
+| `major` | 76 | 7 | **9.2%** |
+| `independent` | 116 | 10 | **8.6%** |
+| `unknown` (BR-11.2) | 125 | 13 | 10.4% |
+
+**Difference +0.6pp · 95% CI [−7.7%, +8.9%] · z = 0.141 · p = 0.888 · NOT SIGNIFICANT.**
+
+**R1 is recorded as NOT SUPPORTED at the resolvable effect size.** Not disproven — the CI rules out
+roughly ±8pp, about 2× against a ~9% baseline, and nothing smaller. The pre-registration said in
+advance that this gate could find a strong effect or nothing; it found nothing. ⚠️ The observed
+baseline (8.9% pooled) came in at the **bottom** of the 10–20% the power table assumed, so n = 50
+per group bought less resolution than designed.
+
+⚠️ **BR-11.2's most informative check also returned nothing.** The `unknown` group was expected to
+resemble `independent` if unknowns are uncatalogued independents. All three groups sit within 1.8
+points of each other.
+
+⚠️ **Open item 3b is UNSETTLED AGAIN, not confirmed.** Label coverage among ISRC-bearing plays came
+in at pre-2022 **56%** / 2022+ **60%** — the recency bias measured twice before (86%→44%, 100%→43%)
+has closed and mildly inverted on the larger corpus. The earlier numbers were small-sample.
+
+⚠️ **Open item 4 rides along with this result and is not resolved.** 12 of 30 skips sit at ratio
+0.80–0.90. The confound's direction **inflates the independent skip rate**, i.e. works *against*
+R1 — correcting it could only move the result toward R1, never further from it. Retroactively
+correctable; trails are retained.
+
+**PROVENANCE, RECORDED RATHER THAN HIDDEN**: the runner never implemented the two-proportion test
+and CI that pre-registration §2 requires — earlier revisions stopped at the sufficiency check
+because the outcome was fixed at "insufficient data". It was added **after** the group rates were
+visible, in this session. `MIN_PER_GROUP`, `MIN_SKIPS`, the eligibility predicate and the grouping
+were **not touched**; the added formula is the one named in §2 and has no free parameters, so no
+degree of freedom existed to tune post hoc. Stated in the result document too.
+
+**Decision**: the Phase 2 gate is **discharged**. R1 must not be re-tested hoping for a different
+answer — BR-11.7 forbids exactly that. **U3 is unaffected**: the pre-existing instruction that
+rules must be valuable without R1 being settled was written before the result and stands. U2's
+label enrichment remains a legitimate rule *input*, simply not one backed by evidence that it
+predicts this listener's skips. **R1 was built to be disconfirmable. It was disconfirmed, and the
+design held.**
+
+**Context**: CONSTRUCTION — U3 still paused. No schema change, no data change; the gate is
+read-only. Corpus 427 plays, schema v4.
+
+---
+
+## 2026-09-10 — W-3 added to the backlog: rejection-skip vs session end
+
+**Trigger**: user, from lived experience while collecting data — *"when I want to stop listening to
+music whatever song is playing is getting marked as a skip"* — asking to distinguish "I don't want
+to hear this track" from "I need to do something else". Requested before the gate run.
+
+**Recorded at `requirements.md` §5.1 as W-3**, cross-referenced from risk **R4** (skip inference is
+heuristic) and as open item 8 in `CLAUDE.md`.
+
+⚠️ **PROBED BEFORE WRITING IT UP, AND THE CORPUS SHOWS ZERO INSTANCES.** Two candidate mechanisms
+were formed and **both were disconfirmed**:
+
+1. *A paused track keeps returning a payload, so the play stays open and is later closed by
+   `track-change`.* Structurally real — `PlayObserver.observe` closes only on a `null` sample or a
+   changed `trackId`, and a paused track is neither — but it has **never fired**: no skip outlasts
+   its own track in wall-clock, and the largest observation gap inside any skip is **6 seconds**.
+2. *Session ends are being closed as track changes.* Disconfirmed: **all 30 skips have a successor
+   within 30 s**, and every session end (≥30 min gap) landed on `completed` (5) or `unknown` (4),
+   **never on `skipped`**.
+
+`classify` is correct here **by construction**: stopping yields `playback-stopped` or `pause-idle`,
+both routed to `unknown`. So the item is a **design guard, not a repair**, and the write-up says so
+— had it been recorded as a bug, someone would later have "fixed" a classifier that was right.
+
+**The user's perception and the recorded data disagree, and reconciling that is task #1** of W-3.
+The likeliest explanation is that the eight low-ratio skips (0.09–0.27) are *remembered* as "I
+stopped listening"; that is unverified and W-3 must not be built on it.
+
+**The discriminator, for when it is taken up**: the gap from play *N*'s `ended_at` to play *N+1*'s
+`started_at`. In the corpus 276 of 286 continuations fall under 30 s while every session end
+exceeds 30 min — almost no mass in between. It needs **no new field, no new collection and no
+upstream request**, and applies **retroactively** to every live play, so deferring it costs
+nothing. Design notes recorded: it must not put a clock or a repository lookup inside
+`outcomeClassifier` (breaks FR-20/FR-42 while every test passes); the last play of a session has no
+successor and must stay `unknown`; a fourth outcome value is probably the wrong shape.
+
+**Decision**: deferred to the wishlist, sequenced **after** the Phase 2 gate — so the outcome
+variable could not be changed while a result depending on it was being decided. No code changed.

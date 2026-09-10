@@ -93,6 +93,68 @@ if (!sufficient) {
   console.log('      BR-11.7: this run is NOT the single confirmatory evaluation.');
 }
 
+// ── The pre-registered statistic (BR-11.1, pre-registration §2) ─────────────
+//
+// Two-sided two-proportion test at alpha = 0.05, with a confidence interval on the
+// difference. Added 2026-09-10, when the minimum was first met: earlier revisions of this
+// script stopped at the sufficiency check because the outcome was fixed at "insufficient
+// data" and the statistic could not be needed.
+//
+// ⚠️ This adds a computation the pre-registration already specified. It does NOT touch
+// MIN_PER_GROUP, MIN_SKIPS, the eligibility predicate or the grouping — the quantities a
+// pre-registration exists to freeze. The formula below has no free parameters, so there is
+// no degree of freedom here to have been chosen after seeing the data. Recorded plainly in
+// the result document and in audit.md so the ordering is on the record.
+
+/** Normal CDF via Abramowitz & Stegun 7.1.26 (|error| < 1.5e-7). No dependency, no clock. */
+const normalCdf = (z) => {
+  const sign = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y =
+    1 -
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t +
+      0.254829592) *
+      t *
+      Math.exp(-x * x);
+  return 0.5 * (1 + sign * y);
+};
+
+if (sufficient) {
+  const p1 = major.skipped / major.n;
+  const p2 = independent.skipped / independent.n;
+  const diff = p1 - p2;
+
+  // Pooled SE for the null test; unpooled SE for the interval. Standard practice.
+  const pooled = (major.skipped + independent.skipped) / (major.n + independent.n);
+  const sePooled = Math.sqrt(pooled * (1 - pooled) * (1 / major.n + 1 / independent.n));
+  const z = sePooled > 0 ? diff / sePooled : 0;
+  const pValue = 2 * (1 - normalCdf(Math.abs(z)));
+
+  const seUnpooled = Math.sqrt(
+    (p1 * (1 - p1)) / major.n + (p2 * (1 - p2)) / independent.n,
+  );
+  const lo = diff - 1.96 * seUnpooled;
+  const hi = diff + 1.96 * seUnpooled;
+  const pct = (x) => `${(x * 100).toFixed(1)}%`;
+
+  console.log('\nPRIMARY TEST (pre-registration §2 — two-sided, alpha = 0.05)');
+  console.log(`  major ${pct(p1)} (${major.skipped}/${major.n})  vs  independent ${pct(p2)} (${independent.skipped}/${independent.n})`);
+  console.log(`  difference (major - independent): ${diff >= 0 ? '+' : ''}${pct(diff)}`);
+  console.log(`  95% CI on the difference: [${pct(lo)}, ${pct(hi)}]`);
+  console.log(`  z = ${z.toFixed(3)}   p = ${pValue.toFixed(3)}`);
+
+  const significant = pValue < 0.05;
+  console.log(`\n  ==> ${significant ? 'SIGNIFICANT at alpha = 0.05' : 'NOT SIGNIFICANT at alpha = 0.05'}`);
+  console.log(
+    significant
+      ? `      Direction: ${diff > 0 ? 'major skipped MORE — the direction R1 predicts' : 'major skipped LESS — OPPOSITE to R1; recorded as a finding, not discarded'}`
+      : '      R1 is NOT SUPPORTED at the effect size this instrument can resolve.\n' +
+        '      This is not proof R1 is false. The CI above is what has been ruled out;\n' +
+        '      any effect smaller than that remains possible and undetected.',
+  );
+}
+
 // ── Coverage (BR-11.3) ──────────────────────────────────────────────────────
 console.log('\nCOVERAGE (BR-11.3)');
 const totals = one('SELECT COUNT(*) n FROM play');

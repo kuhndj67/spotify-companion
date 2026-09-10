@@ -483,6 +483,99 @@ pruning. Play records themselves are small and should be kept indefinitely regar
 **Interim policy**: no automatic pruning. A manual prune capability may be added at any time
 without a design decision, since it is user-initiated.
 
+#### W-3 — Distinguish a rejection-skip from a session end
+
+**Raised by the user, 2026-09-10**, from lived experience while collecting data for the Phase 2
+gate: *"when I want to stop listening to music whatever song is playing is getting marked as a
+skip… I'd like to add an algorithm to detect the difference between 'skipping and continuing to
+listen' (I don't want to hear this track) and 'ending playback because I need to do something
+else' (I may really like the track but have other tasks)."*
+
+**What it would enable**: a `skipped` verdict that means *rejection* and nothing else. That is the
+outcome variable R1 is tested against, so a session end recorded as a skip is not noise — it is
+contamination of the dependent variable by an event that carries no opinion about the track.
+
+**Why this matters more than an ordinary accuracy improvement**: R4 already records that skip
+inference is heuristic. This is a *specific, nameable* confounder within R4, and unlike most of
+them it has a clean discriminator available (below).
+
+---
+
+##### ⚠️ Probed 2026-09-10 before the gate run — the corpus shows ZERO instances
+
+This item is recorded as a **design guard, not a repair**, and the distinction must not be lost:
+
+| Check | Result |
+|---|---|
+| Skips whose `close_reason` is not `track-change` | **0 of 30** — `classify` only ever calls a track change a skip |
+| Skips followed by ≥30 min of silence (session-end shaped) | **0 of 30** |
+| Skips followed by another play within 30 s | **30 of 30** |
+| Session ends in the corpus (≥30 min gap) | 5 landed on `completed`, 4 on `unknown`, **0 on `skipped`** |
+| Skips outlasting their own track in wall-clock (paused-and-abandoned shape) | **0 of 30** |
+| Max observation gap within any skip | **6 seconds** |
+
+The classifier is currently correct here **by construction**: stopping playback yields
+`playback-stopped` or `pause-idle`, and `classify` routes both to `unknown`, never to `skipped`.
+Two candidate mechanisms were formed and **both were disconfirmed by probe**:
+
+1. *A paused track keeps returning a payload, so the play stays open and is later closed by
+   `track-change`.* Structurally real — `PlayObserver.observe` only closes on a `null` sample or a
+   changed `trackId`, and a paused track is neither — but it **has never fired**: every skip's
+   wall-clock duration fits inside its own track length.
+2. *Session ends are being closed as track changes.* Disconfirmed: every skip has a successor
+   within 30 seconds.
+
+**So the user's perception and the recorded data disagree, and that gap is itself the first task.**
+The most likely reconciliation is that the low-ratio skips (0.09–0.27, eight of them) are
+*remembered* as "I stopped listening" while the instrument saw a genuine track change — but this
+is unverified, and W-3 must not be implemented on the assumption that it is right.
+
+##### The discriminator, when this is taken up
+
+**Do not add a new field first.** The signal is already in the data and is computable
+retroactively over the whole corpus, which is exactly the `store observations, derive judgements`
+principle (FR-20):
+
+> A rejection-skip is followed by **another play, within seconds**. A session end is followed by
+> **silence**. The gap between play *N*'s `ended_at` and play *N+1*'s `started_at` separates them
+> cleanly — in the current corpus, 276 of 286 continuations fall under 30 s while every session
+> end exceeds 30 min. There is close to no mass in between.
+
+Consequences that make this cheap:
+
+- It needs **no new collection** and **no upstream requests**. It is a window function over `play`.
+- It is **retroactively applicable** to every live play ever recorded, so taking it up later costs
+  nothing that taking it up now would save.
+- It belongs in a **new `CLASSIFIER_VERSION`**, not in a schema change, and `reclassify` already
+  exists to re-derive stored verdicts from retained trails.
+
+##### Design considerations
+
+- **The successor gap is not available at close time.** The classifier is pure and per-play; it
+  cannot see the next play, which has not happened yet. Either this becomes a derived column
+  computed on read, or a deferred second-pass reclassification. **It must not be solved by putting
+  a clock or a repository lookup inside `outcomeClassifier`** — that breaks FR-20 and FR-42 while
+  every existing test passes (`test/purity.test.ts` is the only guard).
+- **The last play of a session has no successor and never will.** It is the one play where the
+  discriminator is structurally unavailable, and it is *also* the play most likely to be a session
+  end. It must resolve to `unknown` — a fourth outcome value asserting "session-ended" would be a
+  judgement the data does not contain, the same error as the 2026-09-06 `unknown` merge.
+- **A third outcome value is probably wrong.** `abandoned` looks attractive and would need every
+  consumer, export and rule predicate to handle it. Prefer keeping the outcome tri-state and
+  recording the session boundary as *evidence*, letting the gate's eligibility predicate exclude
+  it — the same shape as BR-11.4's `skip_source <> 'rule'` exclusion.
+- **U5 raises the stakes.** Automated skipping introduces a second non-rejection cause of a skip.
+  BR-11.4 already excludes `skip_source = 'rule'`; this is the *user-initiated* twin of that
+  exclusion and should be designed alongside it, not after.
+- **Interaction with open item 4.** Twelve of the thirty skips sit at ratio 0.80–0.90, immediately
+  below the completion threshold — the crossfade confound. W-3 and open item 4 both act on the
+  same small set of near-threshold plays, and fixing either one changes what the other is looking
+  at. Whichever is taken up second must be re-measured, not assumed still valid.
+
+**Prerequisite**: none technically. But it should be sequenced **after** the Phase 2 gate is
+discharged, so that a change to the outcome variable cannot be made while a result that depends on
+it is being decided.
+
 ---
 
 ## 6. Risks and Open Questions
@@ -492,7 +585,7 @@ without a design decision, since it is user-initiated.
 | R1 | **The promotion hypothesis may be false.** Signed-vs-independent may not predict skip behaviour | One rule input loses its value; the engine itself is unaffected | FR-19/FR-20 keep raw data re-analysable; dry-run (FR-37) and back-testing (FR-42) test the hypothesis against real history before rules act on it. Treat as a hypothesis to be *tested*, not an assumption to build on |
 | R2 | **MusicBrainz coverage is incomplete**, especially for new and independent releases — precisely the population of interest | Systematic missing-data bias, correlated with the variable being measured; label-based rules misfire on the tracks that matter most | FR-16 records `unknown` as a distinct value, never as "independent"; FR-32/FR-33 make `unknown` an explicit tri-state the rule must handle. Track coverage rate as a first-class metric |
 | R3 | **Major/indie has no clean definition.** Distribution deals, imprints and majors' "indie" sublabels blur the line | Classification disagrees with intuition | FR-13 stores per-signal votes rather than a boolean verdict |
-| R4 | **Skip inference is heuristic**, with several confounders (§3.3) | Noisy outcome variable weakens the model | FR-19/FR-20; NFR-22 property tests; FR-23 excludes app-initiated skips |
+| R4 | **Skip inference is heuristic**, with several confounders (§3.3) | Noisy outcome variable weakens the model | FR-19/FR-20; NFR-22 property tests; FR-23 excludes app-initiated skips. **W-3** names the session-end confounder specifically and records the discriminator for it (probed 2026-09-10: zero instances in the corpus so far) |
 | R5 | **A runaway rule** skips an entire queue. Higher now that rules are user-authored over arbitrary fields | User-visible loss of control | FR-37 dry-run, FR-38 kill switch, FR-39 rate limit, FR-40 no-repeat-skip, FR-47 off by default |
 | R11 | **Slow fields cannot be resolved before a track starts.** A label lookup is 2 MusicBrainz calls behind a 1 req/sec queue | Label-based rules fire late or not at all — and those are the rules that test R1 | FR-36 pre-warms from the queue endpoint (verified reachable 2026-08-25); FR-34/FR-35 bound the fallback. **Queue lookahead unconfirmed during active playback** |
 | R12 | **A rule language over arbitrary fields invites `eval`** | Arbitrary code execution reachable from the rule store, collapsing the §4.1 posture | FR-43 structured predicate tree, FR-44 prohibits code evaluation, FR-45 validates at creation |

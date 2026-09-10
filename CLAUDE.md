@@ -73,9 +73,10 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## Current state (2026-09-05)
+## Current state (2026-09-10)
 
 **INCEPTION complete. CONSTRUCTION in progress — U2 of 5 units approved. Next: U3.**
+**The Phase 2 hypothesis gate was discharged 2026-09-10: R1 NOT SUPPORTED. U3 is unblocked.**
 
 | Unit | Phase | Status |
 |---|---|---|
@@ -86,36 +87,58 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-486 tests passing · 99.19% line · 92.86% branch · typecheck clean · **181 plays recorded**
+486 tests passing · 99.19% line · 92.86% branch · typecheck clean · **427 plays recorded**
 · schema v4. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
 `integrity_check: ok`, all 65 live trails intact. Backup kept in `data/`.
 
-### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
+### 🔒 THE HYPOTHESIS GATE IS DISCHARGED — **R1 IS NOT SUPPORTED** (confirmatory, 2026-09-10)
 
-Pre-registration committed at `fd09ad7` **before** the comparison was computed;
-result in `construction/u2-label-enrichment/hypothesis-gate/`. **BR-11.6a**: `n ≥ 50` per group and
-`≥ 10` skips. Actual: `major` 8, `independent` 13, **4 skips**. The gate stays open under BR-11.7 —
-this run was not the single confirmatory evaluation.
+Pre-registration committed at `fd09ad7`, **five days and 240 plays before** the comparison was
+computed. Result in `construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-10.md`.
+BR-11.6a was met for the first time on this run, so under **BR-11.7 this was the single
+confirmatory evaluation. It has been spent.**
 
-> **R1 is untested, and roughly 215 more live plays (~11 listening sessions) away from being
-> testable.** Only 21 of 145 plays can enter the gate; the 104 backfilled plays never will, because
-> they lack the observation trail as well as the ISRC. **The instrument can find a strong effect or
-> nothing** — detecting 15% vs 25% would need 250 per group.
+| Group | n | skipped | skip rate |
+|---|---|---|---|
+| `major` | 76 | 7 | **9.2%** |
+| `independent` | 116 | 10 | **8.6%** |
+| `unknown` (BR-11.2) | 125 | 13 | 10.4% |
+
+**+0.6pp · 95% CI [−7.7%, +8.9%] · p = 0.888 · not significant.**
+
+> ⚠️ **NOT SUPPORTED is not DISPROVEN.** The CI rules out about ±8pp — roughly 2× against a ~9%
+> baseline — and **nothing smaller**. An effect of 8.6% vs 12% is fully compatible with this result
+> and would need several hundred plays per group to see. The pre-registration said in advance that
+> this instrument finds a strong effect or nothing.
 >
-> **This does not gate U3.** Rules are user-authored; they must be valuable *without* R1 being
-> settled. Design U3 on that assumption.
+> ⚠️ **Do not re-run the gate hoping for a different answer.** BR-11.7 forbids exactly that; any
+> further run is **exploratory** and cannot discharge the gate. The script will happily print a new
+> number — that is not permission to treat it as one.
+>
+> **This does not gate U3**, and that instruction was written *before* the result. Rules are
+> user-authored; they must be valuable without R1. Label enrichment stays a legitimate rule input —
+> just not one backed by evidence that it predicts this listener's skips.
 
-### ⏸️ Deliberately paused to collect data (user, 2026-09-05)
+⚠️ **Open item 4 rides along with the result.** 12 of the 30 skips sit at ratio 0.80–0.90. The
+confound inflates the *independent* skip rate, so correcting it could only move the result **toward**
+R1, never further away. Retroactively correctable — trails are retained.
 
-U3 is **on hold, not abandoned**. There is no time constraint, and the gate needs listening more
-than it needs code. The app now runs **unattended in a container** on Rancher Desktop autostart
-(`application.autoStart` + `startInBackground`, plus `restart: unless-stopped`), so the chain is
-Windows login → Rancher Desktop → dockerd → app. **Recording does not need the UI** — the poll
-loop is a server-side timer, not something a browser drives.
+⚠️ **Open item 3b is UNSETTLED AGAIN.** Label coverage came in pre-2022 **56%** / 2022+ **60%** —
+the recency bias measured twice before (86%→44%, 100%→43%) has closed and mildly inverted on the
+larger corpus. Both earlier numbers were small-sample. Do not cite them as confirmed.
 
-Before resuming U3, check the corpus: `node scripts/hypothesis-gate.mjs`. ⚠️ Under **BR-11.7**,
-running it is fine below the minimum but any run *at or above* it is the single confirmatory
-evaluation — treat that one deliberately.
+⚠️ **The runner had no significance test until this run.** Earlier revisions stopped at the
+sufficiency check because the answer was fixed at "insufficient data". The §2 test was added
+**after** the group rates were visible — thresholds, eligibility and grouping untouched, and the
+formula has no free parameters. Recorded in the result doc and `audit.md` rather than hidden.
+
+### ⏸️ U3 was paused to collect data (user, 2026-09-05) — that reason is now spent
+
+The pause existed so the gate could reach its minimum. **It has.** U3 is the next unit, and the
+app should keep running regardless: it runs **unattended in a container** on Rancher Desktop
+autostart (`application.autoStart` + `startInBackground`, plus `restart: unless-stopped`), so the
+chain is Windows login → Rancher Desktop → dockerd → app. **Recording does not need the UI** — the
+poll loop is a server-side timer, not something a browser drives.
 
 ### ✅ The autostart chain is PROVEN — reboot test passed 2026-09-05
 
@@ -390,6 +413,7 @@ A failing build once read as success here.
 | 3b | **MusicBrainz label coverage is recency-biased, and this is now CONFIRMED TWICE.** Ad-hoc probe 2026-08-26: pre-2022 100%, 2022+ **43%**. Shipped code on a larger corpus 2026-09-05: **86%** / **44%**. The gap is real and stable, not an artefact of the first sample, and stays concentrated on the recent independent releases R1 is about. ⚠️ Measure it **only over ISRC-bearing plays** — see the denominator warning above | ✅ confirmed |
 | 4 | **⚠️ The completion threshold is a possible CONFOUND, not just noise.** User listens via Spotify's **AI DJ**, which crossfades. Crossfade removes roughly *constant seconds*; a *proportional* threshold converts that into a penalty scaling inversely with track length. Measured 2026-09-02: **13 of 27** track-change plays sit within ±0.05 of 0.90, and **major tracks are longer** (median 248s) than independent (191s), so an identical crossfade costs independents **~1.3× more ratio**. That biases the *outcome* variable by the *independent* variable. ⚠️ n=10/11, so the duration gap may be chance — the mechanism is not. **User chose to keep 0.90** (2026-09-02); fully correctable retroactively because trails are retained. Revisit once the duration difference is confirmed or dissolved | Later |
 | 5 | R11 — queue lookahead unverified during playback | U5 |
+| 8 | **Distinguish a rejection-skip from a session end** — user-raised 2026-09-10. Backlog item **W-3** in `requirements.md` §5.1. ⚠️ **Probed before adding: the corpus has ZERO instances** — all 30 skips close on `track-change` and all 30 have a successor within 30 s, while every session end landed on `completed` or `unknown`. Recorded as a **design guard, not a repair**; the discriminator (gap from `ended_at` to the next `started_at`) needs no new collection and applies retroactively. Sequence it **after** the Phase 2 gate | Later |
 | 7 | **Playback context is never recorded for live plays.** `context_type` is NULL on all 35: the MCP `getNowPlaying` returns no context field. Spotify's `/me/player/currently-playing` **does** — probed 2026-09-02, returning `spotify:playlist:37i9dQZF1EYkqdzj48dyYq` (the AI DJ). A DJ play is therefore indistinguishable from a playlist play, and the DJ is algorithmic selection into the feed — arguably the closest available proxy for what R1 calls *promoted*. **User declined for now** (2026-09-02) | Later |
 | 6 | ~~`label_resolved_at` missing~~ — **closed 2026-08-31.** Superseded by BR-13: resolutions are versioned append-only, and a play stores `label_resolution_id`, the exact version its verdict came from | ✅ |
 

@@ -2822,3 +2822,70 @@ successor and must stay `unknown`; a fourth outcome value is probably the wrong 
 
 **Decision**: deferred to the wishlist, sequenced **after** the Phase 2 gate — so the outcome
 variable could not be changed while a result depending on it was being decided. No code changed.
+
+---
+
+## 2026-09-10 — U3 Functional Design APPROVED
+
+**Stage**: CONSTRUCTION — Functional Design, Unit U3 (Rule Model & Evaluation).
+**User response**: *"approved, continue"* (2026-09-10).
+
+**Plan**: `construction/plans/u3-functional-design-plan.md` — 11 questions, then 3 follow-ups
+raised because three answers had consequences their questions had not spelled out.
+
+**Answers**: Q1 **A** Kleene strong · Q2 **B** `is-unknown` operator · Q3 **A** `note` on
+`FieldDefinition` · Q4 **D** case-insensitive + punctuation-folded · Q5 **A** exclude
+`context.type` · Q6 **A** partial dates `unknown` for ordering · Q7 **A** unevaluable rule disabled
+with a reason · Q8 **B** genres as a string field · Q9 **B** `hold` deferred to U5 · Q10 **B**
+last-known-good on reload · Q11 **A** order is presentational.
+**Follow-ups**: FQ1 **A** drop `exists` · FQ2 **A** per-element word-boundary genre matching ·
+FQ3 **C** `hold` stored, rule disabled with a reason.
+
+**Artifacts**: `construction/u3-rule-model/functional-design/` — `domain-entities.md`,
+`business-logic-model.md`, `business-rules.md` (**BR-14 … BR-21**, continuing from U2's BR-13).
+
+### Three findings that changed the design, each caught before it was written down
+
+⚠️ **A tri-state `exists` can never return `false`.** A field is present (`true`) or absent
+(`unknown`) — there is no third input state, so `not(exists(f))` evaluates to `not(unknown)` =
+`unknown`: exactly the question it was meant to answer, unanswered. `exists` was **removed from the
+operator set** (FQ1), leaving `is-unknown` and `not(is-unknown)` as one obvious way to write each
+direction.
+
+⚠️ **Joining genres and then folding punctuation lets a match cross a boundary.**
+`["hip hop","rapcore"]` → `"hiphoprapcore"`. Measured over the corpus's **110 distinct genres, 62
+multi-word**: plain substring matching also makes `contains "rap"` match `trap`, `trap latino` and
+`trap metal` — 4 unintended hits of 7. It reads as a working rule. Resolved by matching **per
+element on word boundaries** (FQ2), with folding applied per value and never across a join.
+
+⚠️ **Q7=A forces validation to run at load, not only at creation.** FR-45 specifies creation-time
+validation, which cannot catch a field that vanishes afterwards — and one did, when migration 004
+removed the artist-level label verdict on 2026-09-06. `validateRuleSet` now runs on every load and
+reload; `LoadedRule.status` carries the answer. **FR-45 is exceeded, not merely met.**
+
+### Two distinctions written into the model to stop a known defect shape recurring
+
+- **`enabled` vs `status`** (BR-18.2). `enabled: false` is *the user turned this off*;
+  `status: disabled` is *the system cannot evaluate this*. Merging them loses the reason and shows
+  the user their own toggle switched off by something else.
+- **`genres == null` vs `genres == []`** (BR-17.6). "Never asked" vs "asked, there are none" —
+  39 and 131 plays respectively. Merging them is the 2026-09-06 `unknown`-merge defect again.
+
+⚠️ **`restedOnUnknown` is set from the RAW VERDICT, never accumulated while walking the tree**
+(BR-19.6). Q1 offered option C — Kleene's answers with Bochvar's flagging — and it was **not
+chosen**. The tempting implementation, a flag accumulated during the walk, silently produces the
+rejected option. A one-line difference in code, a large one in meaning.
+
+⚠️ **FR-33 is knowingly PARTIALLY met by U3.** `no-match` and `match` are implemented; **`hold` is
+not**, because it needs a deadline and a re-evaluation trigger that a pure synchronous module
+cannot have (Q9 = B). Rules declaring it are stored and disabled with a reason (BR-18.6, FQ3 = C),
+so they begin working when U5 lands without being re-authored. **FR-33 is discharged by U5, not
+U3** — recorded so the requirement is not marked complete on the strength of this unit's tests.
+
+**The execution plan's Phase 2 gate anticipated this branch.** Its "hypothesis fails" case reads:
+*"Phase 3 still proceeds; the engine's value never depended on this one field. Age, artist and
+history-based rules remain useful."* That is now the actual situation, and the design holds without
+amendment.
+
+**Context**: CONSTRUCTION — U3 Functional Design complete. No code written, no schema change, no
+data change. 486 tests, typecheck clean, corpus 427 plays and recording throughout.

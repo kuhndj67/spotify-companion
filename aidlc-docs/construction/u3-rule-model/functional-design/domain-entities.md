@@ -203,6 +203,7 @@ type RuleStatus =
 type DisabledReason =
   | 'unknown-field'            // Q7 = A — the field no longer exists
   | 'type-mismatch'            // operator not valid for the field's type
+  | 'too-deep'                 // NFR Q1 = A — tree exceeds MAX_PREDICATE_DEPTH (32)
   | 'unsupported-on-unknown';  // FQ3 = C — onUnknown: 'hold', deferred to U5
 ```
 
@@ -241,7 +242,8 @@ interface Decision {
   outcomes: readonly RuleOutcome[];       // EVERY evaluated rule, matched or not
   disabledRules: readonly { ruleId: string; reason: DisabledReason; detail: string }[];
   restedOnUnknown: boolean;
-  partialData: boolean;                   // FR-35 — deadline expired before enrichment landed
+  unknownFields: readonly string[];       // NFR Q4 = B — catalogue fields that read `unknown`
+  partialData: boolean;                   // FR-35 — SUPPLIED BY THE CALLER, never inferred
 }
 ```
 
@@ -282,14 +284,22 @@ substitutes a default, because a default here is a fabricated fact about the var
 ```ts
 interface RuleStore {
   load(): Promise<ValidationResult<LoadedRule[]>>;
-  watch(onChange: (rules: readonly LoadedRule[]) => void): void;
   current(): readonly LoadedRule[];
+  // watch(onChange) — DEFERRED TO U4 (NFR Q3 = D)
 }
 ```
+
+Reads `config/rules.json` — its own directory and mount, deliberately **not** `data/`, which holds
+the one artefact that cannot be regenerated (NFR Q2 = B, pattern P-15).
 
 Impure only because a JSON file has to be read from somewhere. It performs no evaluation, holds no
 logic about verdicts, and can be replaced by an in-memory double in every test of the other five
 modules.
+
+> ⚠️ **`watch()` is deferred to U4**, where the UI gives live reload something to trigger it. Two
+> consequences: **BR-20.8 (last-known-good on reload) cannot fire in U3** — only cold start exists,
+> so only BR-20.7 applies — and the half-written-file race disappears from U3 along with the
+> watcher. Both are specified and deferred, not implemented-but-dead. See `nfr-design/logical-components.md` LC-11.
 
 ---
 

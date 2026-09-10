@@ -7,8 +7,11 @@ Numbering continues from U2, which ended at BR-13.
 
 **Settled parameters**: Kleene strong logic · `is-unknown` in, `exists` out · folded string
 comparison · genres matched per element on word boundaries · partial dates `unknown` for ordering ·
-`context.type` excluded · unevaluable rules disabled with a reason · last-known-good on reload ·
-order is presentational.
+`context.type` excluded · unevaluable rules disabled with a reason · depth bounded at **32** ·
+cold-start failure is inert · order is presentational.
+
+**Amended 2026-09-10 by NFR Design** (`../nfr-design/`): BR-18.6a (depth bound), BR-21.7–21.9
+(fact cache), and BR-20.8 marked **deferred to U4** because `watch()` is not built in U3.
 
 > ### The rule that governs the other rules
 >
@@ -124,6 +127,7 @@ why nobody would notice.
 | **BR-18.4** | A rule referencing a field not in the catalogue **loads, disabled**, reason `unknown-field`. It is never deleted and never evaluated | Q7 = A |
 | **BR-18.5** | A rule whose operator does not fit its field's type, or whose `value` is missing or ill-typed, **loads, disabled**, reason `type-mismatch` | FR-45 |
 | **BR-18.6** | A rule declaring `onUnknown: 'hold'` **loads, disabled**, reason `unsupported-on-unknown` | Q9 = B, FQ3 = C |
+| **BR-18.6a** | A predicate tree deeper than **`MAX_PREDICATE_DEPTH` = 32** **loads, disabled**, reason `too-deep`. A depth breach is a *semantic* failure: it disables one rule, never the set | NFR Q1 = A |
 | **BR-18.7** | Every disabled rule reports its `reason` and a human-readable `detail` in `Decision.disabledRules` | Q7 = A |
 | **BR-18.8** | A field that disappears **never** becomes `unknown`. "We could not resolve this" and "this field no longer exists" are two facts | Q7 = A |
 
@@ -180,7 +184,7 @@ and no reason. Two fields, two facts.
 | **BR-20.5** | A **semantic** failure disables the individual rule (BR-18.4–18.6); it never rejects the set | Q7 = A |
 | **BR-20.6** | **Never a partial load.** Loading the rules that parsed and dropping the rest is forbidden | Q10 |
 | **BR-20.7** | On **cold start** with an invalid file: **no rules**. A rules engine that cannot read its rules skips nothing | Q10 = B |
-| **BR-20.8** | On **reload** with an invalid file: keep the **last-known-good** set in memory | Q10 = B |
+| **BR-20.8** | On **reload** with an invalid file: keep the **last-known-good** set in memory. ⚠️ **Unreachable in U3 and DEFERRED TO U4** — `watch()` is not built here (NFR Q3 = D), so only BR-20.7 can fire | Q10 = B |
 | **BR-20.9** | Either failure is surfaced **loudly**. A rule set that silently reverts to an older version is an unexplained empty state with consequences | Q10 = A carried |
 | **BR-20.10** | A bad rules file **never** stops the app recording | data-first |
 | **BR-20.11** | A saved and reloaded rule evaluates **identically** on the same facts | NFR-27 |
@@ -204,7 +208,10 @@ come back from retyping; months of play records come back from nowhere.
 | **BR-21.3** | The evaluation instant arrives as `TrackFacts.evaluatedAtMs`, passed in as data. The engine never reads a clock | NFR-26 |
 | **BR-21.4** | The same `(rules, facts)` pair yields an identical `Decision` on every call, on any machine, on any day | NFR-26, FR-42 |
 | **BR-21.5** | `assembleFacts` performs no I/O and issues no request. Absent inputs arrive `null` and stay `null` — no default is ever substituted | FR-32 |
-| **BR-21.6** | `RuleStore` is the unit's **only** impure module, and it performs no evaluation | — |
+| **BR-21.6** | `RuleStore` is the unit's **only** impure module in the rules core, and it performs no evaluation | — |
+| **BR-21.7** | History aggregates are fetched **once per play and cached**, and the cache lives **outside** the pure modules. Caching inside `assembleFacts` would give a pure function a memory and NFR-26 would be gone | NFR Q5 = C |
+| **BR-21.8** | `playsOfTrack` and the other counts **exclude the play being evaluated** — at track start it is not yet recorded, so they mean *“before this one”* | NFR Q5 = C |
+| **BR-21.9** | Fact assembly must **never** fail the recording path. A failure yields `null` counts, never an exception reaching the poll loop | NFR Q5 = C |
 
 > ### BR-21.5 — a default here is a fabricated fact
 >

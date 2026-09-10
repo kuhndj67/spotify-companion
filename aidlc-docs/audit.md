@@ -2889,3 +2889,67 @@ amendment.
 
 **Context**: CONSTRUCTION — U3 Functional Design complete. No code written, no schema change, no
 data change. 486 tests, typecheck clean, corpus 427 plays and recording throughout.
+
+---
+
+## 2026-09-10 — U3 NFR Design APPROVED
+
+**Stage**: CONSTRUCTION — NFR Design, Unit U3. **User response**: *"approve"* (2026-09-10).
+**Plan**: `construction/plans/u3-nfr-design-plan.md` — 5 questions.
+**Answers**: Q1 **A** depth bound at validation · Q2 **B** `config/rules.json` · Q3 **D** no
+watching in U3 · Q4 **B** `partialData` is an input, plus report unknown fields · Q5 **C**
+assemble eagerly, cache per play.
+
+**Artifacts**: `construction/u3-rule-model/nfr-design/` — `nfr-design-patterns.md` (**P-10…P-18**)
+and `logical-components.md` (**LC-7…LC-12**, **PBT-11…PBT-20**).
+
+### Only five questions were asked, deliberately
+
+Most NFR categories were **answered by existing convention** and asking again would have been
+noise: `fast-check` 4.9 with `test/fc-config.ts` (`FC_SEED`, shrinking on, PBT-08), per-unit
+generator modules, `purity.test.ts`'s `PURE_MODULES` list, `noOrphanModules.test.ts`. Scalability,
+availability, concurrency, caching and circuit breakers were evaluated and recorded as **not
+applicable with justification** rather than skipped silently — single user, single process,
+synchronous pure function, no upstream.
+
+### ⚠️ "Never throws" had a hole, and it was the stack
+
+BR-21.1 declares every pure function total. A predicate is a **tree**, the natural evaluator is
+**recursive**, and a deep enough tree overflows the stack — **which is a throw, from a function
+documented as unable to throw.** Reachable without malice, and a property test with a tree
+generator would have found it. Closed by **P-10**: `MAX_PREDICATE_DEPTH = 32`, enforced at
+validation, evaluator stays recursive so it reads against the Kleene tables. `too-deep` is a **new
+`DisabledReason`**, not a reuse of `type-mismatch` — a wrong reason is worse than a generic one.
+
+### ⚠️ Q3 = D removes `watch()` from U3, with two consequences recorded rather than discovered
+
+1. **BR-20.8 (last-known-good on reload) cannot fire in U3.** No watcher means no reload, so only
+   cold start (BR-20.7) applies. Marked **specified and deferred to U4**, not implemented-but-dead
+   — a rule that cannot fire is the "stored setting that does nothing" trap the user rejected at
+   Q9 = C.
+2. **This diverges from the inception design.** `component-methods.md` specifies
+   `RuleStore.watch(onChange)`. Construction refining inception is permitted, but a silently
+   narrowed interface is how a requirement goes missing, so LC-11 states it. The half-written-file
+   race leaves U3 with the watcher and becomes U4's to design.
+
+### Two decisions taken without asking, both recorded as design constraints
+
+- **The fact cache lives OUTSIDE the pure modules** (LC-12, BR-21.7). Caching inside
+  `assembleFacts` would give a pure function a memory and NFR-26 would be gone.
+- **`playsOfTrack` excludes the play being evaluated** (BR-21.8). At track start it is not yet
+  recorded, so the counts mean *"before this one"*. The other reading is equally natural and the
+  difference is invisible in the value.
+
+⚠️ **`partialData` is supplied by the caller and NEVER inferred** (P-17). Inferring it from
+`often-unknown` fields reading `unknown` cannot distinguish *"not yet resolved"* from *"resolved,
+and the answer is nothing"* — the distinction that has caught this project three times. R11 makes
+this the common case, not the edge: a label lookup is two MusicBrainz calls behind a 1 req/sec
+queue, so `label.classification` will usually be `unknown` at track start.
+
+**Amendments to the approved functional design**, made for consistency rather than left
+contradicting: `DisabledReason` gains `too-deep`; `Decision` gains `unknownFields`; `RuleStore`
+loses `watch()` and names `config/rules.json`; BR-18.6a and BR-21.7–21.9 added; BR-20.8 marked
+deferred.
+
+**Context**: CONSTRUCTION — U3 NFR Design complete. No code written, no schema change, no data
+change. 486 tests, typecheck clean.

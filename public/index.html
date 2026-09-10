@@ -80,35 +80,30 @@
             <div><dt>Track</dt><dd id="track-no">&mdash;</dd></div>
             <div><dt>Explicit</dt><dd id="explicit">&mdash;</dd></div>
             <!--
-              U2. Two levels, shown side by side and never merged (Q12): a release's label is a
-              fact about a past pressing, an artist's is a fact about now. They can legitimately
-              disagree - Token's *Full Bag* is independent at release level and Atlantic at
-              artist level, and both are true.
+              U2. ONE label verdict: the label this track was released under, resolved through
+              its ISRC.
+
+              An `Artist label` row sat beside this until 2026-09-06. It was classified over
+              `browse /release?artist=`, which returns every release the artist appears on
+              INCLUDING ONES THEY ONLY FEATURE ON - so it reported other artists' record deals.
+              Bad Bunny: 92 lead releases, 109 guest spots, and one strong `major` vote from a
+              guest credit was enough to decide the fold. See migration 004.
             -->
             <div><dt>Label</dt><dd id="label-verdict" data-testid="label-verdict">&mdash;</dd></div>
-            <div><dt>Artist label</dt><dd id="artist-label-verdict">&mdash;</dd></div>
           </dl>
           <!--
-            The label NAMES behind the two verdicts above. Not redundant with them: the verdict is
-            a classification, these are the labels that voted for it, and a verdict of `major` is
+            The label NAMES behind the verdict above. Not redundant with it: the verdict is a
+            classification, these are the labels that voted for it, and a verdict of `major` is
             worth very little without being able to see it was Spinefarm resolving to Universal.
 
-            Both levels appear, separately labelled and never merged (Q12) -- Token's *Full Bag*
-            is `Never Too Different` at release level and `Atlantic` at artist level, and both are
-            true. Empty is explained rather than left as a bare dash, because `pending` (not
-            looked up yet) and `unknown` (looked up, MusicBrainz has none) are different facts and
-            a dash asserts neither.
+            Empty is explained rather than left as a bare dash, because `pending` (not looked up
+            yet) and `unknown` (looked up, MusicBrainz has none) are different facts and a dash
+            asserts neither. MusicBrainz coverage on recent releases is ~44%, so empty is the
+            common case here and has to read as a measurement rather than as a broken field.
           -->
           <div class="tag-block">
             <dt>Label detail</dt>
-            <div class="label-level">
-              <span class="level-name">Release</span>
-              <div id="label-names" class="tags"><span class="muted">&mdash;</span></div>
-            </div>
-            <div class="label-level">
-              <span class="level-name">Artist</span>
-              <div id="artist-label-names" class="tags"><span class="muted">&mdash;</span></div>
-            </div>
+            <div id="label-names" class="tags"><span class="muted">&mdash;</span></div>
           </div>
           <div class="genres">
             <dt>Genres</dt>
@@ -143,6 +138,14 @@
             </figcaption>
             <div class="trend-plot" id="trend-plot"></div>
             <ul class="legend" id="trend-legend"></ul>
+            <!--
+              Plays the app never watched. Counted here rather than drawn as a fourth bar: on
+              this corpus they are 84 of 187 across seven days the app was not running, and as a
+              series they dominated every artist's chart with the instrument's downtime. Removing
+              them from the plot without saying so would be the merge defect of 2026-09-06 again
+              in a quieter form, so the number stays on the page.
+            -->
+            <p class="trend-note muted" id="trend-note"></p>
             <!--
               The table view is not decoration. Two of the three series sit below 3:1 contrast
               against the light surface, and `unknown` is deliberately a low-chroma neutral, so

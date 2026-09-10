@@ -203,31 +203,15 @@ export function createApi(deps: ApiDeps): Router {
       raw.labelResolutionId === null
         ? null
         : deps.repository.getLabelResolutionById(raw.labelResolutionId);
-    const artistResolution =
-      raw.artistLabelResolutionId === null
-        ? null
-        : deps.repository.getArtistLabelResolutionById(raw.artistLabelResolutionId);
 
     const release = buildTrace({
       playId,
       resolution: releaseResolution,
-      scope: 'release',
       storedClassifierVersion: raw.labelClassifierVersion,
       runningClassifierVersion: LABEL_CLASSIFIER_VERSION,
       majorRoots: MAJOR_ROOTS,
       isrcVote: isrcPrefixVote(play.isrc),
       unknownReason: raw.labelUnknownReason,
-    });
-
-    const artist = buildTrace({
-      playId,
-      resolution: artistResolution,
-      scope: 'artist',
-      storedClassifierVersion: raw.labelClassifierVersion,
-      runningClassifierVersion: LABEL_CLASSIFIER_VERSION,
-      majorRoots: MAJOR_ROOTS,
-      isrcVote: null,
-      capConfidenceAt: 'medium',
     });
 
     res.json({
@@ -239,10 +223,11 @@ export function createApi(deps: ApiDeps): Router {
         startedAt: play.startedAt,
         isrc: play.isrc,
       },
-      // Two levels, reported side by side and never merged (Q12). Token - Full Bag is
-      // `Never Too Different` at release level and `Atlantic` at artist level; both are true.
+      // One level. The artist-level trace was removed on 2026-09-06 with the verdict it
+      // explained: it derived a label from `browse /release?artist=`, which counts releases the
+      // artist merely features on, so it was a tidy derivation over other artists' record deals
+      // (migration 004). The label a track was released under is this one, via the ISRC.
       release: { ...release, summary: summariseTrace(release) },
-      artist: { ...artist, summary: summariseTrace(artist) },
     });
   });
 

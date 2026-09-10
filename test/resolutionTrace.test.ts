@@ -16,12 +16,7 @@ import assert from 'node:assert/strict';
 
 import { buildTrace, summariseTrace } from '../src/musicbrainz/resolutionTrace.js';
 import { MAJOR_ROOTS } from '../src/musicbrainz/majorRootList.js';
-import type {
-  ArtistLabelResolution,
-  LabelCandidate,
-  LabelResolution,
-  LabelType,
-} from '../src/musicbrainz/types.js';
+import type { LabelCandidate, LabelResolution, LabelType } from '../src/musicbrainz/types.js';
 
 function candidate(labelName: string, labelType: LabelType = 'Imprint'): LabelCandidate {
   return {
@@ -55,7 +50,6 @@ function resolution(candidates: LabelCandidate[], over: Partial<LabelResolution>
 
 const base = {
   playId: 1,
-  scope: 'release' as const,
   storedClassifierVersion: 1,
   runningClassifierVersion: 1,
   majorRoots: MAJOR_ROOTS,
@@ -220,41 +214,25 @@ describe('BR-12.2 — the trace runs the same classifier that produced the verdi
   });
 });
 
-describe('artist-level traces', () => {
-  const artistResolution: ArtistLabelResolution = {
-    id: 3,
-    spotifyArtistId: '4Ws4bnyoc0Q8FQvpBoRvIz',
-    artistMbid: 'artist-mbid',
-    releaseCount: 66,
-    namedLabelCount: 41,
-    resolvedAt: '2026-08-31T00:00:00.000Z',
-    status: 'resolved',
-    supersedesId: null,
-    candidates: [candidate('Atlantic')],
-    votes: [],
-    genres: [{ name: 'alternative rock', count: 11 }],
-  };
-
-  it('uses the exact Spotify-URL join as its key', () => {
-    const trace = buildTrace({
-      ...base,
-      scope: 'artist',
-      resolution: artistResolution,
-      capConfidenceAt: 'medium',
-    });
-    assert.equal(trace.join?.key, 'spotify-url');
-    assert.equal(trace.join?.value, '4Ws4bnyoc0Q8FQvpBoRvIz');
-  });
-
-  it('never claims high confidence, because it aggregates a career', () => {
-    const trace = buildTrace({
-      ...base,
-      scope: 'artist',
-      resolution: artistResolution,
-      capConfidenceAt: 'medium',
-    });
-    assert.equal(trace.confidence?.band, 'medium');
-    assert.ok(trace.confidence?.capsApplied.includes('BR-5.5'));
+/**
+ * ⚠️ Pins a REMOVAL, and the reason matters more than the shape.
+ *
+ * There used to be a second scope here. An artist-level verdict was classified over
+ * `browse /release?artist=<mbid>`, which returns every release the artist appears on including
+ * ones they only feature on. Probed on Bad Bunny: 92 lead releases against 109 guest spots, and
+ * 49 of the 64 label names reachable only through somebody else's record deal. Since one strong
+ * `major` vote decides the fold, every collaborative artist read `major` — bias in the
+ * independent variable, pointing the way that would mask R1.
+ *
+ * The trace made that derivation look rigorous, which is the dangerous part: a tidy, internally
+ * consistent explanation of the wrong question. If a later unit wants an artist-level signal it
+ * has to start from a browse that distinguishes lead credits from features, and this test is what
+ * should fail first.
+ */
+describe('there is one scope, and it is the release', () => {
+  it('joins on the ISRC and nothing else', () => {
+    const trace = buildTrace({ ...base, resolution: resolution([candidate('Atlantic')]) });
+    assert.equal(trace.join?.key, 'isrc');
   });
 });
 

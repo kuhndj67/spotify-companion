@@ -47,6 +47,7 @@ const ui = {
   trendSpan: el('trend-span'),
   trendPlot: el('trend-plot'),
   trendLegend: el('trend-legend'),
+  trendNote: el('trend-note'),
   trendTableBody: el('trend-table-body'),
 };
 
@@ -267,17 +268,14 @@ function render(data) {
  */
 function renderLabel(label) {
   const verdict = el('label-verdict');
-  const artistVerdict = el('artist-label-verdict');
   const names = el('label-names');
 
   if (!label) {
     verdict.textContent = 'pending';
     verdict.dataset.verdict = 'pending';
-    artistVerdict.textContent = DASH;
     // Pending, not unknown: the lookup has not happened. At one request per second behind a
     // backfill sweep this state can last minutes, so it is common rather than transient.
     renderLabelNames(names, null, 'pending');
-    renderLabelNames(el('artist-label-names'), null, 'pending');
     return;
   }
 
@@ -285,11 +283,7 @@ function renderLabel(label) {
   verdict.dataset.verdict = label.verdict;
   verdict.title = label.confidence ? `confidence: ${label.confidence}` : '';
 
-  artistVerdict.textContent = label.artistVerdict ?? DASH;
-  if (artistVerdict.dataset) artistVerdict.dataset.verdict = label.artistVerdict ?? '';
-
   renderLabelNames(names, label.names, label.verdict);
-  renderLabelNames(el('artist-label-names'), label.artistNames, label.artistVerdict);
 }
 
 /**
@@ -692,33 +686,50 @@ el('export-open').addEventListener('click', () => {
  * ## Stack order and colour
  *
  * `completed` sits on the baseline because it is the series the eye compares week to week; a
- * segment floating above a variable offset cannot be compared by length. `unknown` is a
- * low-chroma neutral with a hatch rather than a third hue: it is not an outcome, it is the
- * absence of an observation trail (every backfilled play has one), and colouring it like a
- * verdict would assert a judgement the data does not contain.
+ * segment floating above a variable offset cannot be compared by length.
  */
 
 /**
- * ⚠️ **`Not recorded` and `Inconclusive` are separate series, and merging them was a real defect.**
+ * The series the chart draws: **outcomes the app actually observed.**
  *
+ * ⚠️ **`Not recorded` and `Inconclusive` are different facts, and merging them was a real defect.**
  * Both rendered as one "Unknown" bar until 2026-09-06, so a chart of *listening* was silently
- * reporting the *app's uptime*. On this corpus 84 of 149 plays came from the seven days before the
- * container deployment existed — days the app never ran — and they sat in the same bar as a
- * genuine mid-track shutdown. Completion read as 38% overall where it was **74% on the days the
+ * reporting the *app's uptime* — completion read as 38% overall where it was **74% on the days the
  * instrument was actually watching**.
  *
- * - `Not recorded` — the app was off. From `recently-played`, which reports no progress at all,
- *   so there is no trail and there never can be. Drawn as a hatched neutral because it is an
- *   absence, not an outcome.
  * - `Inconclusive` — the app was watching and could not classify: a pause, a stop, a shutdown
- *   mid-track. A real measurement that happens to be indeterminate, so it gets a real hue.
+ *   mid-track. A real measurement that happens to be indeterminate, so it is drawn, in a real hue.
+ * - `Not recorded` — the app was off. From `recently-played`, which reports no progress at all, so
+ *   there is no trail and there never can be. **Not drawn** — see {@link NOT_OBSERVED}.
  */
-const SERIES = [
+const DRAWN_SERIES = [
   { key: 'completed', label: 'Completed', fill: 'var(--series-completed)' },
   { key: 'skipped', label: 'Skipped', fill: 'var(--series-skipped)' },
   { key: 'inconclusive', label: 'Inconclusive', fill: 'var(--series-inconclusive)' },
-  { key: 'not-observed', label: 'Not recorded', fill: 'url(#hatch-unknown)' },
 ];
+
+/**
+ * ⚠️ **Counted everywhere, drawn nowhere — and the distinction is the whole point.**
+ *
+ * `not-observed` was a fourth bar until 2026-09-06. On this corpus that is 84 of 187 plays across
+ * seven days the app never ran, so every artist's chart was dominated by columns that record the
+ * *instrument's downtime* rather than any listening — the user's report was that the trend is
+ * unreadable, and it was.
+ *
+ * It is removed from the **plot** only. It stays in the legend note, the hover tooltip, the table
+ * and the track panel's breakdown, because deleting it from those would be the 2026-09-06 defect
+ * again in a quieter form: a reader would take `Times played 6 · 1 completed` for six observed
+ * listens. The chart answers "what did the app measure"; the numbers beside it still answer "and
+ * how much did it miss". R2 depends on the second question staying askable.
+ *
+ * The rows themselves are never deleted. They are 73 distinct tracks over seven days that
+ * `recently-played` cannot return again — its window is 50 plays — so they are the one thing here
+ * that does not come back.
+ */
+const NOT_OBSERVED = { key: 'not-observed', label: 'Not recorded' };
+
+/** Every bucket, for the surfaces that report rather than draw. */
+const ALL_BUCKETS = [...DRAWN_SERIES, NOT_OBSERVED];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -780,7 +791,7 @@ function trendSvg(weeks, maxTotal) {
     // every multi-outcome week by 2px per boundary.
     const drawn = [];
     let cumulative = 0;
-    for (const series of SERIES) {
+    for (const series of DRAWN_SERIES) {
       const value = week.byBucket[series.key] ?? 0;
       if (value === 0) continue;
       const yBottom = baseline - (cumulative / maxTotal) * PLOT_HEIGHT;
@@ -834,12 +845,8 @@ function trendSvg(weeks, maxTotal) {
 
   return (
     `<svg viewBox="0 0 ${VB_WIDTH} ${PLOT_TOP + PLOT_HEIGHT + AXIS_HEIGHT}" ` +
-    `role="img" aria-label="Weekly play counts by outcome. Values are in the table view below.">` +
-    `<defs><pattern id="hatch-unknown" width="6" height="6" patternUnits="userSpaceOnUse" ` +
-    `patternTransform="rotate(45)">` +
-    `<rect width="6" height="6" style="fill:var(--series-unknown)" />` +
-    `<line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--series-unknown-line);stroke-width:2" />` +
-    `</pattern></defs>` +
+    `role="img" aria-label="Weekly counts of observed plays by outcome. Values, including plays ` +
+    `the app did not observe, are in the table view below.">` +
     parts.join('') +
     `</svg>`
   );
@@ -847,17 +854,11 @@ function trendSvg(weeks, maxTotal) {
 
 function renderLegend(totals) {
   ui.trendLegend.replaceChildren(
-    ...SERIES.map((series) => {
+    ...DRAWN_SERIES.map((series) => {
       const item = document.createElement('li');
       const swatch = document.createElement('span');
       swatch.className = 'swatch';
-      // The hatch is an SVG paint server, so the legend swatch restates it as a CSS gradient of
-      // the same two colours rather than trying to reuse the pattern.
-      swatch.style.background =
-        series.key === 'not-observed'
-          ? 'repeating-linear-gradient(45deg, var(--series-unknown) 0 2px,' +
-            ' var(--series-unknown-line) 2px 4px)'
-          : series.fill;
+      swatch.style.background = series.fill;
       const label = document.createElement('span');
       label.textContent = series.label;
       const count = document.createElement('span');
@@ -905,7 +906,7 @@ function renderTrendTable(weeks, totals) {
   const label = document.createElement('th');
   label.textContent = 'Total';
   foot.append(label);
-  const grand = SERIES.reduce((sum, series) => sum + totals[series.key], 0);
+  const grand = ALL_BUCKETS.reduce((sum, series) => sum + totals[series.key], 0);
   for (const value of [
     totals.completed,
     totals.skipped,
@@ -933,13 +934,27 @@ function attachTrendTooltip(weeks) {
     heading.className = 'tip-week';
     heading.textContent = `Week of ${formatWeek(week.weekStart)}`;
     tip.append(heading);
-    for (const series of SERIES) {
+    for (const series of DRAWN_SERIES) {
       const row = document.createElement('div');
       row.className = 'tip-row';
       const name = document.createElement('span');
       name.textContent = series.label;
       const value = document.createElement('span');
       value.textContent = week.byBucket[series.key];
+      row.append(name, value);
+      tip.append(row);
+    }
+
+    // Reported on hover even though it is not drawn: a week whose column is short because most
+    // of it went unobserved must not read as a quiet week.
+    const missed = week.byBucket[NOT_OBSERVED.key] ?? 0;
+    if (missed > 0) {
+      const row = document.createElement('div');
+      row.className = 'tip-row muted';
+      const name = document.createElement('span');
+      name.textContent = NOT_OBSERVED.label;
+      const value = document.createElement('span');
+      value.textContent = missed;
       row.append(name, value);
       tip.append(row);
     }
@@ -969,6 +984,7 @@ function renderTrend(artist, artistName) {
     ui.trendSpan.textContent = DASH;
     ui.trendPlot.replaceChildren(muted('No artist id for this track.'));
     ui.trendLegend.replaceChildren();
+    ui.trendNote.textContent = '';
     ui.trendTableBody.replaceChildren();
     return;
   }
@@ -987,25 +1003,65 @@ function renderTrend(artist, artistName) {
     : `all history, from ${formatWeek(artist.window.start)}`;
 
   const totals = { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 };
-  let maxTotal = 0;
+  // ⚠️ Two maxima, and using the wrong one is the trap. `week.total` counts plays the chart no
+  // longer draws, so scaling to it would shrink every bar against an axis whose height comes from
+  // columns that are not there -- a week of 8 observed plays would read as a third of a week that
+  // was 24 unobserved. The axis measures what is drawn.
+  let drawnMax = 0;
+  let anyPlays = 0;
   for (const week of artist.weeks) {
     for (const key of Object.keys(totals)) totals[key] += week.byBucket[key] ?? 0;
-    if (week.total > maxTotal) maxTotal = week.total;
+    const drawn = DRAWN_SERIES.reduce((sum, series) => sum + (week.byBucket[series.key] ?? 0), 0);
+    if (drawn > drawnMax) drawnMax = drawn;
+    anyPlays += week.total;
   }
 
-  if (maxTotal === 0) {
+  if (anyPlays === 0) {
     ui.trendPlot.replaceChildren(muted('First time hearing this artist.'));
     ui.trendLegend.replaceChildren();
+    ui.trendNote.textContent = '';
     ui.trendTableBody.replaceChildren();
+    return;
+  }
+
+  // ⚠️ Distinct from the line above, and it has to be. "Never heard this artist" and "heard them
+  // and watched none of it" are different facts, and an empty plot asserts neither on its own --
+  // the same mistake `Label detail` made by rendering a bare dash until someone nearly deleted it
+  // as broken.
+  if (drawnMax === 0) {
+    ui.trendPlot.replaceChildren(
+      muted(`${anyPlays} ${anyPlays === 1 ? 'play' : 'plays'}, none observed — the app was not running.`),
+    );
+    ui.trendLegend.replaceChildren();
+    // Not `renderTrendNote` — it would print the same sentence a second line down. The plot has
+    // said it; the table below still carries the per-week counts.
+    ui.trendNote.textContent = '';
+    renderTrendTable(artist.weeks, totals);
     return;
   }
 
   // The SVG carries no user-supplied text — only week dates and integers — so building it as
   // markup is safe here. Everything with a name in it goes through textContent above.
-  ui.trendPlot.innerHTML = trendSvg(artist.weeks, maxTotal);
+  ui.trendPlot.innerHTML = trendSvg(artist.weeks, drawnMax);
   attachTrendTooltip(artist.weeks);
   renderLegend(totals);
+  renderTrendNote(totals);
   renderTrendTable(artist.weeks, totals);
+}
+
+/**
+ * The plays this window holds that the app never watched.
+ *
+ * Stated as a number rather than drawn as a bar. Silence here would be the dishonest option: a
+ * chart covering seven days the app was off, saying nothing about them, invites the reader to
+ * take the bars for the whole story.
+ */
+function renderTrendNote(totals) {
+  const missed = totals[NOT_OBSERVED.key] ?? 0;
+  ui.trendNote.textContent =
+    missed === 0
+      ? ''
+      : `${missed} ${missed === 1 ? 'play' : 'plays'} not observed — the app was not running.`;
 }
 
 let statsKey = null;
@@ -1037,7 +1093,7 @@ function renderStats(payload, artistName) {
   } else {
     // The breakdown rides the count, because the count alone invites the same misreading the
     // chart used to: six plays of which five predate the app is not six observed listens.
-    const parts = SERIES.filter((series) => track.byBucket[series.key] > 0).map(
+    const parts = ALL_BUCKETS.filter((series) => track.byBucket[series.key] > 0).map(
       (series) => `${track.byBucket[series.key]} ${series.label.toLowerCase()}`,
     );
     ui.statPlays.textContent = parts.length

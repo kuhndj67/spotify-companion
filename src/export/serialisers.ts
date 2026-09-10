@@ -62,10 +62,10 @@ export const CSV_COLUMNS = [
   'label_unknown_reason',
   'label_resolution_id',
   'label_classifier_version',
-  'artist_label_verdict',
-  'artist_label_confidence',
-  'artist_label_names',
-  'artist_label_resolution_id',
+  // The artist level exports a pointer and genres, and no verdict. One was exported until
+  // 2026-09-06; it was classified over the artist's release browse, which counts releases the
+  // artist only features on, so the column carried other artists' record deals (migration 004).
+  'artist_resolution_id',
   'liked_at_start',
   'liked_at_end',
   'liked_added_at',
@@ -166,9 +166,6 @@ export function toCsvRow(play: PlayRecord): string {
     play.label?.unknownReason ?? null,
     play.label?.resolutionId ?? null,
     play.label?.classifierVersion ?? null,
-    renderVerdict(play.label?.artistVerdict),
-    play.label?.artistConfidence ?? null,
-    renderNames(play.label?.artistNames),
     play.label?.artistResolutionId ?? null,
     play.label?.likedAtStart ?? null,
     play.label?.likedAtEnd ?? null,
@@ -216,8 +213,8 @@ export function toJsonObject(play: PlayRecord): Record<string, unknown> {
       rewound: play.evidence.rewound,
       ended_with_idle: play.evidence.endedWithIdle,
     },
-    // Two levels, side by side and never merged (Q12). Nested so a reader cannot mistake an
-    // artist-level verdict for a release-level one -- they answer different questions.
+    // The label a track was released under, resolved through its ISRC. There is no second,
+    // artist-level verdict beside it any more -- see migration 004.
     label: {
       verdict: renderVerdict(play.label?.verdict),
       confidence: renderMaybe(play.label?.confidence),
@@ -229,12 +226,7 @@ export function toJsonObject(play: PlayRecord): Record<string, unknown> {
       resolution_id: renderMaybe(play.label?.resolutionId),
       classifier_version: renderMaybe(play.label?.classifierVersion),
     },
-    artist_label: {
-      verdict: renderVerdict(play.label?.artistVerdict),
-      confidence: renderMaybe(play.label?.artistConfidence),
-      names: renderNames(play.label?.artistNames),
-      resolution_id: renderMaybe(play.label?.artistResolutionId),
-    },
+    artist_resolution_id: renderMaybe(play.label?.artistResolutionId),
     liked: {
       at_start: renderMaybe(play.label?.likedAtStart),
       at_end: renderMaybe(play.label?.likedAtEnd),

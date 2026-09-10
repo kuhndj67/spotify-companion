@@ -425,20 +425,18 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
    skipped / inconclusive pass the lightness band, chroma floor, CVD separation (worst adjacent
    ΔE 9.2 light, 9.4 dark) and the normal-vision floor in both modes.
 
-   `--series-unknown` is deliberately a low-chroma NEUTRAL and deliberately fails the chroma
-   floor. It paints `Not recorded`, which is not an outcome at all — it is the absence of an
-   observation trail, from days the app was not running — and it must not compete with the three
-   real verdicts. The 45° hatch keeps it distinguishable without relying on hue.
+   There is no fourth colour. `Not recorded` used to be painted as a low-chroma hatched neutral
+   and is no longer drawn at all — it is the absence of an observation trail rather than an
+   outcome, and as a bar it dominated every chart with the app's downtime. It is reported as a
+   count under the legend and as a column in the table instead.
 
-   Light-mode contrast for the green and the neutral is below 3:1, which obliges relief:
-   the legend prints every count and there is a table view. Both are present.
+   Light-mode contrast for the green is below 3:1, which obliges relief: the legend prints every
+   count and there is a table view. Both are present.
    ========================================================================== */
 :root {
   --series-completed: #1baf7a;
   --series-skipped: #eb6834;
   --series-inconclusive: #2a78d6;
-  --series-unknown: #b4b4ae;
-  --series-unknown-line: #8c8c86;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -446,8 +444,6 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
     --series-completed: #199e70;
     --series-skipped: #d95926;
     --series-inconclusive: #3987e5;
-    --series-unknown: #4f545b;
-    --series-unknown-line: #797f88;
   }
 }
 
@@ -659,18 +655,7 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
   cursor: progress;
 }
 
-.label-level {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-top: 0.3rem;
-}
-
-.label-level .level-name {
-  flex: none;
-  min-width: 3.6rem;
-  color: var(--muted);
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.trend-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.76rem;
 }

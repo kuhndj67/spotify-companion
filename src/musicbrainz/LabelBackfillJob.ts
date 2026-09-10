@@ -167,10 +167,7 @@ export class LabelBackfillJob {
           const artist = await this.#enrichment.resolveArtist(play.artistId, 'low');
           const artistSnapshot = this.#enrichment.toArtistSnapshot(artist);
           if (artistSnapshot !== null) {
-            const wroteArtist = this.#repository.applyArtistLabelSnapshot(
-              play.playId,
-              artistSnapshot,
-            );
+            const wroteArtist = this.#repository.applyArtistSnapshot(play.playId, artistSnapshot);
             if (wroteArtist) report.artistsResolved += 1;
           }
         }

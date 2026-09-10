@@ -386,11 +386,18 @@ describe('/api/explain/:playId', () => {
     assert.equal((await fetch(`${base}/api/explain/9999`)).status, 404);
   });
 
-  it('reports both levels side by side and never merged', async () => {
-    // Q12: a release's label is a fact about a past pressing, an artist's is a fact about now.
+  /**
+   * ⚠️ There used to be an `artist` trace beside this one, and its absence is the assertion.
+   *
+   * It derived a label verdict from `browse /release?artist=`, which returns every release the
+   * artist appears on including ones they only feature on — 109 of Bad Bunny's 201 official
+   * releases are other people's records. The trace explained that derivation rigorously, which
+   * made a wrong question look like a careful answer.
+   */
+  it('traces the release level, and only the release level', async () => {
     const body: Body = await (await fetch(`${base}/api/explain/1`)).json();
     assert.ok(body.release, 'release level missing');
-    assert.ok(body.artist, 'artist level missing');
+    assert.equal(body.artist, undefined, 'the artist-level trace was removed with its verdict');
     assert.equal(body.play.id, 1);
   });
 });

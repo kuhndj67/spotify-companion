@@ -86,8 +86,8 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-486 tests passing · 99.12% line · 92.70% branch · typecheck clean · **149 plays recorded** (47 completed, 5 skipped, 97 unknown)
-· schema v3. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
+486 tests passing · 99.19% line · 92.86% branch · typecheck clean · **181 plays recorded**
+· schema v4. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
 `integrity_check: ok`, all 65 live trails intact. Backup kept in `data/`.
 
 ### 🔒 The hypothesis gate has been pre-registered and run — **INSUFFICIENT DATA**
@@ -159,6 +159,9 @@ Mode, so there is no single-track check to fall back on; clicking re-reads the w
 (`POST /api/liked/refresh`). Nothing polls it: ~12 requests on a timer to keep a badge warm would
 spend rate limit that label resolution needs. The badge's tooltip carries the age of its answer.
 
+⚠️ **The artist-level LABEL verdict is gone (2026-09-06) — see the warning below.** `Label
+detail` now renders one level, the release, and `Genres` is what the artist level is for.
+
 ⚠️ **`Label detail` looked dead and was not.** It renders the label *names* behind a verdict, and
 36 of 177 plays have them; it is empty ~80% of the time because **MusicBrainz coverage on recent
 releases is ~44%** (open item 3b). It used to render a bare `—`, which is indistinguishable from a
@@ -166,8 +169,9 @@ broken field, and was nearly deleted on that basis. It now says `not yet resolve
 lists no label`. **An empty state that does not explain itself will eventually be removed by
 someone who assumes it is broken.**
 
-`artistNames` had been broadcast by the server and silently dropped by the client since U2 — two
-verdicts, one set of names. Both levels now render, separately labelled and never merged (Q12).
+`artistNames` had been broadcast by the server and silently dropped by the client since U2. Both
+levels rendered from 2026-09-06 — and the artist level was removed the same day, because rendering
+it is what revealed it was wrong. **Q12 is withdrawn, not amended.**
 
 ### Phases are sequenced by risk containment
 
@@ -239,6 +243,38 @@ as **38% of the corpus where it was 74% of what was actually measured**: the app
 of this by filtering backfilled rows out -- their volume is real information about the corpus,
 and R2 depends on it being visible.
 
+**`not-observed` is COUNTED EVERYWHERE AND DRAWN NOWHERE, and that asymmetry is deliberate.**
+It stopped being a fourth bar on the weekly trend on 2026-09-06 — 84 of 187 plays are backfilled
+across seven days the app never ran, so as a series it filled every artist's chart with the
+*instrument's downtime*. It is still reported in the note under the legend, the hover tooltip, the
+table column and the track panel's breakdown. **Do not tidy it out of those too**: a reader who
+sees `Times played 6 · 1 completed` with no fourth number will take it for six observed listens,
+which is the 2026-09-06 merge defect wearing a different hat. The chart answers *what did the app
+measure*; the numbers beside it answer *how much did it miss*, and R2 needs the second question to
+stay askable.
+
+⚠️ **The trend's y-axis scales to the DRAWN total, never `week.total`.** `week.total` still counts
+the undrawn `not-observed` plays, so scaling to it shrinks every bar against an axis whose height
+comes from columns that are not on the page — a week of 8 observed plays rendering at a third of a
+week that was 24 unobserved, for a reason nothing on screen explains.
+
+⚠️ **An artist whose every play is backfilled has a drawn max of zero, and that is NOT "first time
+hearing this artist".** Same family as the `Label detail` dash: an empty state that does not
+explain itself gets read as broken, or as the wrong fact. It says `N plays, none observed — the app
+was not running.`
+
+**Play rows are never deleted to tidy the display, and the backfilled ones least of all.** Asked on
+2026-09-06 whether the `not recorded` rows could be marked `completed` or else removed: neither.
+Marking them completed is fabrication that reaches R1 — the gate's `ELIGIBLE` predicate is
+`outcome IN ('completed','skipped')` with **no provenance guard**, so the moment open item 3
+recovers their ISRCs, 84 rows that are completions *by construction* enter the hypothesis test with
+zero skips against a live-measured 12% skip rate. Deleting them is worse: **seven of the corpus's
+ten days have zero live plays** and exist only as backfilled rows — 73 tracks, 42 artists — and
+`recently-played` is a 50-play window, so unlike code, labels or genres, they come back from
+nowhere. There is a real derivation available if it is ever wanted (`played_at` is the end, so
+`end_B − end_A` is B's listened time; validated at 53:1 in the 0.90–1.05 band, resolving 56 of 83),
+but it was declined as complexity the app does not need.
+
 **A coverage percentage cannot see a file no test imports.** V8 coverage only reports modules
 that were actually *loaded*, so an untested file is missing from the **denominator** rather than
 counted as 0% — it cannot drag the average down. On 2026-09-06 the suite reported **98.96%** while
@@ -294,6 +330,34 @@ Sunday and `%U` from the first Monday, and neither is the ISO week; at a year bo
 week `00` that is sometimes partial and sometimes fused with December. That is one wrong week in
 fifty-two, drawn as a listening pattern rather than raised as an error. `history/playStats.ts` is
 pure and takes `now` as a parameter, which is the only reason the week seam is testable at all.
+
+**MusicBrainz `browse /release?artist=` COUNTS RELEASES THE ARTIST ONLY FEATURES ON.** There is no
+flag for this and the field that would tell you (`artist-credit`) is not returned unless you ask
+for it. Probed 2026-09-06 on Bad Bunny: 201 official releases, **92 his, 109 other people's records
+he guests on**, and **49 of the 64 distinct labels reachable only through a guest credit** —
+Atlantic from Cardi B's *I Like It*, El Cartel from Daddy Yankee's *Dura*. An artist-level label
+verdict was classified over this until 2026-09-06 and it read *other artists' record deals*.
+Because BR-4.3's fold makes one strong `major` vote decisive, **every collaborative artist read
+`major`** — bias in the *independent* variable, pushing independents into the major group, which
+is the direction that would mask R1. The verdict is **removed, not repaired** (migration 004): the
+label a track was released under is a release-level fact answered through the ISRC, and there is
+no second label question worth a request. The artist level is **genres and a pointer**. If a later
+unit wants an artist-level signal, it must start from `inc=artist-credits` and filter on
+`artist-credit[0]`, and `test/resolutionTrace.test.ts` is what should fail first.
+
+⚠️ **That browse was also `limit=100` with no paging, and the 100 was stored as `release_count`.**
+Bad Bunny has 205; page 2 alone held 20 labels page 1 never saw, including Universal, Epic and
+Warner. 18 of 56 stored resolutions sat exactly at 100 — an arbitrary sample recorded as a
+complete count, with nothing marking it truncated. **Any capped fetch whose count is written down
+is this bug.** `LikedSetCache` pages; that path never learned to.
+
+⚠️ **A work set needs a terminator that a permanent absence can still satisfy.** The label backfill
+asked "does this play still need the artist level?" with `artist_label_verdict IS NULL`, which
+terminated only because a not-found artist got the verdict `unknown`. With the verdict gone,
+`artist_genres IS NULL` reads as the obvious replacement and is a trap: an artist MusicBrainz has
+never catalogued has no genres and never will, so the play would return on every sweep for ever,
+spending requests to learn the same nothing. The guard is `artist_resolution_id IS NULL` — a
+pointer written even when the answer is empty.
 
 **MusicBrainz throttles at 1 req/sec spacing.** Measured: 6 of 19 tracks took a `503` at 1200 ms —
 wider than the policy floor. The bounded retry is load-bearing, not belt-and-braces. Each retry

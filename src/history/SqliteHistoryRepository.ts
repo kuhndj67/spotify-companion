@@ -22,12 +22,12 @@ import { dirname } from 'node:path';
 import type { HistoryRepository } from './HistoryRepository.js';
 import { migrate, type MigrationReport } from './migrations.js';
 import type {
-  ArtistLabelSnapshot,
+  ArtistSnapshot,
   LabelCoverage,
   LabelRepository,
   LabelSnapshot,
   LikedEvidence,
-  NewArtistLabelResolution,
+  NewArtistResolution,
   NewLabelResolution,
   PlayLabelPointers,
   PlayNeedingLabels,
@@ -35,7 +35,7 @@ import type {
 } from '../musicbrainz/LabelRepository.js';
 import type {
   ArtistGenre,
-  ArtistLabelResolution,
+  ArtistResolution,
   LabelCandidate,
   LabelResolution,
   LabelVerdict,
@@ -163,10 +163,7 @@ function toLabelFields(row: Record<string, unknown>): LabelFields {
     unknownReason: (row.label_unknown_reason ?? null) as string | null,
     resolutionId: (row.label_resolution_id ?? null) as number | null,
     classifierVersion: (row.label_classifier_version ?? null) as number | null,
-    artistVerdict: (row.artist_label_verdict ?? null) as string | null,
-    artistConfidence: (row.artist_label_confidence ?? null) as string | null,
-    artistNames: names(row.artist_label_names),
-    artistResolutionId: (row.artist_label_resolution_id ?? null) as number | null,
+    artistResolutionId: (row.artist_resolution_id ?? null) as number | null,
     likedAtStart: bool(row.liked_at_start),
     likedAtEnd: bool(row.liked_at_end),
     likedAddedAt: (row.liked_added_at ?? null) as string | null,
@@ -566,7 +563,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
         );
 
       const id = Number(info.lastInsertRowid);
-      this.#insertCandidates('label_candidate', id, resolution.candidates);
+      this.#insertCandidates(id, resolution.candidates);
       this.#insertVotes('label_signal_vote', id, resolution.votes);
 
       this.#db.exec('COMMIT');
@@ -577,28 +574,25 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     }
   }
 
-  insertArtistLabelResolution(resolution: NewArtistLabelResolution): number {
+  insertArtistResolution(resolution: NewArtistResolution): number {
     this.#db.exec('BEGIN');
     try {
       const previous = this.#db
         .prepare(
-          `SELECT id FROM artist_label_resolution
+          `SELECT id FROM artist_resolution
            WHERE spotify_artist_id = ? ORDER BY resolved_at DESC LIMIT 1`,
         )
         .get(resolution.spotifyArtistId) as { id: number } | undefined;
 
       const info = this.#db
         .prepare(
-          `INSERT INTO artist_label_resolution
-             (spotify_artist_id, artist_mbid, release_count, named_label_count,
-              resolved_at, status, supersedes_id, genres)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO artist_resolution
+             (spotify_artist_id, artist_mbid, resolved_at, status, supersedes_id, genres)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           resolution.spotifyArtistId,
           resolution.artistMbid,
-          resolution.releaseCount,
-          resolution.namedLabelCount,
           resolution.resolvedAt,
           resolution.status,
           previous?.id ?? null,
@@ -606,8 +600,6 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
         );
 
       const id = Number(info.lastInsertRowid);
-      this.#insertCandidates('artist_label', id, resolution.candidates);
-      this.#insertVotes('artist_label_signal_vote', id, resolution.votes);
 
       this.#db.exec('COMMIT');
       return id;
@@ -617,33 +609,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     }
   }
 
-  #insertCandidates(table: string, resolutionId: number, candidates: LabelCandidate[]): void {
-    if (table === 'artist_label') {
-      // The artist-level table carries a per-label release count rather than release detail:
-      // it aggregates a career, so which pressing a label appeared on is not the question.
-      const statement = this.#db.prepare(
-        `INSERT INTO artist_label (resolution_id, label_name, label_mbid, label_type, release_count)
-         VALUES (?, ?, ?, ?, ?)`,
-      );
-      const counts = new Map<string, number>();
-      for (const candidate of candidates) {
-        counts.set(candidate.labelName, (counts.get(candidate.labelName) ?? 0) + 1);
-      }
-      const seen = new Set<string>();
-      for (const candidate of candidates) {
-        if (seen.has(candidate.labelName)) continue;
-        seen.add(candidate.labelName);
-        statement.run(
-          resolutionId,
-          candidate.labelName,
-          candidate.labelMbid,
-          candidate.labelType,
-          counts.get(candidate.labelName) ?? 1,
-        );
-      }
-      return;
-    }
-
+  #insertCandidates(resolutionId: number, candidates: LabelCandidate[]): void {
     const statement = this.#db.prepare(
       `INSERT INTO label_candidate
          (resolution_id, label_name, label_mbid, label_type, catalog_number,
@@ -696,26 +662,6 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     }));
   }
 
-  #loadArtistCandidates(resolutionId: number): LabelCandidate[] {
-    const rows = this.#db
-      .prepare(
-        'SELECT label_name, label_mbid, label_type, release_count FROM artist_label WHERE resolution_id = ?',
-      )
-      .all(resolutionId) as Record<string, string | number | null>[];
-
-    return rows.map((row) => ({
-      labelName: row.label_name as string,
-      labelMbid: (row.label_mbid ?? null) as string | null,
-      labelType: (row.label_type ?? null) as LabelCandidate['labelType'],
-      catalogNumber: null,
-      // Artist-level candidates are not tied to one release; the count is the evidence.
-      releaseId: `aggregate:${String(row.release_count ?? 0)}`,
-      releaseTitle: null,
-      releaseDate: null,
-      releaseStatus: null,
-    }));
-  }
-
   #loadVotes(table: string, resolutionId: number): SignalVote[] {
     const rows = this.#db
       .prepare(`SELECT signal, verdict, strength, evidence FROM ${table} WHERE resolution_id = ?`)
@@ -732,7 +678,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   getPlayLabelPointers(playId: number): PlayLabelPointers {
     const row = this.#db
       .prepare(
-        `SELECT label_resolution_id, artist_label_resolution_id,
+        `SELECT label_resolution_id, artist_resolution_id,
                 label_classifier_version, label_unknown_reason
          FROM play WHERE id = ?`,
       )
@@ -740,7 +686,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
 
     return {
       labelResolutionId: (row?.label_resolution_id ?? null) as number | null,
-      artistLabelResolutionId: (row?.artist_label_resolution_id ?? null) as number | null,
+      artistResolutionId: (row?.artist_resolution_id ?? null) as number | null,
       labelClassifierVersion: (row?.label_classifier_version ?? null) as number | null,
       labelUnknownReason: (row?.label_unknown_reason ?? null) as UnknownReason | null,
     };
@@ -779,36 +725,24 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     };
   }
 
-  getCurrentArtistLabelResolution(spotifyArtistId: string): ArtistLabelResolution | null {
+  getCurrentArtistResolution(spotifyArtistId: string): ArtistResolution | null {
     const row = this.#db
       .prepare(
-        `SELECT * FROM artist_label_resolution
+        `SELECT * FROM artist_resolution
          WHERE spotify_artist_id = ? ORDER BY resolved_at DESC LIMIT 1`,
       )
       .get(spotifyArtistId) as Record<string, unknown> | undefined;
     return row === undefined ? null : this.#toArtistResolution(row);
   }
 
-  getArtistLabelResolutionById(id: number): ArtistLabelResolution | null {
-    const row = this.#db.prepare('SELECT * FROM artist_label_resolution WHERE id = ?').get(id) as
-      | Record<string, unknown>
-      | undefined;
-    return row === undefined ? null : this.#toArtistResolution(row);
-  }
-
-  #toArtistResolution(row: Record<string, unknown>): ArtistLabelResolution {
-    const id = row.id as number;
+  #toArtistResolution(row: Record<string, unknown>): ArtistResolution {
     return {
-      id,
+      id: row.id as number,
       spotifyArtistId: row.spotify_artist_id as string,
       artistMbid: (row.artist_mbid ?? null) as string | null,
-      releaseCount: row.release_count as number,
-      namedLabelCount: row.named_label_count as number,
       resolvedAt: row.resolved_at as string,
-      status: row.status as ArtistLabelResolution['status'],
+      status: row.status as ArtistResolution['status'],
       supersedesId: (row.supersedes_id ?? null) as number | null,
-      candidates: this.#loadArtistCandidates(id),
-      votes: this.#loadVotes('artist_label_signal_vote', id),
       // NULL means we never asked or the lookup failed; [] means MusicBrainz has none.
       genres: parseGenres(row.genres),
     };
@@ -845,19 +779,23 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     return info.changes > 0;
   }
 
-  applyArtistLabelSnapshot(playId: number, snapshot: ArtistLabelSnapshot): boolean {
+  /**
+   * Write the artist-level snapshot, refusing to overwrite one that already exists (BR-8.4a).
+   *
+   * ⚠️ **The guard is `artist_resolution_id IS NULL`, and the pointer is written even when there
+   * are no genres.** It used to guard on `artist_label_verdict IS NULL`, which terminated the work
+   * set only because a not-found artist got the verdict `unknown`. With the verdict gone, guarding
+   * on `artist_genres IS NULL` instead would look equivalent and would not be: an artist
+   * MusicBrainz has never catalogued has no genres and never will, so that play would come back
+   * round on every sweep for ever, spending two requests each time to learn the same nothing.
+   */
+  applyArtistSnapshot(playId: number, snapshot: ArtistSnapshot): boolean {
     const info = this.#db
       .prepare(
-        `UPDATE play SET
-           artist_label_verdict = ?, artist_label_confidence = ?,
-           artist_label_names = ?, artist_label_resolution_id = ?,
-           artist_genres = ?
-         WHERE id = ? AND artist_label_verdict IS NULL`,
+        `UPDATE play SET artist_resolution_id = ?, artist_genres = ?
+         WHERE id = ? AND artist_resolution_id IS NULL`,
       )
       .run(
-        snapshot.verdict,
-        snapshot.confidence,
-        snapshot.labelNames.length > 0 ? JSON.stringify(snapshot.labelNames) : null,
         snapshot.resolutionId,
         snapshot.genres === null ? null : JSON.stringify(snapshot.genres),
         playId,
@@ -921,7 +859,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
          FROM play
          WHERE isrc IS NOT NULL
            AND ( label_verdict IS NULL
-              OR (artist_id IS NOT NULL AND artist_label_verdict IS NULL) )
+              OR (artist_id IS NOT NULL AND artist_resolution_id IS NULL) )
          ORDER BY started_at DESC
          LIMIT ?`,
       )
@@ -991,9 +929,9 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   listArtistsNeedingGenres(limit: number): string[] {
     const rows = this.#db
       .prepare(
-        `SELECT spotify_artist_id FROM artist_label_resolution AS r
+        `SELECT spotify_artist_id FROM artist_resolution AS r
          WHERE r.resolved_at = (
-                 SELECT MAX(resolved_at) FROM artist_label_resolution
+                 SELECT MAX(resolved_at) FROM artist_resolution
                  WHERE spotify_artist_id = r.spotify_artist_id)
            AND r.status = 'resolved'
            AND r.genres IS NULL
@@ -1009,7 +947,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     const info = this.#db
       .prepare(
         `UPDATE play SET artist_genres = (
-           SELECT r.genres FROM artist_label_resolution AS r
+           SELECT r.genres FROM artist_resolution AS r
            WHERE r.spotify_artist_id = play.artist_id
              AND r.genres IS NOT NULL
            ORDER BY r.resolved_at DESC LIMIT 1)
@@ -1018,7 +956,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
            WHERE artist_genres IS NULL
              AND artist_id IS NOT NULL
              AND EXISTS (
-               SELECT 1 FROM artist_label_resolution AS r2
+               SELECT 1 FROM artist_resolution AS r2
                WHERE r2.spotify_artist_id = play.artist_id AND r2.genres IS NOT NULL)
            LIMIT ?)`,
       )

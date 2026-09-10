@@ -90,9 +90,6 @@ export type VoteStrength = 'strong' | 'weak';
 /** Which heuristic produced a vote. All three exist and measurably disagree (R3, Part 5). */
 export type SignalName = 'major-root-list' | 'label-relationship' | 'isrc-prefix';
 
-/** The two levels, stored separately and **never merged** (Q12). */
-export type ResolutionScope = 'release' | 'artist';
-
 /**
  * One label as it appears on one release. Immutable.
  *
@@ -161,28 +158,33 @@ export interface ArtistGenre {
 }
 
 /**
- * The artist-level equivalent, resolved through an **exact** Spotify-URL join rather than by name.
+ * The artist level carries **genres, and nothing else.**
  *
- * MusicBrainz stores streaming links as first-class `url` entities, so the Spotify artist ID the
- * app already holds is a direct key — no name matching, none of the misattribution hazard that
- * makes search unsafe. MusicBrainz holds three artists named `Prof`; the join returns the right
- * one by construction.
+ * It used to also carry a label verdict classified over `browse /release?artist=`. That browse
+ * returns every release the artist appears on **including features**, and for a collaborative
+ * artist the features dominate: Bad Bunny came back 92 lead releases against 109 guest spots,
+ * and 49 of the 64 distinct label names were reachable only through somebody else's record deal
+ * — Atlantic via Cardi B's *I Like It*, El Cartel via Daddy Yankee's *Dura*. Since one strong
+ * `major` vote decides the fold, any artist who had ever featured on a major-label single read
+ * as `major`. That biases the *independent variable* in the direction that would mask R1, and it
+ * surfaced on the panel as 42 label names for a track released on Rimas.
  *
- * ⚠️ **It answers a different question from the release level and must never be merged with it.**
- * Token — *Full Bag* is `Never Too Different` (independent) at release level and `Atlantic` at
- * artist level. Both are true: an Atlantic artist releasing this one independently.
+ * The label question is answered at release level through the ISRC, which names the label the
+ * track was actually released under. There is no second label question worth spending a request
+ * on, so the artist-level browse and its classification are gone (migration 004).
+ *
+ * The Spotify-URL join survives because genres need the MBID: MusicBrainz stores streaming links
+ * as first-class `url` entities, so the Spotify artist ID is an exact key with none of the
+ * misattribution hazard that makes name search unsafe. MusicBrainz holds three artists named
+ * `Prof`; the join returns the right one by construction.
  */
-export interface ArtistLabelResolution {
+export interface ArtistResolution {
   id: number;
   spotifyArtistId: string;
   artistMbid: string | null;
-  releaseCount: number;
-  namedLabelCount: number;
   resolvedAt: string;
   status: ResolutionStatus;
   supersedesId: number | null;
-  candidates: LabelCandidate[];
-  votes: SignalVote[];
   /**
    * `null` means we never asked or the lookup failed; `[]` means we asked and MusicBrainz has
    * none. Different facts, kept different.

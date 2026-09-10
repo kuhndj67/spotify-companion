@@ -30,13 +30,11 @@
  */
 
 import type {
-  ArtistLabelResolution,
   CandidateDecision,
   Confidence,
   LabelResolution,
   LabelVerdict,
   NarrowingTier,
-  ResolutionScope,
   SignalVote,
   UnknownReason,
 } from './types.js';
@@ -61,12 +59,18 @@ export interface ClassifierVersionReport {
   diverged: boolean;
 }
 
+/**
+ * ⚠️ **There is one scope now: the release.** This carried a `scope` of `release | artist` until
+ * 2026-09-06, because an artist-level verdict was classified over the artist's release browse.
+ * That browse counts releases the artist only *features* on as their own, so the artist trace was
+ * a derivation over other people's record deals — see migration 004. The artist level is genres,
+ * and genres are looked up rather than derived, so they have nothing to trace.
+ */
 export interface ResolutionTrace {
   playId: number;
-  scope: ResolutionScope;
   /** Present unless nothing was ever resolved. */
   join: {
-    key: 'isrc' | 'spotify-url';
+    key: 'isrc';
     value: string;
     matchMethod: string;
     recordingMbid: string | null;
@@ -96,14 +100,11 @@ export interface ResolutionTrace {
 
 export interface TraceInput {
   playId: number;
-  resolution: LabelResolution | ArtistLabelResolution | null;
-  scope: ResolutionScope;
+  resolution: LabelResolution | null;
   storedClassifierVersion: number | null;
   runningClassifierVersion: number;
   majorRoots: readonly string[];
   isrcVote: SignalVote | null;
-  /** Set for artist-level, where confidence is capped because it aggregates a career. */
-  capConfidenceAt?: Confidence;
   /** Why the verdict was unknown, when there is no resolution to derive from. */
   unknownReason?: UnknownReason | null;
 }
@@ -126,12 +127,6 @@ function toTracedCandidate(decision: CandidateDecision): TracedCandidate {
   };
 }
 
-function isReleaseResolution(
-  resolution: LabelResolution | ArtistLabelResolution,
-): resolution is LabelResolution {
-  return 'isrc' in resolution;
-}
-
 /**
  * Build a trace.
  *
@@ -140,16 +135,8 @@ function isReleaseResolution(
  * only the second is a coverage finding.
  */
 export function buildTrace(input: TraceInput): ResolutionTrace {
-  const {
-    playId,
-    resolution,
-    scope,
-    storedClassifierVersion,
-    runningClassifierVersion,
-    majorRoots,
-    isrcVote,
-    capConfidenceAt,
-  } = input;
+  const { playId, resolution, storedClassifierVersion, runningClassifierVersion, majorRoots, isrcVote } =
+    input;
 
   const classifierVersion: ClassifierVersionReport = {
     storedOnPlay: storedClassifierVersion,
@@ -163,7 +150,6 @@ export function buildTrace(input: TraceInput): ResolutionTrace {
   if (resolution === null) {
     return {
       playId,
-      scope,
       join: null,
       narrowingTier: null,
       releaseCount: null,
@@ -177,15 +163,13 @@ export function buildTrace(input: TraceInput): ResolutionTrace {
     };
   }
 
-  const isRelease = isReleaseResolution(resolution);
-  const narrowingTier: NarrowingTier = isRelease ? resolution.narrowingTier : 'none';
+  const narrowingTier: NarrowingTier = resolution.narrowingTier;
 
   // The same pure function that produced the verdict, over the candidates THIS VERSION held.
   const classification = classify(resolution.candidates, {
     majorRoots,
     narrowingTier,
     isrcVote,
-    capConfidenceAt,
   });
 
   const decisions = explainCandidates(resolution.candidates);
@@ -195,12 +179,11 @@ export function buildTrace(input: TraceInput): ResolutionTrace {
 
   return {
     playId,
-    scope,
     join: {
-      key: isRelease ? 'isrc' : 'spotify-url',
-      value: isRelease ? resolution.isrc : resolution.spotifyArtistId,
-      matchMethod: isRelease ? resolution.matchMethod : 'exact-url',
-      recordingMbid: isRelease ? resolution.recordingMbid : resolution.artistMbid,
+      key: 'isrc',
+      value: resolution.isrc,
+      matchMethod: resolution.matchMethod,
+      recordingMbid: resolution.recordingMbid,
       resolvedAt: resolution.resolvedAt,
       resolutionId: resolution.id,
       status: resolution.status,

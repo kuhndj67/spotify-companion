@@ -29,7 +29,7 @@
 
 import type {
   ArtistGenre,
-  ArtistLabelResolution,
+  ArtistResolution,
   Confidence,
   LabelCandidate,
   LabelResolution,
@@ -54,15 +54,15 @@ export interface NewLabelResolution {
   votes: SignalVote[];
 }
 
-export interface NewArtistLabelResolution {
+/**
+ * Genres only. There is no artist-level label verdict — see {@link ArtistResolution} for why the
+ * release browse it was classified from had to go.
+ */
+export interface NewArtistResolution {
   spotifyArtistId: string;
   artistMbid: string | null;
-  releaseCount: number;
-  namedLabelCount: number;
   resolvedAt: string;
   status: ResolutionStatus;
-  candidates: LabelCandidate[];
-  votes: SignalVote[];
   /** `null` = never asked or the lookup failed; `[]` = asked, MusicBrainz has none. */
   genres: ArtistGenre[] | null;
 }
@@ -86,10 +86,15 @@ export interface LabelSnapshot {
   classifierVersion: number;
 }
 
-export interface ArtistLabelSnapshot {
-  verdict: LabelVerdict;
-  confidence: Confidence;
-  labelNames: string[];
+/**
+ * The artist-level as-of-play snapshot: the genres, and a pointer to the version they came from.
+ *
+ * `resolutionId` is also the **work-set terminator**. It used to be `artist_label_verdict IS NULL`
+ * that said "this play still needs the artist level", which only worked because a not-found artist
+ * was written down as verdict `unknown`. With no verdict left to write, the pointer is what stops
+ * an artist MusicBrainz has never heard of from being looked up on every single sweep.
+ */
+export interface ArtistSnapshot {
   resolutionId: number | null;
   genres: ArtistGenre[] | null;
 }
@@ -114,7 +119,7 @@ export interface LikedEvidence {
  */
 export interface PlayLabelPointers {
   labelResolutionId: number | null;
-  artistLabelResolutionId: number | null;
+  artistResolutionId: number | null;
   labelClassifierVersion: number | null;
   labelUnknownReason: UnknownReason | null;
 }
@@ -172,9 +177,8 @@ export interface LabelRepository {
   /** A specific version, by id — what the trace uses so it explains what actually ran. */
   getLabelResolutionById(id: number): LabelResolution | null;
 
-  insertArtistLabelResolution(resolution: NewArtistLabelResolution): number;
-  getCurrentArtistLabelResolution(spotifyArtistId: string): ArtistLabelResolution | null;
-  getArtistLabelResolutionById(id: number): ArtistLabelResolution | null;
+  insertArtistResolution(resolution: NewArtistResolution): number;
+  getCurrentArtistResolution(spotifyArtistId: string): ArtistResolution | null;
 
   /**
    * Write the as-of-play snapshot.
@@ -184,7 +188,7 @@ export interface LabelRepository {
    */
   applyLabelSnapshot(playId: number, snapshot: LabelSnapshot): boolean;
 
-  applyArtistLabelSnapshot(playId: number, snapshot: ArtistLabelSnapshot): boolean;
+  applyArtistSnapshot(playId: number, snapshot: ArtistSnapshot): boolean;
 
   /** Amend liked evidence once, after the grace window (BR-9.2). */
   updateLikedEvidence(playId: number, evidence: LikedEvidence): void;

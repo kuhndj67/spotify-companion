@@ -12,17 +12,24 @@
   [`hypothesis-gate/gate-result-2026-09-05.md`](construction/u2-label-enrichment/hypothesis-gate/gate-result-2026-09-05.md).
   **U3 is deliberately PAUSED (user, 2026-09-05) to collect data** — the gate needs listening
   more than it needs code, and there is no time constraint.
-  Database at schema **v3**, **164 plays** (84 backfilled / 80 live) after the `played_at` repair
-  of 2026-09-06 — 41 duplicate backfill rows removed, 84 re-timed. 72 with label verdicts.
+  Database at schema **v4**, **181 plays** after the `played_at` repair of 2026-09-06 — 41
+  duplicate backfill rows removed, 84 re-timed.
   A **listening-statistics panel** was added 2026-09-06 (see below) — display only, no migration.
-  **486 tests** · 99.12% line · 92.70% branch. Routes extracted to `api.ts` and tested over real
+  ⚠️ **The artist-level LABEL verdict was removed 2026-09-06 (migration 004) and Q12 is
+  withdrawn.** It was classified over `browse /release?artist=`, which counts releases the artist
+  merely *features* on: Bad Bunny returned 92 lead releases against 109 guest spots, and 49 of 64
+  label names came only from other artists' record deals. One strong `major` vote decides the
+  fold, so every collaborative artist read `major` — bias in the **independent** variable, in the
+  direction that would mask R1. The label question is answered once, at release level, through the
+  ISRC; the artist level is now **genres and a resolution pointer**, at 4 requests per new artist
+  instead of 5. See `audit.md` for the probe and the four-way classifier comparison.
+  **486 tests** · 99.19% line · 92.86% branch. Routes extracted to `api.ts` and tested over real
   HTTP; `noOrphanModules.test.ts` closes the coverage blind spot that hid them.
 
 ### ▶ Where to pick up (2026-09-06, end of session)
 
-**Nothing is half-finished.** Working tree clean, container healthy and recording, six commits
-today, all documented in `audit.md`. **25 commits are unpushed** — code only exists on this
-machine until `git push`.
+**Nothing is half-finished.** Container healthy and recording on schema v4, all work documented
+in `audit.md`. **Commits are unpushed** — code only exists on this machine until `git push`.
 
 The instrument is now collecting properly for the first time: before today every restart
 duplicated recent plays, and the corpus mixed "the app was off" with "the app could not tell".
@@ -38,8 +45,13 @@ Open threads, none blocking:
 2. **`public/app.js` has no tests at all** and is not covered by the orphan check, which walks
    `src/` only. Two real defects were found there today by *clicking* — the liked-refresh race
    and the "every axis tick says Aug" bug.
-3. **A database backup sits in `data/`** (`history.db.backup-2026-09-06T02-07-53-966Z`, 704 KB)
-   from the `played_at` repair. Delete it once the repaired data has been trusted for a while.
+3. **Two database backups sit in `data/`** — `history.db.backup-2026-09-06T02-07-53-966Z` from
+   the `played_at` repair, and `backup-before-migration-004-20260906T231755Z/` from the
+   artist-level removal. Delete each once its change has been trusted for a while.
+4. **The label-coverage statistics are now cleaner than they were, for a reason worth noting.**
+   Nothing consumed the artist-level verdict except the panel and the export — the hypothesis
+   gate has always grouped on `label_verdict` (release level, BR-11.1a), so removing it changed
+   **no gate input**. That is why this was a safe removal rather than a re-measurement.
 4. **Watch `Inconclusive` on the weekly chart.** With the container on autostart it should stay
    near zero; today's 17 live-unknowns are mostly container rebuilds. A rising count with the app
    running continuously would be a real classifier finding.
@@ -354,7 +366,7 @@ discovered.
 ## U2 Settled Design Parameters (Functional Design, 2026-08-26)
 | Parameter | Value | Source |
 |---|---|---|
-| Join key | **ISRC only** at release level; **exact Spotify-URL join** at artist level | Q3, Q12 |
+| Join key | **ISRC only** at release level; the **exact Spotify-URL join** survives at artist level for genres alone | Q3, Q12 rescinded |
 | Resolution chain | **Two calls** — `/isrc/{isrc}` then `/release?recording=…&inc=labels` | Part 5 |
 | Release narrowing | **Cascade** `title+date → title → all`, tier recorded | Q1 = A |
 | Tier `all` | **Caps confidence at `low`** | Q1 = A |
@@ -365,7 +377,7 @@ discovered.
 | Fold rule | Any strong `major` ⇒ `major`; `independent` requires **no** major vote | Q5 principle |
 | `contested` | **Major-vs-major only**; caps confidence at `low` | Q2 = A+C |
 | Confidence | **Ordinal `high`/`medium`/`low`**, per-signal votes retained underneath | Q6+Q11 = A |
-| Two levels | Release and artist stored **separately, never merged** | Q12 = A |
+| ~~Two levels~~ | ~~Release and artist stored separately, never merged~~ — **Q12 WITHDRAWN 2026-09-06.** The artist level had no valid label evidence; it is genres only | Q12 rescinded |
 | Artist confidence | **Capped at `medium`** — aggregates a career, not a release | Part 6 |
 | ISRC backfill | **Yes** — 47 one-off `GET /tracks/{id}` | Q7 = A |
 | `likedAtEnd` | Play close **+ ~30 s grace window**, attributed by `added_at` | Q8 = A |
@@ -385,6 +397,15 @@ of it. **This principle already caught one live error** — it is what exposed t
 `label_candidate`, `label_signal_vote`, `artist_label_resolution`, `artist_label`,
 `artist_label_signal_vote` — **16 new nullable `play` columns**, 6 indexes. Additive only, and
 still unimplemented (`schema_version` = 1).
+
+**Migration 004** (2026-09-06) is the first **non-additive** one: `artist_label` and
+`artist_label_signal_vote` dropped, the three `artist_label_*` verdict columns dropped, and
+`artist_label_resolution` / `artist_label_resolution_id` renamed to `artist_resolution` /
+`artist_resolution_id`. Renamed rather than left as-is, because a table called
+`artist_label_resolution` holding only genres reads as evidence that a verdict exists somewhere.
+Forward-only, like the rest; the dropped rows were **derived, not observed**, and regenerable in
+principle — unlike a play record, which is why the same latitude does not extend to `play` or
+`observation`.
 
 > **New session?** Read `CLAUDE.md` first, then this file, then the last few `audit.md` entries.
 

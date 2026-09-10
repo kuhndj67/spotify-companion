@@ -172,13 +172,11 @@ const labelInFlight = new Set<string>();
 const MAX_DISPLAY_LABELS = 500;
 
 interface DisplayLabel {
-  /** `pending` when only the artist level resolved — never `unknown`, which is an answer. */
+  /** `pending` when only genres resolved — never `unknown`, which is an answer. */
   verdict: string;
   confidence: string | null;
   contested: boolean;
   names: string[];
-  artistVerdict: string | null;
-  artistNames: string[];
   /**
    * Artist genres from MusicBrainz. Spotify's `GET /artists/{id}` returns no genres field at all
    * — one of this project's documentation-vs-reality catches — so this is the only source.
@@ -263,30 +261,22 @@ async function resolveLabelForDisplay(sample: {
     // same conflation cost 21 real plays their artist verdict during Build and Test.
     const snapshot = labelEnrichment.toSnapshot(resolution, sample.isrc);
 
-    let artistVerdict: string | null = null;
-    let artistNames: string[] = [];
     let genres: { name: string; count: number }[] | null = null;
     if (sample.artistId !== null) {
       const artist = await labelEnrichment.resolveArtist(sample.artistId, 'high');
       const artistSnapshot = labelEnrichment.toArtistSnapshot(artist);
-      if (artistSnapshot !== null) {
-        artistVerdict = artistSnapshot.verdict;
-        artistNames = artistSnapshot.labelNames;
-        genres = artistSnapshot.genres;
-      }
+      if (artistSnapshot !== null) genres = artistSnapshot.genres;
     }
 
     // Nothing at all resolved -- leave it uncached so a later tick tries again, rather than
     // pinning `pending` on the panel for the rest of the track.
-    if (snapshot === null && artistVerdict === null) return;
+    if (snapshot === null && genres === null) return;
 
     labelByTrack.set(sample.trackId, {
       verdict: snapshot?.verdict ?? 'pending',
       confidence: snapshot?.confidence ?? null,
       contested: snapshot?.contested ?? false,
       names: snapshot?.labelNames ?? [],
-      artistVerdict,
-      artistNames,
       genres,
     });
 
@@ -353,7 +343,7 @@ async function enrichRecordedPlay(playId: number, record: NewPlayRecord): Promis
     if (record.artistId !== null) {
       const artist = await labelEnrichment.resolveArtist(record.artistId, 'high');
       const artistSnapshot = labelEnrichment.toArtistSnapshot(artist);
-      if (artistSnapshot !== null) repository.applyArtistLabelSnapshot(playId, artistSnapshot);
+      if (artistSnapshot !== null) repository.applyArtistSnapshot(playId, artistSnapshot);
     }
   } catch (error) {
     console.error('[labels] enrichment failed for play', playId, error);

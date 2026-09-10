@@ -284,19 +284,6 @@ export class MusicBrainzClient {
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }
 
-  /** An artist's releases with labels, for the artist-level verdict. */
-  async listReleasesForArtist(
-    artistMbid: string,
-    priority: Priority = 'low',
-  ): Promise<ReleaseSummary[]> {
-    const body = await this.#request<{ releases?: RawRelease[] }>(
-      '/release',
-      { artist: artistMbid, inc: 'labels', limit: '100' },
-      priority,
-    );
-    return (body.releases ?? []).map(toReleaseSummary);
-  }
-
   /**
    * Search fallback — deliberately almost never fires.
    *

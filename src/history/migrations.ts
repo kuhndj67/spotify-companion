@@ -282,6 +282,64 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    description: 'artist level is genres only; the artist-label verdict and its evidence are gone',
+    up(db) {
+      db.exec(`
+        -- ============================================================================
+        -- Removing the artist-level LABEL verdict. Genres stay; they are why the artist
+        -- level still exists at all.
+        --
+        -- The verdict was classified over \`browse /release?artist=<mbid>\`, and that browse
+        -- returns every release the artist appears on INCLUDING ONES THEY ONLY FEATURE ON.
+        -- Probed live 2026-09-06 on Bad Bunny: 201 official releases, of which 92 are his
+        -- and 109 are other artists' records he guests on. 49 of the 64 distinct label
+        -- names were reachable ONLY through a guest credit -- Atlantic from Cardi B's
+        -- \`I Like It\`, El Cartel from Daddy Yankee's \`Dura (remix)\`, Capitol, RCA, Sony,
+        -- Kemosabe, Mad Decent. None of them are his deal.
+        --
+        -- Because BR-4.3's fold makes ONE strong \`major\` vote decisive, this made every
+        -- collaborative artist read \`major\`. That is not noise in the outcome variable, it
+        -- is bias in the INDEPENDENT one, and it points the way that would mask R1 -- the
+        -- feature-heavy end of the catalogue is exactly where the independents are. On the
+        -- panel it showed as 42 label names beside a track released on Rimas.
+        --
+        -- A second defect rode along: the browse was \`limit=100\` with no paging, and
+        -- \`release_count\` recorded that 100 as though it were a total. Bad Bunny has 205;
+        -- page 2 alone held 20 labels page 1 never saw. 18 of 56 stored resolutions sat
+        -- exactly at 100. Same family as the denominator traps -- an arbitrary sample
+        -- written down as a complete count, with nothing marking it truncated.
+        --
+        -- Neither defect touches the RELEASE level, which narrows through the ISRC to the
+        -- specific pressing and answers the actual question: what label was this track
+        -- released under. There is no second label question worth two requests, so the
+        -- browse is deleted rather than filtered (Q12 is withdrawn, not amended).
+        --
+        -- The rows go rather than being left in place. They are derived, not observed --
+        -- regenerable in principle from MusicBrainz, unlike a play record -- and a wrong
+        -- verdict left in a research database is a liability: it reads as a finding.
+        -- ============================================================================
+
+        DROP TABLE artist_label;
+        DROP TABLE artist_label_signal_vote;
+
+        ALTER TABLE play DROP COLUMN artist_label_verdict;
+        ALTER TABLE play DROP COLUMN artist_label_confidence;
+        ALTER TABLE play DROP COLUMN artist_label_names;
+
+        ALTER TABLE artist_label_resolution DROP COLUMN release_count;
+        ALTER TABLE artist_label_resolution DROP COLUMN named_label_count;
+
+        -- Renamed, not kept: a table called artist_label_resolution holding only genres is
+        -- the kind of name someone later reads as evidence that a verdict exists somewhere.
+        -- SQLite rewrites play's foreign key to follow the rename (probed, plus
+        -- foreign_key_check).
+        ALTER TABLE play RENAME COLUMN artist_label_resolution_id TO artist_resolution_id;
+        ALTER TABLE artist_label_resolution RENAME TO artist_resolution;
+      `);
+    },
+  },
 ];
 
 /**

@@ -116,9 +116,13 @@ export interface LabelFields {
   /** The exact resolution version this verdict came from (BR-13.4). */
   resolutionId: number | null;
   classifierVersion: number | null;
-  artistVerdict: string | null;
-  artistConfidence: string | null;
-  artistNames: string[] | null;
+  /**
+   * The artist-level resolution version this play's genres came from (BR-13.4).
+   *
+   * There is no artist-level *verdict* beside it. One was classified over the artist's release
+   * browse until 2026-09-06, and that browse counts features as the artist's own — see
+   * migration 004. The label a track was released under is the release-level fields above.
+   */
   artistResolutionId: number | null;
   likedAtStart: boolean | null;
   likedAtEnd: boolean | null;

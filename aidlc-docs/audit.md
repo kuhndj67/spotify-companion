@@ -2520,3 +2520,208 @@ chart and the track panel. Backfilled plays are shown, never filtered — their 
 information about the corpus.
 **Context**: CONSTRUCTION — U3 still paused. Display-only; no schema change, no data change.
 **486 tests**, typecheck clean, schema v3, container rebuilt and live
+
+
+---
+
+## The Artist-Level Label Verdict Was Reporting Who the Artist's GUESTS Are Signed To
+**Timestamp**: 2026-09-06
+**User Input**: *"As I collect data for test/debug... I see potential issues with the data for
+this track: The current playing track is from 'Bad Bunny' but the 'Artist' field has a TON of
+media companies (I'm guessing incorrectly). Interestingly... the Label listed is 'Independant'
+which I believe is true (so not sure why all the music companies in the artist field."*
+Then, on scope: *"I don't care about artist-credits... the ONLY details at that level that are of
+interest are the artist name and the label that the track was released under... we don't need any
+additional complexity there. I think we'd also not want to perform unnecessary queries (increasing
+the overhead of running the app) so I'd expect the app to do the minimum work required to pin down
+those two values then stop digging."*
+**AI Response**: "The user read the panel correctly and diagnosed it correctly: the release-level
+verdict was right and the artist level was junk. The cause was worse than cosmetic.
+
+**`browse /release?artist=<mbid>` RETURNS RELEASES THE ARTIST ONLY FEATURES ON.**
+
+Probed live, Bad Bunny, all three pages (205 releases, 201 official):
+
+```
+official releases where he is the FIRST artist credit (lead)    92
+official releases where he is a JOINT / FEATURE credit         109
+
+Cardi B, Bad Bunny & J Balvin           - I Like It          -> Atlantic
+Daddy Yankee feat. Becky G, Bad Bunny   - Dura (remix)       -> El Cartel
+Maluma feat. Bad Bunny, Nengo Flow      - 1 polvo            -> Sony Music | Latin
+Nicky Jam feat. Ozuna & Bad Bunny       - El amante (remix)  -> Sony Music
+
+distinct labels overall                                         64
+labels reachable ONLY through a guest credit                    49
+```
+
+His own lead catalogue is 15 labels: `Rimas` 46, `NFL` 17, `Hear This Music` 8, `Rimas
+Entertainment LLC` 7. That is the same independent story the release level already told through
+the ISRC. The 42 names on the panel were **other artists' record deals.**
+
+WARNING: **THIS IS BIAS IN THE INDEPENDENT VARIABLE, NOT NOISE IN THE OUTCOME.** BR-4.3's fold
+makes ONE strong `major` vote decisive, so any artist who had ever featured on a major-label
+single read `major`. Feature-heavy catalogues are exactly where the independents are, so the error
+pushes independents into the `major` group — the direction that would **mask R1**. Ran the shipped
+`classify` over four candidate sets to measure it rather than assert it:
+
+```
+candidate set                              verdict      conf    contested  names  major votes
+first 100, lead + guest  <- what shipped    major        low     yes          42       29
+all 205, lead + guest                       major        low     yes          61       52
+all 205, LEAD credits only                  major        medium  no           13        2
+first 100, LEAD credits only                independent  medium  no            5        0
+```
+
+**A SECOND DEFECT RODE ALONG: `limit=100` WITH NO PAGING, RECORDED AS A TOTAL.** Bad Bunny has
+205 releases; the app fetched 100 and stored `release_count: 100` as though that were his
+catalogue. Page 2 alone held 20 labels page 1 never saw (Universal Music Group, Epic, Warner
+Records). **18 of 56 stored artist resolutions sat exactly at 100** — Slipknot, Radiohead, Tame
+Impala, Goo Goo Dolls, Ren, Dolly Parton, bbno$, Audioslave. The bottom two rows of that table
+disagree for this reason: the verdict depended on which arbitrary half of a catalogue came back.
+Same family as the 28% -> 12% denominator and the `inc=releases` 200 — an arbitrary sample written
+down as a complete count, with nothing marking it truncated.
+
+**REMOVED RATHER THAN FIXED, ON THE USER'S SCOPE CALL.** Filtering to lead credits and paging
+would have cost a request per prolific artist and still answered a question the release level
+already answers better. The user asked for the minimum work to pin down the artist name and the
+label the track was released under, so the browse is **deleted, not filtered** — and deleted
+rather than fetched-and-discarded, because the cheapest request is the one not made.
+
+**GENRES WERE ENTANGLED AND WERE NOT DROPPED SILENTLY.** The artist level cost three requests: the
+Spotify-URL join for the MBID, the release browse, and the genre lookup. Only the browse is the
+defect, but the URL join exists solely to feed genres — so the choice was surfaced rather than
+decided. User: *"I also would like Genre so maybe we need to keep the queries."* Kept. **Five
+requests per new artist drop to four**, and the artist level is now genres and a pointer.
+
+**Q12 IS WITHDRAWN, NOT AMENDED.** "Two levels, side by side, never merged" was a sound rule about
+a level that should not have existed. Gone from the panel, the export (`artist_label_verdict`,
+`artist_label_confidence`, `artist_label_names`), the JSON `artist_label` block, and
+`/api/explain`, whose artist trace made the wrong question look like a careful answer.
+
+WARNING: **THE WORK-SET TERMINATOR MOVED, AND THE OBVIOUS REPLACEMENT WAS A TRAP.**
+`listPlaysNeedingLabels` keyed on `artist_label_verdict IS NULL`, which only terminated because a
+not-found artist was written down as verdict `unknown`. `artist_genres IS NULL` looks equivalent
+and is not: an artist MusicBrainz has never catalogued has no genres and never will, so every
+sweep would re-look-up the same nothing for ever. The guard is `artist_resolution_id IS NULL` —
+the pointer is written even when there are no genres.
+
+**MIGRATION 004, APPLIED TO THE LIVE DATABASE.** Dropped `artist_label` and
+`artist_label_signal_vote`; dropped the three verdict columns; renamed `artist_label_resolution`
+-> `artist_resolution` and `artist_label_resolution_id` -> `artist_resolution_id`. Renamed rather
+than left in place: a table called `artist_label_resolution` holding only genres is a name someone
+later reads as evidence that a verdict exists somewhere. The rows went rather than being kept —
+they are derived, not observed, and a wrong verdict left in a research database is a liability,
+because it reads as a finding.
+
+Every DDL step probed on a copy first (SQLite 3.50 drops a column carrying a CHECK constraint;
+`RENAME TO` rewrites `play`'s foreign key), then the real migration code was dry-run against a
+copy of the live file, then applied. **181 plays, 5,359 observations, 140 plays with genres and 34
+resolutions with genres all preserved; `integrity_check: ok`, `foreign_key_check` zero
+violations.** Backup at `data/backup-before-migration-004-20260906T231755Z/`.
+
+**VERIFIED LIVE.** Rebuilt and running on schema v4: UI `200`, WebSocket handshake `101`,
+cross-site Origin `403`, startup sweep `1 resolved, 0 refreshed, 5 genres, 0 errors`. Bad Bunny's
+`EoO` now reads `independent` / `Rimas` with genres `reggaeton, trap latino, latin, hip hop` — and
+no media companies. `/api/explain/224` returns `play` and `release` only."
+
+**Decision**: The artist-level label verdict is **removed**, not repaired — its evidence came from
+`browse /release?artist=`, which counts features as the artist's own and biased the independent
+variable toward `major`. The artist level is genres and a resolution pointer; the label question
+is answered once, at release level, through the ISRC. Genres kept at the user's request. Migration
+004 drops the tables, columns and export fields.
+**Context**: CONSTRUCTION — U3 still paused. Schema v3 -> v4 with data removal (derived rows
+only); play and observation records untouched.
+**486 tests**, 99.19% line / 92.86% branch, typecheck clean, schema v4, container rebuilt and live
+
+
+---
+
+## `Not recorded` Stops Being a Bar and Becomes a Number — the Rows Stay
+**Timestamp**: 2026-09-06
+**User Input**: *"every artist 'Weekly plays' has a number of 'not recorded' plays, all older than
+our set up updates yesterday. Is it possible to update those 'not recorded' records to
+'Completed'? For artists like Prof I know I've not skipped any plays so all those old plays are
+definitely completed but likely an issue in the app caused them to not cleanly get recorded as
+completed."* Then, after the analysis: *"maybe it would be cleaner to remove those 'Not Recorded'
+entries... If those 'Not Recorded' entries are truly incomplete and can't be repaired then they
+should be removed perhaps?"*
+**AI Response**: "The complaint was real and the diagnosis was wrong, twice over — and the second
+proposal would have been worse than the first.
+
+**THERE IS NO DEFECT. ALL 84 ARE `backfilled` WITH ZERO OBSERVATIONS.** The app was not running;
+`recently-played` reports no progress at all. There is no trail that failed to be written.
+
+**THE REQUESTED WRITE WOULD HAVE CHANGED NOTHING ON SCREEN.** `bucketOf` tests provenance FIRST:
+
+```ts
+if (play.provenance === 'backfilled') return 'not-observed';
+```
+
+Setting `outcome='completed'` on those rows leaves the chart byte-identical. The visible problem
+was never in the `outcome` column.
+
+⚠️ **AND IT WOULD HAVE PLANTED A DELAYED TRAP IN THE HYPOTHESIS GATE.** `ELIGIBLE` is
+`outcome IN ('completed','skipped')` with **no provenance guard**. Only 1 backfilled row carries a
+verdict today, so the damage would have looked like nothing — but open item 3 is *recover ISRCs for
+backfilled plays at 47 calls*. The moment anyone spends them, 84 rows that are completions **by
+construction** enter the gate with zero skips, against a live-measured skip rate of 12%. Both group
+rates collapse toward zero and it reads as a finding. The project's recurring shape, on a fuse.
+
+**A REAL DERIVATION WAS AVAILABLE AND WAS STILL NOT GOOD ENOUGH.** `played_at` is the END of a
+play, so for consecutive plays the listened time of B is `end_B - end_A`. Validated against the 83
+live plays where the trail is ground truth: in the 0.90-1.05 band, **53 completed against 1
+skipped**, 98% precision, resolving 56 of 83 backfilled rows. Offered and declined — correctly, on
+the grounds that it adds a concept to the app for a benefit the user did not want.
+
+**THEN DELETION WAS PROPOSED, AND THE DAY BREAKDOWN KILLED IT:**
+
+```
+2026-08-20  live  0   backfilled 10      2026-08-27  live  0   backfilled 19
+2026-08-21  live  0   backfilled  1      2026-08-31  live  0   backfilled  1
+2026-08-24  live  0   backfilled 25      2026-09-02  live 20   backfilled  0
+2026-08-25  live  0   backfilled 14      2026-09-03  live  0   backfilled  1
+2026-08-26  live 21   backfilled 12      2026-09-06  live 62   backfilled  1
+```
+
+**Seven of the ten days in the corpus have zero live plays.** Deleting the backfilled rows does not
+thin those days, it erases them — 73 distinct tracks, 42 artists, 55 rows carrying genres. And
+they are the one thing in this project that does not come back: `recently-played` is a 50-play
+window and these reach back 17 days. Code returns from git, labels from MusicBrainz, genres on
+re-resolve. These return from nowhere.
+
+**THE COMPLAINT WAS A DISPLAY COMPLAINT AND GOT A DISPLAY FIX THAT REMOVES CODE.** `not-observed`
+is no longer a drawn series — three bars, not four — and is reported as a line under the legend:
+*7 plays not observed — the app was not running.* The SVG hatch pattern and both
+`--series-unknown*` tokens are deleted with it.
+
+⚠️ **IT IS REMOVED FROM THE PLOT ONLY, AND THAT DISTINCTION IS THE WHOLE POINT.** The count stays
+in the note, the hover tooltip, the table column and the track panel's breakdown. Dropping it from
+those would be the 2026-09-06 merge defect again in a quieter form — a reader would take
+`Times played 6 · 1 completed` for six observed listens. The chart answers *what did the app
+measure*; the numbers beside it still answer *and how much did it miss*, which is what R2 needs.
+
+⚠️ **TWO MAXIMA, AND THE WRONG ONE WAS THE EASY MISTAKE.** The y-axis scaled to `week.total`, which
+still counts plays the chart no longer draws. Left alone, a week of 8 observed plays would render
+at a third the height of a week that was 24 unobserved — the bars would shrink for a reason
+invisible on the page. The axis now scales to the drawn total.
+
+⚠️ **AND THE EMPTY STATE HAD TO BE SPLIT.** An artist whose every play is backfilled now has a
+drawn max of zero, which would have fallen into `First time hearing this artist.` — false, and
+exactly the `Label detail` failure where an unexplained empty state gets read as a broken one. It
+says `2 plays, none observed — the app was not running.` instead. Verified by driving the panel at
+an all-backfilled artist.
+
+**VERIFIED IN THE BROWSER, NOT ONLY IN TESTS** — `public/app.js` still has no test harness (open
+thread 2), so this was checked by looking. Prof, live: three series reading Completed 5, Skipped 0,
+Inconclusive 3, the note `7 plays not observed`, axis maximum 6 (the drawn max, not 13), no console
+errors. The all-backfilled path checked separately."
+
+**Decision**: `not-observed` is **not drawn** on the weekly trend and is reported as a count
+beneath it. No play rows were altered or deleted; `outcome`, `bucketOf`, the API and the hypothesis
+gate are untouched. The proposal to write `completed` onto backfilled rows was declined as
+fabrication that would reach R1; the proposal to delete them was declined because seven of the
+corpus's ten days exist only in those rows and `recently-played` cannot return them.
+**Context**: CONSTRUCTION — U3 still paused. View-only change; no schema change, no data change.
+**486 tests**, typecheck clean, schema v4, container rebuilt and live
+

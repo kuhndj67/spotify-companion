@@ -74,6 +74,27 @@ const vote: SignalVote = {
   evidence: 'Atlantic matches major root "atlantic"',
 };
 
+/**
+ * Insert a real artist resolution and return its id.
+ *
+ * ⚠️ A literal id will not do: `play.artist_resolution_id` is a foreign key, and passing an
+ * invented number fails the constraint rather than quietly storing it. That is the schema doing
+ * its job — the pointer has to name a version that exists (BR-13.4).
+ */
+function newArtistResolution(
+  store: SqliteHistoryRepository,
+  resolvedAt = '2026-08-31T00:00:00.000Z',
+  genres: { name: string; count: number }[] | null = null,
+): number {
+  return store.insertArtistResolution({
+    spotifyArtistId: 'artist-1',
+    artistMbid: 'mbid-a',
+    resolvedAt,
+    status: 'resolved',
+    genres,
+  });
+}
+
 function resolution(isrc: string, resolvedAt: string, labels: string[]) {
   return {
     isrc,
@@ -244,13 +265,7 @@ describe('the as-of-play snapshot is written once (BR-8.4a)', () => {
     store.applyLabelSnapshot(playId, snapshot);
     assert.equal(store.listPlaysNeedingLabels(10).length, 1, 'artist level still owed');
 
-    store.applyArtistLabelSnapshot(playId, {
-      verdict: 'major',
-      confidence: 'medium',
-      labelNames: ['Atlantic'],
-      resolutionId: null,
-      genres: null,
-    });
+    store.applyArtistSnapshot(playId, { resolutionId: newArtistResolution(store), genres: null });
     assert.equal(store.listPlaysNeedingLabels(10).length, 0);
     store.close();
   });
@@ -268,12 +283,12 @@ describe('the backfill work set is derived from the database (P-5)', () => {
     store.close();
   });
 
-  it('keeps a play in the set when only the artist verdict is missing', () => {
+  it('keeps a play in the set when only the artist level is missing', () => {
     // The two levels resolve independently -- release through the ISRC chain, artist through
     // the Spotify-URL join -- and can fail independently. Keying the work set only on the
     // release verdict leaves a play whose artist lookup failed permanently unfinished.
     //
-    // Found live: 21 real plays sat with a release verdict, no artist verdict, and a work set
+    // Found live: 21 real plays sat with a release verdict, no artist level, and a work set
     // reporting zero rows remaining.
     const store = repo();
     const playId = store.recordPlay(play(), trail);
@@ -296,13 +311,7 @@ describe('the backfill work set is derived from the database (P-5)', () => {
       'the artist level is still owed, so the play is not finished',
     );
 
-    store.applyArtistLabelSnapshot(playId, {
-      verdict: 'major',
-      confidence: 'medium',
-      labelNames: ['Atlantic'],
-      resolutionId: null,
-      genres: null,
-    });
+    store.applyArtistSnapshot(playId, { resolutionId: newArtistResolution(store), genres: null });
 
     assert.equal(store.listPlaysNeedingLabels(10).length, 0, 'now both levels are written');
     store.close();
@@ -393,12 +402,8 @@ describe('genres (migration 003)', () => {
     return {
       spotifyArtistId: 'artist-1',
       artistMbid: 'mbid-a',
-      releaseCount: 10,
-      namedLabelCount: 2,
       resolvedAt,
       status: 'resolved' as const,
-      candidates: [],
-      votes: [],
       genres,
     };
   }
@@ -407,14 +412,13 @@ describe('genres (migration 003)', () => {
     // The count is the only quality signal MusicBrainz provides — eleven people agreeing beats
     // one person's opinion — so it travels with the name rather than being discarded.
     const store = repo();
-    const id = store.insertArtistLabelResolution(
+    store.insertArtistResolution(
       artistResolution('2026-09-02T00:00:00.000Z', [
         { name: 'alternative rock', count: 11 },
         { name: 'hard rock', count: 6 },
       ]),
     );
-    const back = store.getArtistLabelResolutionById(id);
-    assert.deepEqual(back?.genres, [
+    assert.deepEqual(store.getCurrentArtistResolution('artist-1')?.genres, [
       { name: 'alternative rock', count: 11 },
       { name: 'hard rock', count: 6 },
     ]);
@@ -423,11 +427,13 @@ describe('genres (migration 003)', () => {
 
   it('keeps null (never asked) distinct from empty (asked, none)', () => {
     const store = repo();
-    const unknown = store.insertArtistLabelResolution(artistResolution('2026-09-02T00:00:00.000Z', null));
-    const none = store.insertArtistLabelResolution(artistResolution('2026-09-02T00:00:01.000Z', []));
+    store.insertArtistResolution(artistResolution('2026-09-02T00:00:00.000Z', null));
+    assert.equal(store.getCurrentArtistResolution('artist-1')?.genres, null, 'never asked');
 
-    assert.equal(store.getArtistLabelResolutionById(unknown)?.genres, null);
-    assert.deepEqual(store.getArtistLabelResolutionById(none)?.genres, []);
+    // Appended as a new version (BR-13.1) rather than revising the one above, so the newest is
+    // now the empty answer -- a different fact from the null it supersedes.
+    store.insertArtistResolution(artistResolution('2026-09-02T00:00:01.000Z', []));
+    assert.deepEqual(store.getCurrentArtistResolution('artist-1')?.genres, [], 'asked, none');
     store.close();
   });
 
@@ -435,30 +441,26 @@ describe('genres (migration 003)', () => {
     // Those resolutions are `resolved` and so fresh for the full 90-day TTL. Without this they
     // would carry no genres for a quarter.
     const store = repo();
-    store.insertArtistLabelResolution(artistResolution('2026-09-02T00:00:00.000Z', null));
+    store.insertArtistResolution(artistResolution('2026-09-02T00:00:00.000Z', null));
     assert.deepEqual(store.listArtistsNeedingGenres(10), ['artist-1']);
 
-    store.insertArtistLabelResolution(
+    store.insertArtistResolution(
       artistResolution('2026-09-02T00:00:01.000Z', [{ name: 'rock', count: 3 }]),
     );
     assert.deepEqual(store.listArtistsNeedingGenres(10), [], 'the newer version has genres');
     store.close();
   });
 
-  it('fills a play’s genres without touching its verdict (not a BR-8.4a violation)', () => {
-    // BR-8.4a protects the VERDICT — a judgement that must reflect what was believed at the
-    // time. Genres are descriptive metadata about the artist, not a judgement about this play.
+  it('fills a play’s genres without disturbing the resolution pointer (not a BR-8.4a violation)', () => {
+    // BR-8.4a protects a JUDGEMENT that must reflect what was believed at the time. Genres are
+    // descriptive metadata about the artist, not a judgement about this play, so completing them
+    // later is filling a record in rather than revising one.
     const store = repo();
     const playId = store.recordPlay(play(), trail);
 
-    store.applyArtistLabelSnapshot(playId, {
-      verdict: 'independent',
-      confidence: 'medium',
-      labelNames: ['Sub Pop'],
-      resolutionId: null,
-      genres: null,
-    });
-    store.insertArtistLabelResolution(
+    const pointer = newArtistResolution(store, '2026-09-01T00:00:00.000Z');
+    store.applyArtistSnapshot(playId, { resolutionId: pointer, genres: null });
+    store.insertArtistResolution(
       artistResolution('2026-09-02T00:00:00.000Z', [{ name: 'grunge', count: 4 }]),
     );
 
@@ -466,22 +468,18 @@ describe('genres (migration 003)', () => {
 
     const after = store.getPlay(playId);
     assert.deepEqual(after?.label?.artistGenres, [{ name: 'grunge', count: 4 }]);
-    assert.equal(after?.label?.artistVerdict, 'independent', 'the verdict is untouched');
-    assert.deepEqual(after?.label?.artistNames, ['Sub Pop']);
+    assert.equal(after?.label?.artistResolutionId, pointer, 'the pointer is untouched');
     store.close();
   });
 
   it('never overwrites genres a play already has', () => {
     const store = repo();
     const playId = store.recordPlay(play(), trail);
-    store.applyArtistLabelSnapshot(playId, {
-      verdict: 'independent',
-      confidence: 'medium',
-      labelNames: ['Sub Pop'],
-      resolutionId: null,
+    store.applyArtistSnapshot(playId, {
+      resolutionId: newArtistResolution(store, '2026-09-01T00:00:00.000Z'),
       genres: [{ name: 'original', count: 9 }],
     });
-    store.insertArtistLabelResolution(
+    store.insertArtistResolution(
       artistResolution('2026-09-02T00:00:00.000Z', [{ name: 'different', count: 1 }]),
     );
 

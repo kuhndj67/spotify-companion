@@ -22,11 +22,11 @@
 
 import type {
   LabelRepository,
-  NewArtistLabelResolution,
+  NewArtistResolution,
   NewLabelResolution,
   StaleResolution,
 } from './LabelRepository.js';
-import type { ArtistLabelResolution, LabelResolution } from './types.js';
+import type { ArtistResolution, LabelResolution } from './types.js';
 
 export interface LabelCacheOptions {
   repository: LabelRepository;
@@ -50,8 +50,8 @@ export class LabelCache {
     return this.#repository.getCurrentLabelResolution(isrc);
   }
 
-  getArtist(spotifyArtistId: string): ArtistLabelResolution | null {
-    return this.#repository.getCurrentArtistLabelResolution(spotifyArtistId);
+  getArtist(spotifyArtistId: string): ArtistResolution | null {
+    return this.#repository.getCurrentArtistResolution(spotifyArtistId);
   }
 
   /**
@@ -82,8 +82,8 @@ export class LabelCache {
     return this.#repository.insertLabelResolution(resolution);
   }
 
-  putArtist(resolution: NewArtistLabelResolution): number {
-    return this.#repository.insertArtistLabelResolution(resolution);
+  putArtist(resolution: NewArtistResolution): number {
+    return this.#repository.insertArtistResolution(resolution);
   }
 
   /** Keys whose newest version has aged past its TTL and should be re-resolved. */

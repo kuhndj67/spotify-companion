@@ -65,9 +65,6 @@ function labels(over: Partial<LabelFields> = {}): LabelFields {
     unknownReason: null,
     resolutionId: null,
     classifierVersion: null,
-    artistVerdict: null,
-    artistConfidence: null,
-    artistNames: null,
     artistResolutionId: null,
     likedAtStart: null,
     likedAtEnd: null,
@@ -117,31 +114,36 @@ describe('pending is not unknown (BR-7.7)', () => {
   });
 });
 
-describe('both levels are exported, never merged (Q12, BR-13.7)', () => {
-  it('carries release-level and artist-level verdicts separately', () => {
-    // Token — Full Bag is `Never Too Different` (independent) at release level and `Atlantic`
-    // at artist level. Both are true: an Atlantic artist releasing this one independently.
+describe('one label verdict is exported, and it is the release-level one (BR-13.7)', () => {
+  it('exports the label the track was released under', () => {
     const row = toCsvRow(
-      play({
-        label: labels({
-          verdict: 'independent',
-          names: ['Never Too Different'],
-          artistVerdict: 'major',
-          artistNames: ['Atlantic'],
-        }),
-      }),
+      play({ label: labels({ verdict: 'independent', names: ['Never Too Different'] }) }),
     );
 
     assert.equal(csvCell(row, 'label_verdict'), 'independent');
-    assert.equal(csvCell(row, 'artist_label_verdict'), 'major');
+    assert.equal(csvCell(row, 'label_names'), 'Never Too Different');
   });
 
-  it('carries the resolution ids so a reader can see which version produced each verdict', () => {
+  /**
+   * ⚠️ Pins the removal, because a re-added artist-level verdict would be a regression rather
+   * than a feature. It was classified over `browse /release?artist=`, which counts releases the
+   * artist only features on: Bad Bunny returned 92 lead releases against 109 guest spots, and
+   * 49 of 64 label names came only from other people's deals. An analysis reading a column
+   * called `artist_label_verdict` would be reading who its guests are signed to.
+   */
+  it('exports no artist-level label verdict at all', () => {
+    const header = toCsvHeader();
+    assert.ok(!header.includes('artist_label_verdict'), header);
+    assert.ok(!header.includes('artist_label_names'), header);
+    assert.ok(!header.includes('artist_label_confidence'), header);
+  });
+
+  it('carries the resolution ids so a reader can see which version produced what', () => {
     const row = toCsvRow(
       play({ label: labels({ verdict: 'major', resolutionId: 7, artistResolutionId: 9 }) }),
     );
     assert.equal(csvCell(row, 'label_resolution_id'), '7');
-    assert.equal(csvCell(row, 'artist_label_resolution_id'), '9');
+    assert.equal(csvCell(row, 'artist_resolution_id'), '9');
   });
 });
 

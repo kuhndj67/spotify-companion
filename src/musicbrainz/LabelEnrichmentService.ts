@@ -17,14 +17,14 @@
 import type { Priority } from './RequestQueue.js';
 import { MusicBrainzError, type MusicBrainzClient } from './MusicBrainzClient.js';
 import type { LabelCache } from './LabelCache.js';
-import type { LabelSnapshot, ArtistLabelSnapshot, NewLabelResolution } from './LabelRepository.js';
+import type { LabelSnapshot, ArtistSnapshot, NewLabelResolution } from './LabelRepository.js';
 import { classify } from './labelClassifier.js';
 import { isrcPrefixVote } from './isrcPrefix.js';
 import { narrowReleases } from './releaseNarrowing.js';
 import { MAJOR_ROOTS } from './majorRootList.js';
 import type {
   ArtistGenre,
-  ArtistLabelResolution,
+  ArtistResolution,
   LabelResolution,
   ResolutionStatus,
   UnknownReason,
@@ -163,11 +163,18 @@ export class LabelEnrichmentService {
   }
 
   /**
-   * Resolve the artist-level label through the exact Spotify-URL join.
+   * Resolve the artist through the exact Spotify-URL join — for **genres only**.
    *
-   * ⚠️ **Answers a different question from the release level and is never merged with it** (Q12).
-   * Token — *Full Bag* is `Never Too Different` (independent) at release level and `Atlantic` at
-   * artist level. Both are true: an Atlantic artist releasing this one independently.
+   * ⚠️ **This deliberately never looks at the artist's releases.** It used to: `browse
+   * /release?artist=` was classified into an artist-level label verdict, and that browse counts
+   * releases the artist merely *features on* as their own. Bad Bunny returned 92 lead releases
+   * against 109 guest spots, and 49 of 64 label names came only from other people's deals, so a
+   * single strong `major` vote from a guest credit made every collaborative artist read `major`.
+   * See {@link ArtistResolution}. The label a track was released under is a release-level fact,
+   * answered through the ISRC.
+   *
+   * Two requests, and only for an artist that is new or past its TTL: the URL join for the MBID,
+   * then the genres. There is no third.
    */
   async resolveArtist(
     spotifyArtistId: string,
@@ -176,31 +183,25 @@ export class LabelEnrichmentService {
     // a field we have since started collecting (genres, migration 003). It bypasses the TTL, not
     // the append-only rule -- the result is still a new version.
     options: { force?: boolean } = {},
-  ): Promise<ArtistLabelResolution | null> {
+  ): Promise<ArtistResolution> {
     const now = this.#now();
     const cached = this.#cache.getArtist(spotifyArtistId);
     if (!options.force && cached !== null && this.#cache.isFresh(cached, now)) return cached;
 
     let artistMbid: string | null = null;
     let status: ResolutionStatus = 'resolved';
-    let releases: Awaited<ReturnType<MusicBrainzClient['listReleasesForArtist']>> = [];
     let genres: ArtistGenre[] | null = null;
 
     try {
       artistMbid = await this.#client.lookupArtistBySpotifyId(spotifyArtistId, priority);
-      if (artistMbid === null) {
-        status = 'not-found';
-      } else {
-        releases = await this.#client.listReleasesForArtist(artistMbid, priority);
-      }
+      if (artistMbid === null) status = 'not-found';
     } catch (error) {
       status = error instanceof MusicBrainzError && error.kind === 'not-found' ? 'not-found' : 'error';
     }
 
-    // Genres are a separate, optional lookup: Spotify returns none at all, so MusicBrainz is the
-    // only source. Failing to get them must never downgrade the LABEL verdict -- they answer a
-    // different question and are the reason for their own try/catch rather than sharing the one
-    // above. `null` stays `null` on failure, which reads as unknown rather than "no genres".
+    // Genres get their own try/catch: `null` stays `null` on failure, which reads as unknown
+    // rather than "no genres", and a genre failure must not promote the whole resolution to
+    // `error` -- that is the status which makes a play retry for ever.
     if (artistMbid !== null) {
       try {
         genres = await this.#client.lookupArtistGenres(artistMbid, priority);
@@ -209,39 +210,11 @@ export class LabelEnrichmentService {
       }
     }
 
-    // Bootlegs and regional licensees inflate an artist's set and say nothing about a signing
-    // (Slipknot picks up `Smokin' Cactus` and `Jigu Records` this way), so only official
-    // releases vote at this level.
-    const official = releases.filter((release) => release.status === null || release.status === 'Official');
-    const candidates = official.flatMap((release) =>
-      release.labels.map((label) => ({
-        labelName: label.labelName,
-        labelMbid: label.labelMbid,
-        labelType: label.labelType,
-        catalogNumber: label.catalogNumber,
-        releaseId: release.releaseId,
-        releaseTitle: release.title,
-        releaseDate: release.date,
-        releaseStatus: release.status,
-      })),
-    );
-
-    const classification = classify(candidates, {
-      majorRoots: MAJOR_ROOTS,
-      narrowingTier: 'none',
-      isrcVote: null,
-      capConfidenceAt: 'medium',
-    });
-
     const id = this.#cache.putArtist({
       spotifyArtistId,
       artistMbid,
-      releaseCount: releases.length,
-      namedLabelCount: new Set(candidates.map((c) => c.labelName)).size,
       resolvedAt: now,
       status,
-      candidates,
-      votes: classification.votes,
       genres,
     });
 
@@ -249,13 +222,9 @@ export class LabelEnrichmentService {
       id,
       spotifyArtistId,
       artistMbid,
-      releaseCount: releases.length,
-      namedLabelCount: new Set(candidates.map((c) => c.labelName)).size,
       resolvedAt: now,
       status,
       supersedesId: cached?.id ?? null,
-      candidates,
-      votes: classification.votes,
       genres,
     };
   }
@@ -317,31 +286,16 @@ export class LabelEnrichmentService {
     };
   }
 
-  /** Same rule as {@link toSnapshot}: a transient failure writes nothing. */
-  toArtistSnapshot(resolution: ArtistLabelResolution | null): ArtistLabelSnapshot | null {
-    if (resolution !== null && resolution.status === 'error') return null;
-
-    if (resolution === null) {
-      return {
-        verdict: 'unknown',
-        confidence: 'low',
-        labelNames: [],
-        resolutionId: null,
-        genres: null,
-      };
-    }
-
-    const classification = classify(resolution.candidates, {
-      majorRoots: MAJOR_ROOTS,
-      narrowingTier: 'none',
-      isrcVote: null,
-      capConfidenceAt: 'medium',
-    });
+  /**
+   * Same rule as {@link toSnapshot}: a transient failure writes nothing and is retried.
+   *
+   * There is no verdict to derive any more — the artist level is genres and a pointer to the
+   * version they came from.
+   */
+  toArtistSnapshot(resolution: ArtistResolution): ArtistSnapshot | null {
+    if (resolution.status === 'error') return null;
 
     return {
-      verdict: classification.verdict,
-      confidence: classification.confidence,
-      labelNames: classification.labelNames,
       resolutionId: resolution.id,
       genres: resolution.genres,
     };

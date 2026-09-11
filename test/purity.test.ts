@@ -42,6 +42,16 @@ const PURE_MODULES = [
   'musicbrainz/releaseNarrowing.ts',
   'musicbrainz/labelClassifier.ts',
   'musicbrainz/resolutionTrace.ts',
+  // U3. The rules core. A Date.now() or a database read in any of these would break FR-20
+  // recomputation and FR-42 back-testing while every other test still passed — the same silent
+  // failure this file was written for. RuleStore.ts is deliberately absent: it is the unit's
+  // impure boundary, and it reads a file on purpose (P-12).
+  'rules/types.ts',
+  'rules/fieldCatalogue.ts',
+  'rules/trackFacts.ts',
+  'rules/predicate.ts',
+  'rules/ruleValidator.ts',
+  'rules/RuleEngine.ts',
 ];
 
 /**

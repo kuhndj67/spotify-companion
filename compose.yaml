@@ -91,6 +91,17 @@ services:
       # endpoint, so a test asserting "no releases" would pass against the bug.
       MUSICBRAINZ_BASE_URL: https://musicbrainz.org/ws/2
 
+      # -- U3: rule definitions -------------------------------------------------
+      # Only the PATH is configurable. The bounds are not: MAX_PREDICATE_DEPTH (32),
+      # MAX_RULES (1000) and MAX_RULES_FILE_BYTES (1 MiB) are constants in code, for
+      # the same reason the MusicBrainz spacing below is. A depth limit that can be
+      # raised from the environment will be raised at the moment it first refuses
+      # something -- which is the moment it is doing its job.
+      #
+      # Nothing reads this yet. U3 is the pure core: it produces Decision values that
+      # nothing consumes until U4/U5.
+      RULES_PATH: /config/rules.json
+
       # NOTE: request spacing (1 req/sec, NFR-15) and the retry policy are NOT
       # settings. There is no legitimate value other than one per second, so a knob
       # here would exist only to violate the policy -- most likely while debugging,
@@ -118,5 +129,30 @@ services:
       # above: nothing rewrites this file, and copying the `rw` out of habit would
       # grant a write capability with no use.
       - ./secrets/musicbrainz.json:/app/secrets/musicbrainz.json:ro
+
+      # Rule definitions (U3).
+      #
+      # The DIRECTORY is mounted, not the file -- the same distinction as ./data above,
+      # for a different reason. A single-file bind mount binds an INODE, and the safe way
+      # to write a config file is write-temp-then-rename, which REPLACES the inode. Through
+      # a single-file mount that rename either fails or silently detaches the container's
+      # view from the host file. U3 only reads, so the bug would be invisible here and
+      # would surface the first time the U4 rule editor saves.
+      #
+      # READ-ONLY, like ./secrets/musicbrainz.json and unlike ./data: nothing in U3 writes
+      # rules. `npm run rules:init` creates the file on the host; the app never does. This
+      # becomes :rw at U4 when the editor needs to write -- a deliberate one-word change,
+      # not a capability granted early out of habit.
+      #
+      # NOT under ./data on purpose. That directory holds history.db, the one artefact here
+      # that cannot be regenerated. Rules are user-authored text that costs retyping.
+      # Keeping the hand-edited file out of the directory nobody should hand-edit is the
+      # whole point.
+      #
+      # ⚠️ Run `npm run rules:init` BEFORE the first `compose up`. Docker creates a missing
+      # bind-mount source directory owned by ROOT, and the entrypoint drops privileges to
+      # `node` -- a root-owned config/ leaves the app unable to read its own rules, with a
+      # permissions error that reads like a code fault.
+      - ./config:/config:ro
 
     restart: unless-stopped

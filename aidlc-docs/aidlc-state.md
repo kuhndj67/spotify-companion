@@ -895,7 +895,10 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       atomic rename at U4). Bounds are constants, not settings. ⚠️ FQ1 taken **by
       recommendation**, not an explicit answer.
 - [x] Code Generation — **U1 complete** 2026-08-25. 10 files created, 8 modified, 7 test files.
-      184/184 tests passing. Awaiting approval. U2–U5 pending.
+      184/184 tests passing. **U3 complete 2026-09-11**: 7 new modules in `src/rules/`, 7 new test
+      files, **620 tests passing**, typecheck clean, purity clean, no new `ALLOWED_ORPHANS`.
+      ⚠️ **Wired to nothing** — `git status src/` shows only `src/rules/`; no route, no
+      `server.ts` change, no schema change. U2, U4–U5 pending.
 - [x] Build and Test — **U1 complete** 2026-08-26. Build ✅, 193/193 tests, container verified.
       **One open decision blocks container use** (see below). Awaiting approval.
       **U2 complete** 2026-09-01, **approved 2026-09-05** after a verification pass:

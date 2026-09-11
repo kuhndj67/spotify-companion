@@ -83,11 +83,11 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 | U0 Display + enrichment | 0 | ✅ Delivered |
 | **U1 Listening history + export** | 1 | ✅ **Built, tested, live-verified** |
 | **U2 Label enrichment** | 2 | ✅ **Approved 2026-09-05** |
-| **U3 Rule model (pure core)** | 3 | ⬅️ **Next** |
+| **U3 Rule model (pure core)** | 3 | ✅ **Built — 620 tests, not wired to anything** |
 | U4 Rule observability | 3 | Pending |
 | U5 Automated skipping | 4 | Pending |
 
-486 tests passing · 99.19% line · 92.86% branch · typecheck clean · **427 plays recorded**
+620 tests passing · 99.19% line · 92.86% branch · typecheck clean · **427 plays recorded**
 · schema v4. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,
 `integrity_check: ok`, all 65 live trails intact. Backup kept in `data/`.
 
@@ -400,6 +400,63 @@ and nothing exercised the upgrade handler. Both paths now go through `decideAcce
 
 **Check build exit codes directly.** `docker compose build | tail` reports the *pipe's* exit code.
 A failing build once read as success here.
+
+**A guard computed the same way as the thing it guards is not a guard.** `MAX_PREDICATE_DEPTH`
+exists so a deep predicate tree cannot overflow the stack in `evaluate`. The first `depthOf` was
+recursive — the obvious way — and would have **overflowed while computing the guard's own input**,
+on exactly the trees the guard exists to refuse. The `RangeError` would have surfaced from the
+*validator* rather than the evaluator, and the protection would have been decorative. `depthOf` is
+now iterative with an explicit stack and an early exit at the limit, so a pathological tree costs
+O(limit) rather than O(tree); `predicate.property.test.ts` nests 50,000 levels and asserts both
+that it returns and that it returns fast. Look for this shape anywhere a limit is enforced by
+measuring first.
+
+**`exists` cannot exist in a tri-state language.** A field is present (`true`) or absent
+(`unknown`) — there is no third input state, so `false` is unreachable and `not(exists(f))` is
+`not(unknown)` = `unknown`: precisely the question it was meant to answer, unanswered. The
+operator was removed and `is-unknown` (always decisive) put in its place. The general shape: an
+operator whose result set is narrower than its name implies will be used as though it were wider.
+
+**`restedOnUnknown` is the raw verdict, never an accumulator.** Under Kleene logic a predicate can
+contain an unknown and still resolve decisively — `false AND unknown` is `false`, because the data
+answered it. Flagging "an unknown appeared anywhere in the tree" was offered as an option and
+rejected, and the tempting implementation (a flag set during the walk) silently implements the
+rejected one. `ruleEngine.test.ts` pins it with a predicate that does exactly this.
+
+⚠️ **A property-test generator that recurses per branch is exponential.** `treeOfDepth(d)` calling
+itself three times per level builds ~3^d arbitraries; at depth 20 it exhausted the heap and killed
+the test process with a V8 stack dump and no useful message. It reads as *"property testing is
+slow"*, not *"the generator is wrong"*. Build the child arbitrary **once** and reuse it.
+
+**Genre matching is per element and on word boundaries, and that was measured.** Over the corpus's
+110 distinct genres (62 multi-word), plain substring matching makes `contains "rap"` also match
+`trap`, `trap latino` and `trap metal` — 4 unintended hits of 7. Worse, joining genres and then
+folding punctuation turns `["hip hop","rapcore"]` into `"hiphoprapcore"`, where a match crosses a
+boundary that exists in the data but not in the string. Both read as working rules.
+
+**A single-file bind mount binds an INODE.** `./config:/config:ro` mounts the directory for this
+reason: write-temp-then-rename, the safe way to save a config file, *replaces* the inode, and
+through a single-file mount that rename either fails or silently detaches the container's view
+from the host file. U3 only reads, so the bug is invisible here and would surface the first time
+the U4 rule editor saves. Same family as `./data` needing a directory mount for SQLite's `-wal`
+and `-shm` siblings.
+
+⚠️ **Run `npm run rules:init` before the first `compose up`.** Docker creates a missing bind-mount
+source directory **owned by root**, and the entrypoint drops privileges to `node` — a root-owned
+`config/` leaves the app unable to read its own rules, with a permissions error that reads like a
+code fault rather than a setup one.
+
+**FR-33 is only partly met, deliberately.** `onUnknown: 'no-match'` and `'match'` work; **`'hold'`
+does not**, because it needs a deadline and a re-evaluation trigger that a pure synchronous module
+cannot have. A rule declaring it is **stored and disabled with a reason**, so rules written now
+begin working when U5 lands without being re-authored. Do not mark FR-33 complete on the strength
+of U3's tests. The `applyOnUnknown` switch has no `default:` clause on purpose: adding an
+`OnUnknown` member is then a compile error at the place that must change.
+
+**U3 is wired to nothing, and `git status src/` proves it.** The unit added `src/rules/` and
+changed no existing source file — no route, no `server.ts` change, no poll loop, no schema. If a
+later session finds the rules engine affecting app behaviour before U4/U5, that is a regression of
+the phase boundary, not progress.
 
 ---
 

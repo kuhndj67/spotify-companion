@@ -25,6 +25,12 @@ spotify-config.json
 # SNAPSHOT_DIR outside the project tree if that matters to you.
 data/
 
+# Rule definitions (U3). User-authored, and a fairly direct statement of listening
+# preference — this repository is public. Same shape as secrets/: the directory is
+# ignored, the committed example template is not.
+config/*
+!config/rules.example.json
+
 *.log
 npm-debug.log*
 .DS_Store

@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "auth": "node scripts/auth.mjs",
+    "rules:init": "node scripts/rules-init.mjs",
     "mcp:setup": "node scripts/mcp-setup.mjs",
     "test": "node --import tsx --test test/*.test.ts",
     "test:watch": "node --import tsx --test --watch test/*.test.ts",

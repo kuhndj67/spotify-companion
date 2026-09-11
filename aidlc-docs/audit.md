@@ -3028,3 +3028,104 @@ Generation.
 
 **Context**: CONSTRUCTION — U3 Infrastructure Design complete. No code written, no schema change,
 no data change. 486 tests, typecheck clean.
+
+---
+
+## 2026-09-10T00:00:00Z — U3 Code Generation plan presented for approval
+
+**Stage**: CONSTRUCTION — Code Generation Part 1 (Planning), Unit U3.
+**Plan**: `construction/plans/u3-code-generation-plan.md` — **13 steps**, 7 new source modules,
+6 new test files, 1 test file extended, 5 deployment artifacts, 2 documents.
+
+**Approval prompt logged before asking**, per the stage rules. One scoping decision is embedded in
+the plan rather than assumed: whether **LC-12 `FactCache`** is built now or deferred to the unit
+that first evaluates rules on the poll path. U3 has no caller, so building it now would land an
+impure component a unit early, shaped by guesses about a caller that does not exist. Deferral is
+recommended and is the same treatment `watch()` and BR-20.8 already received.
+
+**Awaiting explicit approval of the whole plan and generation sequence.**
+
+**APPROVED** 2026-09-11 — user response: *"continue"*. The `FactCache` scoping tag was left
+blank, so option **A (defer)** was taken by recommendation and recorded in the plan as an
+assumption. Proceeding to Code Generation Part 2.
+
+---
+
+## 2026-09-11 — U3 Code Generation COMPLETE — the rules core exists and is wired to nothing
+
+**Stage**: CONSTRUCTION — Code Generation Part 2, Unit U3. Plan approved 2026-09-11 (*"continue"*).
+**Summary**: `construction/u3-rule-model/code/u3-code-summary.md`.
+
+**620 tests passing** (from 486) · typecheck clean · `purity.test.ts` clean with six new modules ·
+`noOrphanModules.test.ts` clean with **no new `ALLOWED_ORPHANS`**.
+
+### The containment claim is verified, not asserted
+
+> **`git status src/` shows only `src/rules/`. Not one existing source file changed.**
+
+No route, no `server.ts` wiring, no poll-loop change, no UI, no schema change, no migration. The
+app behaves exactly as before. `Decision` values are produced and consumed by nothing until U4.
+That was the whole point of putting the largest, least-certain component where being wrong costs
+nothing.
+
+**Seven modules**: `types`, `fieldCatalogue`, `trackFacts`, `predicate`, `ruleValidator`,
+`RuleEngine` (all pure) and `RuleStore` (impure). **Seven test files** including
+`ruleGenerators.ts`. Deployment: `./config:/config:ro`, `RULES_PATH`, `.gitignore`,
+`config/rules.example.json`, `scripts/rules-init.mjs`, `npm run rules:init`.
+
+### ⚠️ THE DEPTH GUARD COULD NOT BE REACHED — found while writing it
+
+`depthOf` was written recursively, the obvious way. **It is the guard that stops `evaluate` from
+overflowing the stack, and a recursive implementation overflows while computing the guard's own
+input** — on exactly the trees the guard exists to refuse. The `RangeError` would have escaped
+from the *validator* rather than the evaluator, and P-10 would have been strictly decorative.
+
+Rewritten iteratively with an explicit stack and early exit at the limit: a pathological tree now
+costs O(limit), not O(tree). `predicate.property.test.ts` nests **50,000 levels** and asserts both
+that it returns and that it returns in under 50 ms.
+
+> **A guard computed the same way as the thing it guards is not a guard.** Look for this shape
+> anywhere a limit is enforced by measuring first.
+
+### ⚠️ A property-test generator that recurses per branch is exponential
+
+`treeOfDepth(d)` called itself three times per level — ~3^d arbitraries. At depth 20 it exhausted
+the heap and killed the test process with a V8 stack dump and **no useful message**: it read as
+*"property testing is slow"*, not *"the generator is wrong"*. Fixed by building the child
+arbitrary once. Same bug in `predicateTree`.
+
+### `applyOnUnknown` threw on an unreachable branch, and totality won
+
+The first draft threw on `'hold'` to make the U5 seam loud. But **BR-21.1 says every pure function
+is total** and PBT-13 asserts no input throws — a test constructing a `LoadedRule` directly,
+bypassing the validator, would have hit it. The compile-time tripwire comes from the switch having
+**no `default:`**, which is what actually makes adding an `OnUnknown` member a compile error; the
+throw added nothing but a failure mode.
+
+### One test was wrong rather than one behaviour
+
+A property asserted every catalogue field reads `unknown` on blank facts. `track.title`,
+`artist.name` and `album.name` are `availability: 'always'` and never absent. Rewritten to
+condition on whether the field *actually* reads null — testing more, not less — plus a companion
+check that any never-absent field is declared `always`.
+
+### `noOrphanModules` earned its keep immediately
+
+It failed on `rules/trackFacts.ts`, which had no test. **Filled the gap rather than allowlisting
+it** — `trackFacts.test.ts` now pins the rule that matters there: an absent history count stays
+`null` and never becomes `0`, and an empty genre list stays `[]` and never becomes `null`.
+
+### Requirements
+
+FR-26–32, FR-43–45, NFR-25–27 ✅. **FR-33 remains PARTIAL**: `no-match` and `match` implemented,
+**`hold` is U5's**. A rule declaring it is stored and disabled with a reason, so rules written now
+begin working when U5 lands without being re-authored. **Do not mark FR-33 complete on the
+strength of U3's tests.**
+
+**Exit criteria all met.** Tri-state property-tested, De Morgan holds both ways, no input throws,
+invalid rules rejected with usable messages, rules round-trip by **behaviour not bytes**,
+evaluation deterministic and side-effect free, and no I/O, clock, network or database in any of
+the six pure modules.
+
+**Context**: CONSTRUCTION — U3 built. Container not rebuilt and does not need to be: nothing reads
+`RULES_PATH` yet. Corpus 427 plays, recording throughout.

@@ -2953,3 +2953,78 @@ deferred.
 
 **Context**: CONSTRUCTION — U3 NFR Design complete. No code written, no schema change, no data
 change. 486 tests, typecheck clean.
+
+---
+
+## 2026-09-10 — U3 Infrastructure Design APPROVED
+
+**Stage**: CONSTRUCTION — Infrastructure Design, Unit U3. **User response**: *"approve"*.
+**Plan**: `construction/plans/u3-infrastructure-design-plan.md`.
+**Answers**: Q1 **A** `:ro` mount · Q2 **A** directory mount · Q3 **C** *(conflicted — see below)* ·
+Q4 **A** gitignored with a committed example · Q5 **A** bounded at 1 MB / 1000 rules.
+**Artifact**: `construction/u3-rule-model/infrastructure-design/infrastructure-design.md`.
+
+U3 adds **one file and one mount**. Container, port binding, access posture, database mount and
+snapshot schedule are untouched.
+
+### ⚠️ Q1 = A and Q3 = C were in DIRECT CONFLICT, and it was raised rather than resolved silently
+
+Q3 = C asked the **app** to write a default rules file when none exists. Q1 = A mounts `config/`
+**read-only**. Option C's own text carried the dependency — *"Requires `:rw` (Q1)"* — and on a
+read-only mount that write fails `EROFS` at **every startup of a fresh install**, logging an error
+each time: the exact noisy-fresh-install outcome Q3 existed to prevent, reached from the other
+direction.
+
+Resolved by **FQ1 = A**: keep `:ro`, and move creation off the app onto an explicit
+`npm run rules:init`, the same shape as `npm run auth` creating `secrets/spotify-config.json`. C's
+intent — the file should always exist and be discoverable — is preserved; the app never writes a
+byte through U3.
+
+⚠️ **FQ1 WAS ANSWERED BY RECOMMENDATION, NOT EXPLICITLY.** The user replied *"continue"* with the
+tag left blank, and A was the stated recommendation. Recorded in both the plan and the artifact as
+an **assumption rather than a decision**. Reversal to B is a one-word compose change (`:ro` →
+`:rw`) plus restoring the auto-create in `RuleStore`.
+
+### ⚠️ A single-file bind mount binds an INODE — caught before U4 could hit it
+
+Q2 = A mounts the **directory** `./config:/config`, not the file. The safe way to write a config
+file is write-temp-then-rename, which **replaces the inode**; through a single-file bind mount that
+rename either fails or silently detaches the container's view from the host file. **U3 only reads,
+so the bug would be invisible here and would surface the first time the U4 editor saves.** Same
+family as `compose.yaml`'s existing warning that `./data` must be mounted as a directory because
+SQLite's `-wal` and `-shm` siblings have to live beside the database.
+
+### ⚠️ Docker creates a missing bind-mount source directory OWNED BY ROOT
+
+The entrypoint drops privileges to `node`, so a root-owned `config/` would leave the app unable to
+read its own rules — with a permissions error that reads like a code fault. `rules:init` creates
+the directory as the invoking user, which is why the setup step earns its place rather than being
+a README line.
+
+### Decisions
+
+| Decision | Source |
+|---|---|
+| `config/rules.json` — its own directory, **never `data/`** | NFR Q2 = B (P-15) |
+| `./config:/config` — the **directory** | Q2 = A |
+| **`:ro`** at U3, `:rw` at U4 | Q1 = A |
+| The app **never** creates the file; `npm run rules:init` does | FQ1 = A |
+| Absent **file** is quiet/info; absent **directory** is warn; invalid is error | Q3 reporting |
+| `config/*` gitignored, `config/rules.example.json` committed | Q4 = A |
+| 1 MB / 1000 rules / depth 32 — **constants in code, not settings** | Q5 = A, NFR Q1 |
+
+**The bounds are deliberately not environment variables**, following the precedent set for
+MusicBrainz request spacing: a knob exists only to violate the policy, most likely while debugging
+and then forgotten. A depth limit that can be raised from the environment will be raised at the
+moment it first refuses something — the moment it is doing its job.
+
+**An absent file and an absent directory are different facts** and get different log levels. A
+missing file on a fresh install is normal; a missing directory means the mount did not happen, and
+quiet would be exactly wrong. Both name the path. The two-facts pattern in infrastructure clothing.
+
+**Nothing was applied.** The `compose.yaml`, `.gitignore`, `config/rules.example.json`,
+`scripts/rules-init.mjs` and `package.json` changes are recorded as a list to apply at Code
+Generation.
+
+**Context**: CONSTRUCTION — U3 Infrastructure Design complete. No code written, no schema change,
+no data change. 486 tests, typecheck clean.

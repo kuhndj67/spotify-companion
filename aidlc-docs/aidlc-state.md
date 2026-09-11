@@ -889,7 +889,11 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       **U3 complete and APPROVED 2026-09-10** — `construction/u3-rule-model/nfr-design/`,
       **P-10…P-18**, **LC-7…LC-12**, **PBT-11…PBT-20**. ⚠️ `RuleStore.watch()` **deferred to U4**
       (Q3 = D), which also defers **BR-20.8**; diverges from `component-methods.md` by design.
-- [x] Infrastructure Design — **U1 complete** 2026-08-25 (narrow: storage + R7), approved
+- [x] Infrastructure Design — **U1 complete** 2026-08-25 (narrow: storage + R7), approved.
+      **U3 complete and APPROVED 2026-09-10** — one file, one mount: `./config:/config:ro`
+      (the DIRECTORY, not the file — a single-file bind mount binds an inode and breaks
+      atomic rename at U4). Bounds are constants, not settings. ⚠️ FQ1 taken **by
+      recommendation**, not an explicit answer.
 - [x] Code Generation — **U1 complete** 2026-08-25. 10 files created, 8 modified, 7 test files.
       184/184 tests passing. Awaiting approval. U2–U5 pending.
 - [x] Build and Test — **U1 complete** 2026-08-26. Build ✅, 193/193 tests, container verified.

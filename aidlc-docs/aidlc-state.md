@@ -900,6 +900,9 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       ⚠️ **Wired to nothing** — `git status src/` shows only `src/rules/`; no route, no
       `server.ts` change, no schema change. U2, U4–U5 pending.
 - [x] Build and Test — **U1 complete** 2026-08-26. Build ✅, 193/193 tests, container verified.
+      **U3 complete 2026-09-11** — PASS. 620 tests, 99.26% line / 93.10% branch, container built
+      (exit 0) and **recreated on the new compose**: UI 200, WS handshake 101, cross-site 403,
+      `/config` read-only, `integrity_check: ok`, 428 rows before and after.
       **One open decision blocks container use** (see below). Awaiting approval.
       **U2 complete** 2026-09-01, **approved 2026-09-05** after a verification pass:
       404/404 tests, typecheck clean, three defect fixes confirmed against production data.

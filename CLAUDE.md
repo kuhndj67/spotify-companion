@@ -441,10 +441,12 @@ from the host file. U3 only reads, so the bug is invisible here and would surfac
 the U4 rule editor saves. Same family as `./data` needing a directory mount for SQLite's `-wal`
 and `-shm` siblings.
 
-⚠️ **Run `npm run rules:init` before the first `compose up`.** Docker creates a missing bind-mount
-source directory **owned by root**, and the entrypoint drops privileges to `node` — a root-owned
-`config/` leaves the app unable to read its own rules, with a permissions error that reads like a
-code fault rather than a setup one.
+**Run `npm run rules:init` before the first `compose up`.** It creates `config/rules.json` from the
+committed template and refuses to overwrite. ⚠️ **The root-ownership rationale is host-specific and
+was NOT observed here** — on a Linux host, Docker creating a missing bind-mount source directory
+owned by root would leave the app (which drops to `node`) unable to read its own rules. Measured
+2026-09-11 on Rancher Desktop / Windows: the bind mount synthesises `rwxrwxrwx root:root`
+regardless, so reads work. Keep the script; do not cite the reason as if it had been seen.
 
 **FR-33 is only partly met, deliberately.** `onUnknown: 'no-match'` and `'match'` work; **`'hold'`
 does not**, because it needs a deadline and a re-evaluation trigger that a pure synchronous module

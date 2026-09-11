@@ -3129,3 +3129,77 @@ the six pure modules.
 
 **Context**: CONSTRUCTION — U3 built. Container not rebuilt and does not need to be: nothing reads
 `RULES_PATH` yet. Corpus 427 plays, recording throughout.
+
+---
+
+## 2026-09-11 — U3 Build and Test: PASS
+
+**Stage**: CONSTRUCTION — Build and Test, Unit U3.
+**Summary**: `construction/build-and-test/u3-build-and-test-summary.md`.
+
+| | |
+|---|---|
+| Typecheck | ✅ clean |
+| Compile | ✅ exit **0** → `dist/rules/` |
+| Tests | ✅ **620 passing**, 0 failing (486 before U3) |
+| Coverage | **99.26% line · 93.10% branch · 97.53% function** (was 99.19 / 92.86) |
+| Purity | ✅ six new pure modules enforced |
+| Orphans | ✅ no new `ALLOWED_ORPHANS` |
+| Container build | ✅ exit **0** |
+| Container runtime | ✅ recreated and verified |
+| App behaviour | ✅ **unchanged** |
+
+⚠️ **Every exit code captured directly, not through a pipe** — `docker compose build | tail`
+reports the pipe's status, and a failing build has read as success here once before.
+
+### The containment claim was checked, not asserted
+
+`git status src/` showed **only `src/rules/`**; `grep -c rules src/api.ts` is **0**; the single hit
+in `server.ts` is an unrelated comment about local-access rules; the container logs carry **no
+rules line** because nothing reads `RULES_PATH`; schema stays **v4** with no migration. If a later
+session finds the rules engine affecting app behaviour before U4/U5, that is a regression of the
+phase boundary rather than progress.
+
+### The container was recreated deliberately, to close a latent failure
+
+The running deployment was still on the **old** compose file, so the new `./config:/config:ro`
+mount would first have been exercised at an **unattended reboot** — and a broken mount means the
+app does not start, which means **recording stops silently**. Corpus recorded before and after.
+
+UI **200** · `/api/health` a real MCP round-trip · **WebSocket handshake 101** · cross-site Origin
+**403** · `/config` mounted with both files · a write to it **refused, "Read-only file system"** ·
+`integrity_check: ok` · `journal_mode: wal` · **428 rows before and after**, 343 live trails
+intact. The WebSocket check is included because a `200` on `/` does not imply the live display
+works — that was the blind spot behind the 2026-09-05 `403`.
+
+### ⚠️ A claim from the infrastructure design was NARROWED because it did not reproduce
+
+The design warned that Docker creates a missing bind-mount source directory **owned by root**,
+leaving the app — which drops privileges to `node` — unable to read its own rules, with a
+permissions error that reads like a code fault. **Measured on this host it does not happen**:
+Rancher Desktop / Windows synthesises `rwxrwxrwx root:root` on the bind mount regardless, so the
+files are world-readable and reads work.
+
+The hazard is real on a **Linux** host. `npm run rules:init` keeps its place — it creates the file
+from the committed template and refuses to overwrite — but `CLAUDE.md` has been corrected so the
+root-ownership rationale is not cited as though it had been observed here. **An untested
+justification repeated confidently is how a wrong reason outlives the decision it justified.**
+
+### Defects
+
+Four, all during code generation, all in `u3-code-summary.md`: the depth guard that could not be
+reached, the exponential tree generator, the throw on an unreachable branch, and one test that was
+wrong rather than a behaviour. **None were found by running the system** — the expected shape for a
+unit with no runtime, and the inverse of U2, where all three defects were only reachable live.
+`noOrphanModules.test.ts` caught an untested module (`trackFacts.ts`) immediately; the gap was
+filled rather than allowlisted.
+
+### Requirements
+
+FR-26–32, FR-43–45 ✅ · NFR-25–27 ✅ (PBT-11 … PBT-20) · **FR-33 PARTIAL — `hold` is U5's, and must
+not be marked complete on this unit's tests.**
+
+**All seven U3 exit criteria met. Done means CI green, and it is.**
+
+**Context**: CONSTRUCTION — U3 complete through Build and Test. Container rebuilt and running on
+the new compose. Corpus 428 plays, recording resumed.

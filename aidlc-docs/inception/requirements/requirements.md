@@ -530,6 +530,47 @@ The most likely reconciliation is that the low-ratio skips (0.09–0.27, eight o
 *remembered* as "I stopped listening" while the instrument saw a genuine track change — but this
 is unverified, and W-3 must not be implemented on the assumption that it is right.
 
+##### ⚠️ RE-RAISED by the user 2026-09-19 — re-probed at 504 plays, still ZERO instances
+
+The user raised this again independently, in the same words as before: *"when I'm done listening
+the last track ends up incompletely played and I suspect will end up marked as a skip."* The
+corpus had grown 427 → **504 plays** (419 live) since the first probe, so it was re-measured
+rather than answered from the earlier result.
+
+| Check | 2026-09-10 | 2026-09-19 |
+|---|---|---|
+| Skips whose `close_reason` is not `track-change` | 0 of 30 | **0 of 31** |
+| Skips followed by ≥30 s before the next play | 0 of 30 | **0 of 31** |
+| Skips with `ev_ended_with_idle` set | 0 of 30 | **0 of 31** |
+| Session-enders (play before a ≥30 min gap, plus the final play) landing on `skipped` | 0 of 9 | **0 of 12** |
+
+The twelve session-enders resolve **7 `completed`, 5 `unknown`, 0 `skipped`**. The five that land
+on `unknown` are exactly the partial ones — ratios 0.02, 0.12, 0.24, 0.32, 0.34 — and they close
+on `pause-idle` or `playback-stopped`, never on `track-change`.
+
+**The suspected contamination is structurally unreachable**, and the reason is one branch in
+`classify`: `skipped` is returned *only* when `closeReason === 'track-change'`. Ending playback
+produces `playback-stopped` or `pause-idle`, both of which fall through to `unknown`. A session
+end cannot become a skip without that branch being edited.
+
+**But the inverse cost is real, and it is what W-3 should now be scoped against.** Those five
+partial session-enders are not contaminating the outcome variable — they are **absent from it**.
+The gate's eligibility predicate is `outcome IN ('completed','skipped')`, so every abandoned
+last-track is silently dropped from any analysis. At 504 plays that is 5 rows; it grows with
+every listening session, and it grows *fastest* for the listener who stops mid-track often.
+
+> **The user's instinct that this data is wrong was right; the direction was inverted.** The
+> instrument is not inventing skips — it is discarding session-enders. That reframing changes the
+> deliverable: W-3's value is **recovering `unknown` rows into a decidable outcome**, not
+> preventing false skips. Anyone picking this up who implements "stop marking session ends as
+> skips" will write code that does nothing, and tests that pass because there was never anything
+> to fix.
+
+The 2026-09-10 reconciliation paragraph above still stands unresolved: the low-ratio skips are
+probably *remembered* as session ends while the instrument saw a real track change. Three cycles
+of probing have not moved it, so **do not spend a fourth on the question of why** — the corpus
+answers what happened, not what it felt like.
+
 ##### The discriminator, when this is taken up
 
 **Do not add a new field first.** The signal is already in the data and is computable
@@ -585,7 +626,7 @@ it is being decided.
 | R1 | **The promotion hypothesis may be false.** Signed-vs-independent may not predict skip behaviour | One rule input loses its value; the engine itself is unaffected | FR-19/FR-20 keep raw data re-analysable; dry-run (FR-37) and back-testing (FR-42) test the hypothesis against real history before rules act on it. Treat as a hypothesis to be *tested*, not an assumption to build on |
 | R2 | **MusicBrainz coverage is incomplete**, especially for new and independent releases — precisely the population of interest | Systematic missing-data bias, correlated with the variable being measured; label-based rules misfire on the tracks that matter most | FR-16 records `unknown` as a distinct value, never as "independent"; FR-32/FR-33 make `unknown` an explicit tri-state the rule must handle. Track coverage rate as a first-class metric |
 | R3 | **Major/indie has no clean definition.** Distribution deals, imprints and majors' "indie" sublabels blur the line | Classification disagrees with intuition | FR-13 stores per-signal votes rather than a boolean verdict |
-| R4 | **Skip inference is heuristic**, with several confounders (§3.3) | Noisy outcome variable weakens the model | FR-19/FR-20; NFR-22 property tests; FR-23 excludes app-initiated skips. **W-3** names the session-end confounder specifically and records the discriminator for it (probed 2026-09-10: zero instances in the corpus so far) |
+| R4 | **Skip inference is heuristic**, with several confounders (§3.3) | Noisy outcome variable weakens the model | FR-19/FR-20; NFR-22 property tests; FR-23 excludes app-initiated skips. **W-3** names the session-end confounder specifically and records the discriminator for it (probed 2026-09-10 and **re-probed 2026-09-19 at 504 plays: still zero instances**). ⚠️ The measured cost runs the *other* way — session-enders land in `unknown` and are excluded from the gate's eligible set, so W-3 is a data-**recovery** item, not a false-skip repair |
 | R5 | **A runaway rule** skips an entire queue. Higher now that rules are user-authored over arbitrary fields | User-visible loss of control | FR-37 dry-run, FR-38 kill switch, FR-39 rate limit, FR-40 no-repeat-skip, FR-47 off by default |
 | R11 | **Slow fields cannot be resolved before a track starts.** A label lookup is 2 MusicBrainz calls behind a 1 req/sec queue | Label-based rules fire late or not at all — and those are the rules that test R1 | FR-36 pre-warms from the queue endpoint (verified reachable 2026-08-25); FR-34/FR-35 bound the fallback. **Queue lookahead unconfirmed during active playback** |
 | R12 | **A rule language over arbitrary fields invites `eval`** | Arbitrary code execution reachable from the rule store, collapsing the §4.1 posture | FR-43 structured predicate tree, FR-44 prohibits code evaluation, FR-45 validates at creation |

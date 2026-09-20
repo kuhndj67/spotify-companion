@@ -3234,3 +3234,45 @@ decision blocks container use"* sat inside U3's entry but belonged to **U1** —
 
 **Context**: CONSTRUCTION — U3 approved. 7 commits pushed to `origin/main`; the repository had
 existed only on this machine since 2026-09-10.
+
+---
+
+## 2026-09-19 — W-3 re-raised and re-probed: the confounder runs the other way
+
+**Stage**: CONSTRUCTION — backlog maintenance. No code changed.
+
+The user re-raised the session-end confounder independently, in the same words as 2026-09-10:
+the last track of a session plays incompletely and is suspected of being recorded as a skip.
+The corpus had grown **427 → 504 plays** since the first probe, so it was **re-measured rather
+than answered from the existing entry**.
+
+**Still zero instances.** All 31 skips close on `track-change`, all have a successor within 30 s,
+none has `ev_ended_with_idle`. The twelve session-enders — the play before each ≥30 min gap, plus
+the final play in the corpus — resolve **7 `completed`, 5 `unknown`, 0 `skipped`**.
+
+The mechanism is one branch in `classify`: `skipped` is returned **only** when
+`closeReason === 'track-change'`. Ending playback yields `playback-stopped` or `pause-idle`, both
+of which fall through to `unknown`. The feared contamination cannot occur without editing that
+branch.
+
+### ⚠️ The direction was inverted, and that changes the deliverable
+
+The five partial session-enders (ratios 0.02, 0.12, 0.24, 0.32, 0.34) are not contaminating the
+outcome variable — they are **missing from it**. The gate's eligibility predicate is
+`outcome IN ('completed','skipped')`, so each abandoned last-track is silently dropped from
+analysis. **The user's instinct that this data is wrong was correct; the direction was not.**
+
+W-3's value is therefore **recovering `unknown` rows into a decidable outcome**, not preventing
+false skips. Recorded explicitly because someone implementing the item as stated would write code
+that does nothing and tests that pass for want of anything to fix — the same shape as a green test
+that is green for the wrong reason.
+
+The item stays in the backlog at the user's request rather than being taken up now. It remains
+**retroactively applicable** (a window function over `play`, no new collection, no upstream
+requests), so deferring it costs nothing.
+
+⚠️ **Not re-litigated**: the 2026-09-10 reconciliation — that low-ratio skips are *remembered* as
+session ends while the instrument saw a genuine track change — is unresolved after three probes.
+Further probing of *why* the perception differs is explicitly not worth a fourth cycle.
+
+**Context**: CONSTRUCTION — U3 approved, U4 next. Corpus 504 plays, recording continuously.

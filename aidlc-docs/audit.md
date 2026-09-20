@@ -3506,3 +3506,60 @@ Host-editability is the point of the mount.
 
 **Context**: CONSTRUCTION — U4 NFR Design plan written, 5 questions open. No code written. Corpus
 528 plays; `config/rules.json` restored to its committed content after the probe.
+
+---
+
+## 2026-09-20 — U4 NFR Design complete (awaiting approval)
+
+**Stage**: CONSTRUCTION — NFR Design, Unit U4.
+**Artifacts**: `construction/u4-rule-observability/nfr-design/` — **P-19…P-26**, **LC-13…LC-20**,
+**PBT-21…PBT-30**.
+
+**Answers**: Q1 **C** · Q2 **C** · Q3 **A** · Q4 **B** · Q5 **C** — all as recommended, none
+vague, **no follow-ups required**. The first stage in this unit to need none.
+
+### What the answers settled
+
+- **P-19 change detection is polling**, 5 s `stat` on `mtime`/`size` with a hash only when those
+  move, plus a reload button. **Both enter the same `load()`** — the one-admission-rule lesson,
+  which the WebSocket `403` taught by having the policy re-implemented rather than reused.
+- **P-20 ordering is fixed**: evaluate → broadcast → write. `node:sqlite` is synchronous and the
+  caller is the poll loop, so sequencing the write after the broadcast makes "the display is never
+  behind the record" a structural claim rather than a measurement that could drift.
+- **P-21 contains derived failure**: a decision-log write failure drops the row, counts it, and
+  never shares a transaction with the `play` write. A rules defect must be unable to abort the one
+  artefact that cannot be regenerated. **The drop is counted, never silent** — a gap in the log
+  reads as *"the rule did not match"*.
+- **P-24 makes truncation unavoidable at the type level**: `truncated` is a **required** field of
+  `BackTestReport`. This is the `release_count = 100` bug pre-empted — an arbitrary sample recorded
+  as a complete count, which happened to 18 of 56 stored resolutions and was believed.
+- **P-25 composes rather than enlarges**: rules diagnostics live in a separate tested module that
+  `diagnostics.ts` calls, so the new surface is tested and the existing `ALLOWED_ORPHANS` entry
+  does not grow.
+
+### ⭐ PBT-22 exists because BR-27.2 has no observable failure mode
+
+The point-in-time decision cannot be validated by hands-on evaluation — as-of-now counts produce
+plausible numbers today and diverge only over months, as the corpus grows underneath a range that
+has not changed. The property makes it immediate: take a report, insert plays dated **after** the
+range, take it again. Point-in-time is stable; as-of-now is not.
+
+**It fails loudly under the wrong implementation and is silent under the right one.** The user's
+answer on this was *"I THINK this will be fine… will need to see it in action"* — and the honest
+answer is that it will never be seen in action, which is why it is pinned by a property instead.
+
+### Purity discipline moved rather than relaxed
+
+U3 was five pure modules of six. U4 is mostly wiring and mostly impure — so the claim narrowed to
+**everything that decides anything stays pure**: `factReconstructor`, the back-test fold,
+`decisionTrace` and `rulesDiagnostics`. Impure code *moves* data; it never *judges* it.
+⚠️ `test/purity.test.ts` must be **extended** to the new pure modules, not merely left passing — a
+`Date.now()` in `factReconstructor` would break NFR-26 while every other test passed.
+
+### Three exit criteria cannot be closed by tests
+
+The dry-run agreement gate, the `partialData` rate that says whether `ENRICHMENT_WAIT_MS = 10 000`
+is right, and **BR-20.8's last-known-good path — specified since U3 and never once run**.
+
+**Context**: CONSTRUCTION — U4 through NFR Design, awaiting approval. Next is Infrastructure
+Design. No code written; schema still v4. Corpus 528 plays, container healthy.

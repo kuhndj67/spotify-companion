@@ -894,6 +894,12 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       follow-ups; artifacts at `construction/u3-rule-model/functional-design/`, **BR-14…BR-21**.
       ⚠️ **FR-33 only partially met by U3**: `hold` is deferred to U5 (Q9 = B). U4–U5 pending.
 - [x] NFR Requirements — **SKIPPED** (27 NFRs already agreed in requirements.md §4)
+- [x] NFR Design — **U4 complete 2026-09-20**, awaiting approval —
+      `construction/u4-rule-observability/nfr-design/`, **P-19…P-26**, **LC-13…LC-20**,
+      **PBT-21…PBT-30**. Q1 C · Q2 C · Q3 A · Q4 B · Q5 C, all as recommended.
+      🔴 **`fs.watch` DISPROVEN on this deployment** — 0 events over the Rancher Desktop bind
+      mount while the container read new content within 1 s. BR-26's watcher is **polling**
+      (5 s `stat`, hash on change) plus a reload button, both entering the same loader.
 - [x] NFR Design — **U1 complete** 2026-08-25 (narrow: persistence only), awaiting approval.
       **U3 complete and APPROVED 2026-09-10** — `construction/u3-rule-model/nfr-design/`,
       **P-10…P-18**, **LC-7…LC-12**, **PBT-11…PBT-20**. ⚠️ `RuleStore.watch()` **deferred to U4**

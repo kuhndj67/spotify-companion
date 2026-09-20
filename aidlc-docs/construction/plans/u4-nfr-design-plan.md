@@ -102,7 +102,7 @@ authoring loop, both entering the *same* loader. One admission rule, invoked twi
 twice.
 
 [Answer]:
-
+C
 ---
 
 ### Question 2 — Where does the decision-log write sit?
@@ -123,7 +123,7 @@ network call, but the ordering question is the same one.
 and crash-safety, keeps the display first, and adds no queue to lose.
 
 [Answer]:
-
+C
 ---
 
 ### Question 3 — What happens when the decision-log write fails? (NFR-13)
@@ -146,7 +146,7 @@ didn't match"*, which is a wrong answer that looks like a finding.
 rather than invisible.
 
 [Answer]:
-
+A
 ---
 
 ### Question 4 — Back-test bounding as the corpus grows
@@ -166,7 +166,7 @@ resolutions sat at exactly 100 and were believed.
 optional one.
 
 [Answer]:
-
+B
 ---
 
 ### Question 5 — What must diagnostics report about rules? (NFR-24)
@@ -191,7 +191,7 @@ it the injection treatment `api.ts` got.
 refactor rides along with a feature unit.
 
 [Answer]:
-
+C
 ---
 
 ## Out of scope for U4 NFR Design

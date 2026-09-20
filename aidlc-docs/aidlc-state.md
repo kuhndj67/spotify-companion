@@ -4,7 +4,11 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U2 APPROVED by the user 2026-09-05.**
+- **Current Stage**: CONSTRUCTION — **U3 APPROVED by the user 2026-09-19. U4 is next.**
+  U3 shipped the rules core **wired to nothing**, and it must stay that way until U4:
+  if the engine affects app behaviour before U4/U5, that is a regression of the phase
+  boundary, not progress. **FR-33 stays PARTIAL** — `hold` is U5's.
+  *(U2 was approved 2026-09-05.)*
   **486 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
   Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
   🔒 The **Phase 2 hypothesis gate** (BR-11) was **DISCHARGED 2026-09-10**: the
@@ -903,7 +907,11 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       **U3 complete 2026-09-11** — PASS. 620 tests, 99.26% line / 93.10% branch, container built
       (exit 0) and **recreated on the new compose**: UI 200, WS handshake 101, cross-site 403,
       `/config` read-only, `integrity_check: ok`, 428 rows before and after.
-      **One open decision blocks container use** (see below). Awaiting approval.
+      **APPROVED by the user 2026-09-19** after a re-verification pass: 620/620 tests green on
+      the day of approval, working tree clean, container up and healthy, corpus grown to **504
+      plays** with recording unbroken across the eight days since the build.
+      ⚠️ The "one open decision blocks container use" note that stood here was **U1's**, and was
+      stale — open item 1 closed 2026-09-05.
       **U2 complete** 2026-09-01, **approved 2026-09-05** after a verification pass:
       404/404 tests, typecheck clean, three defect fixes confirmed against production data.
 - [x] **Phase 2 hypothesis gate (BR-11)** — pre-registered `fd09ad7`; ran 2026-09-05

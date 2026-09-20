@@ -3203,3 +3203,34 @@ not be marked complete on this unit's tests.**
 
 **Context**: CONSTRUCTION — U3 complete through Build and Test. Container rebuilt and running on
 the new compose. Corpus 428 plays, recording resumed.
+
+---
+
+## 2026-09-19 — U3 APPROVED by the user
+
+**Stage**: CONSTRUCTION — Unit U3 (Rule Model, pure core) approved. **U4 is the next unit.**
+
+Approval followed a re-verification pass eight days after the build, not a reading of the build
+summary:
+
+| Check | Result |
+|---|---|
+| Test suite, re-run on the day of approval | ✅ **620 passing, 0 failing** |
+| Working tree | ✅ clean at `ded71b2` |
+| Container | ✅ `spotify-now-playing` up and **healthy** |
+| `/api/health` | ✅ real MCP round-trip — `mcp: connected`, 30 tools |
+| Recording continuity | ✅ corpus **428 → 504 plays**, latest recorded minutes before approval |
+
+**Recording did not stop while the project was idle**, which is the thing the autostart chain
+exists to guarantee and the only claim here that eight days of silence could have falsified.
+
+Carried into U4 unchanged: **FR-33 remains PARTIAL** (`hold` is U5's, and must not be marked
+complete on U3's tests); `RuleStore.watch()` and **BR-20.8** were deferred to U4; and U3 stays
+**wired to nothing** until U4 wires it.
+
+⚠️ A stale sentence was removed from the Build and Test checklist while approving: *"One open
+decision blocks container use"* sat inside U3's entry but belonged to **U1** — open item 1 closed
+2026-09-05. It read as a live blocker on U3.
+
+**Context**: CONSTRUCTION — U3 approved. 7 commits pushed to `origin/main`; the repository had
+existed only on this machine since 2026-09-10.

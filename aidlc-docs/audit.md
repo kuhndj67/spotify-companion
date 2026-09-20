@@ -3563,3 +3563,65 @@ is right, and **BR-20.8's last-known-good path — specified since U3 and never 
 
 **Context**: CONSTRUCTION — U4 through NFR Design, awaiting approval. Next is Infrastructure
 Design. No code written; schema still v4. Corpus 528 plays, container healthy.
+
+---
+
+## 2026-09-20 — U4 Infrastructure Design complete (awaiting approval)
+
+**Stage**: CONSTRUCTION — Infrastructure Design, Unit U4.
+**Artifacts**: `construction/u4-rule-observability/infrastructure-design/infrastructure-design.md`
+plus **`functional-design/frontend-components.md`**, added after Q4.
+
+**Answers**: Q1 **A** · Q2 **as tabled** · Q3 **A** · Q4 **A** + status-bar elaboration.
+
+**U4 adds no infrastructure** — no mount, no volume, no port, no container. One migration and two
+environment values. U3's was *"one file, one mount"*; U4's is *"one migration, no mount"*.
+
+### ✅ Rollback verified rather than assumed
+
+`migrate()` skips every migration at or below the current version, so **U3's image against a v5
+database finds nothing to apply** and ignores the new table and columns. That is the real recovery
+path if U4 misbehaves: `compose up -d` on the previous image, no data surgery, no down-migration.
+
+⚠️ **The guarantee holds only while migrations stay additive.** A future migration that rewrites or
+drops would break rollback **silently** — the old image would start happily against data it can no
+longer interpret. Any non-additive migration must retire this explicitly.
+
+### ⚠️ `compose.yaml` anticipated U4 wrongly, and the comment would have been followed
+
+The `./config` mount says *"this becomes `:rw` at U4 when the editor needs to write"*. **U4 has no
+editor** — the UI is read-only by Application Design Q2 = A, and the reload button re-reads. The
+mount stays `:ro` and the comment is retargeted at the unit that actually adds editing. Left alone
+it would have granted a write capability a whole unit early, which is precisely what the
+`musicbrainz.json` comment beside it warns against.
+
+A second comment on the same mount still states the root-ownership hazard as fact. **Measured
+2026-09-11 not to occur on this host**; CLAUDE.md was corrected then and `compose.yaml` was not.
+Both corrections apply at code generation.
+
+### Q4 became a status bar rather than a banner
+
+A failed migration leaves `repository` null: display works, WebSocket connects, **nothing is
+recorded**, and it is said only in the startup log — which nobody reads at an autostart. The user,
+from a rich-application background, asked for the standard shape: a compact status strip with an
+error field and short red/green indicators.
+
+That is a better answer than a one-off banner, because U4 was already going to add a rules version
+indicator — three separate one-off indicators was the alternative. **Recording · Rules · Connection
+· Spotify**, in one bar.
+
+⚠️ **Four states, not three.** An indicator that has not yet heard from its subsystem renders
+**unknown, never green**. A status dot that is green because nothing has reported yet is this
+project's central defect wearing a UI hat — and it matters most on *Recording*, where a false green
+says "your listening is being saved" about the one artefact that cannot be regenerated.
+
+⚠️ **Colour is never the only channel**: every indicator carries a text label and a distinct glyph
+per state. A bar that is *only* red and green fails outright for red-green colour deficiency.
+
+⚠️ **State derivation lives in `src/` as tested pure functions**, not in `public/app.js`. That file
+has no tests and is outside the orphan check, and both defects ever found in it were found by
+clicking. The DOM wiring may stay there; the *judgement* may not — a false green would come from
+exactly that judgement.
+
+**Context**: CONSTRUCTION — U4 through Infrastructure Design, awaiting approval. **Next: Code
+Generation.** No code written; schema still v4. Corpus 528 plays, container healthy.

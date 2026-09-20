@@ -904,7 +904,15 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       **U3 complete and APPROVED 2026-09-10** — `construction/u3-rule-model/nfr-design/`,
       **P-10…P-18**, **LC-7…LC-12**, **PBT-11…PBT-20**. ⚠️ `RuleStore.watch()` **deferred to U4**
       (Q3 = D), which also defers **BR-20.8**; diverges from `component-methods.md` by design.
-- [x] Infrastructure Design — **U1 complete** 2026-08-25 (narrow: storage + R7), approved.
+- [x] Infrastructure Design — **U4 complete 2026-09-20**, awaiting approval —
+      `construction/u4-rule-observability/infrastructure-design/`. Q1 A · Q2 as tabled · Q3 A ·
+      Q4 A. **No new mount, volume or port** — one migration (**005**, additive) and two env
+      values. ✅ **Rollback to U3's image verified safe** (`migrate` skips ≤ current version),
+      *while migrations stay additive*. ⚠️ `./config` stays **`:ro`** — U4 has **no editor**, and
+      compose's comment anticipating `:rw` "at U4" is wrong and gets retargeted.
+      A **status bar** (Q4) surfaces recording/rules/connection/Spotify;
+      `functional-design/frontend-components.md` added.
+      **U1 complete** 2026-08-25 (narrow: storage + R7), approved.
       **U3 complete and APPROVED 2026-09-10** — one file, one mount: `./config:/config:ro`
       (the DIRECTORY, not the file — a single-file bind mount binds an inode and breaks
       atomic rename at U4). Bounds are constants, not settings. ⚠️ FQ1 taken **by

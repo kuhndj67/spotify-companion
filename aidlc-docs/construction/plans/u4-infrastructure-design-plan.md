@@ -100,7 +100,7 @@ restored from.
 somebody is looking at rather than a reboot at 3am.
 
 [Answer]:
-
+A
 ---
 
 ### Question 2 — Which new values are settings, and which are constants?
@@ -124,7 +124,7 @@ not need a rebuild.
 **Recommendation: as tabled.**
 
 [Answer]:
-
+go with recommendation
 ---
 
 ### Question 3 — `./config` mount mode
@@ -141,7 +141,7 @@ capability with no use."* The mount would be writable for a whole unit before an
 soften the root-ownership claim to match what was measured on 2026-09-11.
 
 [Answer]:
-
+A
 ---
 
 ### Question 4 — Should display-only degradation be visible?
@@ -167,7 +167,7 @@ backlog item.
 **Recommendation: A** — the banner is cheap and the failure it reports is expensive.
 
 [Answer]:
-
+A - In rich application development (my background) a header or footer is often implemented that provides key visuals for app status, often an error text field and a number of status indicators (red/green indicators with short text). compact and intended for a quick app health status indication. Something similar but using current appdev best practices.
 ---
 
 ## Out of scope

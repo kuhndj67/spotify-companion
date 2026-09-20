@@ -3458,3 +3458,51 @@ come from the **same walk** that produces the verdict.
 **Context**: CONSTRUCTION — U4 Functional Design revised. Document review declined in favour of
 hands-on evaluation; the three flagged decisions were answered rather than skipped, and one of
 them (BR-29.3) changed as a result.
+
+---
+
+## 2026-09-20 — U4 NFR Design started; `fs.watch` disproven on the deployment
+
+**Stage**: CONSTRUCTION — NFR Design, Unit U4. Plan: `construction/plans/u4-nfr-design-plan.md`.
+
+The user declined the Fable design review for now (*"lets push the fable review... we'll do that
+later"*) and chose to continue to the next stage. The review remains available and non-blocking —
+the functional design is committed and pushed.
+
+### 🔴 `fs.watch` DOES NOT FIRE through the Rancher Desktop bind mount
+
+Probed **before** designing the watcher, not discovered during code generation. A watcher started
+inside the running container on `/config` and on `/config/rules.json`, while the host modified
+`./config/rules.json` by in-place append **and** by write-temp-then-rename:
+
+| Check | Result |
+|---|---|
+| `fs.watch('/config')` directory events in 12 s | **0** |
+| `fs.watch('/config/rules.json')` file events | **0** |
+| Did `watch()` throw? | **No — it registers silently** |
+| **Control: does the container see the new content?** | ✅ **Yes, within 1 s** |
+
+**The control is what makes this conclusive.** Content propagates through the mount correctly and
+immediately; only the change *events* are absent. This is not a mount failure — it is inotify not
+crossing the virtualised filesystem boundary.
+
+⚠️ **The dangerous variant of the project's recurring shape.** `watch()` registers successfully,
+throws nothing, and never calls back — there is **no error to see**. A rules file edited on the
+host would take effect **never**, while the app looked healthy. Same profile as the WebSocket
+`403`: every page load `200`, every handshake refused.
+
+⚠️ **It would have passed every test.** A unit test watching a `tmp` directory on a normal
+filesystem fires correctly; the defect exists only over the bind mount, which is the only place
+the app actually runs. Same family as the option-B divergence — tested in the shape that works,
+deployed in the shape that does not.
+
+**Consequence**: BR-26.1's 500 ms debounce is not the mechanism. It has to be polling (`stat` on
+`mtime`/`size`, hashing only when they move) or an explicit reload control. Q1 of the NFR plan
+settles it; the recommendation is **both**, entering the same loader — one admission rule, invoked
+twice, never written twice.
+
+⚠️ **Do not resolve this later by moving `rules.json` into the image or onto a named volume.**
+Host-editability is the point of the mount.
+
+**Context**: CONSTRUCTION — U4 NFR Design plan written, 5 questions open. No code written. Corpus
+528 plays; `config/rules.json` restored to its committed content after the probe.

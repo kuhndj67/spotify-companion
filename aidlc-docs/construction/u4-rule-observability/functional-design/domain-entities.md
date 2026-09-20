@@ -32,6 +32,7 @@ this is what lets the log answer *"why did my rule **not** fire?"*.
 | `evaluationId` | string | **Groups the rows of one decision.** Without it, "what did the engine see at 14:32" is unanswerable |
 | `decidedAt` | ISO-8601 string | When the decision was taken — not when the play started |
 | `playId` | `Maybe<number>` | FK to `play`. ⚠️ **Nullable and stays nullable** — see below |
+| `playLink` | `'pending' \| 'linked' \| 'link-failed'` | ⚠️ **Why `playId` is absent.** Never inferred from the null — see below |
 | `trackId` | string | Spotify track id, recorded **even when `playId` is null** |
 | `ruleId` | string | The rule as identified in `rules.json` |
 | `ruleName` | string | **Denormalised on purpose** — a renamed or deleted rule must not orphan its history |
@@ -46,7 +47,8 @@ this is what lets the log answer *"why did my rule **not** fire?"*.
 | `executed` | boolean | Whether an action was taken. **Always `false` in U4** |
 | `error` | `Maybe<string>` | Execution failure. **Always `null` in U4** |
 | `engineVersion` | integer | `RULE_ENGINE_VERSION` at the time |
-| `ruleSetVersion` | integer | The loaded rule-set counter (§4) |
+| `ruleSetVersion` | integer | The loaded rule-set counter (§4). **For the UI. It resets on restart** |
+| `ruleSetContentHash` | string | ⚠️ **What actually identifies the set on a durable row** (BR-23.7a) |
 
 ### ⚠️ `playId` is nullable, and that is a fact about ordering, not a convenience
 
@@ -64,6 +66,29 @@ Two consequences that must not be "tidied":
 > A `NOT NULL` constraint here would force a decision to wait for its play, which inverts the
 > causality the unit exists to observe.
 
+> ### ⚠️ `playLink` exists because a null `playId` would otherwise mean two things
+>
+> `PlayObserver` fires `onPlayRecorded` **only after `recordPlay` succeeds**. When the write throws
+> it increments `#gaps`, sets `#degraded`, and the hook never runs — so the back-fill never happens
+> and `playId` stays null for ever, **exactly as if the play had never closed**.
+>
+> Those two readings point opposite ways. *"The play never closed"* is a W-3 case and expected.
+> *"The write failed"* is a fault, on the one artefact that cannot be regenerated. Leaving them on
+> one column makes the fault invisible inside an outcome the design already calls correct.
+>
+> Same family as `error` is not `unknown` — three U2 defects, all of which passed the full suite.
+
+> ### ⚠️ No uniqueness constraint may encode "one decision per play" (BR-22.1a)
+>
+> Not on `playId`, not on `(playId, ruleId)`, not on `evaluationId` per play. FR-34 is a **Must**
+> and requires re-evaluation when slow enrichment lands, so U5 will legitimately write a second
+> decision for one play. A constraint added now would have to be **dropped** then — and a
+> migration that drops a constraint is non-additive, which retires the by-image rollback
+> guarantee that migration 005 currently enjoys.
+>
+> The U4 invariant is real; it is enforced by the coordinator's `decided` flag and tested there,
+> where U5 can change it by changing code rather than by changing the schema.
+
 ---
 
 ## 2. `BackTestReport` — what a rule would have done
@@ -79,7 +104,8 @@ Extends the Application Design shape (`component-methods.md`) with what Q5–Q7 
 | `wouldNotMatch` | integer | Plays where it decisively did not |
 | `undecidable` | integer | ⚠️ Plays where the predicate resolved `unknown` — **distinct from `wouldNotMatch`** |
 | `unknownFieldCounts` | map<string, integer> | Per field, how many plays read it absent |
-| `unanswerableFields` | string[] | Fields **no historical row can answer** (§5) |
+| `unanswerableFields` | string[] | Fields **some row in the range could not answer**, with the count per field (§5) |
+| `truncated` | boolean | ⚠️ **Required, never optional or defaulted** — P-24. The 50,000-play cap fired |
 | `agreedWithUserSkip` | integer | Rule matched **and** the user skipped |
 | `disagreedWithUserKeep` | integer | Rule matched **and** the user completed |
 | `missedUserSkip` | integer | Rule did not match **and** the user skipped |
@@ -87,6 +113,13 @@ Extends the Application Design shape (`component-methods.md`) with what Q5–Q7 
 | `inconclusive` | integer | Live plays the classifier could not judge |
 | `excludedRuleInitiated` | integer | FR-23. **0 until U5** |
 | `computedAt` | ISO-8601 | For the report, never for the evaluation |
+
+> ### ⚠️ `truncated` was specified in P-24 and missing from this table
+>
+> P-24 makes it a **required** field — *"a truncation that does not announce itself is a lie"* —
+> and the entity that defines the report did not list it. That is how the `release_count = 100`
+> bug happened in the first place: the cap was real, the field that would have disclosed it was
+> not written down, and 18 of 56 resolutions recorded an arbitrary sample as a complete count.
 
 ### ⚠️ `undecidable` is not `wouldNotMatch`, and `notObserved` is not `inconclusive`
 
@@ -121,6 +154,13 @@ that sits exactly on a boundary — the same seam that makes SQL week bucketing 
 U3's `RuleStore` returns rules. U4 needs the **set** to be an identifiable thing, because BR-20.8's
 last-known-good is only observable if you can say *which* set is running (FQ5).
 
+⚠️ **`RuleSetWatcher` owns this entity; `RuleStore` owns none** *(settled 2026-09-20)*. U3's store
+sets `#rules = []` on **every** non-`loaded` outcome — `failed`, `absent` *and* `no-directory` —
+so a watcher calling `load()` would violate BR-26.3 the first time a bad file landed. The store
+becomes a parser returning a `LoadOutcome`; the watcher holds the set and decides what to keep.
+That also removes a trap: two `current()` methods returning different things, with the wrong
+wiring evaluating against a wiped set while every indicator read green.
+
 | Field | Type | Notes |
 |---|---|---|
 | `version` | integer | **Monotonic counter assigned at load.** Starts at 1; increments on each accepted load |
@@ -149,10 +189,38 @@ Back-testing reconstructs `TrackFacts` from a `play` row. Not every catalogue fi
 |---|---|---|
 | **Directly stored** | `track.title`, `track.durationMs`, `track.isrc`, `artist.name`, `artist.following`, `artist.genres`, `album.name`, `album.releaseDate`, `album.ageYears`, `label.name`, `label.classification`, `label.confidence`, `liked.atStart`, `liked.transition` | Read from the row |
 | **Point-in-time derived** | `history.playsOfTrack`, `history.skipsOfTrack`, `history.playsOfArtist`, `history.skipsOfArtist` | Counted over plays **strictly before** this row's `started_at` (Q5 = A) |
-| **Stored from v5 forward** | `track.explicit`, `album.type` | Answerable for plays after the migration; **`unanswerable` before it** (FQ2 = B) |
+| **Stored from v5 forward** *(schema era)* | `track.explicit`, `album.type` | Answerable for rows whose `id` exceeds the **v5 watermark**; `unanswerable` below it (FQ2 = B, BR-27.5c) |
+| ⚠️ **A 2026-08 backfill gap** *(cause unestablished)* | `label.name`, `label.classification`, `label.confidence` | `unanswerable` where `isrc IS NULL AND label_unknown_reason IS NULL` — **the row was never asked** (BR-27.5b/5d) |
 
-`unanswerableFields` in the report is computed from the **intersection of the rule's referenced
-fields and the fields no row in the range can answer** — never from "the value came back null".
+`unanswerableFields` is computed **per row**, from the row: the intersection of the rule's
+referenced fields with the fields *that row* cannot answer — never from "the value came back
+null", and never from a single range-wide verdict.
+
+> ### ⚠️ Answerability has TWO eras, and only one of them has a migration
+>
+> Measured on the live corpus 2026-09-20: **82 of 86** backfilled rows dated 2026-08-20 → 08-31
+> carry no ISRC, and on every one of them both `label_verdict` **and** `label_unknown_reason` are
+> null — never asked. Every backfilled row from 2026-09-03 onward carries an ISRC (4 of 4), as
+> does every live row (457 of 457).
+>
+> `recently-played` **does** return `external_ids.isrc` — probed live, HTTP 200, 3/3 items — and
+> `RecentlyPlayedBackfill` has read it since **U1**. ⚠️ **Why those 82 lack one is unestablished,
+> and it is not the code** — one commit on `webApiClient.ts`, no wiring change, live rows with an
+> ISRC from row id 51, and a clean break at row id 120 → 155 with no code change in that window.
+> **No `ALTER TABLE` marks the boundary and no schema-derived watermark can find it**, which is
+> what makes this a per-row question rather than a range-wide one.
+>
+> On those 82 rows `label.classification` is null because there was never a key to ask MusicBrainz
+> with. Reported as an *unknown value* they would be counted as 82 plays that read the field
+> absent — which reads as **coverage**, and is the 28%→12%-where-the-truth-was-86%→44% denominator
+> bug reappearing inside the back-test.
+>
+> The discriminator already exists in the data: a row that *was* attempted carries a verdict or a
+> reason (`notFound` 151, `noEligibleCandidate` 48). Never-attempted is the **pair** of nulls.
+>
+> ⚠️ **The general shape**: an era boundary can come from a code change with no migration behind
+> it. Anywhere answerability is derived from the schema, ask whether the column was ever populated
+> by code that did not always exist.
 
 > ⚠️ **A null and an unanswerable are different, and the report must never infer one from the
 > other.** `label.classification` null means MusicBrainz had no label — a *finding*.

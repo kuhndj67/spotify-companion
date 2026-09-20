@@ -18,28 +18,57 @@
 
 ## 1. The evaluation trigger (FQ1 = A-prime)
 
-Exactly **one decision per play**, taken at the first tick where enrichment has landed, with a
-**10-second cap**.
+Exactly **one decision per play — in U4** (BR-22.1), taken at the first tick where enrichment has
+settled, with a **10-second cap**.
+
+> ⚠️ **Revised 2026-09-20 by the design review.** This section previously re-derived the play
+> boundary from `trackId` and null samples, and defined `enrichmentSettled` as *"the resolver's
+> queue state"* — a state that does not exist. Both are corrected below (BR-22.8, BR-22.5a–c).
+
+**The boundary is `PlayObserver`'s** (BR-22.8). The coordinator does not segment; it subscribes.
 
 ```
+observer.onPlayStarted(sample):           # the observer's own boundary, not a second one
+    current := { trackId, startedAtMs, decided: false }
+
+observer.onPlayRecorded(playId, record):  # fires ONLY after recordPlay() succeeds
+    log.attachPlayId(current.evaluationId, playId)
+    current := null
+
 on tick(sample):
-  if sample is null or sample.trackId != current.trackId:
-      current := newPlayContext(sample)        # decision not yet taken
-      return
+  if current is null or current.decided: return
+  if sample.trackId != current.trackId:   return   # a stale tick; the observer decides boundaries
 
-  if current.decided: return
-
-  facts := buildTrackFacts(sample, enrichment, historyCounts)
+  facts := buildTrackFacts(sample, liveFacts, historyCountsBefore(..., now))
 
   if enrichmentSettled(sample.trackId):
       decide(facts, partialData = false)
-  else if elapsedSince(current.startedAt) >= ENRICHMENT_WAIT_MS:   # 10 s
+  else if elapsedSince(current.startedAtMs) >= ENRICHMENT_WAIT_MS:   # 10 s
       decide(facts, partialData = true)
   # else: wait for the next tick
 ```
 
-`enrichmentSettled` asks the resolver whether this track's label/genre resolution is **still
-queued** — a real state the resolver already tracks, not an inference from fields reading null.
+### `enrichmentSettled` is a tested predicate, not a queue peek (BR-22.5a–c)
+
+```
+settled(trackId) :=
+      spotifyEnrichmentLanded(trackId)
+  AND labelState(trackId) IN { completed, failed, not-attemptable }
+
+not-attemptable :=  labelEnrichmentDisabled
+                 OR (isrc IS NULL AND primaryArtistId IS NULL)
+```
+
+⚠️ **`not-attemptable` is the whole point.** The resolver exposes no per-track pending state, and
+the only state that exists — `labelInFlight` / `labelByTrack` in `server.ts` — has **four** exits
+that leave a track uncached. Three of them are indistinguishable from *"still working"* under a
+naive *not-cached-and-not-in-flight* test, so a keyless track would wait the full 10 s and be
+stamped `partialData = true`: **permanent absence recorded as a timeout**, which is exactly the
+distinction FQ3 exists to draw, corrupting the one number U4 was built to measure.
+
+Those maps, plus `likedAtStartByTrack`, move out of `server.ts` into a small tested **live-fact
+source** that also builds `FactSources` — otherwise U4's wiring grows the one file the orphan
+check excuses.
 
 ### Why not evaluate at track start
 
@@ -68,20 +97,30 @@ figure above.
 ## 2. The decision pipeline
 
 ```
-NowPlayingService.tick
-        │
-        ▼
+NowPlayingService.tick ──────────────┬──────────────> PlayObserver
+        │                            │                    │ owns the play boundary
+        │                            │                    │
+        │        onPlayStarted ◄─────┴────────────────────┤
+        ▼                                                 │
   EvaluationCoordinator ── builds TrackFacts ── RuleEngine.evaluate (U3, pure)
-        │                                              │
-        │                                         Decision
-        ▼                                              │
-  DecisionExecutor ◄───────────────────────────────────┘
+        │      ▲                                       │
+        │      │ liveFactSource                   Decision
+        ▼      │ historyCountsBefore                    │
+  DecisionExecutor ◄─────────────────────────────────────┘
         │  (LoggingExecutor — the ONLY implementation)
         ▼
   DecisionLog.record  ── one row per evaluated rule ──> history.db
-        │
-        └── later, when the play closes ──> back-fill playId
+        ▲
+        └── onPlayRecorded(playId) ── back-fill playId ── PlayObserver
+                (fires ONLY after recordPlay() succeeds)
 ```
+
+⚠️ **`onPlayRecorded` does not fire when the write fails.** The observer counts a `gap`, sets
+`degraded`, and the hook never runs — so the back-fill never happens and `playId` stays null for
+ever. That is the *same* null BR-24.3 assigns to *"the play never closed"*, and the two point at
+opposite conclusions: one is an expected W-3 case, the other is the database refusing a write to
+the one artefact that cannot be regenerated. **The reason is recorded on the row**
+(`pending` → `linked` versus `link-failed`), never inferred (BR-24.3a).
 
 **`DecisionExecutor` has exactly one implementation and it cannot skip.** It takes no playback
 collaborator — not an unused one, not an optional one. The U4 exit criterion is verified by the
@@ -127,15 +166,36 @@ watcher with a 500 ms debounce. **`fs.watch` never fires over the Rancher Deskto
 0 events in 12 s while the container read new content within 1 s. Change detection is polling
 (P-19), and **the poll interval is the debounce**.
 
+⚠️ **Revised again 2026-09-20 by the design review.** `RuleStore.load()` **cannot** deliver
+last-known-good as written — it sets `#rules = []` on `failed`, on `absent` *and* on
+`no-directory`. Settled: the **watcher owns the current set**; `RuleStore` becomes a parser that
+returns a `LoadOutcome` and holds nothing (BR-26.3b).
+
 ```
-every 5 s (or on reloadNow()):
+RuleStore.read() -> LoadOutcome           # parser only: no #rules, no current()
+
+RuleSetWatcher, every 5 s (or on reloadNow()):
   stat -> (mtime, size) unchanged?  -> return
   hash -> unchanged?                -> return
-  parse and validate
-  if valid:    swap atomically; version += 1; state := applied
-  if invalid:  keep last-known-good; state := rejected; record errors
-               # version does NOT advance
+  switch RuleStore.read():
+    loaded       -> swap atomically; version += 1; state := applied
+    failed       -> keep last-known-good; state := rejected; record errors
+    absent       -> cold start: empty set, quiet
+                    RELOAD:     keep last-known-good; state := rejected
+    no-directory -> cold start: empty set, loud
+                    RELOAD:     keep last-known-good; state := rejected
+  # version advances on `loaded` and on nothing else
 ```
+
+⚠️ **`absent` on reload is a rejection, and this is the save race.** A write-temp-then-rename save
+is momentarily `ENOENT`. Treated as an *accepted* empty set — which is what U3's store does — the
+version would advance, every rule would silently drop for one poll interval, and the new file
+would load 5 s later. The user would see a version bump, no error, and would have briefly run
+**no rules at all**. Cold start is unchanged: there, absence really is *"run `npm run rules:init`"*.
+
+⚠️ **Two `current()` methods would have been the trap.** Had `RuleStore` kept its state, the store
+and the watcher would each expose `current()` returning different things, and a coordinator wired
+to the store would evaluate against the wiped set while every indicator read green.
 
 **Atomic swap between evaluations.** A reload never lands mid-evaluation: the coordinator reads the
 current set once at the top of `decide` and uses that reference throughout. This is cheap because
@@ -163,14 +223,21 @@ first time*, because U4 is where `watch()` exists.
 
 ```
 backTest(rule, range):
-  plays := live plays in range, ordered by started_at        # Q7 = B
+  plays := EVERY play in range, ordered by started_at        # BR-28.3a — not "live plays"
   for each play:
-      facts := reconstructFacts(play)                        # §5.1
-      verdict := RuleEngine.evaluateRule(rule, facts)         # the SAME pure engine
+      answerable := answerableFields(play)                   # §5.3, per ROW
+      facts      := reconstructFacts(play, countsBefore(play.started_at))
+      verdict    := RuleEngine.evaluateRule(rule, facts)     # the SAME pure engine
       classify into wouldMatch | wouldNotMatch | undecidable
-      compare against play.outcome                            # §5.2
-  return report                                               # writes NOTHING
+      compare against play.outcome                           # §5.2
+  return report                                              # writes NOTHING
 ```
+
+⚠️ **"Live plays in range" was a defect.** §5.2 reports `notObserved` for **backfilled** rows, so
+that selection made the counter permanently **zero** — the back-test reporting that the app never
+missed anything, over a corpus where **86 of 543 rows are backfilled** and seven of the corpus's
+ten early days exist *only* as backfilled rows. Eligibility (BR-28.3) decides what is **compared**;
+it never decides what is **read**.
 
 The **same engine**, not a back-testing variant. NFR-26's determinism is what makes the comparison
 mean anything, and a second implementation would silently drift from the first.
@@ -183,6 +250,32 @@ The four `history.*` counts are computed over plays **strictly before** this row
 COUNT(*) OVER (PARTITION BY track_id ORDER BY started_at
                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
 ```
+
+⚠️ **One method serves both paths** (BR-27.7). The live coordinator needs the same four counts and
+`HistoryRepository` has **no counting method at all** today — not per track, not per artist. Two
+implementations of *"plays of this artist before this instant"* is the segmentation mistake in a
+second place, and it would be worse here because the two would agree on every fixture and diverge
+only on the corpus. The signature is
+
+```
+historyCountsBefore(trackId, artistId, beforeIso): HistoryCounts
+```
+
+used by the back-test with `before = play.started_at` and by the live path with `before = now`.
+⚠️ **It inherits the `artist_id` limitation**: `artist_id` is the **primary** artist, so a guest
+credit is filed under the lead. Ren appears on 34 plays and owns the primary id on 26 — any
+per-artist count is ~24% low for someone who guests often, live and in back-test alike. That is a
+schema limit, not a listening pattern, and `historyRepository.test.ts` already pins it.
+
+> ### ⚠️ Live and replay can legitimately disagree, and the design must say so (BR-27.8)
+>
+> The 6-hourly backfill inserts rows dated **in the past**. A back-test run next week over last
+> week's range can therefore see prior plays that did not exist when the live decision was taken,
+> so a reconstructed count can exceed the logged one **without either being wrong**.
+>
+> NFR-26's *"replays exactly"* is a claim about the **engine**, not about the corpus. Left
+> unstated, the first person to compare a `fieldsSeen` count against a reconstruction finds a
+> discrepancy, and the cheapest explanation available to them is *"the back-test is broken"*.
 
 > ⚠️ **As-of-now counts fail US-24's own determinism criterion, and would pass every unit test.**
 > *"The same rule and the same history, back-tested twice, gives identical results"* — under
@@ -212,15 +305,52 @@ The eligibility predicate mirrors the hypothesis gate exactly: `outcome IN ('com
 > already learned: merging them made the app's downtime look like the classifier's uncertainty,
 > and completion read as 38% of the corpus where it was 74% of what was actually measured.
 
-### 5.3 Unanswerable fields
+### 5.3 Unanswerable fields — decided **per row**, over two eras *(revised 2026-09-20)*
 
-Before evaluating, the rule's referenced fields are intersected with the fields **no row in the
-range can answer** (pre-v5 `track.explicit` / `album.type`). Those are reported in
-`unanswerableFields` and the affected plays land in `undecidable`, never in `wouldNotMatch`.
+Before evaluating, the rule's referenced fields are intersected with the fields **this row** cannot
+answer. Those are reported in `unanswerableFields`, and the affected plays land in `undecidable`,
+never in `wouldNotMatch`.
+
+| Era | Fields | Unanswerable when | Anchored by |
+|---|---|---|---|
+| **Schema** (migration 005) | `track.explicit`, `album.type` | row `id` ≤ the v5 watermark | a **stored watermark** (BR-27.5c) |
+| **Code** (backfill, 2026-09-03) | `label.*` | `isrc IS NULL AND label_unknown_reason IS NULL` | the row itself (BR-27.5b) |
 
 > ⚠️ **A back-test that reports 0 matches on an unanswerable field reads as "this rule matches
 > nothing".** That is a wrong answer that looks like a finding — the same family as the
 > MusicBrainz `inc=releases` 200 and the `Label detail` dash.
+
+> ### ⚠️ The second gap has no migration behind it, and a schema-derived rule cannot see it
+>
+> Measured on the live corpus 2026-09-20:
+>
+> | Backfilled rows | ISRC | `label_verdict` | `label_unknown_reason` |
+> |---|---|---|---|
+> | 2026-08-20 → 08-31 | **0 of 82** | NULL ×82 | NULL ×82 |
+> | 2026-09-03 → 09-16 | **4 of 4** | populated | populated |
+>
+> `recently-played` **does** return `external_ids.isrc` — probed live, HTTP 200, 3/3 items — and
+> `RecentlyPlayedBackfill` has read `track.external_ids?.isrc` since **U1** (`a8136d9`).
+>
+> ⚠️ **Why those 82 lack one is UNESTABLISHED, and it is not the code** (BR-27.5d):
+> `webApiClient.ts` has exactly one commit, the wiring never changed, live rows carried an ISRC
+> from the very first one (row id 51), and the break is clean at **row id 120 → 155**
+> (2026-09-01 → 09-03) with no code change in that window. **Do not invent a cause** — the rule
+> is keyed on the row's own state and holds regardless of why the gap exists.
+>
+> On those 82 rows `label.classification` is null because **there was never a key to ask
+> MusicBrainz with**, not because MusicBrainz had no label. Under a schema-only rule they would be
+> counted in `unknownFieldCounts` as 82 plays that read the field absent — which any reader takes
+> for **coverage**. ⚠️ **That is the 28%→12%-where-the-truth-was-86%→44% denominator bug,
+> reappearing inside the instrument built to avoid it.**
+>
+> The data already separates the two facts: every row that *was* attempted carries a verdict or a
+> reason (`notFound` 151, `noEligibleCandidate` 48). Never-attempted is the pair of nulls.
+>
+> ⚠️ **`started_at` cannot decide the schema era either** (BR-27.5c). The backfill writes rows
+> dated in the past, so a row inserted *after* migration 005 for a play that happened *before* it
+> is genuinely answerable — the backfill had the values. Judging by date would mark real data
+> unanswerable; judging by row `id` against a watermark stored at migration time answers correctly.
 
 ### 5.4 Back-testing writes nothing
 
@@ -235,7 +365,15 @@ because a predicate does not fit a query string.
 
 ## 6. Retention (Q4 = B, FQ4 = A)
 
-Cap at **100,000 rows**, pruned oldest-first, checked after each write batch.
+Cap at **100,000 rows**, pruned oldest-first, **checked after each write batch** — which places it
+inside the poll tick and off the evaluation path (BR-29.4). Cheap, and stated rather than left to
+be inferred from *"never in the evaluation path"*.
+
+⚠️ **The id list is chunked** below `SQLITE_MAX_VARIABLE_NUMBER` (BR-29.5). Steady state prunes a
+handful of rows and never approaches the bound; the case that matters is the **first** run after
+the cap is lowered or after a long unattended stretch, when the list can be tens of thousands of
+ids at once — and that failure would land in the poll tick. A prune that throws must not stop
+recording, for the same reason BR-20.10 keeps a bad rules file from stopping it.
 
 Measured basis: 49 plays/day mean, 102 busiest, over the 9 days the app has actually run. At 10
 rules that is ~491 rows/day — roughly 7 months to the cap. `observation` already holds 27,842 rows

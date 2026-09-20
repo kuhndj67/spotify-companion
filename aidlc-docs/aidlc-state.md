@@ -4,7 +4,17 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U3 APPROVED by the user 2026-09-19. U4 is next.**
+- **Current Stage**: CONSTRUCTION — **U4 designs complete and REVISED 2026-09-20 after a
+  senior-architect review. Awaiting approval; next stage is Code Generation.**
+  ⚠️ **Still no code**: `git status src/` is clean and the schema is still **v4**. Four review
+  decisions are settled (watcher owns the rule set · BR-22.1 scoped to U4 with no `UNIQUE` ·
+  `PlayObserver` owns segmentation · answerability is per row over two eras), and nine artifact
+  corrections applied. See `audit.md` 2026-09-20 and
+  [`u4-rule-observability/HANDOFF.md`](construction/u4-rule-observability/HANDOFF.md).
+  ✅ **CLAUDE.md open item 3 corrected 2026-09-20** (+ item 3a): `recently-played` *does* return
+  `external_ids.isrc`; recovery is **72 distinct tracks**, not 47 calls; and the cause of the
+  82-row gap is **unestablished and not the code**. The zero-gate-eligible conclusion stands.
+  *(U3 was APPROVED by the user 2026-09-19.)*
   U3 shipped the rules core **wired to nothing**, and it must stay that way until U4:
   if the engine affects app behaviour before U4/U5, that is a regression of the phase
   boundary, not progress. **FR-33 stays PARTIAL** — `hold` is U5's.
@@ -409,7 +419,7 @@ discovered.
 | Confidence | **Ordinal `high`/`medium`/`low`**, per-signal votes retained underneath | Q6+Q11 = A |
 | ~~Two levels~~ | ~~Release and artist stored separately, never merged~~ — **Q12 WITHDRAWN 2026-09-06.** The artist level had no valid label evidence; it is genres only | Q12 rescinded |
 | Artist confidence | **Capped at `medium`** — aggregates a career, not a release | Part 6 |
-| ISRC backfill | **Yes** — 47 one-off `GET /tracks/{id}` | Q7 = A |
+| ISRC backfill | **Yes** — ⚠️ **72** one-off `GET /tracks/{id}`, re-measured 2026-09-20. The *47* was correct at 71 plays (50 rows / 47 tracks); later sweeps grew the gap to **82 rows / 72 tracks**, and it has been closed since 2026-09-03. **Still not spent** — all 82 are `outcome = 'unknown'`, so 0 are gate-eligible (open item 3) | Q7 = A |
 | `likedAtEnd` | Play close **+ ~30 s grace window**, attributed by `added_at` | Q8 = A |
 | Hypothesis gate | **Pre-registered**, `unknown` group reported alongside | Q9 = C |
 
@@ -884,19 +894,38 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
 
 ### 🟢 CONSTRUCTION PHASE
 *Runs once per delivery phase, not all up front (execution plan).*
-- [x] Functional Design — **U4 complete 2026-09-19**, awaiting approval —
-      `construction/u4-rule-observability/functional-design/`, **BR-22…BR-31**. 11 questions +
+- [x] Functional Design — **U4 complete 2026-09-19, REVISED 2026-09-20**, awaiting approval —
+      `construction/u4-rule-observability/functional-design/`, **BR-22…BR-32**. 11 questions +
       7 follow-ups; ⚠️ **all 7 follow-ups taken BY RECOMMENDATION**, and two of them (FQ1, FQ3)
       **modify answers the user gave explicitly** — flagged in the plan, first thing to revisit.
       **BR-20.8 is discharged** (BR-26.3). Schema **v5** proposed.
+      🔵 **Senior-architect design review (Fable) 2026-09-20 — 14 findings, all verified against
+      `src/` before action; 13 held, 1 probed.** Four decisions taken: **watcher owns the rule
+      set** (BR-26.3a/3b), **BR-22.1 scoped to U4, no `UNIQUE`** (BR-22.1a), **`PlayObserver`
+      owns segmentation** (BR-22.8/8a), **answerability is per row over two eras**
+      (BR-27.5a/5b/5c). Plus BR-22.5a–c, BR-23.7a, BR-23.9, BR-24.3a, BR-27.7/27.8, BR-28.3a,
+      BR-29.4/29.5, BR-31.5–31.7.
+      ⚠️ **The probe disproved CLAUDE.md open item 3**: `recently-played` **does** return
+      `external_ids.isrc`, and `RecentlyPlayedBackfill` has read it since **U1** — yet 0 of 82
+      backfilled rows to 2026-08-31 carry one, against 4 of 4 after, and 457 of 457 live.
+      ⚠️ **The cause is UNESTABLISHED and is not the code** (`webApiClient.ts` has one commit,
+      the wiring never changed, the break is clean at row id 120 → 155 with no code change in
+      that window). No migration marks the boundary, so no schema-derived watermark can see it —
+      hence a per-row predicate. ✅ **Open item 3 corrected 2026-09-20, with 3a added.**
       **U1 complete** 2026-08-25, approved. **U2 complete** 2026-08-26,
       **approved 2026-09-05**. **U3 complete and APPROVED 2026-09-10** — 11 questions + 3
       follow-ups; artifacts at `construction/u3-rule-model/functional-design/`, **BR-14…BR-21**.
       ⚠️ **FR-33 only partially met by U3**: `hold` is deferred to U5 (Q9 = B). U4–U5 pending.
 - [x] NFR Requirements — **SKIPPED** (27 NFRs already agreed in requirements.md §4)
 - [x] NFR Design — **U4 complete 2026-09-20**, awaiting approval —
-      `construction/u4-rule-observability/nfr-design/`, **P-19…P-26**, **LC-13…LC-20**,
-      **PBT-21…PBT-30**. Q1 C · Q2 C · Q3 A · Q4 B · Q5 C, all as recommended.
+      `construction/u4-rule-observability/nfr-design/`, **P-19…P-26**, **LC-13…LC-22**,
+      **PBT-21…PBT-33**. Q1 C · Q2 C · Q3 A · Q4 B · Q5 C, all as recommended.
+      🔵 **Revised 2026-09-20 by the design review**: **LC-21 `liveFactSource`** (a real
+      `enrichmentSettled`, moved out of `server.ts` — the resolver has no per-track pending
+      state, and **four** uncached exits are confusable with "still working") and **LC-22
+      `historyCountsBefore`** (one method for live and replay; the repository had **no** counting
+      method at all). New properties **PBT-22a** ⭐ *(PBT-22 passes trivially against counts that
+      are always zero)*, **PBT-30a**, **PBT-31**, **PBT-32**, **PBT-33**.
       🔴 **`fs.watch` DISPROVEN on this deployment** — 0 events over the Rancher Desktop bind
       mount while the container read new content within 1 s. BR-26's watcher is **polling**
       (5 s `stat`, hash on change) plus a reload button, both entering the same loader.
@@ -912,6 +941,15 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       compose's comment anticipating `:rw` "at U4" is wrong and gets retargeted.
       A **status bar** (Q4) surfaces recording/rules/connection/Spotify;
       `functional-design/frontend-components.md` added.
+      🔵 **Revised 2026-09-20**: migration 005 also creates a **`meta` table + v5 watermark**
+      (BR-31.7 — the database has only `schema_version`, verified) and carries **no `UNIQUE`** on
+      the decision log (BR-22.1a — dropping one in U5 would be non-additive and retire the
+      by-image rollback guarantee). ⚠️ **The `explicit`/`album_type` write path was in no scope
+      table**: six places change, export serialisers and CSV headers included. Probed: both
+      fields are on `recently-played`, so the backfill can populate them.
+      Status bar corrected — **Recording reads `degraded`/`gaps`**, not just a null repository,
+      and **Spotify reads the WebSocket snapshot**, never a polled `/api/health` (a real MCP
+      round-trip per request).
       **U1 complete** 2026-08-25 (narrow: storage + R7), approved.
       **U3 complete and APPROVED 2026-09-10** — one file, one mount: `./config:/config:ro`
       (the DIRECTORY, not the file — a single-file bind mount binds an inode and breaks

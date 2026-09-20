@@ -13,13 +13,65 @@
 ## 1. Migration 005
 
 ```sql
-CREATE TABLE decision_log (...);          -- LC-13
+CREATE TABLE decision_log (...);          -- LC-13. ⚠️ NO UNIQUE constraint — BR-22.1a
 CREATE INDEX idx_decision_decided_at ...; -- the retention and listing path
 CREATE INDEX idx_decision_evaluation ...; -- grouping the rows of one decision
 CREATE INDEX idx_decision_play ...;       -- back-fill and the agreement join
 ALTER TABLE play ADD COLUMN explicit   INTEGER;   -- BR-31.2
 ALTER TABLE play ADD COLUMN album_type TEXT;      -- BR-31.2
+-- BR-31.7: the schema-era watermark, written INSIDE the same transaction.
+-- ⚠️ There is no `meta` table today — 005 creates it. Verified 2026-09-20: the database has
+--    schema_version(version, applied_at) and nothing else that would hold a key/value.
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+INSERT INTO meta(key, value)
+  VALUES ('v5_watermark_play_id', (SELECT COALESCE(MAX(id), 0) FROM play));
 ```
+
+### ⚠️ No `UNIQUE` on the decision log *(BR-22.1a)*
+
+Not on `play_id`, not on `(play_id, rule_id)`, not on `evaluation_id` per play. BR-22.1's
+one-decision-per-play is a **U4** invariant; FR-34 is a **Must** that requires re-evaluation when
+slow enrichment lands, so U5 writes a second decision for one play legitimately. Dropping a
+constraint later is a **non-additive** migration — which would retire the by-image rollback
+guarantee below. The invariant is enforced by the coordinator's `decided` flag and tested there.
+
+### ⚠️ The two `play` columns need a WRITE PATH, and it was in no scope table *(BR-31.5)*
+
+The migration was fully specified and nothing was going to populate the columns. They would have
+shipped, stayed null on every row, and been read back as *unanswerable* for ever — with the
+migration reporting success. Six places change:
+
+| | |
+|---|---|
+| `PlaybackSample` | carry `explicit`, `albumType` from enrichment |
+| `NewPlayRecord` | both fields |
+| `SqliteHistoryRepository.recordPlay` | the `INSERT` column list and bindings |
+| `PlayRecord` | read back |
+| **export serialisers** | ⚠️ **including the CSV headers** |
+| `RecentlyPlayedBackfill` | populate both — ✅ **probed**, see below |
+
+⚠️ **The serialisers are the easiest to forget, because nothing fails without them.** A CSV
+silently missing two columns is indistinguishable from a CSV that predates them.
+
+✅ **BR-31.6 was probed, not assumed.** `RecentlyPlayedBackfill`'s hand-written response type
+declares only `album?: { name, release_date }` — which is exactly what an absent field looks
+like. Live probe 2026-09-20: `HTTP 200`, `explicit` present on 3/3 items, `album.album_type`
+present on 3/3 (`album`, `album`, `single`). ⚠️ The same probe **disproved a standing claim in
+CLAUDE.md**: `external_ids.isrc` is returned too, and has been read since 2026-09-03.
+
+### ⚠️ The watermark is a row `id`, and it is written in the migration's own transaction
+
+BR-27.5c: schema era is judged by `play.id` against this watermark, **never by `started_at`**. The
+6-hourly backfill inserts rows dated in the past, so a row written *after* v5 for a play that
+happened *before* it genuinely has both values — judging by date would mark real data
+unanswerable. Writing the watermark inside the same `BEGIN`/`COMMIT` means a rolled-back 005
+cannot leave a watermark behind for a column that does not exist.
+
+⚠️ **`schema_version.applied_at` is NOT the watermark.** It is a timestamp, and the whole point of
+BR-27.5c is that timestamps cannot decide era here. `schema_version` is also append-only history
+of the migrations themselves; overloading it with application state would make `migrate()`'s own
+bookkeeping a place application code writes. A separate `meta` key/value table is created by 005
+for this, and is additive like everything else in the migration.
 
 **Purely additive.** `ALTER TABLE … ADD COLUMN` with no default is an O(1) metadata operation in
 SQLite — no row rewrite, regardless of corpus size. The whole migration is one `BEGIN`/`COMMIT`

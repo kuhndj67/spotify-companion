@@ -37,10 +37,32 @@ Fixed to the **bottom**, single row, collapsing to two rows at phone width.
 
 | Indicator | `ok` | `warn` | `fail` | `unknown` |
 |---|---|---|---|---|
-| **Recording** | writing to `history.db` | — | repository null — **not recording** | before first status |
+| **Recording** | writing to `history.db`, `gaps == 0` | **`degraded`, or `gaps > 0`** | repository null — **not recording** | before first status |
 | **Rules** | `v6 applied` | `reloading` | `v7 rejected — running v6` | no rules file |
 | **Connection** | WebSocket open | reconnecting | closed | before first attempt |
-| **Spotify** | MCP round-trip ok | degraded | MCP down | not yet checked |
+| **Spotify** | last snapshot carried no `error` | transient `error`, retrying | `error` persisting | before the first snapshot |
+
+### ⚠️ Recording: `repository !== null` is the *least* likely fault *(revised 2026-09-20)*
+
+A null repository happens once, at startup, on a failed migration. The likelier fault is a
+**runtime write failure**, and the observer already tracks it: `#degraded` is set and `#gaps` is
+incremented every time `recordPlay` throws ([PlayObserver.ts:225](../../../../src/history/PlayObserver.ts)).
+An indicator reading only the constructor's outcome shows **green while plays are being dropped** —
+a false green about the one artefact that cannot be regenerated, which is the exact failure the
+four-state rule was written to prevent.
+
+`gaps` is **sticky**: it counts plays already lost, so it must not clear when writes recover. The
+recovery is visible as `degraded` going false; the loss is permanent and stays on the display.
+
+### ⚠️ Spotify: do **not** poll `/api/health` *(revised 2026-09-20)*
+
+`/api/health` performs a **real MCP round-trip** per request. Polling it to keep a dot warm spends
+upstream budget that label resolution needs — the same reasoning that stopped the liked badge
+being polled (*"~12 requests on a timer to keep a badge warm"*).
+
+The WebSocket **already delivers** the snapshot's `error` state on every poll, at no extra cost.
+The dot reads that. `/api/health` stays exactly what it is: the thing you open **on click**, when
+the dot is already red and you want to know whether Spotify is actually implicated.
 
 ### ⚠️ Four states, not three — and `unknown` is never drawn as `ok`
 
@@ -122,8 +144,9 @@ Controls: a **matches-only** filter and a rule filter. Nothing else.
 ```
 GET /api/rules      -> FC-2, and the Rules indicator in FC-1
 GET /api/decisions  -> FC-3
-GET /api/health     -> the Spotify indicator
+WebSocket snapshot  -> the Spotify indicator (error state, already broadcast — NOT /api/health)
 WebSocket           -> the Connection indicator (existing socket; no new surface)
+GET /api/health     -> the Spotify indicator's DETAIL view, on click only (real MCP round-trip)
 POST /api/rules/reload -> the reload button (P-19); re-reads, never writes
 ```
 

@@ -3671,3 +3671,112 @@ close. Written so a cold session can start Code Generation without re-deriving t
 **Context**: CONSTRUCTION — U4 designs complete and awaiting approval. Clean break point: tree
 clean, everything pushed, no code written, schema v4, container healthy on the U3 image. Corpus
 **528+ plays** and still recording.
+
+---
+
+## 2026-09-20 — Fable design review settled: four decisions, nine corrections, one stale fact found
+
+**Stage**: CONSTRUCTION — end of U4 design, immediately before Code Generation. **Still no code.**
+
+### Every finding was checked against the source before being acted on
+
+The review's fourteen findings were verified against `src/` rather than accepted. **Thirteen held
+exactly as written.** One rested on an unprobed premise, so it was probed — and the probe
+disproved a standing claim in CLAUDE.md.
+
+Three findings were **worse than the review stated**:
+
+| # | As written | As measured |
+|---|---|---|
+| 1 | `RuleStore.load()` wipes on `failed` | Wipes on `failed`, `absent` **and** `no-directory` — and two `current()` methods would have been the live trap |
+| 3 | Two segmenters must agree | **`onPlayRecorded` fires only after `recordPlay` succeeds** — on a write failure `playId` stays null for ever, identical to "the play never closed" |
+| 5 | Two confusable resolver exits | **Four**, including `labelEnrichment === null`, which makes *every* play wait the full 10 s cap |
+
+One finding was **over-argued**: item 2's remedy (add a `trigger` column now because migrations
+are forward-only) is not load-bearing — `ALTER TABLE ADD COLUMN` is O(1) in U5 as well, and U4's
+value is derivable from `partialData`. ⚠️ **The irreversible risk is a `UNIQUE` constraint**, which
+U5 would have to *drop* — a non-additive migration, which would retire the by-image rollback
+guarantee migration 005 currently enjoys. BR-22.1a forbids the constraint; the column is not added.
+
+### Four decisions, taken by the user
+
+| Settled | Written to |
+|---|---|
+| **`RuleSetWatcher` owns the rule set**; `RuleStore` becomes a stateless parser | BR-26.3a/3b · LC-16 |
+| **BR-22.1 scoped to U4**; no uniqueness constraint may encode it | BR-22.1a · migration 005 |
+| **`PlayObserver` owns play segmentation**; the coordinator consumes its hooks | BR-22.8/8a · LC-14 |
+| **Answerability is per row**, over a schema era *and* a backfill gap | BR-27.5a/5b/5c/5d · LC-17 |
+
+Two review items had no competing option and were applied directly: **LC-22**
+(`historyCountsBefore`, one method for live and replay) and **LC-21** (`liveFactSource`, a real
+`enrichmentSettled` moved out of `server.ts`).
+
+### ⚠️ The probe disproved CLAUDE.md open item 3
+
+Open item 3 states *"Backfilled plays carry no ISRC — `recently-played` returns no
+`external_ids`."* **It does return them** — probed live, HTTP 200, `external_ids.isrc` on 3/3
+items — and `RecentlyPlayedBackfill.ts:109` has read the field since **U1** (`a8136d9`):
+
+| Backfilled rows | ISRC present | `label_verdict` | `label_unknown_reason` |
+|---|---|---|---|
+| 2026-08-20 → 08-31 | **0 of 82** | NULL ×82 | NULL ×82 |
+| 2026-09-03 → 09-16 | **4 of 4** | populated | populated |
+| *(live, all dates)* | 457 of 457 | populated ×457 | — |
+
+A clean break — and ⚠️ **the cause is UNESTABLISHED, and it is not the code.** `webApiClient.ts`
+has exactly one commit, the backfill's wiring never changed, live rows carried an ISRC from the
+very first one (row id 51), and the transition is clean at **row id 120 → 155** (2026-09-01 →
+09-03) with **no code change in that window**. Something outside this repo changed, or the
+original 2026-09-05 observation misattributed its cause. **An explanation was drafted and
+withdrawn** — *"the nulls predate the code that reads the field"* — because `git log -L` disproved
+it. Recording the withdrawal rather than the tidy story, since a plausible wrong cause is exactly
+what this project keeps getting caught by.
+
+⚠️ **No `ALTER TABLE` marks the boundary, so no schema-derived watermark can find it** — which is
+what made the review's item 6 (schema era) only half the problem, and why the predicate is keyed
+on the row's own state rather than on a date or a supposed cause (BR-27.5d).
+
+**Why it reaches the back-test.** On those 82 rows `label.classification` is null because *there
+was never a key to ask MusicBrainz with*. Reported as an unknown **value**, they become 82 plays
+that "read the field absent" — which a reader takes for **coverage**. That is the
+28%→12%-where-the-truth-was-86%→44% denominator bug, reappearing inside the instrument built to
+avoid it. The discriminator already exists: an attempted row carries a verdict or a reason
+(`notFound` 151, `noEligibleCandidate` 48); never-attempted is the **pair** of nulls.
+
+✅ **CLAUDE.md open item 3 was corrected**, and item **3a** added for the unestablished cause.
+Recovery is **72 distinct `track_id`s**, not 47 one-off calls. ⚠️ **The 2026-09-05 conclusion is
+unchanged and remains the decision**: all 82 rows are `outcome = 'unknown'`, so **0 are
+gate-eligible** — what the backfill lacks for the gate is the observation trail, not the ISRC.
+
+⚠️ **The lesson runs opposite to this project's four documented traps.** Those were all *docs said
+yes, probe said no*. This one is **our own notes said no, and the probe says yes**: a recorded
+negative decays silently, because nothing ever re-tests it. It sat in CLAUDE.md for 15 days and
+was only caught because an unrelated review made an unprobed claim about the same endpoint.
+
+### One gap neither the review nor the design had
+
+`BackTestReport` in `domain-entities.md` was **missing `truncated`**, which P-24 declares a
+required field — *"a truncation that does not announce itself is a lie"*. The pattern document
+specified it and the entity that defines the report did not list it. That is precisely how
+`release_count = 100` happened: the cap was real, the disclosing field was never written down, and
+18 of 56 resolutions recorded an arbitrary sample as a complete count.
+
+### ⚠️ Two `play` columns had no writer anywhere in scope
+
+Migration 005 was fully specified and **nothing was going to populate `explicit` or `album_type`**.
+They would have shipped, stayed null on every row, and been read back as *unanswerable* for ever,
+with the migration reporting success. Six places change, and the **export serialisers** are the
+easiest to forget because nothing fails without them — a CSV silently missing two columns is
+indistinguishable from a CSV that predates them. Probed and confirmed available on
+`recently-played` (`album`, `album`, `single` on 3/3 items), so the backfill can populate both.
+
+### New property obligations
+
+**PBT-22a** (positive control — PBT-22 passes trivially against counts that are always zero),
+**PBT-30a** (never-asked vs `notFound`), **PBT-31** (`fieldsSeen` survives serialisation —
+`JSON.stringify` drops `undefined` keys; a pin, since `Maybe<T> = T | null` makes it currently
+unreachable), **PBT-32** (`enrichmentSettled` is immediate for a keyless track), **PBT-33**
+(`absent` on reload changes nothing).
+
+**Context**: CONSTRUCTION — U4 designs revised and awaiting approval. `git status src/` clean,
+schema still v4, container healthy on the U3 image, corpus **543 plays** (457 live, 86 backfilled).

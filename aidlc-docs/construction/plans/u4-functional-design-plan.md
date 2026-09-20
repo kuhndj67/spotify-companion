@@ -111,7 +111,7 @@ is the field the whole project was built around. Option C sees the resolved valu
 real skip. Choosing B now to "get more data" means U5 inherits a 3-second skip loop.
 
 [Answer]:
-
+A - but without enrichment this means the first play of a new track it will not have that data (may not be able to apply a rule)... but on subsequent plays it SHOULD have the enrichment data (collected the first time the track played) to use for the rule correct?
 ---
 
 ### Question 2 — Where does the decision log live?
@@ -128,7 +128,7 @@ putting it in the same file as the thing that cannot. It also argues the other w
 decision to its play is the single most useful query U4 enables, and B and C both make it manual.
 
 [Answer]:
-
+A - I understand the issue that this data is reconstructable so different from the existing history data - but it is ALSO history. I'm assuming that reconstructing the decisions every time they're used in a query would be computationally expensive so I think a table to cache those decisions is still "history" of the decision made. It does introduce a potential issue if the recorded decision differs from what a reconstruction from rules plus history says it SHOULD be. Something to consider when we start looking at reporting.
 ---
 
 ### Question 3 — Log every evaluation, or only matches?
@@ -149,7 +149,7 @@ and BR-14.7 makes evaluation *exhaustive rather than short-circuiting* specifica
 decision that looks like hygiene and removes the diagnostic.
 
 [Answer]:
-
+A
 ---
 
 ### Question 4 — Decision-log retention
@@ -167,7 +167,7 @@ for history (§5.1 W-2) is *no automatic pruning*; a background pruner that walk
 one wrong `WHERE` clause from the corpus. If pruning is automatic, it argues for Q2 = B or C.
 
 [Answer]:
-
+B - but rather than setting a 90 day window I think setting a reasonable record count makes sense (limit database growth size and also protect query times from unconstrained growth). I don't know what a "reasonable record count" is, we may need to test that by predicting size and db performance (or observe the app running for some period of time)
 ---
 
 ### Question 5 — Back-test facts: point-in-time, or as-of-now? ⚠️ **the critical one**
@@ -191,7 +191,7 @@ Option A is a window function over `play` ordered by `started_at`; at 512 rows i
 stays cheap at 10,000.
 
 [Answer]:
-
+A
 ---
 
 ### Question 6 — Fields that history cannot answer at all
@@ -212,7 +212,7 @@ matches nothing".** That is the `Label detail` empty state again, and the MusicB
 distinguish *"evaluated and did not match"* from *"could not be evaluated"*.
 
 [Answer]:
-
+Question - are these two fields empty because that data is NEVER being reported by the data sources we're using? If so can they be removed? (they are not key data points, explicit is of limited value and album.type I'm not sure what it is supposed to report at all)
 ---
 
 ### Question 7 — What counts as agreement, when the outcome variable is partial?
@@ -232,7 +232,7 @@ versus the app watched and could not classify. The statistics panel already spli
 is chosen here should not re-merge them.
 
 [Answer]:
-
+B
 ---
 
 ### Question 8 — Dry-run scope and precedence
@@ -249,7 +249,7 @@ it should be settled now, while being wrong is free. A and C differ only when a 
 held. FR-47 (*automation off by default*) points at C.
 
 [Answer]:
-
+C
 ---
 
 ### Question 9 — `watch()`, debounce, and last-known-good (discharges BR-20.8)
@@ -269,7 +269,9 @@ Settle three things:
    successful reload**, and the user will believe their edit is live.
 
 [Answer]:
-
+1. Debounce makes sense, do we intend to provide visual feedback when a new rules set goes into effect? (this would avoid the issue of the user thinking new rules were in place when they'd not yet been applied)
+2. Atomic evaluation - I don't think there's any value in dealing with the complexity of a mid-evaluation rules change.
+3. Same as in 1, a visual indicator of the rules state might be good here. Maybe each rules set gets a version number and that is indicated in the app... with green meaning "applied", yellow meaning "changing", and red meaning "problem"?
 ---
 
 ### Question 10 — Who supplies `partialData`?
@@ -287,7 +289,7 @@ from `often-unknown` fields reading `unknown` cannot distinguish *"not yet resol
 by three times. If it is chosen, it should be chosen **explicitly and recorded**, not defaulted.
 
 [Answer]:
-
+C
 ---
 
 ### Question 11 — The read-only surface
@@ -308,7 +310,9 @@ displays rules read-only (Q2 = A from Application Design)."*
 that structurally.
 
 [Answer]:
-
+1. nothing to add/drop
+2. would a decision log view in U4 help with any debug/diagnostics needed here? If yes then include it, if no then defer to U5
+3. Please provide more information on this item... use of the back-test invocation, cost/benefit of the three options?
 ---
 
 ## Out of scope for U4 — recorded so it is not re-litigated
@@ -320,3 +324,252 @@ that structurally.
 | Kill switch (FR-38), rate limit (FR-39), no-repeat-skip (FR-40) | U5 — they govern actions, and U4 has none |
 | Rule **editing** in the UI | Read-only in U4 by Application Design Q2 = A |
 | W-3 session-end discriminator | Backlog; would change the outcome variable that back-testing compares against |
+
+---
+
+## Answers received 2026-09-19
+
+Q1 **A** · Q2 **A** · Q3 **A** · Q4 **B** (record count, not days) · Q5 **A** · Q6 *question* ·
+Q7 **B** · Q8 **C** · Q9 **atomic swap + version indicator** · Q10 **C** · Q11 *2 questions*
+
+Three answers asked questions back, and **two of them I could only answer by probing.** Both
+probes changed the answer from what the plan assumed. One further pair (Q1 + Q10) interacts in a
+way neither question could show alone.
+
+### Accepted without a follow-up
+
+**Q2's caveat is right and becomes a business rule.** The concern — *"a potential issue if the
+recorded decision differs from what a reconstruction from rules plus history says it SHOULD be"* —
+is real and is why `RULE_ENGINE_VERSION` already exists. Each decision row will store the engine
+version **and a hash of the rule it evaluated**, so a divergence between a stored decision and a
+recomputed one is **detectable and attributable** rather than a surprise during reporting. Without
+the hash, an edited-but-same-id rule makes old decisions silently unreproducible. Recorded as an
+obligation for `business-rules.md`; no decision needed.
+
+---
+
+### FQ1 — Q1=A: your assumption holds for repeat plays and fails for first plays. Measured.
+
+> *"on subsequent plays it SHOULD have the enrichment data (collected the first time the track
+> played) to use for the rule correct?"*
+
+**Correct, and it is stronger than "should" — it is 94.9%.** Every live play was joined to the
+label resolution it actually used, and the resolution's timestamp compared to the play's start:
+
+| | Resolution already existed before the track started |
+|---|---|
+| **Repeat play (2nd+)** | **56 of 59 — 94.9%** |
+| **First play of a track** | **2 of 382 — 0.5%** |
+
+The lookup is `LabelCache.getRelease(isrc)`, a **synchronous SQLite read** — no network, no queue.
+So on a repeat play the value is there at track start, exactly as you supposed.
+
+WARNING: **first plays are 86.6% of all live plays** (382 distinct tracks across 441 plays; only
+13.4% are repeats). Under Q1=A, a rule over `label.classification` would therefore evaluate
+against a not-yet-resolved label on roughly **seven plays in eight** — for the field the project
+was built around.
+
+> WARNING: **A number in the first draft of this analysis was wrong, and the way it was wrong is
+> the house pattern.** The probe showed resolutions completing a median of **0.2 s** after track
+> start, which would have made Q1=A look nearly free. Checking the code rather than trusting the
+> number showed `resolvedAt` is stamped **before** the two MusicBrainz calls, at the start of
+> `resolveRelease` — it records when resolution was *initiated*, not when it finished.
+> **The true availability latency is recorded nowhere.** R11's floor (2 calls behind a 1 req/sec
+> queue, with measured 503 retries) is all we have, and it is seconds, not milliseconds.
+
+This does not overturn Q1=A — one decision per play remains the right shape, and B's 3-second skip
+loop is still the wrong thing to hand U5. It questions only **when within the play** that one
+decision is taken:
+
+- **A** — At track start, as answered. Simple; label reads unresolved on ~87% of plays.
+- **A-prime** — **One decision per play, taken at the first tick where enrichment has landed**,
+  with a short cap (e.g. 10 s) after which it evaluates with whatever is present. Still exactly
+  one decision per play and one log row; still no 3-second loop. Costs a little state per play.
+- **A-double-prime** — At track start, and **re-evaluate once** if enrichment arrives later
+  (at most 2 rows/play).
+
+WARNING: Under A-prime or A-double-prime, U5 would skip a few seconds into a track rather than at
+its start. Under **A**, U5 would skip promptly but would rarely know the label. **That trade
+cannot be avoided by implementation; it is R11 surfacing at the decision point.**
+
+[Answer]:
+
+---
+
+### FQ2 — Q6: no, the data is not missing from the source. We fetch it and throw it away.
+
+> *"are these two fields empty because that data is NEVER being reported by the data sources?"*
+
+**No.** Both come back from `GET /tracks/{id}` — the call the app **already makes for every
+enriched track** — and both already flow into `TrackFacts`:
+
+    src/spotify/enrichment.ts:293   result.albumType = track.album?.album_type ?? null;
+    src/spotify/enrichment.ts:296   result.explicit  = track.explicit ?? null;
+
+They are live and correct *right now*; they are simply never written to the `play` table. So the
+choice is not "recover unavailable data" but **"stop discarding data we already pay for."**
+Persisting them costs **one migration and zero API requests**.
+
+On `album.type`: Spotify's `album_type` is `album`, `single` or `compilation`. It is a plausible
+rule input for this project specifically — *"skip singles"* is a coarse proxy for promoted
+placements, and promoted tracks are disproportionately singles. That is a hypothesis, not a
+finding, and R1's fate is a caution against assuming it.
+
+- **B** — Add both columns (schema **v5**). History before today stays `unknown`; everything from
+  today forward is answerable, at no request cost. *(Recommended.)*
+- **C** — Remove both from the catalogue, as you suggested. Defensible for `explicit`; it also
+  permanently forecloses `album.type` as a rule input.
+- **B-prime** — Persist `album.type` only, drop `track.explicit` from the catalogue.
+
+WARNING: Whichever is chosen, the back-test report must still distinguish *"evaluated, did not
+match"* from *"could not be evaluated"* — the pre-v5 rows stay unanswerable for ever.
+
+[Answer]:
+
+---
+
+### FQ3 — Q10=C costs more under Q1=A than the question could show
+
+Q10=C sets `partialData` permanently `false`. Read alone that is nearly harmless — nothing acts on
+it until U5. Read **with Q1=A and FQ1's measurement**, it stops being harmless:
+
+Under Q1=A, `label.classification` reads unknown on ~87% of plays, and that unknown has **two
+completely different causes**:
+
+| Cause | Frequency | Meaning |
+|---|---|---|
+| Not yet resolved — the queue has not got there | the common case at track start | **transient**; the answer is coming |
+| Resolved, and MusicBrainz has no label | 153 of 382 first plays carry verdict `unknown` | **permanent**; R2's actual measure |
+
+With `partialData` always `false`, the decision log **cannot tell these apart** — and this is the
+exact distinction that has caught this project three times (`error` vs `unknown` in U2, all three
+defects; the `inc=releases` 200; the coverage denominator). It is also the distinction the
+back-test needs to avoid reporting "no match" for a rule that was merely asked too early.
+
+The cost of A is small: the resolver **already has a work queue**, so "is this track's resolution
+still pending?" is a real, knowable state, not an inference.
+
+- **A** — Caller sets `partialData` when a resolution for this track is still queued.
+  *(Recommended.)*
+- **C** — As answered: always `false`, recorded as a deliberate deferral to U5.
+
+WARNING: If C stands, it should stand **because you want U4 kept small**, which is a good reason —
+not because `partialData` looked unused. It is the field that makes an 87%-unknown log
+interpretable.
+
+[Answer]:
+
+---
+
+### FQ4 — Q4: a record cap needs a number; here is the measurement to set one
+
+> *"I don't know what a 'reasonable record count' is, we may need to test that"*
+
+Measured over the 9 days the app has actually run: **mean 49 plays/day, busiest 102**.
+
+| Rules authored | Rows/day (Q1=A x Q3=A) | Rows/year | Busiest day |
+|---|---|---|---|
+| 5 | 246 | ~90k | 510 |
+| 10 | 491 | ~179k | 1,020 |
+| 25 | 1,228 | ~448k | 2,550 |
+
+**There is already a precedent for a high-volume table in this database**: `observation` holds
+**27,842 rows**, and `history.db` is **1.91 MB** in total. Decision rows are wider than
+observations (they carry `fieldsSeen`), so estimate roughly 300 bytes each — **~50 MB/year at 10
+rules**, which is large relative to today's 1.9 MB but not a performance problem for SQLite with
+an index on the timestamp.
+
+Proposal, in the spirit of your answer:
+
+- **A** — Cap at **100,000 rows**, pruned oldest-first. About 7 months at 10 rules; ~30 MB.
+  Set now, revisited once real rows exist. *(Recommended — a cap that exists beats a cap that is
+  perfect.)*
+- **B** — Ship U4 **uncapped**, measure real row size for a few weeks, then set the cap from
+  observation. Risks the cap never being added.
+- **C** — Cap by **bytes** rather than rows, which is what actually matters for growth.
+
+WARNING: **The pruner must be unable to name `play`.** Whatever the cap, prune through a
+repository method whose SQL mentions only the decision table — a background pruner that can reach
+the corpus is one wrong `WHERE` clause from the one artefact that cannot be regenerated.
+
+[Answer]:
+
+---
+
+### FQ5 — Q9: the version indicator is a good idea; two details to settle
+
+Taking your answer as: **debounce + atomic swap between evaluations + a visible rule-set version
+with a state colour.** Agreed on all three — and the version is what makes a silent
+last-known-good impossible, which was the hazard in Q9.3.
+
+The version can be derived without changing the rules file format: a **monotonic counter assigned
+at load, plus a content hash**. The hash is the same one accepted above for decision rows, so a
+decision can be traced to the exact rule text that produced it.
+
+Two details the traffic light raises:
+
+1. **Yellow will almost never be seen.** Debounce is ~300 ms to 1 s; the swap is atomic.
+   "Changing" exists for a fraction of a second. Options: (a) drop yellow, keep **green = applied
+   vN** and **red = rejected, still running vN**; (b) keep yellow with a minimum display time
+   (~1 s) so a reload is *visibly* acknowledged even when instant.
+2. **Red must say which version is in force**, not just that something failed — *"v7 rejected:
+   rule 'skip majors' has an unknown field `album.kind`. Still running v6."* A red light that does
+   not name the running version leaves exactly the ambiguity Q9.3 was about.
+
+WARNING: This adds a UI element to a unit whose UI is otherwise read-only. It is small and it is
+the thing that makes BR-20.8 observable, so it earns its place — but it is scope, and it is being
+named rather than absorbed.
+
+[Answer]:
+
+---
+
+### FQ6 — Q11.2: yes, include the decision-log view. Recommended, with the reason.
+
+> *"would a decision log view in U4 help with any debug/diagnostics needed here?"*
+
+**Yes, and it is close to required by U4's own exit criterion.** The live gate is *"a dry-run
+session over real listening produces a match log **the user agrees with**"*. Agreement is a
+judgement you make by reading the log against tracks you remember hearing. Via `curl` that means
+reading raw JSON and correlating timestamps by hand — the kind of friction that makes a
+verification step get skipped or done shallowly.
+
+The sharper argument is precedent: **the two real defects in `public/app.js` were found by
+clicking**, not by tests — the liked-refresh race and the "every axis tick says Aug" bug. U4's
+output is a *judgement about your own listening*; it is exactly the kind of thing where looking at
+it is the test.
+
+Scope kept small: a read-only table over `GET /api/decisions` — time, track, rule, verdict,
+matched or not, and the field values seen — with a filter for matches only. No editing, no charts.
+
+[Answer]:
+
+---
+
+### FQ7 — Q11.3: back-test invocation, as requested
+
+**What it is for.** Two different users of the same machinery: the **Curator** authoring a rule
+iteratively (*"would this have been a disaster?"*), run repeatedly over minutes; and the
+**Analyst**, rarely, comparing a rule against history. Today it would run over **400 decidable
+plays** — small and fast.
+
+| | Option | Cost | Benefit | Risk |
+|---|---|---|---|---|
+| **A** | **Script**, like `hypothesis-gate.mjs` | Lowest — no route, no UI | Precedent exists; read-only DB access is safe alongside the container | A second surface from where rules are read; the host needs Node and the repo. **Iterating on a rule means editing a file and re-running a command** |
+| **B** | **`POST /api/backtest`** | Medium — one route in `api.ts` | Runs in the container where the DB writer already lives; **testable over real HTTP** with injected deps; becomes the substrate the UI uses later | A `POST` that writes nothing needs saying out loud |
+| **C** | **Full UI** | Highest | Best for iterative authoring | U4's UI is read-only by design; most of the work lands in the unit with the least certainty |
+
+**Recommendation: B**, with C deferred to U5 where rule editing arrives anyway.
+
+Reasons, in order: it is **testable** — the `api.ts` extraction exists precisely because routes in
+`server.ts` had no tests and hid the WebSocket `403`; a script would be another `ALLOWED_ORPHANS`
+entry. It avoids a **second process touching `history.db`** — read-only is safe, but "never run
+the container and the host at once" is already a standing warning. And it is the **substrate for
+C**, so choosing it now is not throwaway.
+
+WARNING: `POST /api/backtest` **writes nothing** — not a decision row, not a play row. The verb is
+POST only because a rule predicate is too large for a query string. That must be a business rule,
+because "the back-test endpoint started logging its own decisions" is a plausible future change
+that would quietly contaminate the log with hypothetical decisions.
+
+[Answer]:

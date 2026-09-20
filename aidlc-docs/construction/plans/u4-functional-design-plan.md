@@ -573,3 +573,51 @@ because "the back-test endpoint started logging its own decisions" is a plausibl
 that would quietly contaminate the log with hypothetical decisions.
 
 [Answer]:
+
+---
+
+## Follow-up resolutions — 2026-09-19, TAKEN BY RECOMMENDATION
+
+The user answered *"ok commit and continue"*. The seven follow-ups were therefore **not
+individually answered**, and each is resolved below by the recommendation stated in the question.
+
+> WARNING: **Precedent, and its limit.** U3's Infrastructure Design took FQ1 *"by recommendation,
+> not an explicit answer"* and marked it. The same convention applies here — but **two of these
+> resolutions modify an answer the user gave explicitly** (Q1 and Q10). Those two are flagged
+> below and are the first thing to revisit at approval. A recommendation adopted in silence is
+> still a decision someone made, and it should be as easy to reverse as it was to take.
+
+| # | Resolution | Status |
+|---|---|---|
+| **FQ1** | **A-prime** — one decision per play, taken at the first tick where enrichment has landed, capped at **10 s** | WARNING: **modifies the answered Q1=A** |
+| **FQ2** | **B** — persist `explicit` and `album_type` (schema **v5**) | extends Q6 |
+| **FQ3** | **A** — `partialData` is set when the enrichment wait timed out | WARNING: **reverses the answered Q10=C** |
+| **FQ4** | **A** — cap at **100,000 rows**, pruned oldest-first, revisited once real rows exist | refines Q4=B |
+| **FQ5** | **1(b) + 2** — keep yellow with a ~1 s minimum display; red names the version still in force | as proposed by the user |
+| **FQ6** | **Yes** — a read-only decision-log view ships in U4 | answers Q11.2 |
+| **FQ7** | **B** — `POST /api/backtest`, writing nothing; full UI deferred to U5 | answers Q11.3 |
+
+### Why FQ1 and FQ3 resolve together, and why that lowers the cost of both
+
+Taken separately they look like two reversals. Taken together they are one design:
+
+**A-prime waits for enrichment, so "not yet resolved" largely stops happening.** The label is read
+after it has landed, not seven plays in eight before it. What remains is the case where the **10 s
+cap fires** — and that is exactly what `partialData` now means:
+
+> `partialData` is `true` when **the enrichment wait timed out** and the decision was taken with
+> whatever was present.
+
+That is a single, knowable, caller-supplied fact — it satisfies P-17 (never inferred) without the
+resolver needing to expose queue internals, and it is far narrower than the original FQ3 option A.
+It also preserves the user's stated Q1 concern (*"the first play of a new track will not have that
+data"*) rather than accepting it.
+
+**The trade being accepted**: under A-prime, U5 will skip a few seconds into a track rather than
+at its start. That is the R11 trade named in FQ1, chosen in the direction of *knowing the label*
+over *skipping instantly* — because a rule that cannot see the field the project was built around
+is not a rule worth arming.
+
+WARNING: **If either flag is unwanted, say so at approval and both revert together.** Reverting
+FQ1 to a plain track-start evaluation makes FQ3's `partialData` meaningless again, and it should
+revert to Q10=C in the same motion. They are one decision wearing two numbers.

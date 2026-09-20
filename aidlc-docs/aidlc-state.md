@@ -884,7 +884,12 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
 
 ### 🟢 CONSTRUCTION PHASE
 *Runs once per delivery phase, not all up front (execution plan).*
-- [x] Functional Design — **U1 complete** 2026-08-25, approved. **U2 complete** 2026-08-26,
+- [x] Functional Design — **U4 complete 2026-09-19**, awaiting approval —
+      `construction/u4-rule-observability/functional-design/`, **BR-22…BR-31**. 11 questions +
+      7 follow-ups; ⚠️ **all 7 follow-ups taken BY RECOMMENDATION**, and two of them (FQ1, FQ3)
+      **modify answers the user gave explicitly** — flagged in the plan, first thing to revisit.
+      **BR-20.8 is discharged** (BR-26.3). Schema **v5** proposed.
+      **U1 complete** 2026-08-25, approved. **U2 complete** 2026-08-26,
       **approved 2026-09-05**. **U3 complete and APPROVED 2026-09-10** — 11 questions + 3
       follow-ups; artifacts at `construction/u3-rule-model/functional-design/`, **BR-14…BR-21**.
       ⚠️ **FR-33 only partially met by U3**: `hold` is deferred to U5 (Q9 = B). U4–U5 pending.

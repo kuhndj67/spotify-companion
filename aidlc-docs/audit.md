@@ -3276,3 +3276,88 @@ session ends while the instrument saw a genuine track change — is unresolved a
 Further probing of *why* the perception differs is explicitly not worth a fourth cycle.
 
 **Context**: CONSTRUCTION — U3 approved, U4 next. Corpus 504 plays, recording continuously.
+
+---
+
+## 2026-09-19 — U4 Functional Design complete (awaiting approval)
+
+**Stage**: CONSTRUCTION — Functional Design, Unit U4 (Rule Observability).
+**Artifacts**: `construction/u4-rule-observability/functional-design/` — **BR-22 … BR-31**.
+**Plan**: `construction/plans/u4-functional-design-plan.md` — 11 questions + 7 follow-ups.
+
+**Answers**: Q1 A · Q2 A · Q3 A · Q4 B · Q5 A · Q6 *question* · Q7 B · Q8 C · Q9 atomic swap +
+version indicator · Q10 C · Q11 *2 questions*.
+
+⚠️ **All seven follow-ups were taken BY RECOMMENDATION** — the user replied *"ok commit and
+continue"* rather than answering them individually. Two of those recommendations **modify answers
+the user gave explicitly** and are flagged in the plan and the state doc as the first thing to
+revisit at approval.
+
+### Two probes changed the design, and one number was wrong in the house pattern
+
+**The user's Q1 assumption was correct and is now measured.** Every live play was joined to the
+label resolution it used and the timestamps compared: a resolution already existed before the
+track started for **94.9% of repeat plays** and **0.5% of first plays**. The lookup
+(`LabelCache.getRelease`) is a synchronous SQLite read, so on a repeat there is no network at all.
+But **first plays are 86.6% of live plays**, so a track-start trigger reads
+`label.classification` as absent on roughly seven plays in eight.
+
+⚠️ **A first-draft number said resolutions complete a median of 0.2 s after track start**, which
+would have made a track-start trigger look nearly free. `resolvedAt` is stamped **before** the two
+MusicBrainz calls, at the top of `resolveRelease` — it records *initiation*, not completion.
+**The true availability latency is recorded nowhere**, and R11's floor (2 calls behind a 1 req/sec
+queue, with observed 503 retries) is the only evidence. Caught by reading the code rather than
+trusting the number; recorded rather than quietly corrected. `ENRICHMENT_WAIT_MS = 10 000` is
+therefore **a guess made explicit**, and `partialData` counts how often it fires — the first real
+measurement of that latency, taken during U4's live verification.
+
+**`track.explicit` and `album_type` are not missing from the source.** The user asked whether the
+data is never reported. It is: both come back from the `GET /tracks/{id}` call the app **already
+makes for every enriched track** (`enrichment.ts:293` and `:296`) and both already flow into
+`TrackFacts`. They were simply never written to `play`. The choice was therefore not "recover
+unavailable data" but "stop discarding data we already pay for" — one migration, **zero** extra
+requests. Removing them from the catalogue, the user's suggestion, would have discarded a live
+field on the strength of a wrong premise.
+
+### FQ1 and FQ3 are one decision wearing two numbers
+
+Taken separately they read as two reversals; together they are one design. **A-prime waits for
+enrichment**, so *"not yet resolved"* largely stops happening; what remains is the case where the
+10 s cap fires, and that is exactly what `partialData` now means. It is a single caller-supplied
+fact satisfying P-17, far narrower than the original option, and it preserves the user's own Q1
+concern rather than accepting it. **If either is unwanted, both revert together.**
+
+The trade accepted: under A-prime, U5 skips a few seconds into a track rather than at its start —
+chosen in the direction of *knowing the label* over *acting instantly*.
+
+### Decisions worth recording
+
+- **Point-in-time history counts** (Q5 = A). As-of-now counts fail US-24's own determinism
+  criterion and **would pass every unit test**, because fixture history does not grow. It would
+  surface months later as drift. The window must also exclude the current row, or
+  `history.playsOfTrack >= 1` is true for every row in existence.
+- **`playId` is nullable and stays nullable** (BR-24). A decision is taken *during* a play; the
+  play row is written when it *closes*. `NOT NULL` would force a decision to wait for its own
+  consequence, and plays that never close cleanly are exactly the W-3 cases.
+- **Q2's caveat became BR-23.6**: each row carries the rule's **content hash**, so a stored
+  decision diverging from a recomputed one is attributable rather than a mystery during reporting.
+- **BR-28.4 is inert**: 0 rows have `skip_source = 'rule'` and will until U5. Built now because
+  the first row it must exclude appears the moment automation runs, by which time the back-test
+  will already have been trusted.
+
+### ⚠️ U3's containment guarantee is retired by this unit, on purpose
+
+U3's was *"`git status src/` shows only `src/rules/`"*. U4 necessarily changes the poll loop,
+`api.ts`, the schema and the UI, so that guarantee **cannot survive** — from here the phase
+boundary rests entirely on **`src/playback/` not existing** (BR-30.3), a weaker guard. Stated
+rather than discovered. `LoggingExecutor` takes **no** playback collaborator, because an injected
+but uncalled one would reduce the boundary to a runtime flag.
+
+### Not settled by this unit
+
+**FR-33 `hold` remains PARTIAL** — unchanged, still U5's. **BR-20.8 is discharged** (BR-26.3) and
+will be exercised for the first time ever during live verification: it has been specified since U3
+and has never run.
+
+**Context**: CONSTRUCTION — U4 Functional Design complete, awaiting approval. No code written; no
+schema change applied. Corpus 528 plays, container healthy and recording.

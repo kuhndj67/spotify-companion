@@ -621,3 +621,100 @@ is not a rule worth arming.
 WARNING: **If either flag is unwanted, say so at approval and both revert together.** Reverting
 FQ1 to a plain track-start evaluation makes FQ3's `partialData` meaningless again, and it should
 revert to Q10=C in the same motion. They are one decision wearing two numbers.
+
+---
+
+## Clarifications — 2026-09-20
+
+The user declined a full document review (*"I don't think I'll be able to do an efficient review
+of the model and rules in a reasonable amount of time"*) in favour of building and evaluating
+hands-on, and asked three questions about the decisions flagged as uncatchable that way.
+
+### CQ1 — BR-31.3: is `explicit` / `album.type` permanently unresolvable?
+
+> *"does this mean that both new columns are never able to resolve to t/f? OR does it mean that if
+> the field is null/unanswerable then it cannot resolve?"*
+
+**The second, and narrower still: the limitation is temporal and affects only back-tests.**
+
+| Context | Behaviour |
+|---|---|
+| **Live evaluation** (once U4 wires it) | Fully answerable, resolves `true`/`false` normally |
+| **Back-test over post-v5 plays** | Answerable, resolves normally |
+| **Back-test over pre-v5 plays** | Unanswerable → `unknown` |
+
+Both values already come from enrichment and already pass through `assembleFacts` untouched
+(`trackFacts.ts` — `explicit: input.explicit`, `type: input.albumType`). The v5 columns exist
+**only so history can answer them later**; they have nothing to do with live evaluation. Everything
+recorded from migration 005 forward is answerable, and the blind window is the corpus that already
+exists.
+
+⚠️ **And `unknown` does not mean the rule is useless**, because Kleene logic is decisive whenever
+the data answers the question (BR-14.3). `album.type == 'single' AND artist.following == false`
+resolves to **`false`** on a pre-v5 row if the artist *is* followed — the unknown never mattered.
+A rule is only stuck when the unanswerable field is the one that would have decided it.
+
+⚠️ **One case is not temporal and became BR-31.3b**: `explicit` arrives as `boolean | null` from
+enrichment, and it is `null` when `GET /tracks/{id}` **failed**. That is a transient error, not an
+absent fact, and it must never be persisted as `false`. This is the `error` is not `unknown`
+family — three separate U2 defects, all of which passed the full test suite.
+
+### CQ2 — BR-29.3: does fencing the pruner off `play` cost anything?
+
+> *"are there negative consequences of that? If there are good reasons to be able to join in
+> 'play' records, can it be done in a read only mode?"*
+
+**Yes, there is a real cost, and the suggested fix is the right one. BR-29.3 is revised.**
+
+Every retention policy keyed on the decision itself — keep matches, keep the last N per rule, prune
+oldest — needs only the decision table. **The one policy that needs the join is *"keep the
+decisions where the rule and I disagreed"***, which is precisely the subset worth keeping while
+authoring rules. A blanket ban would have quietly pruned the interesting rows first.
+
+**The safety property was never about the module; it is about the DELETE.** A `SELECT` cannot
+destroy anything. Revised to:
+
+- **BR-29.3** — the **DELETE** names only the decision table and deletes by an explicit id list
+- **BR-29.3a** — the pruner **may read `play`** in a `SELECT` to decide which ids to prune
+- **BR-29.3b** — read and delete are **separate statements**; no `DELETE … WHERE id IN (SELECT …
+  JOIN play …)`
+
+⚠️ **Pinned on the SQL text, not on behaviour**, the way `localGuard.test.ts` pins the upgrade
+handler. A single statement that joined and deleted would satisfy every behavioural test and lose
+the property entirely — the *"guard computed the same way as the thing it guards"* shape.
+
+`PRAGMA query_only = 1` on a dedicated read connection was considered and **not** specified: it
+buys enforcement the text assertion already provides, at the cost of a second connection to a file
+with one writer.
+
+### CQ3 — BR-27.2: *"I THINK this will be fine… will need to see it in action."*
+
+**No change needed — the design already takes the safe option (point-in-time, Q5 = A).**
+
+⚠️ **But it will not be visible in action, and that is the entire hazard.** As-of-now counts
+produce plausible numbers today; the defect is that the *same back-test over the same range returns
+a different answer months later*, as the corpus grows underneath it. There is no moment where
+looking at the screen reveals it.
+
+**It can be made visible by a test rather than by looking**, and that becomes an NFR Design
+obligation: *inserting plays dated after a back-test's range must not change that back-test's
+result.* That property fails loudly under as-of-now counts and passes under point-in-time — which
+is the only way this decision ever gets checked.
+
+### Execution trace scope: rule-level (BR-32)
+
+Chosen over per-node. Renders from the stored `Decision`, so **no second evaluation and no engine
+change**.
+
+⚠️ `RuleOutcome` carries a rule-level verdict and a flat `fieldsSeen` map — **not** a tree. A
+per-node trace needs a second walk of the predicate, and a second walk is a second implementation
+of the evaluator: the WebSocket `403` exactly, where the admission rule was re-implemented rather
+than reused, the copies diverged, and **all 411 tests passed** while every handshake failed.
+
+What this gives up: *"which branch of the AND decided it"* is not stated, though it is usually
+inferable from `fieldsSeen`. The upgrade is additive and needs no rework — but if taken, it must
+come from the **same walk** that produces the verdict.
+
+**Context**: CONSTRUCTION — U4 Functional Design revised. Document review declined in favour of
+hands-on evaluation; the three flagged decisions were answered rather than skipped, and one of
+them (BR-29.3) changed as a result.

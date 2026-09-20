@@ -235,9 +235,23 @@ Measured basis: 49 plays/day mean, 102 busiest, over the 9 days the app has actu
 rules that is ~491 rows/day — roughly 7 months to the cap. `observation` already holds 27,842 rows
 in a 1.91 MB database, so this is a known-shaped load.
 
-> ⚠️ **The pruner's SQL must not be able to name `play`.** It lives on the decision repository and
-> mentions one table. `data/` holds the only artefact here that cannot be regenerated; a decision
-> row can be recomputed from rules plus history, and a play row cannot be recomputed from anything.
+### The pruner reads `play`; only its DELETE is fenced (revised 2026-09-20)
+
+```
+ids    := SELECT d.id FROM decision d LEFT JOIN play p ON p.id = d.play_id
+          WHERE <policy>                       -- reads play freely; writes nothing
+DELETE FROM decision WHERE id IN (:ids)        -- names ONE table
+```
+
+> ⚠️ **A blanket ban on touching `play` would have deleted the interesting rows first.** Every
+> policy keyed on the decision itself needs only the decision table. The one policy that needs the
+> join is *"keep the decisions where the rule and I disagreed"* — the subset most worth keeping
+> when authoring rules. The safety property was never about the module; it is about the **DELETE**.
+> A `SELECT` cannot destroy anything.
+>
+> Pinned structurally: a test asserts the delete statement's SQL text contains no reference to
+> `play`. ⚠️ A single statement that joined *and* deleted would pass every behavioural test and
+> lose the property completely.
 
 ---
 
@@ -259,6 +273,23 @@ keeps wiring, startup and the `upgrade` handler.
 **UI** (FQ6): the rules list with its version indicator, plus a read-only decision-log table —
 time, track, rule, verdict, matched, fields seen — with a matches-only filter. No editing, no
 charts.
+
+### The execution trace (BR-32) — rule-level, chosen 2026-09-20
+
+Per decision: the **trigger timeline** (track start → enrichment settled *or* the 10 s wait timed
+out → decided) and, per rule, `verdict`, `applied`, `restedOnUnknown` and every value in
+`fieldsSeen`.
+
+**Rendered from the stored `Decision`. No second evaluation, no engine change.**
+
+> ⚠️ **Per-node verdicts are out of scope, and the reason is a defect this project has already
+> shipped.** `RuleOutcome` carries a rule-level verdict and a flat `fieldsSeen` map — not a tree.
+> Tracing each node needs a second walk, and a second walk is a second implementation of the
+> evaluator. That is the WebSocket `403` exactly: the admission rule was re-implemented rather than
+> reused, the copies diverged, and **all 411 tests passed** while every handshake failed.
+>
+> A trace that drifts from the evaluator explains a decision that did not happen. If per-node
+> tracing is wanted later it must come from **the same walk that produces the verdict**.
 
 The decision-log view is not decoration: U4's live gate is *"a dry-run session produces a match log
 the user agrees with"*, and agreement is a judgement made by reading. The two real defects in

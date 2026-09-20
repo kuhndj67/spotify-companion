@@ -177,15 +177,38 @@ rule evaluated · point-in-time history counts · three-way agreement · dry-run
 |---|---|---|
 | **BR-29.1** | The decision log is capped at **100,000 rows**, pruned oldest-first | Q4 = B, FQ4 = A |
 | **BR-29.2** | The cap is a **constant, not a setting** | U3 precedent |
-| **BR-29.3** | The pruner's SQL names **only** the decision table. It cannot reference `play` | Q4 warning |
+| **BR-29.3** | The pruner's **DELETE** names **only** the decision table and deletes by an explicit id list | Q4 warning, user 2026-09-20 |
+| **BR-29.3a** | The pruner **may read `play`** to decide *which* ids to prune, in a `SELECT` that writes nothing | user 2026-09-20 |
+| **BR-29.3b** | The read and the delete are **separate statements**. No `DELETE ... USING`, no `DELETE ... WHERE id IN (SELECT ... JOIN play ...)` | BR-29.3 |
 | **BR-29.4** | Pruning never runs inside the evaluation path | NFR-10 |
 
-> ### BR-29.3 is structural, not procedural
+> ### BR-29.3 splits the read from the write, because forbidding the read costs a real policy
 >
 > A decision row is recomputable from rules plus history; a play row is recomputable from nothing —
 > `recently-played` is a 50-play window and seven of the corpus's ten days exist only as backfilled
-> rows. A background pruner able to name `play` is one wrong `WHERE` clause from the one artefact
-> here that cannot come back.
+> rows. A pruner able to name `play` **in a DELETE** is one wrong `WHERE` clause from the one
+> artefact here that cannot come back.
+>
+> ⚠️ **But a blanket ban on touching `play` forecloses the most useful retention policy there is.**
+> Raised by the user 2026-09-20. Every policy keyed on the decision itself — keep matches, keep the
+> last N per rule, prune oldest — needs only the decision table. The one policy that needs the join
+> is *"keep the decisions where the rule and I disagreed"*, which is precisely the subset worth
+> keeping when authoring rules. Banning the read would have quietly deleted the interesting rows
+> first.
+>
+> **The safety property is about the DELETE, not about the module.** A `SELECT` cannot destroy
+> anything, so the join is safe by construction; what must never happen is a delete whose predicate
+> can reach `play`. Splitting them keeps the policy and keeps the guarantee.
+>
+> **Pinned structurally**, the way `localGuard.test.ts` pins the upgrade handler: a test asserts the
+> delete statement's SQL text contains no reference to `play`. ⚠️ A single statement that joined and
+> deleted would satisfy every behavioural test and lose the property entirely — this is the
+> *"guard computed the same way as the thing it guards"* shape, and it is why the rule constrains
+> the **SQL text** rather than the outcome.
+>
+> A stronger mechanism is available if it is ever wanted: a dedicated read connection under
+> `PRAGMA query_only = 1`. Not specified here — it buys enforcement the text assertion already
+> gives, at the cost of a second connection to a file with one writer.
 
 ---
 
@@ -217,7 +240,9 @@ rule evaluated · point-in-time history counts · three-way agreement · dry-run
 |---|---|---|
 | **BR-31.1** | Migration 005 adds the decision-log table and its indexes | Q2 = A |
 | **BR-31.2** | Migration 005 adds `explicit` and `album_type` to `play` | FQ2 = B |
-| **BR-31.3** | Both new columns are **nullable**, and null on a pre-v5 row means **unanswerable**, not `false` | BR-27.4 |
+| **BR-31.3** | Both new columns are **nullable**. Null on a **pre-v5 row** means **unanswerable**, not `false` | BR-27.4 |
+| **BR-31.3a** | The limitation is **temporal and back-test-only**. Live evaluation reads both from enrichment and resolves them normally | user 2026-09-20 |
+| **BR-31.3b** | ⚠️ A null arriving from enrichment because `GET /tracks/{id}` **failed** is `unknown`, and must never be written as `false` | `error` is not `unknown` |
 | **BR-31.4** | Persisting them costs **zero** additional upstream requests | FQ2 |
 
 > ### BR-31.2 stops the app discarding data it already pays for
@@ -240,3 +265,36 @@ rule evaluated · point-in-time history counts · three-way agreement · dry-run
 | FR-33 `hold` | ⚠️ **still PARTIAL** — U5. Unchanged by this unit |
 | FR-23 exclude rule-initiated skips | ✅ built, BR-28.4 — **inert until U5** |
 | FR-38, FR-39, FR-40 | ⬜ U5 |
+
+
+---
+
+## BR-32: The execution trace (debug output)
+
+Added 2026-09-20 at the user's request, to make the rules system's output legible during hands-on
+evaluation. **Scope chosen: rule-level, not per-node.**
+
+| # | Rule | Source |
+|---|---|---|
+| **BR-32.1** | The trace reports, per rule: `verdict`, `applied`, `restedOnUnknown`, and `fieldsSeen` with every value | user 2026-09-20 |
+| **BR-32.2** | It reports the **trigger timeline**: track start, whether enrichment settled or the wait timed out, and when the decision was taken | BR-22 |
+| **BR-32.3** | The trace is **rendered from the stored `Decision`**. It adds **no** new evaluation and **no** engine change | user 2026-09-20 |
+| **BR-32.4** | Per-**node** predicate verdicts are **out of scope**. "Which branch of the AND decided it" is not answerable in U4 | user 2026-09-20 |
+
+> ### BR-32.3 is the whole reason this scope was chosen, and it avoids a known failure
+>
+> U3's `RuleOutcome` carries a rule-level verdict and a flat `fieldsSeen` map — **not** per-node
+> verdicts. A per-node trace would require a second walk of the predicate tree, and a second walk
+> is a second implementation of the evaluator.
+>
+> ⚠️ **That is the WebSocket `403` exactly.** The local-access policy was re-implemented rather
+> than reused, the copies diverged, and **all 411 tests passed** while every handshake failed —
+> the UI sat on "Disconnected" in a way that read as *Spotify is down*. A trace that drifts from
+> the evaluator is worse than no trace: it explains a decision that did not happen.
+>
+> If per-node tracing is wanted later, it must come from **the same walk that produces the
+> verdict** — one function returning both — never from a parallel `explain`.
+
+⚠️ **What this gives up**: with `fieldsSeen` showing every value, the deciding branch is usually
+inferable by hand, but it is not *stated*. On a deep predicate with several unknowns that inference
+gets harder. The upgrade is additive and needs no rework of what U4 builds.

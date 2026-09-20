@@ -3625,3 +3625,49 @@ exactly that judgement.
 
 **Context**: CONSTRUCTION — U4 through Infrastructure Design, awaiting approval. **Next: Code
 Generation.** No code written; schema still v4. Corpus 528 plays, container healthy.
+
+---
+
+## 2026-09-20 — Stale watcher rules corrected; U4 blind spot measured; handoff written
+
+**Stage**: CONSTRUCTION — end of U4 design, before Code Generation. Context break point.
+
+### Two rules were stale and are marked superseded, not silently rewritten
+
+BR-26.1 and `business-logic-model.md` §4 described an **event-driven watcher with a 500 ms
+debounce**. They were written **before** the `fs.watch` probe disproved that mechanism. Both now
+carry the supersession explicitly, pointing at P-19's polling.
+
+⚠️ **This is the cost of probing between stages**: the Functional Design was correct when written
+and wrong two days later. Marking it beats rewriting it — a reader who finds only the polling
+design cannot tell whether the event-driven option was considered and rejected, or never thought
+of.
+
+### ⚠️ BR-22.7's blind spot is real, and now measured
+
+A play that **ends** before the 10 s enrichment cap produces **no decision row at all**. Measured
+over 457 live plays:
+
+| | |
+|---|---|
+| Plays ending under 10 s | **13 — 2.8%** |
+| **Skips** ending under 10 s | **4 of 31 — 13%** |
+| Median skip duration | **87.6 s** |
+| At a 15 s cap | 3.5% of plays, 5 of 31 skips |
+
+**Bounded and accepted.** Back-testing is unaffected — it reconstructs from stored plays, not from
+decisions — and in U5 a skip made inside 10 s is one the user already acted on. ⚠️ **But a missing
+row is not a "no match"**: anything counting decisions must use its own denominator rather than the
+play count, or it reproduces the denominator trap that read 28%→12% where the truth was 86%→44%.
+
+⚠️ **The blind spot scales with `ENRICHMENT_WAIT_MS`.** Re-measure before raising it.
+
+### Handoff written
+
+`construction/u4-rule-observability/HANDOFF.md` — reading order, the five things most likely to be
+got wrong, Code Generation scope, the deployment sequence, and the three exit criteria CI cannot
+close. Written so a cold session can start Code Generation without re-deriving the unit.
+
+**Context**: CONSTRUCTION — U4 designs complete and awaiting approval. Clean break point: tree
+clean, everything pushed, no code written, schema v4, container healthy on the U3 image. Corpus
+**528+ plays** and still recording.

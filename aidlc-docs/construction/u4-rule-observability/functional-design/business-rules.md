@@ -29,6 +29,25 @@ rule evaluated · point-in-time history counts · three-way agreement · dry-run
 | **BR-22.6** | The trigger consumes **`tick`**, never `change` | working rule |
 | **BR-22.7** | A play that ends before a decision is taken logs **nothing**. Absence of a row is not a decision | BR-22.1 |
 
+> ### ⚠️ BR-22.7 has a measured blind spot: plays shorter than the wait are never evaluated
+>
+> Under BR-22.3's 10 s cap, a play that **ends** before the cap fires produces **no decision row at
+> all**. Measured over 457 live plays on 2026-09-20:
+>
+> | | |
+> |---|---|
+> | Plays ending under 10 s | **13 — 2.8%** |
+> | **Skips** ending under 10 s | **4 of 31 — 13%** |
+> | Median skip duration | **87.6 s** — comfortably past the wait |
+>
+> **Bounded and acceptable, but it must not be discovered later as a gap in the log.** The back-test
+> is unaffected (it reconstructs from stored plays, not from decisions), and in U5 a skip the user
+> made inside 10 s is one they already acted on themselves. ⚠️ **But a missing row is not a "no
+> match"** — anything counting decisions must use its own denominator, not the play count.
+>
+> ⚠️ **If `ENRICHMENT_WAIT_MS` is ever raised, this blind spot grows with it.** At 15 s it is 3.5%
+> of plays and 5 of 31 skips. Re-measure before changing the constant.
+
 > ### BR-22.6 is the `PlayObserver` lesson, applied to a second consumer
 >
 > `change` is signature-suppressed and the signature excludes progress. A trigger fed from it would
@@ -100,7 +119,7 @@ rule evaluated · point-in-time history counts · three-way agreement · dry-run
 
 | # | Rule | Source |
 |---|---|---|
-| **BR-26.1** | File events are **debounced by 500 ms** before a reload is attempted | Q9.1 |
+| **BR-26.1** | ⚠️ **SUPERSEDED 2026-09-20 by the NFR probe.** Originally "file events debounced by 500 ms" — `fs.watch` **never fires** over the bind mount. Change detection is **polling** (P-19): `stat` every 5 s, hash only when `mtime`/`size` move. **The poll interval is the debounce** | Q9.1, **revised by P-19** |
 | **BR-26.2** | A valid reload **swaps atomically between evaluations**; no reload lands mid-evaluation | Q9.2 |
 | **BR-26.3** | An invalid file **on reload** keeps the last-known-good set in memory | **BR-20.8**, deferred from U3 |
 | **BR-26.4** | An invalid file **at cold start** leaves the app running with no rules and a surfaced reason | BR-20.7 |

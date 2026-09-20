@@ -122,9 +122,15 @@ A rule cannot opt out of a global dry-run. **In U4 `globalAutomationEnabled` is 
 
 ## 4. Rule-set loading, `watch()` and last-known-good (Q9, discharges BR-20.8)
 
+⚠️ **Revised 2026-09-20 by the NFR probe.** This section originally described an event-driven
+watcher with a 500 ms debounce. **`fs.watch` never fires over the Rancher Desktop bind mount** —
+0 events in 12 s while the container read new content within 1 s. Change detection is polling
+(P-19), and **the poll interval is the debounce**.
+
 ```
-on file event:
-  debounce 500 ms                       # editors emit several events per save
+every 5 s (or on reloadNow()):
+  stat -> (mtime, size) unchanged?  -> return
+  hash -> unchanged?                -> return
   parse and validate
   if valid:    swap atomically; version += 1; state := applied
   if invalid:  keep last-known-good; state := rejected; record errors

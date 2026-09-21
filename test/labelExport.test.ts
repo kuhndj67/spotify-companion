@@ -38,6 +38,8 @@ function play(over: Partial<PlayRecord> = {}): PlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    explicit: null,
+    albumType: null,
     classifierVersion: 1,
     evidence: {
       listenedMs: 180_000,

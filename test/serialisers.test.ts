@@ -41,6 +41,8 @@ function play(overrides: Partial<PlayRecord> = {}): PlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    explicit: null,
+    albumType: null,
     classifierVersion: 1,
     evidence: {
       listenedMs: 180_000,
@@ -222,3 +224,70 @@ function parseCsvLine(line: string): string[] {
   fields.push(current);
   return fields;
 }
+
+/**
+ * U4 / schema v5 — the two new columns reach the export.
+ *
+ * ⚠️ This is the step of the write path that fails silently. Nothing breaks when a serialiser
+ * forgets a column: a CSV missing `explicit` is indistinguishable from a CSV written before the
+ * column existed, so the omission surfaces only in an analysis, months later, as a field that
+ * "was never collected".
+ */
+describe('explicit and album_type export like every other nullable field', () => {
+  it('appears in the CSV header', () => {
+    const header = toCsvHeader().split(',');
+
+    assert.ok(header.includes('explicit'));
+    assert.ok(header.includes('album_type'));
+  });
+
+  it('keeps the row aligned with the header', () => {
+    const header = toCsvHeader().split(',');
+    const row = parseCsvLine(toCsvRow(play({ explicit: true, albumType: 'single' })));
+
+    assert.equal(row.length, header.length, 'a row that drifts from the header silently mislabels every later column');
+    assert.equal(row[header.indexOf('explicit')], 'true');
+    assert.equal(row[header.indexOf('album_type')], 'single');
+  });
+
+  /**
+   * ⚠️ BR-6.3, and here it is doing real work: a blank cell would read as "not explicit" and
+   * "no album type". Missing data correlates with what is being measured (R2), so an unknown
+   * that exports blank hides a bias rather than showing it.
+   */
+  it('renders unknown as the literal token, never blank and never false', () => {
+    const header = toCsvHeader().split(',');
+    const row = parseCsvLine(toCsvRow(play({ explicit: null, albumType: null })));
+
+    assert.equal(row[header.indexOf('explicit')], 'unknown');
+    assert.equal(row[header.indexOf('album_type')], 'unknown');
+  });
+
+  it('distinguishes false from unknown in the CSV', () => {
+    const header = toCsvHeader().split(',');
+    const asFalse = parseCsvLine(toCsvRow(play({ explicit: false })));
+    const asUnknown = parseCsvLine(toCsvRow(play({ explicit: null })));
+
+    assert.equal(asFalse[header.indexOf('explicit')], 'false');
+    assert.equal(asUnknown[header.indexOf('explicit')], 'unknown');
+    assert.notEqual(
+      asFalse[header.indexOf('explicit')],
+      asUnknown[header.indexOf('explicit')],
+      'collapsing these two is the defect this project is built to avoid',
+    );
+  });
+
+  it('carries both into the JSON object', () => {
+    const json = toJsonObject(play({ explicit: false, albumType: 'compilation' })) as Record<string, unknown>;
+    const unknown = toJsonObject(play({ explicit: null, albumType: null })) as Record<string, unknown>;
+
+    // ⚠️ String tokens, following the convention `following` already sets: every nullable
+    // field renders through `renderMaybe`, so `false` and `unknown` are both strings and stay
+    // distinguishable. A raw boolean here would make `explicit` the one field whose absent
+    // value is JSON `null` — which a consumer coerces to false without noticing.
+    assert.equal(json.explicit, 'false');
+    assert.equal(json.album_type, 'compilation');
+    assert.equal(unknown.explicit, 'unknown');
+    assert.equal(unknown.album_type, 'unknown');
+  });
+});

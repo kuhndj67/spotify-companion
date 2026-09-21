@@ -340,6 +340,120 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    description: 'decision log, the two play columns rules read, and the schema-era watermark',
+    up(db) {
+      db.exec(`
+        -- ============================================================================
+        -- U4. Purely additive: two CREATE TABLEs, three indexes, two ADD COLUMNs and one
+        -- row. ADD COLUMN with no default is an O(1) metadata operation in SQLite, so the
+        -- corpus size is irrelevant. Rollback to U3's image stays safe -- migrate() skips
+        -- every migration <= the stored version, so the old image simply never reads any
+        -- of this. THAT GUARANTEE HOLDS ONLY WHILE MIGRATIONS STAY ADDITIVE.
+        -- ============================================================================
+
+        -- One row per RULE EVALUATED, not per decision (BR-23.1). Ten rules writes ten
+        -- rows sharing an evaluation_id, which is what lets the log answer "why did my
+        -- rule NOT fire?" -- a question a matched-only log cannot answer at all.
+        CREATE TABLE decision_log (
+          id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+          evaluation_id          TEXT    NOT NULL,
+          decided_at             TEXT    NOT NULL,
+
+          -- NULLABLE AND STAYS NULLABLE (BR-24.1). A decision is taken DURING a play; the
+          -- play row is written when the play CLOSES, seconds to minutes later. NOT NULL
+          -- would force a decision to wait for its own consequence.
+          play_id                INTEGER REFERENCES play(id),
+
+          -- Why play_id is absent (BR-24.3a). Without this column a permanent NULL means
+          -- two incompatible things: "the play never closed" (a W-3 case, expected) and
+          -- "the play closed but its row failed to write" (a fault, on the one artefact
+          -- here that cannot be regenerated). PlayObserver fires onPlayRecorded only after
+          -- recordPlay succeeds, so the second case is silent by construction.
+          play_link              TEXT    NOT NULL DEFAULT 'pending',
+
+          -- Recorded independently of play_id, so a decision stays attributable even when
+          -- the link never arrives.
+          track_id               TEXT    NOT NULL,
+
+          rule_id                TEXT    NOT NULL,
+          -- Denormalised on purpose (BR-23.6): a renamed or deleted rule must not orphan
+          -- its own history, and a stored decision that disagrees with a recomputation is
+          -- attributable to an edit rather than unexplainable.
+          rule_name              TEXT    NOT NULL,
+          rule_hash              TEXT    NOT NULL,
+
+          verdict                TEXT    NOT NULL,
+          matched                INTEGER NOT NULL,
+
+          -- JSON. Nulls are written EXPLICITLY, never by omission (BR-23.4): a field the
+          -- rule demonstrably read must not vanish from its own record.
+          fields_seen            TEXT    NOT NULL,
+          unknown_fields         TEXT    NOT NULL,
+
+          rested_on_unknown      INTEGER NOT NULL,
+          partial_data           INTEGER NOT NULL,
+
+          -- Always 1 / 0 / NULL in U4 (BR-23.8). The columns exist now so U5 changes
+          -- behaviour rather than the schema.
+          dry_run                INTEGER NOT NULL,
+          executed               INTEGER NOT NULL,
+          error                  TEXT,
+
+          engine_version         INTEGER NOT NULL,
+          -- For the UI only. It RESETS TO 1 ON RESTART (BR-26.8), so on a permanent table
+          -- a repeating small integer identifies nothing.
+          rule_set_version       INTEGER NOT NULL,
+          -- What actually attributes this row to a rule set across restarts (BR-23.7a).
+          rule_set_content_hash  TEXT    NOT NULL
+        );
+
+        -- NO UNIQUE CONSTRAINT ANYWHERE ABOVE, AND THAT IS DELIBERATE (BR-22.1a).
+        -- BR-22.1's one-decision-per-play is a U4 invariant, enforced by the coordinator's
+        -- \`decided\` flag and tested there. FR-34 is a Must and requires re-evaluation when
+        -- slow enrichment lands, so U5 will write a second decision for one play
+        -- legitimately. A constraint added here would have to be DROPPED then -- a
+        -- non-additive migration, which would retire the by-image rollback guarantee above.
+
+        CREATE INDEX idx_decision_decided_at ON decision_log(decided_at);
+        CREATE INDEX idx_decision_evaluation ON decision_log(evaluation_id);
+        CREATE INDEX idx_decision_play       ON decision_log(play_id);
+
+        -- ----------------------------------------------------------------------------
+        -- Two fields the app already pays for and was throwing away. Both come back from
+        -- the GET /tracks/{id} call made for every enriched track, and both are on
+        -- recently-played too (probed 2026-09-20: HTTP 200, present on 3/3 items), so
+        -- persisting them costs ZERO additional upstream requests.
+        --
+        -- Nullable, and NULL is never false. Three different causes reach this column as
+        -- NULL: the row predates this migration (unanswerable), the fetch failed
+        -- (unknown), or enrichment had not landed (unknown). Only the first is decided by
+        -- the watermark below.
+        -- ----------------------------------------------------------------------------
+        ALTER TABLE play ADD COLUMN explicit   INTEGER;
+        ALTER TABLE play ADD COLUMN album_type TEXT;
+
+        -- ----------------------------------------------------------------------------
+        -- The schema-era watermark (BR-31.7). There is no key/value table in this database
+        -- -- schema_version(version, applied_at) is the only metadata table and it is
+        -- append-only history of the migrations themselves, so overloading it would make
+        -- migrate()'s own bookkeeping a place application code writes.
+        --
+        -- IT IS A ROW ID, NOT A DATE, AND THAT IS THE POINT (BR-27.5c). The 6-hourly
+        -- backfill inserts rows dated in the PAST, so a row written after this migration
+        -- for a play that happened before it genuinely carries both new values. Judging
+        -- era by started_at would mark that real data unanswerable; judging by id answers
+        -- correctly. Written in this same transaction, so a rolled-back 005 cannot leave a
+        -- watermark behind for columns that do not exist.
+        -- ----------------------------------------------------------------------------
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+        INSERT INTO meta (key, value)
+          SELECT 'v5_watermark_play_id', CAST(COALESCE(MAX(id), 0) AS TEXT) FROM play;
+      `);
+    },
+  },
 ];
 
 /**

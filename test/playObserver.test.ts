@@ -30,6 +30,8 @@ function sample(overrides: Partial<PlaybackSample> = {}): PlaybackSample {
     ageYears: 6,
     following: true,
     contextType: null,
+    explicit: null,
+    albumType: null,
     ...overrides,
   };
 }

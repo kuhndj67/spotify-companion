@@ -150,6 +150,22 @@ export interface PlayRecord {
   releaseDate: string | null;
   ageYears: number | null;
   following: boolean | null;
+  /**
+   * U4, schema v5. Both come back from the `GET /tracks/{id}` call already made for every
+   * enriched track and from `recently-played`, so persisting them costs **zero** extra requests
+   * (BR-31.4).
+   *
+   * ⚠️ **`null` is unknown and never `false`.** Three distinct causes reach this column as null
+   * and they are not the same fact:
+   *   - the row predates migration 005 → **unanswerable** (BR-31.3, BR-27.5a)
+   *   - `GET /tracks/{id}` failed → **unknown** (BR-31.3b — `error` is not `unknown`)
+   *   - enrichment has not landed yet → **unknown**
+   * Only the first is decided by the schema-era watermark; the others are ordinary unknowns.
+   * Writing `false` for any of them would assert a fact about the variable under study.
+   */
+  explicit: boolean | null;
+  /** `album` | `single` | `compilation`, as Spotify reports it. Null per the note on `explicit`. */
+  albumType: string | null;
   /** ISO 8601 UTC. */
   startedAt: string;
   endedAt: string;
@@ -177,6 +193,26 @@ export interface PlayRecord {
 
 /** A play before it has an id — what the observer hands the repository. */
 export type NewPlayRecord = Omit<PlayRecord, 'id'>;
+
+/**
+ * The four `history.*` aggregates a rule can read, counted over plays **strictly before** an
+ * instant (BR-27.2/27.3).
+ *
+ * ⚠️ **`null` means "no history to count", never `0`.** Substituting zero would make
+ * *"never skipped this track"* silently true for a track never heard — US-16's stated failure
+ * mode, and the same error as writing `completed` onto a backfilled play.
+ *
+ * ⚠️ **The artist counts are keyed on the PRIMARY artist** and are low for a frequent guest.
+ * `artist_id` stores `track.artists[0]`, so a feature credit files under the lead: measured
+ * 2026-09-06, Ren appears on 34 plays and owns the primary id on 26 — about 24% low. A schema
+ * limit, not a listening pattern. `historyRepository.test.ts` pins it.
+ */
+export interface HistoryCounts {
+  playsOfTrack: number | null;
+  skipsOfTrack: number | null;
+  playsOfArtist: number | null;
+  skipsOfArtist: number | null;
+}
 
 /** Query filter. Domain types only: no SQL fragments, or the NFR-10 interface is decorative. */
 export interface HistoryFilter {

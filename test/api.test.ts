@@ -63,6 +63,8 @@ function play(overrides: Partial<NewPlayRecord> = {}): NewPlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    explicit: null,
+    albumType: null,
     classifierVersion: CLASSIFIER_VERSION,
     ...overrides,
   };

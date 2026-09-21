@@ -76,6 +76,8 @@ function livePlay(): NewPlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    explicit: null,
+    albumType: null,
     classifierVersion: CLASSIFIER_VERSION,
   };
 }
@@ -252,5 +254,68 @@ describe('backfilled rows stay honest', () => {
     assert.match(report.error ?? '', /429/);
     assert.equal(report.inserted, 0);
     repo.close();
+  });
+});
+
+/**
+ * U4 / schema v5 — the two columns the backfill can fill at no extra cost.
+ *
+ * ⚠️ These exist because the endpoint was believed not to return them. It does: probed live
+ * 2026-09-20, HTTP 200, `explicit` and `album.album_type` present on 3/3 items. What made them
+ * look absent was this file's own hand-written response type, which declared only
+ * `album?: { name, release_date }` — **a field a local type does not declare is
+ * indistinguishable from a field the API does not send.**
+ */
+describe('explicit and album_type are captured from recently-played', () => {
+  it('stores both when the endpoint sends them', async () => {
+    const repo = new SqliteHistoryRepository(':memory:');
+    const api = fakeApi([
+      item('2026-09-20T10:03:00.000Z', {
+        explicit: true,
+        album: { name: 'An Album', release_date: '2019-05-17', album_type: 'single' },
+      }),
+    ]);
+
+    await new RecentlyPlayedBackfill(api, repo).run();
+
+    const [row] = repo.listPlays({ limit: 10 });
+    assert.equal(row!.explicit, true);
+    assert.equal(row!.albumType, 'single');
+  });
+
+  it('stores explicit: false as false, distinctly from absent', async () => {
+    const repo = new SqliteHistoryRepository(':memory:');
+    const api = fakeApi([
+      item('2026-09-20T10:03:00.000Z', {
+        explicit: false,
+        album: { name: 'An Album', release_date: '2019-05-17', album_type: 'album' },
+      }),
+    ]);
+
+    await new RecentlyPlayedBackfill(api, repo).run();
+
+    const [row] = repo.listPlays({ limit: 10 });
+    // Not null: the endpoint answered, and the answer was "no".
+    assert.equal(row!.explicit, false);
+  });
+
+  /**
+   * ⚠️ The `?? null` that must never become `?? false`. An item that omits `explicit` is
+   * unknown, and recording it as "not explicit" is a fabricated fact about a backfilled play —
+   * the same error as writing `completed` onto a row with no observation trail.
+   */
+  it('records an absent field as unknown, never as false or empty', async () => {
+    const repo = new SqliteHistoryRepository(':memory:');
+    const api = fakeApi([
+      item('2026-09-20T10:03:00.000Z', {
+        album: { name: 'An Album', release_date: '2019-05-17' },
+      }),
+    ]);
+
+    await new RecentlyPlayedBackfill(api, repo).run();
+
+    const [row] = repo.listPlays({ limit: 10 });
+    assert.equal(row!.explicit, null);
+    assert.equal(row!.albumType, null);
   });
 });

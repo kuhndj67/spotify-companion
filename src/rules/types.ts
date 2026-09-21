@@ -289,3 +289,196 @@ export const MAX_RULES_FILE_BYTES = 1_048_576;
 
 /** Bumped when evaluation semantics change in a way that could alter a `Decision`. */
 export const RULE_ENGINE_VERSION = 1;
+
+// ---------------------------------------------------------------------------
+// U4 — observability. The types that make a `Decision` durable, attributable
+// and replayable. `Decision` itself is UNMODIFIED: U3 built it for this.
+// ---------------------------------------------------------------------------
+
+/**
+ * Why a decision row has no `playId` (BR-24.3a).
+ *
+ * ⚠️ **Without this, a permanent `null` would mean two incompatible things.** `PlayObserver`
+ * fires `onPlayRecorded` *only after* `recordPlay` succeeds; when the write throws it counts a
+ * gap, sets `degraded`, and the hook never runs — leaving `playId` null for ever, exactly as if
+ * the play had never closed. One of those is an expected W-3 case; the other is the database
+ * refusing a write to the one artefact here that cannot be regenerated.
+ *
+ * Same family as `error` is not `unknown`, which produced three U2 defects that all passed the
+ * full suite.
+ */
+export type PlayLinkState =
+  /** The play has not closed yet. Normal for seconds to minutes after the decision. */
+  | 'pending'
+  /** `playId` is set. */
+  | 'linked'
+  /** The play closed and its row could not be written. The link will never arrive. */
+  | 'link-failed';
+
+/**
+ * One row per **rule evaluated**, not per decision (BR-23.1, Q3 = A). A decision over ten rules
+ * writes ten rows sharing an `evaluationId` — which is what lets the log answer "why did my
+ * rule **not** fire?".
+ */
+export interface DecisionLogEntry {
+  readonly id: number;
+  /** Groups the rows of one decision. Without it, "what did the engine see at 14:32" is unanswerable. */
+  readonly evaluationId: string;
+  /** When the decision was taken — not when the play started. ISO 8601. */
+  readonly decidedAt: string;
+  /** ⚠️ Nullable and stays nullable: a decision precedes its play row (BR-24.1). */
+  readonly playId: number | null;
+  readonly playLink: PlayLinkState;
+  /** Recorded independently of `playId`, so a decision is attributable even if the play never closes. */
+  readonly trackId: string;
+  readonly ruleId: string;
+  /** Denormalised: a renamed or deleted rule must not orphan its history (BR-23.6). */
+  readonly ruleName: string;
+  /** Content hash of the rule's normalised predicate + action + `onUnknown`. */
+  readonly ruleHash: string;
+  readonly verdict: Verdict;
+  /** Whether this rule contributed to the action after `onUnknown` was applied. */
+  readonly matched: boolean;
+  /** ⚠️ Nulls appear explicitly, never by omission (BR-23.4). */
+  readonly fieldsSeen: Readonly<Record<string, unknown>>;
+  readonly unknownFields: readonly string[];
+  /** Copied from the `Decision` verbatim, never accumulated (BR-23.5). */
+  readonly restedOnUnknown: boolean;
+  readonly partialData: boolean;
+  /** Always `true` in U4 (BR-23.8, BR-25.3). */
+  readonly dryRun: boolean;
+  /** Always `false` in U4. */
+  readonly executed: boolean;
+  /** Always `null` in U4. */
+  readonly error: string | null;
+  readonly engineVersion: number;
+  /**
+   * The rule-set counter **for the UI**. ⚠️ It resets to 1 on restart (BR-26.8), so on a durable
+   * table a repeating small integer identifies nothing: today's `v3` and next month's `v3` are
+   * different rule sets wearing the same number. `ruleSetContentHash` is the identifier.
+   */
+  readonly ruleSetVersion: number;
+  /** ⚠️ What actually attributes this row to a rule set across restarts (BR-23.7a). */
+  readonly ruleSetContentHash: string;
+}
+
+/** A row before it has an id — what the executor hands the log. */
+export type NewDecisionLogEntry = Omit<DecisionLogEntry, 'id'>;
+
+/** Half-open `[from, to)`, so adjacent ranges partition history without double-counting. */
+export interface DateRange {
+  readonly from: string;
+  readonly to: string;
+}
+
+export interface DecisionFilter {
+  readonly from?: string;
+  readonly to?: string;
+  readonly ruleId?: string;
+  readonly trackId?: string;
+  readonly matchedOnly?: boolean;
+  readonly limit: number;
+  readonly cursor?: number;
+}
+
+/**
+ * What a rule **would have done** over stored history (FR-42, US-24).
+ *
+ * ⚠️ Three distinctions here are load-bearing and must never be merged. Each is a mistake this
+ * project has already made once and paid for:
+ *   - `undecidable` is not `wouldNotMatch` — "could not be answered" reported as "matched
+ *     nothing" is the `Label detail` dash and the `inc=releases` 200 in a new place.
+ *   - `notObserved` is not `inconclusive` — the 2026-09-06 merge exactly: the app's **downtime**
+ *     rendered as the classifier's **uncertainty**.
+ *   - `unanswerable` is not `unknown` — see `unanswerableFields`.
+ */
+export interface BackTestReport {
+  readonly ruleId: string;
+  readonly ruleName: string;
+  readonly ruleHash: string;
+  readonly range: DateRange;
+  /** Plays the rule was evaluated against. ⚠️ Every row in range, not only eligible ones (BR-28.3a). */
+  readonly evaluated: number;
+  readonly wouldMatch: number;
+  readonly wouldNotMatch: number;
+  /** ⚠️ Predicate resolved `unknown`. **Distinct from `wouldNotMatch`.** */
+  readonly undecidable: number;
+  /** Per field, how many plays read it absent. */
+  readonly unknownFieldCounts: Readonly<Record<string, number>>;
+  /**
+   * Fields some row in the range could not answer **at all**, with the count of such rows.
+   *
+   * ⚠️ Computed from the row, never from a value coming back null (BR-27.5). Two eras reach
+   * this: pre-v5 `track.explicit` / `album.type` (schema), and `label.*` on a row that was never
+   * asked (`isrc IS NULL AND label_unknown_reason IS NULL`). A back-test reporting 0 matches on
+   * an unanswerable field reads as "this rule matches nothing" — a wrong answer that looks
+   * like a finding.
+   */
+  readonly unanswerableFields: Readonly<Record<string, number>>;
+  readonly agreedWithUserSkip: number;
+  readonly disagreedWithUserKeep: number;
+  readonly missedUserSkip: number;
+  /** Backfilled plays — the app was not running. */
+  readonly notObserved: number;
+  /** Live plays the classifier could not judge. */
+  readonly inconclusive: number;
+  /** FR-23. **0 until U5 is armed** — a design guard, not a repair (BR-28.4). */
+  readonly excludedRuleInitiated: number;
+  /**
+   * ⚠️ **Required, never optional and never defaulted** (P-24). This is the
+   * `release_count = 100` bug pre-empted: a browse capped at 100 with no paging had the 100
+   * stored as the count, and 18 of 56 resolutions recorded an arbitrary sample as a complete
+   * figure with nothing marking it partial.
+   */
+  readonly truncated: boolean;
+  /** For the report, never for the evaluation. */
+  readonly computedAt: string;
+}
+
+/** Drives the version indicator (FQ5). */
+export type RuleSetState = 'applied' | 'reloading' | 'rejected';
+
+/**
+ * The rule set as an identifiable thing — BR-20.8's last-known-good is only observable if you
+ * can say *which* set is running.
+ *
+ * ⚠️ Owned by `RuleSetWatcher`, never by `RuleStore` (BR-26.3b). The store is a parser.
+ */
+export interface LoadedRuleSet {
+  /**
+   * ⚠️ Counts **accepted loads**, not file writes (BR-26.5/26.6). "v7 rejected, still running
+   * v6" is only sayable if 7 was never taken. Not persisted: it resets on restart.
+   */
+  readonly version: number;
+  /** Hash of the file's normalised content. Carries identity across restarts. */
+  readonly contentHash: string;
+  readonly loadedAt: string;
+  readonly rules: readonly LoadedRule[];
+  readonly state: RuleSetState;
+  /** Present only in `rejected`. Names the errors; the running version is `version`. */
+  readonly rejection: { readonly attemptedAt: string; readonly errors: readonly string[] } | null;
+}
+
+/**
+ * Whether label resolution for a track has finished, in the only sense the trigger can act on
+ * (BR-22.5a/5b).
+ *
+ * ⚠️ **`not-attemptable` is terminal and immediate**, and it is the whole reason this type
+ * exists. The resolver exposes no per-track pending state, and the maps that do have four exits
+ * leaving a track uncached — three of which a naive not-cached-and-not-in-flight test reads as
+ * "still working". A keyless track would then wait the full cap and be stamped `partialData`,
+ * recording **permanent absence as a timeout**: exactly the distinction FQ3 exists to draw, in
+ * the one number U4 was built to measure.
+ */
+export type LabelResolutionState =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  /** No ISRC *and* no artist id, or label enrichment is disabled. Never answerable for this track. */
+  | 'not-attemptable';
+
+/** ⚠️ The decision log is capped, and the cap is a **constant, not a setting** (BR-29.2). */
+export const DECISION_LOG_CAP = 100_000;
+
+/** ⚠️ A bound, not a setting. `truncated` discloses when it fires (P-24). */
+export const BACK_TEST_MAX_PLAYS = 50_000;

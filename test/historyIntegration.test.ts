@@ -54,6 +54,8 @@ function track(id: string, durationMs: number, overrides: Partial<PlaybackSample
     ageYears: 6,
     following: true,
     contextType: 'playlist',
+    explicit: null,
+    albumType: null,
     ...overrides,
   });
 }

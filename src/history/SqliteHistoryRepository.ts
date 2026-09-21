@@ -77,6 +77,9 @@ interface PlayRow {
   skip_source: string | null;
   context_type: string | null;
   classifier_version: number;
+  /** Schema v5. Null on a pre-v5 row is UNANSWERABLE, not `false` — decided by the watermark. */
+  explicit: number | null;
+  album_type: string | null;
   ev_listened_ms: number;
   ev_duration_ms: number;
   ev_completion_ratio: number;
@@ -117,6 +120,8 @@ function rowToRecord(row: PlayRow): PlayRecord {
     skipSource: row.skip_source as SkipSource | null,
     contextType: row.context_type,
     classifierVersion: row.classifier_version,
+    explicit: fromDbBool(row.explicit),
+    albumType: row.album_type,
     evidence: {
       listenedMs: row.ev_listened_ms,
       durationMs: row.ev_duration_ms,
@@ -223,10 +228,10 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
           `INSERT INTO play (
              track_id, isrc, title, artist_name, artist_id, album_name, release_date,
              age_years, following, started_at, ended_at, outcome, close_reason, provenance,
-             skip_source, context_type, classifier_version,
+             skip_source, context_type, classifier_version, explicit, album_type,
              ev_listened_ms, ev_duration_ms, ev_completion_ratio, ev_max_progress_ms,
              ev_max_gap_ms, ev_observation_count, ev_saw_pause, ev_rewound, ev_ended_with_idle
-           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           play.trackId,
@@ -246,6 +251,8 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
           play.skipSource,
           play.contextType,
           play.classifierVersion,
+          toDbBool(play.explicit),
+          play.albumType,
           play.evidence.listenedMs,
           play.evidence.durationMs,
           play.evidence.completionRatio,

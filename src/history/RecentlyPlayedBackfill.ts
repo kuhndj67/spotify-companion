@@ -28,7 +28,12 @@ interface RecentlyPlayedResponse {
       name: string;
       duration_ms: number;
       artists?: { id: string; name: string }[];
-      album?: { name: string; release_date?: string };
+      // ⚠️ This narrow hand-written shape is why `explicit` and `album_type` were believed
+      // absent from this endpoint: a field a local type does not declare is indistinguishable
+      // from a field the API does not send. Probed 2026-09-20 — HTTP 200, both present on 3/3
+      // items (`album`, `album`, `single`), alongside `external_ids.isrc`.
+      album?: { name: string; release_date?: string; album_type?: string };
+      explicit?: boolean;
       external_ids?: { isrc?: string };
     };
     context?: { type?: string } | null;
@@ -113,6 +118,11 @@ export class RecentlyPlayedBackfill {
         albumName: track.album?.name ?? '',
         releaseDate: track.album?.release_date ?? null,
         ageYears: null,
+        // ⚠️ `?? null`, never `?? false`. An item that omitted `explicit` would be unknown, and
+        // recording it as "not explicit" is a fabricated fact about a backfilled play — the same
+        // error as writing `completed` onto a row with no observation trail.
+        explicit: track.explicit ?? null,
+        albumType: track.album?.album_type ?? null,
         // Not looked up: follow status is a *current* fact, and asserting it retroactively for a
         // play that happened hours ago would be a small fabrication in a dataset whose value
         // depends on not making any.

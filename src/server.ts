@@ -374,6 +374,11 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
     ageYears: enrichmentData?.ageYears ?? null,
     following: enrichmentData?.following ?? null,
     contextType: null,
+    // U4 / schema v5. `?? null` is the right coalesce here and `?? false` would be a defect:
+    // enrichment that has not landed, and a `GET /tracks/{id}` that failed, both arrive as
+    // absent — and neither is evidence that the track is clean (BR-31.3b).
+    explicit: enrichmentData?.explicit ?? null,
+    albumType: enrichmentData?.albumType ?? null,
   };
 }
 

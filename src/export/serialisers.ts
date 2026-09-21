@@ -41,6 +41,13 @@ export const CSV_COLUMNS = [
   'skip_source',
   'context_type',
   'classifier_version',
+  // -- U4, schema v5 ----------------------------------------------------------
+  // ⚠️ These two export as the literal token `unknown` when absent, like every other
+  // nullable field (BR-6.3) — and here that token is doing real work. A blank cell would be
+  // read as "not explicit" and "no album type", which is a fabricated answer about rows that
+  // predate migration 005 and about rows whose `GET /tracks/{id}` failed.
+  'explicit',
+  'album_type',
   'listened_ms',
   'duration_ms',
   'completion_ratio',
@@ -148,6 +155,8 @@ export function toCsvRow(play: PlayRecord): string {
     play.skipSource,
     play.contextType,
     play.classifierVersion,
+    play.explicit,
+    play.albumType,
     play.evidence.listenedMs,
     play.evidence.durationMs,
     play.evidence.completionRatio,
@@ -202,6 +211,8 @@ export function toJsonObject(play: PlayRecord): Record<string, unknown> {
     skip_source: renderMaybe(play.skipSource),
     context_type: renderMaybe(play.contextType),
     classifier_version: play.classifierVersion,
+    explicit: renderMaybe(play.explicit),
+    album_type: renderMaybe(play.albumType),
     evidence: {
       listened_ms: play.evidence.listenedMs,
       duration_ms: play.evidence.durationMs,

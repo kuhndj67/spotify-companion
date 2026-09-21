@@ -49,6 +49,9 @@ export interface PlaybackSample {
   ageYears: number | null;
   following: boolean | null;
   contextType: string | null;
+  /** U4, schema v5. See the note on `PlayRecord.explicit` — null is unknown, never `false`. */
+  explicit: boolean | null;
+  albumType: string | null;
 }
 
 interface InProgressPlay {
@@ -196,6 +199,8 @@ export class PlayObserver {
       releaseDate: play.sample.releaseDate,
       ageYears: play.sample.ageYears,
       following: play.sample.following,
+      explicit: play.sample.explicit,
+      albumType: play.sample.albumType,
       startedAt: new Date(play.startedAtMs).toISOString(),
       endedAt: new Date(play.trail[play.trail.length - 1]!.atMs).toISOString(),
       outcome,

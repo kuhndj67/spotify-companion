@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/kuhndj67/spotify/aidlc-docs/reference/rules.schema.json",
+  "title": "Spotify companion rule set",
+
+  "description": "STRUCTURAL PHASE ONLY. This schema encodes the grammar in rules-language.md -- the checks that, when they fail, reject the WHOLE rule set. It deliberately cannot encode the semantic phase: the field catalogue, which operators are valid for a given field's type, whether an operand matches that type, or the 32-level depth limit. A document this schema accepts can still load with individual rules DISABLED, each with a reason. Editor validation is a convenience, never the authority; src/rules/ruleValidator.ts is.",
+
+  "oneOf": [
+    { "$ref": "#/$defs/ruleArray" },
+    {
+      "type": "object",
+      "description": "Any member other than `rules` is ignored by the loader, including `version` and `$schema`.",
+      "required": ["rules"],
+      "properties": { "rules": { "$ref": "#/$defs/ruleArray" } }
+    }
+  ],
+
+  "$defs": {
+    "ruleArray": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/rule" }
+    },
+
+    "rule": {
+      "type": "object",
+      "required": ["id", "name", "enabled", "action", "onUnknown", "predicate"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique within the set. A DUPLICATE REJECTS THE WHOLE SET rather than disabling one of the pair: with two rules sharing an id, no report can say which matched. JSON Schema cannot express uniqueness across a keyed field, so this is unchecked here."
+        },
+        "name": { "type": "string", "description": "Display name. Not part of the rule's identity hash -- a rename does not change what the rule decides." },
+        "enabled": { "type": "boolean" },
+        "action": { "const": "skip" },
+        "onUnknown": {
+          "enum": ["no-match", "match", "hold"],
+          "description": "What to do when the rule's own verdict is `unknown`. WARNING: `hold` is accepted structurally but loads the rule DISABLED -- it needs a deadline and a re-evaluation trigger that do not exist yet."
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Optional, default false. Inert today: global automation is off, so every decision is dry-run regardless. A rule cannot opt OUT of a global dry-run."
+        },
+        "predicate": { "$ref": "#/$defs/predicate" }
+      }
+    },
+
+    "predicate": {
+      "oneOf": [
+        { "$ref": "#/$defs/comparison" },
+        { "$ref": "#/$defs/junction" },
+        { "$ref": "#/$defs/negation" }
+      ]
+    },
+
+    "comparison": {
+      "type": "object",
+      "required": ["kind", "field", "op"],
+      "properties": {
+        "kind": { "const": "compare" },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must name a catalogue field. NOT CHECKED HERE -- an unknown field loads the rule disabled with reason `unknown-field`. See rules-language.md section 2."
+        },
+        "op": { "enum": ["eq", "neq", "lt", "lte", "gt", "gte", "in", "contains", "is-unknown"] },
+        "value": {
+          "description": "Required for every operator except `is-unknown`. `in` takes an array; everything else takes a scalar. Two things are NOT checked here because they are semantic: the operand's type must match the field's type, and an `in` array must be non-empty. Both disable the individual rule rather than rejecting the set.",
+          "oneOf": [
+            { "type": ["string", "number", "boolean"] },
+            { "type": "array", "items": { "type": ["string", "number", "boolean"] } }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "is-unknown" } }, "required": ["op"] },
+          "then": {
+            "not": { "required": ["value"] },
+            "description": "`is-unknown` takes NO value. Writing `\"value\": null` is providing one, and is refused."
+          },
+          "else": { "required": ["value"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "in" } }, "required": ["op"] },
+          "then": {
+            "properties": { "value": { "type": "array" } },
+            "description": "`in` requires an ARRAY structurally. That it must be NON-EMPTY is enforced in the semantic phase, so an empty array disables that one rule with reason `type-mismatch` rather than rejecting the whole set. Cross-checked against ruleValidator.ts -- do not add minItems here, it would make this schema stricter than the implementation and report a whole-file error for a single bad rule."
+          }
+        }
+      ]
+    },
+
+    "junction": {
+      "type": "object",
+      "required": ["kind", "operands"],
+      "properties": {
+        "kind": { "enum": ["and", "or"] },
+        "operands": {
+          "type": "array",
+          "minItems": 1,
+          "description": "MUST NOT BE EMPTY. An empty `and` is true and an empty `or` is false by the identity laws, but a rule containing one is almost certainly a mistake -- and the validator is a better place to object than an evaluator that invents an answer.",
+          "items": { "$ref": "#/$defs/predicate" }
+        }
+      }
+    },
+
+    "negation": {
+      "type": "object",
+      "required": ["kind", "operand"],
+      "properties": {
+        "kind": { "const": "not" },
+        "operand": { "$ref": "#/$defs/predicate" }
+      }
+    }
+  }
+}

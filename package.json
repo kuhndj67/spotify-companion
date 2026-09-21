@@ -17,7 +17,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "test:watch": "node --import tsx --test --watch test/*.test.ts",
     "test:coverage": "node --import tsx --test --experimental-test-coverage test/*.test.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.test.json"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "check:rules-schema": "node --import tsx scripts/check-rules-schema.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

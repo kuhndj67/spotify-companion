@@ -52,6 +52,10 @@ const PURE_MODULES = [
   'rules/predicate.ts',
   'rules/ruleValidator.ts',
   'rules/RuleEngine.ts',
+  // U4. `factReconstructor` decides what a back-test SEES, so a clock or a query here would
+  // break NFR-26's determinism while every other test passed — and the drift would appear
+  // months later as unexplained back-test movement, not as a failure.
+  'rules/factReconstructor.ts',
 ];
 
 /**

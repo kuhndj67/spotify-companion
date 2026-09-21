@@ -63,6 +63,7 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   // report is correct rather than a gap.
   'history/types.ts': 'type declarations only',
   'history/HistoryRepository.ts': 'interface only',
+  'rules/DecisionLogRepository.ts': 'interface only',
   'musicbrainz/types.ts': 'type declarations only',
   'musicbrainz/LabelRepository.ts': 'interface only',
 };

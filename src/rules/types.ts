@@ -112,6 +112,19 @@ export interface Rule {
   readonly action: RuleAction;
   readonly onUnknown: OnUnknown;
   readonly predicate: Predicate;
+  /**
+   * U4, BR-25.1. Per-rule dry-run: evaluate and record, never act.
+   *
+   * ⚠️ **Optional, defaulting to `false`, and inert in U4** — `globalAutomationEnabled` is a
+   * constant `false`, so every decision is dry-run regardless of what this says. It exists now
+   * for the same reason `onUnknown: 'hold'` is stored and disabled rather than rejected: a rule
+   * authored today keeps working when U5 arms automation, instead of needing to be rewritten
+   * at the moment the stakes become real.
+   *
+   * ⚠️ **A rule cannot opt OUT of a global dry-run** (BR-25.2). `false` here means "this rule
+   * does not add a dry-run of its own", never "run this one for real".
+   */
+  readonly dryRun?: boolean;
 }
 
 export type DisabledReason =

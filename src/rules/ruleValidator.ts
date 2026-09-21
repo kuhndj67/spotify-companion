@@ -248,6 +248,12 @@ export function validateRule(raw: unknown, at = 'rule'): ValidationResult<Rule> 
   if (typeof raw['name'] !== 'string') errors.push(`${at}: 'name' must be a string`);
   if (typeof raw['enabled'] !== 'boolean') errors.push(`${at}: 'enabled' must be true or false`);
   if (raw['action'] !== 'skip') errors.push(`${at}: 'action' must be 'skip'`);
+  // Optional and inert in U4 (BR-25.1). Absent means "adds no dry-run of its own"; it is
+  // validated now so a rule written today is not silently accepted with a typo'd flag that
+  // starts mattering the moment U5 arms automation.
+  if ('dryRun' in raw && typeof raw['dryRun'] !== 'boolean') {
+    errors.push(`${at}: 'dryRun' must be true or false when present`);
+  }
 
   const onUnknown = raw['onUnknown'];
   if (typeof onUnknown !== 'string' || !ON_UNKNOWN.includes(onUnknown as OnUnknown)) {
@@ -272,6 +278,7 @@ export function validateRule(raw: unknown, at = 'rule'): ValidationResult<Rule> 
       action: 'skip',
       onUnknown: onUnknown as OnUnknown,
       predicate: raw['predicate'] as Predicate,
+      dryRun: 'dryRun' in raw ? (raw['dryRun'] as boolean) : false,
     },
   };
 }

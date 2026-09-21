@@ -200,6 +200,12 @@ function renderEnrichment(data, albumName) {
 }
 
 function render(data) {
+  // U4: pre-derived by `src/ui/statusBar.ts`; this only paints it.
+  if (data.status) {
+    lastServerStatus = data.status;
+    renderStatusBar();
+  }
+
   if (data.error) {
     setState('error', data.error);
     ui.raw.textContent = data.detail ?? '';
@@ -1154,6 +1160,333 @@ function refreshStats(trackId, artistId, artistName) {
   }, 6000);
 }
 
+// -- U4: status bar, rules panel, decision log ------------------------------
+//
+// ⚠️ DOM WIRING ONLY. Every judgement about what an indicator MEANS is made in
+// `src/ui/statusBar.ts`, which is tested, and arrives here pre-derived on the snapshot.
+// This file has no tests and is outside the orphan check; a false green would come from
+// exactly that judgement, and it matters most on Recording, where green says "your listening
+// is being saved" about the one artefact that cannot be regenerated.
+//
+// ⚠️ The Connection dot is the one exception, because its input is this browser's own socket
+// state and no server can know it. That is the safe one to except: its failure mode is
+// VISIBLE — a page that has stopped updating is apparent on screen — whereas a Recording dot
+// that is wrongly green looks exactly like one that is rightly green.
+
+const CONNECTION_GLYPH = { ok: '●', warn: '◐', fail: '✕', unknown: '○' };
+
+let connectionState = null;
+let lastServerStatus = null;
+let openDetail = null;
+
+function connectionIndicatorView() {
+  switch (connectionState) {
+    case 'open':
+      return { level: 'ok', label: 'Connected', detail: 'Live updates are arriving.' };
+    case 'reconnecting':
+      return {
+        level: 'warn',
+        label: 'Reconnecting',
+        detail: 'The live connection dropped and is retrying.',
+      };
+    case 'closed':
+      return {
+        level: 'fail',
+        label: 'Disconnected',
+        detail: 'No live connection. The page is not updating.',
+      };
+    default:
+      return { level: 'unknown', label: 'Connection', detail: 'Not yet attempted.' };
+  }
+}
+
+function renderStatusBar() {
+  const dots = el('statusbar-dots');
+  const message = el('statusbar-message');
+  if (!dots) return;
+
+  const server = lastServerStatus;
+  const indicators = [
+    server?.recording ?? { level: 'unknown', label: 'Recording', detail: 'No status yet.' },
+    server?.rules ?? { level: 'unknown', label: 'Rules', detail: 'No status yet.' },
+    connectionIndicatorView(),
+    server?.spotify ?? { level: 'unknown', label: 'Spotify', detail: 'No snapshot yet.' },
+  ];
+
+  dots.replaceChildren();
+  for (const indicator of indicators) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'status-dot';
+    button.dataset.level = indicator.level;
+    // Named for screen readers: the glyph alone says nothing out loud.
+    button.setAttribute(
+      'aria-label',
+      `${indicator.label}: ${indicator.level}. ${indicator.detail}`,
+    );
+
+    const glyph = document.createElement('span');
+    glyph.className = 'glyph';
+    glyph.textContent = indicator.glyph ?? CONNECTION_GLYPH[indicator.level];
+    glyph.setAttribute('aria-hidden', 'true');
+
+    const text = document.createElement('span');
+    text.className = 'text';
+    text.textContent = indicator.label;
+
+    button.append(glyph, text);
+    button.addEventListener('click', () => {
+      openDetail = openDetail === indicator.label ? null : indicator.label;
+      renderStatusBar();
+    });
+    dots.append(button);
+
+    if (openDetail === indicator.label) {
+      const detail = document.createElement('p');
+      detail.className = 'status-detail';
+      detail.textContent = indicator.detail;
+      dots.append(detail);
+    }
+  }
+
+  // ⚠️ One message, not a list. A bar showing three problems at once reads as broken rather
+  // than informative, and the most serious one is what needs acting on.
+  const worst = indicators.find((i) => i.level === 'fail');
+  if (message) {
+    message.hidden = worst === undefined;
+    message.textContent = worst === undefined ? '' : worst.detail;
+  }
+}
+
+function setConnectionState(state) {
+  connectionState = state;
+  renderStatusBar();
+}
+
+// -- FC-2: the rules panel ---------------------------------------------------
+
+async function loadRules() {
+  const body = el('rules-body');
+  if (!body) return;
+
+  try {
+    const response = await fetch('/api/rules');
+    if (!response.ok) {
+      // ⚠️ An empty state that does not explain itself gets read as broken, or removed by
+      // someone who assumes it is. `Label detail` rendered a bare dash and was nearly deleted.
+      body.replaceChildren(muted('The rules engine is not running, so there is nothing to show.'));
+      return;
+    }
+
+    const data = await response.json();
+    body.replaceChildren();
+
+    const head = document.createElement('p');
+    head.className = 'muted';
+    head.textContent =
+      data.version === 0
+        ? 'No rules file has been loaded yet.'
+        : `Version ${data.version} · ${data.state} · loaded ${formatDay(data.loadedAt)}`;
+    body.append(head);
+
+    // ⚠️ Red names the version STILL IN FORCE. A light that only says "something failed"
+    // leaves exactly the ambiguity it exists to remove, and a silent last-known-good is
+    // indistinguishable from a successful reload.
+    if (data.rejection) {
+      const warn = document.createElement('p');
+      warn.className = 'rule-reason';
+      warn.textContent =
+        `A newer file was rejected: ${data.rejection.errors.join('; ')} ` +
+        `Still running v${data.version}.`;
+      body.append(warn);
+    }
+
+    if (data.rules.length === 0) {
+      body.append(muted('This rule set is empty — no rules are being evaluated.'));
+      return;
+    }
+
+    for (const rule of data.rules) {
+      const row = document.createElement('div');
+      row.className = 'rule-row';
+
+      const name = document.createElement('div');
+      name.className = 'rule-name';
+      name.textContent = rule.name;
+      row.append(name);
+
+      const flags = document.createElement('div');
+      flags.className = 'rule-flags';
+      const add = (text, kind) => {
+        const flag = document.createElement('span');
+        flag.className = 'rule-flag';
+        if (kind) flag.dataset.kind = kind;
+        flag.textContent = text;
+        flags.append(flag);
+      };
+      add(rule.action);
+      add(`on unknown: ${rule.onUnknown}`);
+      if (!rule.enabled) add('switched off', 'disabled');
+      if (rule.status.state === 'disabled') add('disabled', 'disabled');
+      // In U4 every decision is dry-run anyway; the flag is shown when the rule asks for it.
+      if (rule.dryRun) add('dry run', 'dry-run');
+      row.append(flags);
+
+      // ⚠️ A disabled rule must say WHY, in words. A rule that silently does nothing is
+      // indistinguishable from a rule that does not match — and `onUnknown: 'hold'` is
+      // disabled by design until U5, which is exactly what someone would read as broken.
+      if (rule.status.state === 'disabled') {
+        const reason = document.createElement('p');
+        reason.className = 'rule-reason';
+        reason.textContent = `Disabled (${rule.status.reason}): ${rule.status.detail}`;
+        row.append(reason);
+      }
+
+      body.append(row);
+    }
+  } catch (error) {
+    body.replaceChildren(muted(`Could not load the rule set: ${error.message}`));
+  }
+}
+
+// -- FC-3: the decision log --------------------------------------------------
+
+async function loadDecisions() {
+  const body = el('decisions-body');
+  if (!body) return;
+
+  const matchedOnly = el('decisions-matched-only')?.checked ?? false;
+
+  try {
+    const response = await fetch(`/api/decisions?limit=60${matchedOnly ? '&matchedOnly=true' : ''}`);
+    if (!response.ok) {
+      body.replaceChildren(muted('The decision log is unavailable.'));
+      return;
+    }
+
+    const data = await response.json();
+    body.replaceChildren();
+
+    if (data.traces.length === 0) {
+      // ⚠️ Two different empty states, because they mean different things and the fix differs.
+      body.append(
+        muted(
+          matchedOnly
+            ? 'No matches recorded. Rules have run; none of them matched.'
+            : 'No decisions recorded yet — either no rules are active, or nothing has played ' +
+              'for long enough since the last restart.',
+        ),
+      );
+      return;
+    }
+
+    for (const trace of data.traces) {
+      const wrap = document.createElement('div');
+      wrap.className = 'decision';
+
+      const head = document.createElement('div');
+      head.className = 'decision-head';
+      const when = document.createElement('strong');
+      when.textContent = formatDay(trace.decidedAt);
+      head.append(when);
+
+      // ⚠️ `partialData` means THE WAIT TIMED OUT, not "a field read null" (FQ3). It is the
+      // measurement that says whether ENRICHMENT_WAIT_MS is right, so it is on screen.
+      const trigger = document.createElement('span');
+      trigger.className = 'decision-trigger';
+      trigger.textContent =
+        trace.trigger.kind === 'deadline'
+          ? 'decided before enrichment finished'
+          : 'enrichment settled first';
+      head.append(trigger);
+      wrap.append(head);
+
+      for (const rule of trace.rules) {
+        const line = document.createElement('div');
+        line.className = 'decision-head';
+
+        const name = document.createElement('span');
+        name.textContent = rule.ruleName;
+
+        const verdict = document.createElement('span');
+        verdict.className = 'verdict';
+        verdict.dataset.v = rule.verdict;
+        verdict.textContent = rule.verdict;
+
+        const matched = document.createElement('span');
+        matched.className = 'decision-trigger';
+        matched.textContent = rule.matched ? 'matched' : 'did not match';
+
+        line.append(name, verdict, matched);
+        if (rule.restedOnUnknown) {
+          const rested = document.createElement('span');
+          rested.className = 'decision-trigger';
+          rested.textContent = 'rested on unknown';
+          line.append(rested);
+        }
+        wrap.append(line);
+
+        const details = document.createElement('details');
+        details.className = 'decision-fields';
+        const summary = document.createElement('summary');
+        summary.textContent = `${rule.fields.length} field(s) read`;
+        details.append(summary);
+
+        for (const field of rule.fields) {
+          const row = document.createElement('div');
+          row.className = 'field-row';
+          const key = document.createElement('span');
+          key.textContent = field.name;
+          const value = document.createElement('span');
+          // ⚠️ Never blank and never `false`. A blank cell hides a bias instead of showing
+          // it, and missing data here correlates with what is being measured (R2).
+          if (field.wasUnknown) value.className = 'unknown';
+          value.textContent = field.display;
+          row.append(key, value);
+          details.append(row);
+        }
+
+        wrap.append(details);
+      }
+
+      body.append(wrap);
+    }
+  } catch (error) {
+    body.replaceChildren(muted(`Could not load the decision log: ${error.message}`));
+  }
+}
+
+function wireRulesDialog() {
+  const dialog = el('rules');
+  const open = el('rules-open');
+  const close = el('rules-close');
+  const reload = el('rules-reload');
+  const matchedOnly = el('decisions-matched-only');
+  if (!dialog || !open) return;
+
+  open.addEventListener('click', () => {
+    dialog.showModal();
+    void loadRules();
+    void loadDecisions();
+  });
+  close?.addEventListener('click', () => dialog.close());
+  matchedOnly?.addEventListener('change', () => void loadDecisions());
+
+  // Re-READS the file. Nothing in U4 writes rules; `./config` stays mounted read-only.
+  reload?.addEventListener('click', async () => {
+    reload.disabled = true;
+    try {
+      await fetch('/api/rules/reload', { method: 'POST' });
+      await loadRules();
+    } finally {
+      reload.disabled = false;
+    }
+  });
+}
+
+wireRulesDialog();
+renderStatusBar();
+
 // -- Transport --------------------------------------------------------------
 
 function connect() {
@@ -1169,9 +1502,14 @@ function connect() {
     }
   });
 
+  socket.addEventListener('open', () => setConnectionState('open'));
+
   socket.addEventListener('close', () => {
     setState('error', 'Disconnected — reconnecting…');
     progress.running = false;
+    // ⚠️ `reconnecting`, not `closed`: a retry is pending, and the two are different facts.
+    // `closed` is reserved for a socket with nothing scheduled behind it.
+    setConnectionState('reconnecting');
     setTimeout(connect, 2000);
   });
 

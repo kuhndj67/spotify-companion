@@ -98,9 +98,37 @@ services:
       # raised from the environment will be raised at the moment it first refuses
       # something -- which is the moment it is doing its job.
       #
-      # Nothing reads this yet. U3 is the pure core: it produces Decision values that
-      # nothing consumes until U4/U5.
+      # As of U4 this IS read: the rule set is loaded from here and re-read on a poll.
       RULES_PATH: /config/rules.json
+
+      # -- U4: rule observability ----------------------------------------------
+      # Operational cadence, exactly like POLL_INTERVAL_MS above.
+      #
+      # ⚠️ This is a POLL, not a watch, and that is not a style choice. `fs.watch` was
+      # probed on 2026-09-20 over this very bind mount: ZERO events in 12 seconds for
+      # both an in-place write and a rename, while the container read the new content
+      # within 1 second. It registers, throws nothing, and never calls back. The poll
+      # interval IS the debounce; there is no separate one.
+      RULES_POLL_INTERVAL_MS: 5000
+
+      # ⚠️ THE ONLY NUMBER IN U4 OPENLY ADMITTED TO BE UNMEASURED, and a setting for
+      # exactly that reason -- tuning it must not need a rebuild.
+      #
+      # A decision is taken at the first tick where enrichment has settled, or on this
+      # deadline, whichever comes first. The enrichment latency it waits on has never
+      # been measured: the 0.2s figure that looked like a measurement was `resolvedAt`
+      # stamped BEFORE the two MusicBrainz calls, so it recorded initiation. The
+      # `partialData` rate this produces is the first real measurement of it.
+      #
+      # ⚠️ Raising it widens a measured blind spot. A play that ENDS before the deadline
+      # produces no decision row at all -- 2.8% of plays and 4 of 31 skips at 10s,
+      # 3.5% and 5 of 31 at 15s. Re-measure before changing it.
+      ENRICHMENT_WAIT_MS: 10000
+
+      # The decision-log cap (100,000 rows) and the back-test cap (50,000 plays) are NOT
+      # here, for the same reason the predicate bounds are not: a limit that can be
+      # raised from the environment will be raised at the moment it first refuses
+      # something, which is the moment it is doing its job.
 
       # NOTE: request spacing (1 req/sec, NFR-15) and the retry policy are NOT
       # settings. There is no legitimate value other than one per second, so a knob
@@ -139,20 +167,33 @@ services:
       # view from the host file. U3 only reads, so the bug would be invisible here and
       # would surface the first time the U4 rule editor saves.
       #
-      # READ-ONLY, like ./secrets/musicbrainz.json and unlike ./data: nothing in U3 writes
-      # rules. `npm run rules:init` creates the file on the host; the app never does. This
-      # becomes :rw at U4 when the editor needs to write -- a deliberate one-word change,
-      # not a capability granted early out of habit.
+      # READ-ONLY, like ./secrets/musicbrainz.json and unlike ./data: nothing in U3 OR U4
+      # writes rules. `npm run rules:init` creates the file on the host; the app never does.
+      #
+      # ⚠️ CORRECTED 2026-09-21. This previously said "this becomes :rw at U4 when the
+      # editor needs to write". U4 HAS NO EDITOR -- it is read-only observability, and its
+      # reload button re-READS the file. Left as written, that sentence was an instruction a
+      # later session would follow without re-deriving, granting a write capability a whole
+      # unit before anything used it. It becomes :rw in the unit that adds RULE EDITING, and
+      # not before.
       #
       # NOT under ./data on purpose. That directory holds history.db, the one artefact here
       # that cannot be regenerated. Rules are user-authored text that costs retyping.
       # Keeping the hand-edited file out of the directory nobody should hand-edit is the
       # whole point.
       #
-      # ⚠️ Run `npm run rules:init` BEFORE the first `compose up`. Docker creates a missing
-      # bind-mount source directory owned by ROOT, and the entrypoint drops privileges to
-      # `node` -- a root-owned config/ leaves the app unable to read its own rules, with a
-      # permissions error that reads like a code fault.
+      # ⚠️ Run `npm run rules:init` BEFORE the first `compose up`.
+      #
+      # ⚠️ CORRECTED 2026-09-21: the reason previously given here was stated as fact and was
+      # NOT observed on this host. The claim was that Docker creates a missing bind-mount
+      # source directory owned by ROOT, leaving the app -- which drops to `node` -- unable to
+      # read its own rules. That hazard is real on a Linux host. Measured 2026-09-11 on
+      # Rancher Desktop / Windows, it does not occur: the bind mount synthesises
+      # `rwxrwxrwx root:root` regardless, so reads work.
+      #
+      # Keep the script; it still saves you a confusing empty rule set on first run. Do not
+      # cite the root-ownership reason as if it had been seen here. An untested justification
+      # repeated confidently is how a wrong reason outlives the decision it justified.
       - ./config:/config:ro
 
     restart: unless-stopped

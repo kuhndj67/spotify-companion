@@ -61,6 +61,9 @@ const PURE_MODULES = [
   'rules/decisionTrace.ts',
   'rules/rulesDiagnostics.ts',
   'rules/ruleHash.ts',
+  // U4's UI judgement. ⚠️ This is where a false green would come from, so it lives in src/
+  // and is tested; `public/app.js` has no tests and is outside the orphan check.
+  'ui/statusBar.ts',
 ];
 
 /**

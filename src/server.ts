@@ -20,6 +20,12 @@ import { RuleSetWatcher } from './rules/RuleSetWatcher.js';
 import { RuleStore } from './rules/RuleStore.js';
 import { SqliteDecisionLogRepository } from './rules/SqliteDecisionLogRepository.js';
 import { DECISION_LOG_CAP } from './rules/types.js';
+import {
+  recordingIndicator,
+  rulesIndicator,
+  spotifyIndicator,
+  type Indicator,
+} from './ui/statusBar.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
@@ -655,21 +661,89 @@ function likedFor(trackId: string): DisplayLiked | undefined {
   };
 }
 
-/** Attach everything the panel shows but the poll loop does not carry: label verdict, liked. */
+/**
+ * Attach everything the panel shows but the poll loop does not carry: label verdict, liked,
+ * and the status bar's indicators.
+ *
+ * ⚠️ **`status` is attached even when nothing is playing.** That is precisely when someone
+ * looks at the bar — an idle screen is the state in which "is this thing still recording?"
+ * cannot be answered by watching the track change.
+ */
 function decorate(
   snapshot: Snapshot,
-): Snapshot & { label?: DisplayLabel; liked?: DisplayLiked } {
+): Snapshot & { label?: DisplayLabel; liked?: DisplayLiked; status?: StatusIndicators } {
+  const status = statusIndicators(snapshot);
   const trackId = (snapshot as { trackId?: string | null }).trackId ?? null;
-  if (trackId === null) return snapshot;
+  if (trackId === null) return { ...snapshot, status };
 
   const label = labelByTrack.get(trackId);
   const liked = likedFor(trackId);
-  if (label === undefined && liked === undefined) return snapshot;
 
   return {
     ...snapshot,
     ...(label === undefined ? {} : { label }),
     ...(liked === undefined ? {} : { liked }),
+    status: statusIndicators(snapshot),
+  };
+}
+
+/**
+ * The status bar's three server-known indicators (FC-1), derived by the tested pure functions
+ * in `src/ui/statusBar.ts` and broadcast with every snapshot.
+ *
+ * ## ⚠️ Why these are derived here and not in `public/app.js`
+ *
+ * `app.js` has no tests and is outside the orphan check. **A false green would come from
+ * exactly this derivation**, and it matters most on Recording, where green says "your
+ * listening is being saved" about the one artefact that cannot be regenerated. The DOM wiring
+ * stays in `app.js`; the judgement does not.
+ *
+ * ## ⚠️ The Connection dot is the exception, and it is the safe one to except
+ *
+ * Its input is the browser's own socket state, which no server can know, so it is rendered
+ * from a small switch in `app.js`. That is acceptable precisely because its failure mode is
+ * **visible rather than silent**: a page that has stopped updating is apparent on screen,
+ * whereas a Recording dot that is wrongly green looks exactly like one that is rightly green.
+ *
+ * ## ⚠️ Spotify reads the SNAPSHOT, never a polled `/api/health`
+ *
+ * `/api/health` does a real MCP round-trip per request; polling it to keep a dot warm would
+ * spend rate limit that label resolution needs — the reasoning that stopped the liked badge
+ * being polled. The snapshot already carries the error state every tick, at no cost.
+ */
+interface StatusIndicators {
+  recording: Indicator;
+  rules: Indicator;
+  spotify: Indicator;
+}
+
+function statusIndicators(snapshot: Snapshot): StatusIndicators {
+  return {
+    recording: recordingIndicator({
+      repositoryOpen: repository === null ? false : true,
+      degraded: observer?.stats.degraded ?? false,
+      gaps: observer?.stats.gaps ?? 0,
+      startupError: historyStartupError,
+    }),
+    rules: rulesIndicator(
+      ruleWatcher === null
+        ? { version: null, state: null, activeRules: 0, disabledRules: 0, rejectionErrors: [] }
+        : (() => {
+            const set = ruleWatcher.current();
+            const disabled = set.rules.filter((r) => r.status.state === 'disabled').length;
+            return {
+              version: set.version,
+              state: set.state,
+              activeRules: set.rules.length - disabled,
+              disabledRules: disabled,
+              rejectionErrors: set.rejection?.errors ?? [],
+            };
+          })(),
+    ),
+    spotify: spotifyIndicator({
+      hasSnapshot: true,
+      snapshotError: 'error' in snapshot ? String(snapshot.error) : null,
+    }),
   };
 }
 

@@ -28,6 +28,12 @@
             type="button"
             data-testid="diagnostics-open-button"
           >Diagnostics</button>
+          <button
+            id="rules-open"
+            class="ghost"
+            type="button"
+            data-testid="rules-open-button"
+          >Rules</button>
         </header>
 
         <!-- Blurred cover, sits behind the card content. Purely decorative. -->
@@ -209,6 +215,55 @@
       <footer class="diag-foot">
         <button id="diag-run" class="primary" type="button">Run again</button>
       </footer>
+    </dialog>
+
+    <!--
+      FC-1. Fixed to the bottom, one row, collapsing to two at phone width.
+
+      role="status" + aria-live="polite" so a change is announced rather than merely rendered;
+      the error field is role="alert" because a failure should interrupt.
+
+      Every indicator is a <button>, not a hover target: hover is unusable on touch and
+      invisible to a keyboard. Colour is never the only channel -- each carries a text label
+      and a distinct glyph, because a bar that is only red and green fails outright for the
+      ~8% of men with red-green colour deficiency.
+    -->
+    <div id="statusbar" class="statusbar" role="status" aria-live="polite">
+      <p id="statusbar-message" class="statusbar-message" role="alert" hidden></p>
+      <div id="statusbar-dots" class="statusbar-dots"></div>
+    </div>
+
+    <dialog id="rules" class="diag" data-testid="rules-dialog">
+      <header class="diag-head">
+        <h2>Rules</h2>
+        <button id="rules-close" class="ghost" type="button">Close</button>
+      </header>
+
+      <!-- FC-2. Read-only: rule editing is out of scope until U5. -->
+      <section class="diag-section">
+        <h3>
+          Loaded rule set
+          <button id="rules-reload" class="ghost" type="button" data-testid="rules-reload">
+            Re-read file
+          </button>
+        </h3>
+        <div id="rules-body"><p class="muted">Loading&hellip;</p></div>
+      </section>
+
+      <!--
+        FC-3. One row per rule EVALUATED, matched or not -- which is what lets this answer
+        "why did my rule NOT fire?". A matched-only log cannot.
+      -->
+      <section class="diag-section">
+        <h3>
+          Decision log
+          <label class="muted decision-filter">
+            <input type="checkbox" id="decisions-matched-only" data-testid="matched-only" />
+            matches only
+          </label>
+        </h3>
+        <div id="decisions-body"><p class="muted">Loading&hellip;</p></div>
+      </section>
     </dialog>
 
     <script type="module" src="./app.js"></script>

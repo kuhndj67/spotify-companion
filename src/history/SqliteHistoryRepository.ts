@@ -46,6 +46,7 @@ import type {
   CoverageStats,
   CloseReason,
   LabelFields,
+  HistoryCounts,
   HistoryFilter,
   NewPlayRecord,
   Observation,
@@ -411,6 +412,63 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       const existing = Date.parse(row.ended_at);
       return !Number.isNaN(existing) && Math.abs(existing - target) <= toleranceMs;
     });
+  }
+
+  /**
+   * LC-22. See the interface for why this is one method rather than two, and why the artist
+   * counts run low for a frequent guest.
+   *
+   * ⚠️ **`started_at < ?`, strictly.** `<=` would make every play count itself.
+   *
+   * The counts are `null` rather than `0` only when there is no history at all for that key —
+   * "never skipped this track" must not be silently true for a track never heard. A track with
+   * prior plays and no prior skips legitimately reports `skipsOfTrack: 0`, because the data
+   * answered the question.
+   */
+  historyCountsBefore(trackId: string, artistId: string | null, beforeIso: string): HistoryCounts {
+    const track = this.#db
+      .prepare(
+        `SELECT COUNT(*) AS plays,
+                SUM(CASE WHEN outcome = 'skipped' THEN 1 ELSE 0 END) AS skips
+           FROM play
+          WHERE track_id = ? AND started_at < ?`,
+      )
+      .get(trackId, beforeIso) as { plays: number; skips: number | null };
+
+    // A null artist id is not "no plays" — it is "we cannot ask". Distinguishing them is the
+    // whole `null` is unknown rule: returning 0 here would assert this artist is new.
+    const artist =
+      artistId === null
+        ? null
+        : (this.#db
+            .prepare(
+              `SELECT COUNT(*) AS plays,
+                      SUM(CASE WHEN outcome = 'skipped' THEN 1 ELSE 0 END) AS skips
+                 FROM play
+                WHERE artist_id = ? AND started_at < ?`,
+            )
+            .get(artistId, beforeIso) as { plays: number; skips: number | null });
+
+    return {
+      playsOfTrack: track.plays > 0 ? track.plays : null,
+      skipsOfTrack: track.plays > 0 ? (track.skips ?? 0) : null,
+      playsOfArtist: artist === null ? null : artist.plays > 0 ? artist.plays : null,
+      skipsOfArtist: artist === null ? null : artist.plays > 0 ? (artist.skips ?? 0) : null,
+    };
+  }
+
+  /**
+   * ⚠️ Returns `null` when the key is absent, which is **not** the same as `0`. Zero means
+   * "migration 005 ran on an empty database, so every row is post-v5"; null means the watermark
+   * was never written, and answerability cannot be decided from the schema era at all.
+   */
+  v5Watermark(): number | null {
+    const row = this.#db
+      .prepare("SELECT value FROM meta WHERE key = 'v5_watermark_play_id'")
+      .get() as { value: string } | undefined;
+    if (row === undefined) return null;
+    const parsed = Number(row.value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   coverage(): CoverageStats {

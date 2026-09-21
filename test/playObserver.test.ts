@@ -172,6 +172,10 @@ describe('degraded operation (BR-3.8, BR-3.9)', () => {
       getTrail: () => [],
       updateOutcome: () => {},
       hasPlayNearEnd: () => false,
+      historyCountsBefore: () => {
+        throw new Error('unused');
+      },
+      v5Watermark: () => null,
       coverage: () => {
         throw new Error('unused');
       },

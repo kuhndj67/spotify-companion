@@ -12,6 +12,7 @@
 
 import type {
   CoverageStats,
+  HistoryCounts,
   HistoryFilter,
   NewPlayRecord,
   Observation,
@@ -67,6 +68,61 @@ export interface HistoryRepository {
    * the one value Spotify reports exactly; dedup uses it rather than one derived from it.
    */
   hasPlayNearEnd(trackId: string, endedAt: string, toleranceMs: number): boolean;
+
+
+  /**
+   * The four `history.*` aggregates a rule can read, counted over plays **strictly before**
+   * `beforeIso` (BR-27.2/27.3, LC-22).
+   *
+   * ## ⚠️ One method, two callers, and that is the requirement
+   *
+   * The live coordinator calls it with `before = now`; the back-test calls it with
+   * `before = row.startedAt`. The design originally gave the back-test a SQL window function
+   * and the live path nothing at all — two implementations of *"plays of this artist before
+   * this instant"* that would agree on every fixture and diverge only on the corpus. That is
+   * the WebSocket `403` shape, where the admission rule was re-implemented rather than reused,
+   * the copies diverged, and **all 411 tests passed** while every handshake failed.
+   *
+   * ## ⚠️ Strictly before, never inclusive
+   *
+   * A window that includes the current row makes every play count itself, so
+   * `history.playsOfTrack >= 1` is true for **every row in existence** — a rule that looks like
+   * it is working and is matching nothing but its own arithmetic (BR-27.3).
+   *
+   * ## ⚠️ Point-in-time, not as-of-now
+   *
+   * US-24 requires two back-tests of the same rule over the same history to be identical. Under
+   * as-of-now counts they are identical only within a day, because the corpus grows underneath a
+   * range that has not changed. **Fixture history does not grow, so no unit test would catch
+   * it**; it would surface months later as unexplained drift. PBT-22 and PBT-22a exist for this.
+   *
+   * ## ⚠️ `artist_id` is the PRIMARY artist, so the artist counts run low
+   *
+   * The schema stores `track.artists[0]`, so a feature credit files under the lead and is absent
+   * from the guest's totals. Measured 2026-09-06: Ren appears on 34 plays and owns the primary
+   * id on 26 — about 24% low for someone who guests often. It reads as a listening pattern and
+   * is a schema limit. Live evaluation and back-test inherit it **equally**, which is what keeps
+   * NFR-26's replay honest; `historyRepository.test.ts` pins the limitation.
+   *
+   * Returns `null` for a count with no history to count, **never `0`** — substituting zero makes
+   * *"never skipped this track"* silently true for a track never heard (US-16's failure mode).
+   */
+  historyCountsBefore(
+    trackId: string,
+    artistId: string | null,
+    beforeIso: string,
+  ): HistoryCounts;
+
+  /**
+   * The highest `play.id` that existed when migration 005 ran, or `null` on a database that
+   * never had one.
+   *
+   * ⚠️ **A row id, not a date** (BR-27.5c). The 6-hourly backfill inserts rows dated in the
+   * past, so a row written *after* v5 for a play that happened *before* it genuinely carries
+   * `explicit` and `album_type`. Judging era by `started_at` would mark that real data
+   * unanswerable; judging by id answers correctly.
+   */
+  v5Watermark(): number | null;
 
   /** Coverage counts for export (FR-51) and diagnostics. */
   coverage(): CoverageStats;

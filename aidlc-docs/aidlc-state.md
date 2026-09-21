@@ -4,8 +4,12 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U4 designs complete and REVISED 2026-09-20 after a
-  senior-architect review. Awaiting approval; next stage is Code Generation.**
+- **Current Stage**: CONSTRUCTION — **U4 CODE GENERATION COMPLETE and DEPLOYED 2026-09-21.
+  Schema v5 is live. Awaiting the three hands-on exit criteria CI cannot close.**
+  811 tests · typecheck clean · 543 plays · 3 rules active in dry-run · `src/playback/` absent.
+  🔴 **Still open**: the dry-run agreement gate, the `partialData` rate, and BR-20.8's
+  last-known-good path exercised against the real deployment. See `audit.md` 2026-09-21.
+  *(U4 designs were revised 2026-09-20 after a senior-architect review and approved.)*
   ⚠️ **Still no code**: `git status src/` is clean and the schema is still **v4**. Four review
   decisions are settled (watcher owns the rule set · BR-22.1 scoped to U4 with no `UNIQUE` ·
   `PlayObserver` owns segmentation · answerability is per row over two eras), and nine artifact

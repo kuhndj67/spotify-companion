@@ -3780,3 +3780,106 @@ unreachable), **PBT-32** (`enrichmentSettled` is immediate for a keyless track),
 
 **Context**: CONSTRUCTION — U4 designs revised and awaiting approval. `git status src/` clean,
 schema still v4, container healthy on the U3 image, corpus **543 plays** (457 live, 86 backfilled).
+
+---
+
+## 2026-09-21 — U4 Code Generation complete; migration 005 deployed; awaiting the dry-run gate
+
+**Stage**: CONSTRUCTION — U4 Code Generation. **Eight batches, 811 tests, schema v5 live.**
+
+### Two scoping questions were answered before any code was written
+
+**`FactCache` (LC-12, P-16) is CLOSED as superseded.** U3 deferred it *"to the unit that first
+evaluates rules on the poll path"* — which is U4 — and U4's design never mentioned it, so it
+would have been dropped by omission. BR-22.1's one-decision-per-play already assembles the four
+aggregates exactly once, so the cache has nothing to save. ⚠️ **It becomes live again in U5**,
+where FR-34's re-evaluation means a second assembly for the same play.
+
+**Back-testing ships API-only.** FQ6's UI is the rules panel and the decision log; `curl`
+satisfies the exit criterion and PBT-21/22, and back-testing lands beside the rule editor in U5.
+⚠️ **US-24 is therefore delivered but not *surfaced*** — reading the UI alone will not find it.
+
+### What the type system and the guards caught
+
+The write path for `explicit` / `album_type` **was in no scope table**, and `tsc` found every one
+of its six call sites the moment the fields became non-optional. Without that they would have
+shipped, stayed null on every row, and been read back as *unanswerable* for ever — with the
+migration reporting success.
+
+`noOrphanModules.test.ts` refused three new modules in turn until they had tests. `purity.test.ts`
+now covers `factReconstructor`, `decisionTrace`, `rulesDiagnostics`, `ruleHash` and `statusBar`.
+
+### ⚠️ The point-in-time counter was MUTATION-CHECKED, and it needed to be
+
+BR-27.2 has no observable failure mode, so a green test proves nothing by itself. Two mutations:
+
+| Mutation | PBT-22 | PBT-22a (positive control) |
+|---|---|---|
+| counts always `null` | **PASSES** | fails ✅ |
+| as-of-now (ignores the instant) | fails ✅ | passes |
+
+**PBT-22 alone is vacuous** — an implementation returning zero for everything satisfies it
+perfectly. The audit's item 12 was the difference between a real test and a decorative one.
+Both mutations were reverted and the suite re-verified clean.
+
+### Three self-inflicted defects, found and fixed rather than worked around
+
+- A fixture that never spread its overrides — **7 tests were passing for the wrong reason**.
+- An invented `play_id` that the live foreign key correctly refused. The FK is on; good to know.
+- A JSON export expectation that contradicted the established `renderMaybe` convention. The
+  convention won: a raw boolean would have made `explicit` the one field whose absent value is
+  JSON `null`, which a consumer coerces to `false` without noticing.
+
+⚠️ **A stray `prettier` run** reformatted `LoggingExecutor.ts` to double quotes. **The project has
+no prettier config**, so that was prettier's defaults rather than house style, and it was reverted.
+It did surface a real bug it had nothing to do with: `outcome.rule.id` where `RuleOutcome` carries
+only `ruleId`.
+
+### `PlayObserver` gained `onPlayDropped`, which the design did not have
+
+`onPlayRecorded` fires **only after a successful write**, so its *absence* was the only signal a
+consumer got — and absence is indistinguishable from *"the play has not closed yet"*. For the
+decision log those mean opposite things: a fault on the artefact that cannot be regenerated,
+versus an ordinary W-3 case. Without the hook, `playLink` could never leave `pending`.
+
+### Deployment — migration 005, 2026-09-21
+
+```
+docker compose down                                  # the writer stopped first
+data/backup-before-migration-005-20260921-093911/    # integrity_check: ok, v4, 543 plays
+docker compose build                                 # exit code read DIRECTLY: 0
+docker compose up -d
+"migrated 5: ..."                                    # exactly once
+```
+
+| Check | Result |
+|---|---|
+| Schema | **v5** |
+| `integrity_check` | **ok** |
+| Plays | **543**, intact |
+| v5 watermark | **584** = `MAX(play.id)` — every pre-existing row correctly pre-v5 |
+| UI | `200` |
+| WS handshake, same-origin | **`101`** |
+| WS handshake, cross-site `Origin` | **`403`** |
+| `GET /api/rules` | v1, `applied`, 3 active |
+| `GET /api/decisions` | empty — correct, nothing has played since restart |
+| Status indicators over the socket | recording `ok`, rules `ok`, spotify `ok` |
+
+⚠️ **Both WebSocket directions were checked**, because a `200` on `/` does not imply the live
+display works — that was the shape of the `403` that made the UI sit on "Disconnected" for a whole
+deployment while all 411 tests passed.
+
+⚠️ **`/api/now-playing` carries no `status` field.** `decorate()` runs on the WebSocket broadcast
+only, which is what the UI uses. The REST endpoint stays the raw snapshot it has always been.
+
+### 🔴 Three exit criteria remain, and CI cannot close any of them
+
+1. **The dry-run agreement gate** — a real session whose match log the user agrees with.
+2. **The `partialData` rate** — the first real measurement of enrichment latency, and the only
+   evidence for whether `ENRICHMENT_WAIT_MS = 10 000` is right.
+3. **BR-20.8's last-known-good path** — implemented and unit-tested for the first time in this
+   unit, but **never once run against the real deployment**.
+
+**Context**: CONSTRUCTION — U4 code complete and deployed, awaiting hands-on verification.
+811 tests, typecheck clean, schema v5, container healthy, 543 plays, 3 rules active in dry-run.
+`src/playback/` does not exist.

@@ -1,4 +1,5 @@
 import express from 'express';
+import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,14 @@ import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
 import { runDiagnostics } from './diagnostics.js';
 import { localGuard, decideAccess } from './localGuard.js';
 import { createApi, type DisplayLiked } from './api.js';
+import { BackTestService } from './rules/BackTestService.js';
+import { EvaluationCoordinator } from './rules/EvaluationCoordinator.js';
+import { LiveFactSource } from './rules/liveFactSource.js';
+import { LoggingExecutor } from './rules/LoggingExecutor.js';
+import { RuleSetWatcher } from './rules/RuleSetWatcher.js';
+import { RuleStore } from './rules/RuleStore.js';
+import { SqliteDecisionLogRepository } from './rules/SqliteDecisionLogRepository.js';
+import { DECISION_LOG_CAP } from './rules/types.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
@@ -67,12 +76,25 @@ if (config.historyEnabled) {
           // BR-9.1 — liked state is point-in-time and needs only the track id, which is present
           // on the very first sample. Unlike the label below, it cannot wait.
           likedAtStartByTrack.set(sample.trackId, likedSet?.isLiked(sample.trackId) ?? null);
+          liveFacts.noteLikedAtStart(sample.trackId, likedSet?.isLiked(sample.trackId) ?? null);
+          // ⚠️ U4: the trigger takes the play boundary FROM HERE and never re-derives it
+          // (BR-22.8). Two segmenters that must agree is the WebSocket `403` shape, and the
+          // evaluationId -> playId back-fill depends on their agreement, so a divergence
+          // would mis-link decisions to plays rather than fail.
+          coordinator?.onPlayStarted(sample.trackId, Date.now());
         },
         // Enrichment happens AFTER the row is written, never before and never on the display
         // path (NFR-16, BR-7.5): MusicBrainz latency was measured at 0.1-6.7s and can be
         // minutes behind a backfill sweep.
         onPlayRecorded: (playId, record) => {
+          // ⚠️ This fires ONLY after recordPlay() succeeded. A failed write takes the other
+          // path below, because a permanently-null playId would otherwise mean both "the play
+          // never closed" (expected) and "the write failed" (a fault) — BR-24.3a.
+          coordinator?.onPlayRecorded(record.trackId, playId);
           void enrichRecordedPlay(playId, record);
+        },
+        onPlayDropped: (record) => {
+          coordinator?.onPlayDropped(record.trackId);
         },
       },
     );
@@ -215,6 +237,8 @@ function maybeResolveLabelForDisplay(snapshot: Snapshot): void {
   if (enrichmentData.isrc === null && enrichmentData.primaryArtistId === null) return;
 
   labelInFlight.add(trackId);
+  // U4: the trigger waits on this, so it has to know a lookup started (BR-22.5).
+  liveFacts.noteLabelPending(trackId);
   void resolveLabelForDisplay({
     trackId,
     isrc: enrichmentData.isrc ?? null,
@@ -270,7 +294,15 @@ async function resolveLabelForDisplay(sample: {
 
     // Nothing at all resolved -- leave it uncached so a later tick tries again, rather than
     // pinning `pending` on the panel for the rest of the track.
-    if (snapshot === null && genres === null) return;
+    //
+    // ⚠️ U4: this is one of the four exits that leave a track UNCACHED, and it is a transient
+    // FAILURE rather than "still working". Saying so explicitly is what stops the trigger
+    // waiting out the full cap and stamping `partialData` on a lookup that already finished
+    // — recording a failure as a timeout (BR-22.5a).
+    if (snapshot === null && genres === null) {
+      liveFacts.noteLabelResult(sample.trackId, 'failed');
+      return;
+    }
 
     labelByTrack.set(sample.trackId, {
       verdict: snapshot?.verdict ?? 'pending',
@@ -278,6 +310,22 @@ async function resolveLabelForDisplay(sample: {
       contested: snapshot?.contested ?? false,
       names: snapshot?.labelNames ?? [],
       genres,
+    });
+
+    // U4. ⚠️ `pending` is a DISPLAY state meaning "genres only, no release verdict"; for the
+    // rules engine the lookup has completed and the classification is simply unknown. Passing
+    // the display token through as a classification would invent a fourth LabelClass.
+    liveFacts.noteLabelResult(sample.trackId, 'completed', {
+      name: snapshot?.labelNames?.[0] ?? null,
+      classification:
+        snapshot?.verdict === 'major' ||
+        snapshot?.verdict === 'independent' ||
+        snapshot?.verdict === 'unknown'
+          ? snapshot.verdict
+          : null,
+      confidence: snapshot?.confidence ?? null,
+      // `null` = never asked, `[]` = asked and there are none. The distinction is load-bearing.
+      genres: genres === null ? null : genres.map((g) => g.name),
     });
 
     while (labelByTrack.size > MAX_DISPLAY_LABELS) {
@@ -288,6 +336,9 @@ async function resolveLabelForDisplay(sample: {
   } catch (error) {
     // A label is enrichment. Failing to get one must never affect the display (NFR-18).
     console.error('[labels] display resolution failed:', error);
+    // ⚠️ And it must not leave the trigger waiting out the cap on a lookup that has already
+    // ended. `failed` is not `pending`, and neither is `unknown`.
+    liveFacts.noteLabelResult(sample.trackId, 'failed');
   }
 }
 
@@ -382,6 +433,86 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
   };
 }
 
+/**
+ * ## U4: the rules engine, wired in dry-run
+ *
+ * ⚠️ **This is where U3's containment guarantee retires** (BR-30). U3's was "`git status src/`
+ * shows only `src/rules/`"; from here the phase boundary rests on `src/playback/` not existing
+ * and on `LoggingExecutor` taking no playback collaborator. Nothing below can skip a track —
+ * there is no code in this process that can.
+ *
+ * ⚠️ **Everything here is optional.** A rules subsystem that fails to start must never stop the
+ * app recording: the play records are the artefact that cannot be regenerated, and rules are
+ * text that can be retyped (BR-20.10).
+ */
+const RULES_PATH = process.env['RULES_PATH'] ?? '/config/rules.json';
+const RULES_POLL_INTERVAL_MS = Number(process.env['RULES_POLL_INTERVAL_MS'] ?? 5_000);
+/**
+ * ⚠️ **An admitted guess, and the only number in U4 openly unmeasured** (BR-22.3). The
+ * enrichment latency it waits on has never been measured — the 0.2 s figure that looked like a
+ * measurement was `resolvedAt` stamped BEFORE the two MusicBrainz calls.
+ *
+ * ⚠️ Raising it widens BR-22.7's blind spot: plays that END before the cap produce no decision
+ * row at all — 2.8% of plays and 4 of 31 skips at 10 s, 3.5% and 5 of 31 at 15 s. The
+ * `partialData` rate is the first real measurement; re-measure before changing this.
+ */
+const ENRICHMENT_WAIT_MS = Number(process.env['ENRICHMENT_WAIT_MS'] ?? 10_000);
+
+const liveFacts = new LiveFactSource(labelEnrichment !== null);
+
+let ruleWatcher: RuleSetWatcher | null = null;
+let decisionLog: SqliteDecisionLogRepository | null = null;
+let coordinator: EvaluationCoordinator | null = null;
+let backTest: BackTestService | null = null;
+let lastRuleCheck: string | null = null;
+
+// ⚠️ No repository means no decision log and no evaluation (BR-22.8a), accepted knowingly:
+// the trigger hangs off PlayObserver's hooks, and the log lives in history.db anyway.
+if (repository !== null) {
+  try {
+    decisionLog = new SqliteDecisionLogRepository(repository.database);
+
+    ruleWatcher = new RuleSetWatcher({
+      store: new RuleStore(RULES_PATH),
+      intervalMs: RULES_POLL_INTERVAL_MS,
+      now: () => new Date().toISOString(),
+    });
+
+    coordinator = new EvaluationCoordinator({
+      rules: () => ruleWatcher!.rules(),
+      ruleSet: () => ruleWatcher!.current(),
+      liveFacts,
+      executor: new LoggingExecutor(decisionLog),
+      historyCounts: (trackId, artistId, beforeIso) =>
+        repository!.historyCountsBefore(trackId, artistId, beforeIso),
+      attachPlayId: (evaluationId, playId) => decisionLog!.attachPlayId(evaluationId, playId),
+      markLinkFailed: (evaluationId) => decisionLog!.markLinkFailed(evaluationId),
+      nowMs: () => Date.now(),
+      newEvaluationId: () => randomUUID(),
+      enrichmentWaitMs: ENRICHMENT_WAIT_MS,
+    });
+
+    backTest = new BackTestService({
+      playsInRange: (range) => repository!.listPlays({ since: range.from, until: range.to }),
+      historyCountsBefore: (trackId, artistId, beforeIso) =>
+        repository!.historyCountsBefore(trackId, artistId, beforeIso),
+      v5Watermark: () => repository!.v5Watermark(),
+      now: () => new Date().toISOString(),
+    });
+
+    void ruleWatcher.start().then(() => {
+      lastRuleCheck = new Date().toISOString();
+    });
+  } catch (error) {
+    // Inert, never fatal. The display and the recorder are unaffected.
+    console.error('[rules] failed to start — running with no rules engine:', error);
+    ruleWatcher = null;
+    decisionLog = null;
+    coordinator = null;
+    backTest = null;
+  }
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.use(localGuard);
@@ -408,6 +539,19 @@ app.use(
     diagnostics: runDiagnosticsReport,
     likedFor,
     now: () => new Date().toISOString(),
+    // ⚠️ The rule set comes from the WATCHER, which owns it. `RuleStore` has no `current()`
+    // to wire this to by mistake (BR-26.3b).
+    ruleSet: ruleWatcher === null ? null : () => ruleWatcher!.current(),
+    decisionLog,
+    backTest,
+    reloadRules:
+      ruleWatcher === null
+        ? null
+        : async () => {
+            const outcome = await ruleWatcher!.reloadNow();
+            lastRuleCheck = new Date().toISOString();
+            return outcome;
+          },
   }),
 );
 
@@ -555,6 +699,54 @@ nowPlaying.on('tick', (snapshot: Snapshot) => {
 });
 
 /**
+ * ⚠️ **U4's trigger consumes `tick`, never `change`** (BR-22.6), for the same reason history
+ * capture does: `change` is signature-suppressed and the signature excludes progress, so a
+ * trigger fed from it would evaluate sparsely, at the wrong moments, and would look like it
+ * was working.
+ *
+ * Registered AFTER the observer's tick handler, so the observer has opened the play (and the
+ * coordinator has its boundary) before the first evaluation attempt for that track.
+ */
+function registerEvaluationTick(): void {
+  if (coordinator === null) return;
+  nowPlaying.on('tick', (snapshot: Snapshot) => {
+    try {
+      coordinator!.onTick(toEvaluationSample(snapshot), Date.now());
+    } catch (error) {
+      // ⚠️ Rules are text that can be retyped; the play records cannot be regenerated. A
+      // failure here must never reach the recorder or the display (BR-20.10).
+      console.error('[rules] evaluation tick failed:', error);
+    }
+  });
+}
+
+/** Project a snapshot onto what a rule may read. Null when nothing is playing. */
+function toEvaluationSample(snapshot: Snapshot) {
+  if ('error' in snapshot || !snapshot.playing) return null;
+  if (!snapshot.trackId) return null;
+
+  const enrichmentData = snapshot.enrichment;
+  return {
+    trackId: snapshot.trackId,
+    title: snapshot.track ?? '',
+    durationMs: snapshot.durationMs ?? 0,
+    explicit: enrichmentData?.explicit ?? null,
+    isrc: enrichmentData?.isrc ?? null,
+    artistId: enrichmentData?.primaryArtistId ?? null,
+    artistName: snapshot.artist ?? '',
+    following: enrichmentData?.following ?? null,
+    albumName: snapshot.album ?? '',
+    releaseDate: enrichmentData?.releaseDate ?? null,
+    ageYears: enrichmentData?.ageYears ?? null,
+    albumType: enrichmentData?.albumType ?? null,
+    // ⚠️ Whether enrichment LANDED, not whether its fields happen to be non-null. A track
+    // with no ISRC and no artist id has landed and is permanently unanswerable; inferring
+    // "pending" from null fields is the confusion BR-22.5 exists to prevent.
+    enrichmentLanded: enrichmentData !== null && enrichmentData !== undefined,
+  };
+}
+
+/**
  * History capture consumes `tick`, never `change`.
  *
  * `change` is signature-suppressed and the signature deliberately excludes progress. Feeding the
@@ -572,6 +764,8 @@ if (observer) {
     }
   });
 }
+
+registerEvaluationTick();
 
 // ---------------------------------------------------------------------------
 

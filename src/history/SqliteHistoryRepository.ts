@@ -425,6 +425,21 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
    * prior plays and no prior skips legitimately reports `skipsOfTrack: 0`, because the data
    * answered the question.
    */
+  /**
+   * The open connection, for components that must share it.
+   *
+   * ⚠️ **Exposed so there is exactly ONE writer**, not as a convenience. Two connections to one
+   * SQLite file is this project's standing hazard — the reason `docker compose down` precedes
+   * every `npm start`. The decision log lives in the same `history.db` as `play`, so it takes
+   * this handle rather than opening its own.
+   *
+   * ⚠️ Not a licence to run arbitrary SQL from elsewhere: `pruneToCap`'s fenced DELETE is
+   * pinned on its statement text precisely because a connection is reachable.
+   */
+  get database(): DatabaseSync {
+    return this.#db;
+  }
+
   historyCountsBefore(trackId: string, artistId: string | null, beforeIso: string): HistoryCounts {
     const track = this.#db
       .prepare(

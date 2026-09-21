@@ -25,6 +25,9 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { createApi, type ApiDeps } from '../src/api.js';
+import { validateRuleSet } from '../src/rules/ruleValidator.js';
+import type { DecisionLogRepository } from '../src/rules/DecisionLogRepository.js';
+import type { DateRange, DecisionLogEntry, LoadedRule, LoadedRuleSet } from '../src/rules/types.js';
 import { SqliteHistoryRepository } from '../src/history/SqliteHistoryRepository.js';
 import { ExportService } from '../src/export/ExportService.js';
 import { DEFAULT_TOLERANCES, CLASSIFIER_VERSION, summarise } from '../src/history/outcomeClassifier.js';
@@ -83,6 +86,12 @@ function serve(overrides: Partial<ApiDeps> = {}) {
     listToolNames: async () => ['a', 'b'],
     diagnostics: async () => ({ ok: true, steps: [] }) as never,
     likedFor: () => undefined,
+    // U4. Null by default: every route must degrade to 503 rather than throw when the rules
+    // engine is not running, and that is the state most of these tests exercise.
+    ruleSet: null,
+    decisionLog: null,
+    backTest: null,
+    reloadRules: null,
     now: () => NOW,
     ...overrides,
   };
@@ -455,5 +464,321 @@ describe('/api/history/coverage', () => {
     assert.equal(body.gaps, 1);
     await close(server);
     repository.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// U4 — rule observability routes
+// ---------------------------------------------------------------------------
+
+/**
+ * ⚠️ The routes in this section exist in `api.ts` rather than `server.ts` for the reason the
+ * file header gives: nine routes at zero coverage while the suite reported 98.96%, because a
+ * module no test loads is absent from the coverage DENOMINATOR rather than counted as zero.
+ * These are the first U4 routes, and they are tested from the start.
+ */
+
+function loadedRuleSet(overrides: Partial<LoadedRuleSet> = {}): LoadedRuleSet {
+  const parsed = validateRuleSet({
+    rules: [
+      {
+        id: 'skip-majors',
+        name: 'Skip majors',
+        enabled: true,
+        action: 'skip',
+        onUnknown: 'no-match',
+        predicate: { kind: 'compare', field: 'label.classification', op: 'eq', value: 'major' },
+      },
+      {
+        // FR-33 is partial until U5: `hold` is stored and DISABLED with a reason, so a rule
+        // written now begins working when U5 lands instead of being re-authored.
+        id: 'held',
+        name: 'Held rule',
+        enabled: true,
+        action: 'skip',
+        onUnknown: 'hold',
+        predicate: { kind: 'compare', field: 'track.explicit', op: 'eq', value: true },
+      },
+    ],
+  });
+  assert.ok(parsed.ok);
+
+  return {
+    version: 6,
+    contentHash: 'set-hash-6',
+    loadedAt: '2026-09-20T10:00:00.000Z',
+    rules: parsed.value,
+    state: 'applied',
+    rejection: null,
+    ...overrides,
+  };
+}
+
+function decisionRow(overrides: Partial<DecisionLogEntry> = {}): DecisionLogEntry {
+  return {
+    id: 1,
+    evaluationId: 'ev-1',
+    decidedAt: '2026-09-20T10:00:00.000Z',
+    playId: null,
+    playLink: 'pending',
+    trackId: 'track-1',
+    ruleId: 'skip-majors',
+    ruleName: 'Skip majors',
+    ruleHash: 'rule-hash',
+    verdict: 'true',
+    matched: true,
+    fieldsSeen: { 'label.classification': 'major', 'artist.genres': null },
+    unknownFields: ['artist.genres'],
+    restedOnUnknown: false,
+    partialData: false,
+    dryRun: true,
+    executed: false,
+    error: null,
+    engineVersion: 1,
+    ruleSetVersion: 6,
+    ruleSetContentHash: 'set-hash-6',
+    ...overrides,
+  };
+}
+
+function stubLog(rows: DecisionLogEntry[]): DecisionLogRepository {
+  return {
+    record: () => {},
+    attachPlayId: () => {},
+    markLinkFailed: () => {},
+    list: () => rows,
+    countSince: () => rows.length,
+    count: () => rows.length,
+    pruneToCap: () => 0,
+  };
+}
+
+describe('the rules engine is not running — every U4 route degrades, none throws', () => {
+  let server: Server;
+  let base: string;
+
+  before(async () => {
+    server = serve();
+    base = await listen(server);
+  });
+  after(() => close(server));
+
+  for (const [method, path] of [
+    ['GET', '/api/rules'],
+    ['GET', '/api/decisions'],
+    ['POST', '/api/backtest'],
+    ['POST', '/api/rules/reload'],
+  ] as const) {
+    it(`${method} ${path} answers 503 rather than throwing`, async () => {
+      const response = await fetch(`${base}${path}`, {
+        method,
+        ...(method === 'POST'
+          ? { headers: { 'content-type': 'application/json' }, body: '{}' }
+          : {}),
+      });
+
+      assert.equal(response.status, 503);
+      const body = (await response.json()) as Body;
+      assert.ok(typeof body.error === 'string' && body.error.length > 0, 'and it says why');
+    });
+  }
+});
+
+describe('GET /api/rules', () => {
+  let server: Server;
+  let base: string;
+
+  before(async () => {
+    server = serve({ ruleSet: () => loadedRuleSet() });
+    base = await listen(server);
+  });
+  after(() => close(server));
+
+  it('names the running version and its content hash', async () => {
+    const body = (await (await fetch(`${base}/api/rules`)).json()) as Body;
+
+    assert.equal(body.version, 6);
+    // ⚠️ The version resets to 1 on restart, so the hash is what identifies the set over time.
+    assert.equal(body.contentHash, 'set-hash-6');
+    assert.equal(body.state, 'applied');
+  });
+
+  /**
+   * ⚠️ A disabled rule must say WHY, in words. A rule that silently does nothing is
+   * indistinguishable from a rule that does not match — and `hold` is disabled by design
+   * until U5, which is exactly the case someone would otherwise read as broken.
+   */
+  it('reports each rule status, including the reason a rule is disabled', async () => {
+    const body = (await (await fetch(`${base}/api/rules`)).json()) as Body;
+
+    const held = (body.rules as Body[]).find((r) => r.id === 'held')!;
+    assert.equal(held.status.state, 'disabled');
+    assert.ok(typeof held.status.detail === 'string' && held.status.detail.length > 0);
+  });
+});
+
+describe('GET /api/rules — a rejected reload', () => {
+  let server: Server;
+  let base: string;
+
+  before(async () => {
+    server = serve({
+      ruleSet: () =>
+        loadedRuleSet({
+          state: 'rejected',
+          rejection: {
+            attemptedAt: '2026-09-20T10:05:00.000Z',
+            errors: ["rule 'skip majors' references unknown field 'album.kind'"],
+          },
+        }),
+    });
+    base = await listen(server);
+  });
+  after(() => close(server));
+
+  /**
+   * ⚠️ FQ5. A red light that only says "something failed" leaves exactly the ambiguity the
+   * indicator exists to remove, and a silent last-known-good is indistinguishable from a
+   * successful reload.
+   */
+  it('reports the rejection AND the version still in force', async () => {
+    const body = (await (await fetch(`${base}/api/rules`)).json()) as Body;
+
+    assert.equal(body.state, 'rejected');
+    assert.equal(body.version, 6, 'the running version must be nameable');
+    assert.match(String(body.rejection.errors[0]), /album\.kind/);
+  });
+});
+
+describe('GET /api/decisions', () => {
+  let server: Server;
+  let base: string;
+
+  before(async () => {
+    server = serve({
+      decisionLog: stubLog([
+        decisionRow({ id: 2, ruleId: 'skip-majors', matched: true }),
+        decisionRow({ id: 1, ruleId: 'held', matched: false, verdict: 'unknown' }),
+      ]),
+    });
+    base = await listen(server);
+  });
+  after(() => close(server));
+
+  it('returns the rows of a decision', async () => {
+    const body = (await (await fetch(`${base}/api/decisions`)).json()) as Body;
+
+    assert.equal((body.rows as unknown[]).length, 2);
+  });
+
+  /** One row per rule evaluated, grouped into one trace per decision (BR-23.1, BR-32). */
+  it('groups the rows into a trace, rendered from those same rows', async () => {
+    const body = (await (await fetch(`${base}/api/decisions`)).json()) as Body;
+
+    assert.equal((body.traces as unknown[]).length, 1, 'both rows share one evaluationId');
+    assert.equal((body.traces as Body[])[0]!.rules.length, 2);
+  });
+
+  it('renders a field that read null as the token unknown, never blank', async () => {
+    const body = (await (await fetch(`${base}/api/decisions`)).json()) as Body;
+
+    const fields = (body.traces as Body[])[0]!.rules[0].fields as Body[];
+    const genres = fields.find((f) => f.name === 'artist.genres')!;
+    assert.equal(genres.display, 'unknown');
+  });
+});
+
+describe('POST /api/backtest', () => {
+  let server: Server;
+  let base: string;
+
+  before(async () => {
+    server = serve({
+      ruleSet: () => loadedRuleSet(),
+      backTest: {
+        run: (loaded: LoadedRule, range: DateRange) =>
+          ({
+            ruleId: loaded.rule.id,
+            range,
+            truncated: false,
+          }) as never,
+      } as never,
+    });
+    base = await listen(server);
+  });
+  after(() => close(server));
+
+  it('runs the named rule over the range', async () => {
+    const response = await fetch(`${base}/api/backtest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ruleId: 'skip-majors',
+        from: '2026-09-01T00:00:00.000Z',
+        to: '2026-10-01T00:00:00.000Z',
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as Body;
+    assert.equal(body.ruleId, 'skip-majors');
+    assert.equal(body.truncated, false, 'required, never optional');
+  });
+
+  it('refuses a request missing its range rather than inventing one', async () => {
+    const response = await fetch(`${base}/api/backtest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ruleId: 'skip-majors' }),
+    });
+
+    assert.equal(response.status, 400);
+  });
+
+  it('404s for a rule that is not loaded, rather than silently testing nothing', async () => {
+    const response = await fetch(`${base}/api/backtest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ruleId: 'no-such-rule',
+        from: '2026-09-01T00:00:00.000Z',
+        to: '2026-10-01T00:00:00.000Z',
+      }),
+    });
+
+    assert.equal(response.status, 404);
+  });
+});
+
+describe('POST /api/rules/reload', () => {
+  it('reports the outcome and the version in force after a rejected reload', async () => {
+    let reloaded = false;
+    const server = serve({
+      ruleSet: () =>
+        loadedRuleSet({
+          state: 'rejected',
+          rejection: { attemptedAt: '2026-09-20T10:05:00.000Z', errors: ['invalid JSON'] },
+        }),
+      reloadRules: async () => {
+        reloaded = true;
+        return { kind: 'failed', errors: ['invalid JSON'] };
+      },
+    });
+    const base = await listen(server);
+
+    try {
+      const response = await fetch(`${base}/api/rules/reload`, { method: 'POST' });
+
+      // ⚠️ 200: the REQUEST succeeded. The rule set's state is the answer, not an HTTP error —
+      // and the body names the version still running.
+      assert.equal(response.status, 200);
+      const body = (await response.json()) as Body;
+      assert.equal(body.outcome, 'failed');
+      assert.equal(body.state, 'rejected');
+      assert.equal(body.version, 6);
+      assert.ok(reloaded);
+    } finally {
+      await close(server);
+    }
   });
 });

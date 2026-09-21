@@ -77,6 +77,16 @@ const MAX_TRAIL = 4000;
 export interface PlayObserverHooks {
   onPlayStarted?(sample: PlaybackSample): void;
   onPlayRecorded?(playId: number, record: NewPlayRecord): void;
+  /**
+   * The play closed and its row could **not** be written (U4, BR-24.3a).
+   *
+   * ⚠️ **Without this, `onPlayRecorded` simply not firing is silent.** A consumer holding
+   * state for the play — U4's coordinator holds a pending `playId` link — cannot distinguish
+   * "the write failed" from "the play has not closed yet", and the two point at opposite
+   * conclusions: one is a fault on the artefact that cannot be regenerated, the other is an
+   * ordinary W-3 case. Recording already counts the gap; this tells the consumers.
+   */
+  onPlayDropped?(record: NewPlayRecord): void;
 }
 
 export class PlayObserver {
@@ -229,6 +239,8 @@ export class PlayObserver {
       // reading of the data, and therefore an undetectable corruption. Count it instead.
       this.#gaps++;
       this.#repo.recordGap();
+      // Guarded like the others: a consumer's failure must not compound a write failure.
+      this.#safely('onPlayDropped', () => this.#hooks.onPlayDropped?.(record));
       if (!this.#degraded) {
         // BR-3.8 / P-6: once per failure class, not once per tick. At a 3 s poll the alternative
         // is 1,200 identical lines an hour, burying everything else.

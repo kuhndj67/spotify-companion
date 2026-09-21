@@ -39,6 +39,13 @@ import {
   validateFilter,
 } from './export/ExportService.js';
 import { buildTrace, summariseTrace } from './musicbrainz/resolutionTrace.js';
+// ⚠️ Aliased: `resolutionTrace` (U2, why a LABEL was chosen) already owns the name
+// `buildTrace`, and this is a different thing entirely (U4, why a RULE fired).
+import { groupIntoTraces } from './rules/decisionTrace.js';
+import type { BackTestService } from './rules/BackTestService.js';
+import type { DecisionLogRepository } from './rules/DecisionLogRepository.js';
+import type { LoadOutcome } from './rules/RuleStore.js';
+import type { DecisionFilter, LoadedRuleSet } from './rules/types.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
 import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { LABEL_CLASSIFIER_VERSION } from './musicbrainz/LabelEnrichmentService.js';
@@ -73,10 +80,28 @@ export interface ApiDeps {
   likedFor: (trackId: string) => DisplayLiked | undefined;
   /** ISO 8601. Injected so the trend window is a function of its inputs. */
   now: () => string;
+
+  // -- U4: rule observability ------------------------------------------------
+  /**
+   * The rule set in force. ⚠️ Comes from `RuleSetWatcher`, which owns it — `RuleStore` holds
+   * none (BR-26.3b), so there is no second `current()` to wire this to by mistake.
+   */
+  ruleSet: (() => LoadedRuleSet) | null;
+  decisionLog: DecisionLogRepository | null;
+  backTest: BackTestService | null;
+  /** Re-reads the rules file. ⚠️ Re-reads only: nothing in U4 writes rules. */
+  reloadRules: (() => Promise<LoadOutcome>) | null;
 }
 
 export function createApi(deps: ApiDeps): Router {
   const router = express.Router();
+
+  // ⚠️ Body parsing belongs to the ROUTER, not to `server.ts`. `POST /api/backtest` is the
+  // only route that takes a body, and mounting the parser beside the route means the router
+  // works wherever it is mounted — including in tests, which is the whole reason the routes
+  // live in this file. Bounded: an unbounded body on a local service is still a way to spend
+  // memory by accident.
+  router.use(express.json({ limit: '64kb' }));
 
   /** REST snapshot. The UI uses the WebSocket; this stays for scripting and debugging. */
   router.get('/api/now-playing', (_req, res) => {
@@ -326,6 +351,125 @@ export function createApi(deps: ApiDeps): Router {
       size: deps.likedSet.size,
       available: deps.likedSet.available,
       liked: trackId === null ? null : (deps.likedFor(trackId) ?? null),
+    });
+  });
+
+  // -- U4: rule observability ------------------------------------------------
+  //
+  // ⚠️ All read-only except the reload, which re-READS. `./config` stays mounted `:ro`;
+  // granting `:rw` a unit before an editor exists is what the musicbrainz.json comment warns
+  // against.
+
+  /** The rule set in force, its version, and per-rule status including disabled reasons. */
+  router.get('/api/rules', (_req, res) => {
+    if (deps.ruleSet === null) {
+      res.status(503).json({ error: 'The rules engine is not running.' });
+      return;
+    }
+
+    const set = deps.ruleSet();
+    res.json({
+      version: set.version,
+      contentHash: set.contentHash,
+      loadedAt: set.loadedAt,
+      state: set.state,
+      // ⚠️ Present whenever a reload was refused, and it names the version STILL IN FORCE.
+      // A red light that only says "something failed" leaves exactly the ambiguity the
+      // indicator exists to remove, and a silent last-known-good is indistinguishable from a
+      // successful reload.
+      rejection: set.rejection,
+      rules: set.rules.map((loaded) => ({
+        id: loaded.rule.id,
+        name: loaded.rule.name,
+        enabled: loaded.rule.enabled,
+        action: loaded.rule.action,
+        onUnknown: loaded.rule.onUnknown,
+        dryRun: loaded.rule.dryRun ?? false,
+        status: loaded.status,
+      })),
+    });
+  });
+
+  /** The decision log, filtered and paginated. One row per rule evaluated (BR-23.1). */
+  router.get('/api/decisions', (req, res) => {
+    if (deps.decisionLog === null) {
+      res.status(503).json({ error: 'The decision log is unavailable.' });
+      return;
+    }
+
+    const limit = Math.min(Number(req.query['limit'] ?? 100) || 100, 500);
+    const filter: DecisionFilter = {
+      limit,
+      ...(typeof req.query['from'] === 'string' ? { from: req.query['from'] } : {}),
+      ...(typeof req.query['to'] === 'string' ? { to: req.query['to'] } : {}),
+      ...(typeof req.query['ruleId'] === 'string' ? { ruleId: req.query['ruleId'] } : {}),
+      ...(typeof req.query['trackId'] === 'string' ? { trackId: req.query['trackId'] } : {}),
+      ...(req.query['matchedOnly'] === 'true' ? { matchedOnly: true } : {}),
+      ...(typeof req.query['cursor'] === 'string'
+        ? { cursor: Number(req.query['cursor']) }
+        : {}),
+    };
+
+    const rows = deps.decisionLog.list(filter);
+    res.json({
+      rows,
+      // Grouped into one trace per decision, rendered from these same rows and nothing else.
+      traces: groupIntoTraces(rows),
+      nextCursor: rows.length === limit ? (rows[rows.length - 1]?.id ?? null) : null,
+    });
+  });
+
+  /**
+   * Back-test one rule over a range (FR-42).
+   *
+   * ⚠️ **Writes nothing** (BR-28.6) — not a decision row, not a play row, not a cached
+   * report. POST only because a predicate does not fit a query string.
+   */
+  router.post('/api/backtest', (req, res) => {
+    if (deps.backTest === null || deps.ruleSet === null) {
+      res.status(503).json({ error: 'Back-testing is unavailable.' });
+      return;
+    }
+
+    const body = req.body as { ruleId?: unknown; from?: unknown; to?: unknown } | undefined;
+    const ruleId = typeof body?.ruleId === 'string' ? body.ruleId : null;
+    const from = typeof body?.from === 'string' ? body.from : null;
+    const to = typeof body?.to === 'string' ? body.to : null;
+
+    if (ruleId === null || from === null || to === null) {
+      res.status(400).json({ error: 'ruleId, from and to are required.' });
+      return;
+    }
+
+    const loaded = deps.ruleSet().rules.find((r) => r.rule.id === ruleId);
+    if (loaded === undefined) {
+      res.status(404).json({ error: `No rule with id '${ruleId}' is loaded.` });
+      return;
+    }
+
+    res.json(deps.backTest.run(loaded, { from, to }));
+  });
+
+  /**
+   * Re-read the rules file now (P-19's manual trigger).
+   *
+   * ⚠️ **The same loader the poll uses.** Re-implementing it is the WebSocket `403` shape.
+   */
+  router.post('/api/rules/reload', async (_req, res) => {
+    if (deps.reloadRules === null || deps.ruleSet === null) {
+      res.status(503).json({ error: 'The rules engine is not running.' });
+      return;
+    }
+
+    const outcome = await deps.reloadRules();
+    const set = deps.ruleSet();
+    // 200 even on a rejected reload: the REQUEST succeeded, and the rule set's state is the
+    // answer rather than an HTTP error. The body says which version is still in force.
+    res.json({
+      outcome: outcome.kind,
+      version: set.version,
+      state: set.state,
+      rejection: set.rejection,
     });
   });
 

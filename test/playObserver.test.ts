@@ -208,6 +208,43 @@ describe('degraded operation (BR-3.8, BR-3.9)', () => {
     assert.equal(observer.stats.degraded, true);
   });
 
+  /**
+   * ⚠️ U4, BR-24.3a. `onPlayRecorded` fires only after a successful write, so its ABSENCE is
+   * the only signal a consumer gets — and absence is indistinguishable from "the play has not
+   * closed yet". For the decision log those two mean opposite things: a fault on the artefact
+   * that cannot be regenerated, versus an ordinary W-3 case. The failure has to be announced.
+   */
+  it('announces a dropped play, so a consumer can tell a fault from a play still running', () => {
+    const { repo } = failingRepo();
+    const dropped: string[] = [];
+    const recorded: number[] = [];
+    const observer = new PlayObserver(repo, T, {
+      onPlayRecorded: (playId) => void recorded.push(playId),
+      onPlayDropped: (record) => void dropped.push(record.trackId),
+    });
+
+    observer.observe(sample({ progressMs: 0 }), 1000);
+    observer.observe(null, 4000);
+
+    assert.deepEqual(dropped, ['track1']);
+    assert.deepEqual(recorded, [], 'a failed write is not a recording');
+  });
+
+  it('a consumer throwing in onPlayDropped does not compound the write failure', () => {
+    const { repo, gaps } = failingRepo();
+    const observer = new PlayObserver(repo, T, {
+      onPlayDropped: () => {
+        throw new Error('consumer exploded');
+      },
+    });
+
+    assert.doesNotThrow(() => {
+      observer.observe(sample({ progressMs: 0 }), 1000);
+      observer.observe(null, 4000);
+    });
+    assert.equal(gaps(), 1);
+  });
+
   it('does not throw — the display must survive a broken database', () => {
     const { repo } = failingRepo();
     const observer = new PlayObserver(repo, T);

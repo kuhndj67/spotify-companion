@@ -56,6 +56,11 @@ const PURE_MODULES = [
   // break NFR-26's determinism while every other test passed — and the drift would appear
   // months later as unexplained back-test movement, not as a failure.
   'rules/factReconstructor.ts',
+  // Renders a decision that already happened. A clock or a lookup here would let the trace
+  // disagree with the row it claims to explain — which is worse than no trace.
+  'rules/decisionTrace.ts',
+  'rules/rulesDiagnostics.ts',
+  'rules/ruleHash.ts',
 ];
 
 /**

@@ -18,24 +18,46 @@
  * ⚠️ **A bad rules file never stops the app recording** (BR-20.10). Recording is the artefact
  * that cannot be regenerated; rules are text that can be retyped.
  *
- * ## `watch()` is deliberately absent
+ * ## ⚠️ U4: this is a PARSER. It holds no rule set (BR-26.3b)
  *
- * Deferred to U4, where the UI gives live reload something to trigger it (NFR Q3 = D). Two
- * consequences, both intended: BR-20.8 (last-known-good on reload) cannot fire here because there
- * is no reload, and the half-written-file race — a text editor's save is frequently not atomic —
- * does not exist in U3 because nothing is watching. Both return with the watcher.
+ * In U3 it held `#rules` and wiped them on **every** non-`loaded` outcome — `failed`, `absent`
+ * *and* `no-directory` — which was correct when there was no reload and nothing to retain.
+ * `RuleSetWatcher` now owns the current set, because last-known-good is a decision about
+ * *whether this load replaces the running set*, and only the watcher knows whether this is a
+ * cold start or a reload.
+ *
+ * ⚠️ **Two `current()` methods was the trap avoided.** Had the store kept its state, it and the
+ * watcher would each expose one returning different things, and a coordinator wired to the
+ * store would evaluate against a wiped set **while every indicator read green**.
+ *
+ * Change detection lives in the watcher too, and it is **polling, not `fs.watch`** — probed
+ * 2026-09-20, `watch()` registers, throws nothing and delivers 0 events in 12 s over the
+ * Rancher Desktop bind mount, which is the only place this app runs.
  */
 
 import { readFile, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+import { hashRuleSetContent } from './ruleHash.js';
 import { validateRuleSet } from './ruleValidator.js';
 import { MAX_RULES_FILE_BYTES, type LoadedRule } from './types.js';
 
-/** How the load ended. The app's behaviour is identical for every failure; the report is not. */
+/**
+ * How the read ended.
+ *
+ * ⚠️ **The store does not decide what these MEAN.** `absent` is a normal cold start and a
+ * *rejection* on reload (BR-26.3a): a write-temp-then-rename save is momentarily `ENOENT`, and
+ * treating that as an accepted empty set would advance the version and silently drop every rule
+ * for a poll interval, showing the user a version bump and no error.
+ */
 export type LoadOutcome =
   /** File read and valid. `rules` may still be empty — an empty rule set is a valid rule set. */
-  | { readonly kind: 'loaded'; readonly rules: readonly LoadedRule[] }
+  | {
+      readonly kind: 'loaded';
+      readonly rules: readonly LoadedRule[];
+      /** Identity across restarts, when `version` cannot provide it (BR-23.7a). */
+      readonly contentHash: string;
+    }
   /** No file. Normal on a fresh install — `npm run rules:init` creates it. */
   | { readonly kind: 'absent' }
   /** No directory. The mount did not happen; quiet would be exactly wrong. */
@@ -55,34 +77,55 @@ const defaultLogger: RuleStoreLogger = {
   error: (m) => console.error(`[rules] ${m}`),
 };
 
+/** Enough to tell cheaply whether the file could have changed, without reading it. */
+export interface FileSignature {
+  readonly mtimeMs: number;
+  readonly size: number;
+}
+
 export class RuleStore {
   readonly #path: string;
   readonly #log: RuleStoreLogger;
-  #rules: readonly LoadedRule[] = [];
 
   constructor(path: string, logger: RuleStoreLogger = defaultLogger) {
     this.#path = path;
     this.#log = logger;
   }
 
-  /** The current rule set. Empty until a successful `load()`. */
-  current(): readonly LoadedRule[] {
-    return this.#rules;
+  get path(): string {
+    return this.#path;
   }
 
   /**
-   * Read and validate the rules file.
-   *
-   * Total: every failure is returned as a `LoadOutcome`, never thrown. The caller cannot be
-   * required to wrap this in a try/catch, because a caller that forgets would take down the poll
-   * loop over a malformed config file.
+   * The cheap change check the watcher polls with (P-19). `null` when the file is not there —
+   * which is a **change** if it was there a moment ago.
    */
-  async load(): Promise<LoadOutcome> {
-    const outcome = await this.#read();
+  async signature(): Promise<FileSignature | null> {
+    try {
+      const info = await stat(this.#path);
+      if (!info.isFile()) return null;
+      return { mtimeMs: info.mtimeMs, size: info.size };
+    } catch {
+      return null;
+    }
+  }
 
+  /**
+   * Read, validate and hash the rules file.
+   *
+   * Total: every failure is returned as a `LoadOutcome`, never thrown. A caller that forgot a
+   * try/catch would take down the poll loop over a malformed config file.
+   *
+   * ⚠️ **It holds nothing and decides nothing.** The watcher applies the outcome.
+   */
+  async read(): Promise<LoadOutcome> {
+    return this.#read();
+  }
+
+  /** Report an outcome. Kept here so the wording stays with the module that knows the path. */
+  describe(outcome: LoadOutcome): void {
     switch (outcome.kind) {
       case 'loaded': {
-        this.#rules = outcome.rules;
         const disabled = outcome.rules.filter((r) => r.status.state === 'disabled');
         this.#log.info(
           `loaded ${outcome.rules.length} rule(s) from ${this.#path}` +
@@ -96,32 +139,21 @@ export class RuleStore {
         }
         break;
       }
-
-      // Normal on a fresh install. Quiet, but names the path so a typo is still diagnosable.
       case 'absent':
-        this.#rules = [];
         this.#log.info(`no rules file at ${this.#path} — no rules active`);
         break;
-
       // NOT the same fact as an absent file: the mount did not happen. Louder for that reason.
       case 'no-directory':
-        this.#rules = [];
         this.#log.warn(
           `rules directory ${dirname(this.#path)} does not exist — no rules active. ` +
             `Is the config volume mounted?`,
         );
         break;
-
       case 'failed':
-        // ⚠️ The previous set is NOT retained here. On cold start there is nothing to retain
-        // (BR-20.7); last-known-good on reload is BR-20.8, which arrives with watch() in U4.
-        this.#rules = [];
-        this.#log.error(`rules file at ${this.#path} could not be loaded — no rules active:`);
+        this.#log.error(`rules file at ${this.#path} could not be loaded:`);
         for (const e of outcome.errors) this.#log.error(`  ${e}`);
         break;
     }
-
-    return outcome;
   }
 
   async #read(): Promise<LoadOutcome> {
@@ -175,6 +207,8 @@ export class RuleStore {
     const result = validateRuleSet(parsed);
     if (!result.ok) return { kind: 'failed', errors: result.errors };
 
-    return { kind: 'loaded', rules: result.value };
+    // Hashed over the file's TEXT, so adding, removing or reordering a rule changes the set's
+    // identity even when every individual rule survives unchanged.
+    return { kind: 'loaded', rules: result.value, contentHash: hashRuleSetContent(text) };
   }
 }

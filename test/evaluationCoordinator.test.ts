@@ -17,6 +17,7 @@ import { LoggingExecutor } from '../src/rules/LoggingExecutor.js';
 import { LiveFactSource, isSettled } from '../src/rules/liveFactSource.js';
 import { validateRuleSet } from '../src/rules/ruleValidator.js';
 import type { DecisionLogRepository } from '../src/rules/DecisionLogRepository.js';
+import type { DecisionSummaryInput } from '../src/rules/decisionSummary.js';
 import type { HistoryCounts } from '../src/history/types.js';
 import type { LoadedRule, NewDecisionLogEntry } from '../src/rules/types.js';
 
@@ -461,6 +462,99 @@ describe('failures never stop the poll loop', () => {
     coordinator.onTick(sample(), 200);
 
     assert.equal(calls, 1);
+  });
+});
+
+describe('the decision summary hook', () => {
+  it('fires once per decision, with the elapsed time and every rule', () => {
+    const summaries: DecisionSummaryInput[] = [];
+    const log = spyLog();
+    const liveFacts = new LiveFactSource(true);
+    const rules = loadedRules(
+      { id: 'a', field: 'track.explicit', value: false },
+      { id: 'b', field: 'track.explicit', value: true },
+    );
+    const coordinator = new EvaluationCoordinator({
+      rules: () => rules,
+      ruleSet: () => ({ version: 1, contentHash: 'h', rules }),
+      liveFacts,
+      executor: new LoggingExecutor(log.repo),
+      historyCounts: () => NO_COUNTS,
+      attachPlayId: () => {},
+      markLinkFailed: () => {},
+      nowMs: () => 0,
+      newEvaluationId: () => 'ev-1',
+      enrichmentWaitMs: 10_000,
+      onDecision: (s) => void summaries.push(s),
+    });
+    liveFacts.noteLabelResult('track-1', 'completed');
+
+    coordinator.onPlayStarted('track-1', 1_000);
+    coordinator.onTick(sample(), 5_200);
+
+    assert.equal(summaries.length, 1);
+    assert.equal(summaries[0]!.elapsedMs, 4_200, 'measured from the play start, not from zero');
+    assert.equal(summaries[0]!.partialData, false);
+    assert.deepEqual(summaries[0]!.rules.map((r) => r.name).sort(), ['a', 'b']);
+  });
+
+  /** It fires AFTER the rows are written, so a line on screen always means a row in the log. */
+  it('does not fire when the write failed', () => {
+    const summaries: DecisionSummaryInput[] = [];
+    const liveFacts = new LiveFactSource(true);
+    const rules = loadedRules({ id: 'a', field: 'track.explicit', value: false });
+    const coordinator = new EvaluationCoordinator({
+      rules: () => rules,
+      ruleSet: () => ({ version: 1, contentHash: 'h', rules }),
+      liveFacts,
+      executor: {
+        execute: () => {
+          throw new Error('disk full');
+        },
+      },
+      historyCounts: () => NO_COUNTS,
+      attachPlayId: () => {},
+      markLinkFailed: () => {},
+      nowMs: () => 0,
+      newEvaluationId: () => 'ev-1',
+      enrichmentWaitMs: 10_000,
+      onError: () => {},
+      onDecision: (s) => void summaries.push(s),
+    });
+    liveFacts.noteLabelResult('track-1', 'completed');
+
+    coordinator.onPlayStarted('track-1', 0);
+    coordinator.onTick(sample(), 100);
+
+    assert.deepEqual(summaries, [], 'a log line implying a row that does not exist is worse than silence');
+  });
+
+  /** ⚠️ Logging is the least important thing here and must never reach the poll loop. */
+  it('survives a hook that throws', () => {
+    const log = spyLog();
+    const liveFacts = new LiveFactSource(true);
+    const rules = loadedRules({ id: 'a', field: 'track.explicit', value: false });
+    const coordinator = new EvaluationCoordinator({
+      rules: () => rules,
+      ruleSet: () => ({ version: 1, contentHash: 'h', rules }),
+      liveFacts,
+      executor: new LoggingExecutor(log.repo),
+      historyCounts: () => NO_COUNTS,
+      attachPlayId: () => {},
+      markLinkFailed: () => {},
+      nowMs: () => 0,
+      newEvaluationId: () => 'ev-1',
+      enrichmentWaitMs: 10_000,
+      onError: () => {},
+      onDecision: () => {
+        throw new Error('stdout is gone');
+      },
+    });
+    liveFacts.noteLabelResult('track-1', 'completed');
+
+    coordinator.onPlayStarted('track-1', 0);
+    assert.doesNotThrow(() => coordinator.onTick(sample(), 100));
+    assert.equal(log.rows.length, 1, 'the decision was still recorded');
   });
 });
 

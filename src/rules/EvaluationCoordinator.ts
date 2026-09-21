@@ -25,6 +25,7 @@
  * same mistake in `PlayObserver` produced sparse trails and plausible-but-wrong verdicts.
  */
 
+import type { DecisionSummaryInput } from './decisionSummary.js';
 import type { DecisionExecutor } from './LoggingExecutor.js';
 import type { LiveFactSource } from './liveFactSource.js';
 import { assembleFacts } from './trackFacts.js';
@@ -73,6 +74,14 @@ export interface EvaluationCoordinatorDeps {
    */
   readonly enrichmentWaitMs: number;
   readonly onError?: (error: unknown) => void;
+  /**
+   * Called once per decision, after it has been recorded.
+   *
+   * ⚠️ **Formatting is deliberately not done here.** The coordinator hands over facts; the
+   * caller decides what to do with them. That keeps the log line testable as a pure function
+   * and keeps a `console.log` out of the component whose correctness matters most.
+   */
+  readonly onDecision?: (summary: DecisionSummaryInput) => void;
 }
 
 interface CurrentPlay {
@@ -227,6 +236,22 @@ export class EvaluationCoordinator {
 
       this.#decisions += 1;
       if (partialData) this.#partialDataCount += 1;
+
+      // Inside #safely: a logging fault is counted like any other and must never reach the
+      // poll loop. It fires only after the rows are written, so a line on screen always
+      // means a row in the database.
+      this.#deps.onDecision?.({
+        trackId: sample.trackId,
+        title: sample.title,
+        artistName: sample.artistName,
+        elapsedMs: atMs - play.startedAtMs,
+        partialData,
+        rules: decision.outcomes.map((outcome) => ({
+          name: ruleSet.rules.find((r) => r.rule.id === outcome.ruleId)?.rule.name ?? outcome.ruleId,
+          verdict: outcome.verdict,
+          matched: decision.matchedRuleIds.includes(outcome.ruleId),
+        })),
+      });
     });
   }
 

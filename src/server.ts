@@ -18,6 +18,7 @@ import { LiveFactSource } from './rules/liveFactSource.js';
 import { LoggingExecutor } from './rules/LoggingExecutor.js';
 import { RuleSetWatcher } from './rules/RuleSetWatcher.js';
 import { RuleStore } from './rules/RuleStore.js';
+import { formatDecisionSummary } from './rules/decisionSummary.js';
 import { SqliteDecisionLogRepository } from './rules/SqliteDecisionLogRepository.js';
 import { DECISION_LOG_CAP } from './rules/types.js';
 import {
@@ -496,6 +497,15 @@ if (repository !== null) {
       nowMs: () => Date.now(),
       newEvaluationId: () => randomUUID(),
       enrichmentWaitMs: ENRICHMENT_WAIT_MS,
+      // One line per DECISION — per play, so ~50-100/day, not the per-tick volume BR-3.8
+      // forbids. It is the only per-play line this app writes; everything else on this
+      // stream speaks on failure only, and that stays true.
+      //
+      // ⚠️ Summary only. Every field value is already durable in `decision_log` and served
+      // by GET /api/decisions, so reprinting it here would duplicate a queryable record into
+      // a stream that scrolls away — and would bury the recording-failure lines that BR-3.8
+      // keeps rare precisely so they get noticed.
+      onDecision: (summary) => console.log(formatDecisionSummary(summary)),
     });
 
     backTest = new BackTestService({

@@ -4168,3 +4168,56 @@ and noted in place.
 - **`u4-rule-observability/HANDOFF.md`** — item 4 no longer described as "the crossfade confound".
 
 **Context**: CONSTRUCTION — U4 complete, deployed and verified. 866 tests, schema v6, 591 plays.
+
+---
+
+## 2026-09-22 — U4 closed out: Build and Test complete, U5 handoff written
+
+**Stage**: CONSTRUCTION — U4 Build and Test. **U4 is complete, deployed and verified.**
+
+### All three exit criteria CI could not close are closed
+
+| Criterion | Result |
+|---|---|
+| Dry-run agreement | ✅ 65 decisions, 195 rows, 37 matches, over a full day. The user read it and agreed |
+| `partialData` rate | ✅ **0 of 65**. Median settle 4.1 s, p90 7.2 s, **max 9.0 s** |
+| BR-20.8 last-known-good | ✅ **Run for the first time since U3 specified it** |
+
+⚠️ **The agreement gate did more than pass** — reading the log is what exposed the `skip_source`
+defect. That is the argument for the gate existing at all, and no test could have substituted.
+
+### ⚠️ `ENRICHMENT_WAIT_MS` is correct but NOT generous
+
+Max observed settle is **9.0 s** against a 10 s cap — 1.0 s of headroom.
+
+An earlier reading of the *same measurement* showed max 6.9 s and suggested 7–8 s was safe. A few
+hours more listening produced 9.0 s. **The tail moved and the median did not.** Recorded because
+the earlier advice is in this log and would otherwise be followed.
+
+### 866 tests, 99.39% line / 93.27% branch
+
+⚠️ Function coverage fell 97.53% → 95.82%. Not a regression in what is tested: U4 adds impure
+wiring with defensive branches, where U3 added pure functions exercised exhaustively.
+
+`RuleSetWatcher` is the lowest-covered module at 93.42%, knowingly — its uncovered lines are the
+polling timer's callback, and **a unit test of that timer proves nothing about the only place it
+runs**. Verified live twice instead.
+
+### Five defects, four invisible to the suite
+
+1. `skip_source = 'user'` asserted rather than observed — found by the **user**, not a test.
+2. `trackPlayStats` re-implementing `bucketOf`, so the fix reached the chart and not the panel.
+3. `history.db` corrupted by a maintenance script run against the live container.
+4. Open item 4's four numbers, all n≈10, none replicating.
+5. The `explicit`/`album_type` write path missing from every scope table — caught by `tsc`.
+
+### U5 handoff written
+
+`construction/u5-automated-skipping/HANDOFF.md`. ⚠️ **Its first item is the one that matters**:
+`BackTestService` counts every `skipped` row regardless of attribution, and skips are now **22
+user / 21 unattributed**. U5 arms rules on those agreement numbers, so it must decide **in
+writing** whether an `unattributed` skip counts as agreement. Inheriting the current behaviour
+silently means arming rules against a target that is half noise.
+
+**Context**: CONSTRUCTION — **U4 COMPLETE**, awaiting user approval. U5 next. 866 tests, schema
+v6, 613 plays, `integrity_check: ok`, `src/playback/` absent.

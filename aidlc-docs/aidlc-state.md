@@ -4,24 +4,28 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U4 CODE GENERATION COMPLETE and DEPLOYED 2026-09-21.
-  Schema v5 is live. Awaiting the three hands-on exit criteria CI cannot close.**
-  811 tests · typecheck clean · 543 plays · 3 rules active in dry-run · `src/playback/` absent.
-  🔴 **Still open**: the dry-run agreement gate, the `partialData` rate, and BR-20.8's
-  last-known-good path exercised against the real deployment. See `audit.md` 2026-09-21.
-  *(U4 designs were revised 2026-09-20 after a senior-architect review and approved.)*
-  ⚠️ **Still no code**: `git status src/` is clean and the schema is still **v4**. Four review
-  decisions are settled (watcher owns the rule set · BR-22.1 scoped to U4 with no `UNIQUE` ·
-  `PlayObserver` owns segmentation · answerability is per row over two eras), and nine artifact
-  corrections applied. See `audit.md` 2026-09-20 and
+- **Current Stage**: CONSTRUCTION — **U4 COMPLETE, DEPLOYED AND VERIFIED 2026-09-22.
+  All three exit criteria CI could not close are CLOSED. U5 is next.**
+  866 tests · typecheck clean · schema **v6** · 613 plays · `src/playback/` absent.
+  ✅ Dry-run agreement gate (65 decisions, user agreed) · `partialData` **0 of 65**, max settle
+  **9.0 s** · **BR-20.8 exercised live for the first time since U3 specified it**.
+  Summary: [`construction/build-and-test/u4-build-and-test-summary.md`](construction/build-and-test/u4-build-and-test-summary.md).
+  Handoff: [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md).
+  ⚠️ **U5 inherits a half-noisy outcome variable**: `skip_attribution` splits skips 22 user /
+  21 unattributed, and `BackTestService` counts both. U5 must decide in writing whether an
+  `unattributed` skip counts as agreement before arming anything.
+  The 2026-09-20 design review's four decisions (watcher owns the rule set · BR-22.1 scoped to
+  U4 with no `UNIQUE` · `PlayObserver` owns segmentation · answerability is per row over two
+  eras) are all **built and shipped**. See `audit.md` 2026-09-20 and
   [`u4-rule-observability/HANDOFF.md`](construction/u4-rule-observability/HANDOFF.md).
   ✅ **CLAUDE.md open item 3 corrected 2026-09-20** (+ item 3a): `recently-played` *does* return
   `external_ids.isrc`; recovery is **72 distinct tracks**, not 47 calls; and the cause of the
   82-row gap is **unestablished and not the code**. The zero-gate-eligible conclusion stands.
   *(U3 was APPROVED by the user 2026-09-19.)*
-  U3 shipped the rules core **wired to nothing**, and it must stay that way until U4:
-  if the engine affects app behaviour before U4/U5, that is a regression of the phase
-  boundary, not progress. **FR-33 stays PARTIAL** — `hold` is U5's.
+  U3 shipped the rules core wired to nothing; **U4 wired it, in dry-run only**. The phase
+  boundary now rests on `src/playback/` not existing and on `LoggingExecutor` taking no
+  playback collaborator — if anything can skip a track before U5, that is a regression.
+  **FR-33 stays PARTIAL** — `hold` is U5's.
   *(U2 was approved 2026-09-05.)*
   **486 tests passing · typecheck clean · live-verified against the real MusicBrainz.**
   Summary: [`construction/build-and-test/u2-build-and-test-summary.md`](construction/build-and-test/u2-build-and-test-summary.md).
@@ -969,7 +973,15 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       files, **620 tests passing**, typecheck clean, purity clean, no new `ALLOWED_ORPHANS`.
       ⚠️ **Wired to nothing** — `git status src/` shows only `src/rules/`; no route, no
       `server.ts` change, no schema change. U2, U4–U5 pending.
-- [x] Build and Test — **U1 complete** 2026-08-26. Build ✅, 193/193 tests, container verified.
+- [x] Build and Test — **U4 complete 2026-09-22.** 866 tests, 99.39% line / 93.27% branch,
+      schema v6, container verified end to end, **all three live exit criteria closed**.
+      ⚠️ **Five defects, four invisible to the suite**: `skip_source` asserted rather than
+      observed (found by the user, not a test); `trackPlayStats` re-implementing `bucketOf`;
+      `history.db` corrupted by a maintenance script run against the live container (fully
+      recovered, zero rows lost); open item 4's four numbers all failing to replicate; and the
+      `explicit`/`album_type` write path missing from every scope table.
+      Summary: [`construction/build-and-test/u4-build-and-test-summary.md`](construction/build-and-test/u4-build-and-test-summary.md).
+      **U1 complete** 2026-08-26. Build ✅, 193/193 tests, container verified.
       **U3 complete 2026-09-11** — PASS. 620 tests, 99.26% line / 93.10% branch, container built
       (exit 0) and **recreated on the new compose**: UI 200, WS handshake 101, cross-site 403,
       `/config` read-only, `integrity_check: ok`, 428 rows before and after.

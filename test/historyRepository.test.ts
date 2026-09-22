@@ -263,6 +263,7 @@ describe('listening statistics', () => {
     assert.deepEqual(stats.byBucket, {
       completed: 1,
       skipped: 1,
+      'ended-early': 0,
       inconclusive: 1,
       'not-observed': 0,
     });
@@ -282,6 +283,7 @@ describe('listening statistics', () => {
     assert.deepEqual(stats.byBucket, {
       completed: 0,
       skipped: 0,
+      'ended-early': 0,
       inconclusive: 0,
       'not-observed': 0,
     });

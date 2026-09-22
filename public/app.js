@@ -711,6 +711,12 @@ el('export-open').addEventListener('click', () => {
 const DRAWN_SERIES = [
   { key: 'completed', label: 'Completed', fill: 'var(--series-completed)' },
   { key: 'skipped', label: 'Skipped', fill: 'var(--series-skipped)' },
+  // ⚠️ Added 2026-09-21, and drawn SEPARATELY from `Skipped` on purpose. The track played to
+  // 81-90% and was then replaced by something the listener did not choose -- 19 of 36 skips on
+  // this corpus. Folding it back into `Skipped` tells someone they rejected music they sat
+  // through, which is how this was found: the panel showed skips of an artist the listener
+  // never skips.
+  { key: 'ended-early', label: 'Ended early', fill: 'var(--series-ended-early)' },
   { key: 'inconclusive', label: 'Inconclusive', fill: 'var(--series-inconclusive)' },
 ];
 
@@ -885,7 +891,15 @@ function renderTrendTable(weeks, totals) {
 
   const table = document.createElement('table');
   const head = table.createTHead().insertRow();
-  for (const heading of ['Week of', 'Completed', 'Skipped', 'Inconcl.', 'Not rec.', 'Total']) {
+  for (const heading of [
+    'Week of',
+    'Completed',
+    'Skipped',
+    'Ended early',
+    'Inconcl.',
+    'Not rec.',
+    'Total',
+  ]) {
     const cell = document.createElement('th');
     cell.textContent = heading;
     head.append(cell);
@@ -900,6 +914,7 @@ function renderTrendTable(weeks, totals) {
     for (const value of [
       week.byBucket.completed,
       week.byBucket.skipped,
+      week.byBucket['ended-early'],
       week.byBucket.inconclusive,
       week.byBucket['not-observed'],
       week.total,
@@ -916,6 +931,7 @@ function renderTrendTable(weeks, totals) {
   for (const value of [
     totals.completed,
     totals.skipped,
+    totals['ended-early'],
     totals.inconclusive,
     totals['not-observed'],
     grand,

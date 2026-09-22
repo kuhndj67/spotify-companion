@@ -436,6 +436,9 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 :root {
   --series-completed: #1baf7a;
   --series-skipped: #eb6834;
+  /* Amber: adjacent to `skipped` because it is the same event seen differently, but never
+     the same colour -- these are tracks the listener did NOT reject. */
+  --series-ended-early: #d9a321;
   --series-inconclusive: #2a78d6;
 }
 
@@ -443,6 +446,7 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
   :root {
     --series-completed: #199e70;
     --series-skipped: #d95926;
+    --series-ended-early: #c79017;
     --series-inconclusive: #3987e5;
   }
 }

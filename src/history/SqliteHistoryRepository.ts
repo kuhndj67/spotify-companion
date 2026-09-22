@@ -42,6 +42,7 @@ import type {
   SignalVote,
   UnknownReason,
 } from '../musicbrainz/types.js';
+import { bucketOf } from './playStats.js';
 import type { SkipAttribution } from './skipAttribution.js';
 import type {
   CoverageStats,
@@ -562,18 +563,20 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   // ==========================================================================
 
   trackPlayStats(trackId: string): TrackPlayStats {
-    // Grouped by provenance as well as outcome: a backfilled play is `unknown` because nothing
-    // watched it, and folding that in with a live `unknown` would report the app's downtime as
-    // though it were something about the listening.
+    // Grouped by provenance and attribution as well as outcome. A backfilled play is
+    // `unknown` because nothing watched it, and folding that in with a live `unknown` would
+    // report the app's downtime as though it were something about the listening. A skip the
+    // listener did not make is likewise not a skip.
     const rows = this.#db
       .prepare(
-        `SELECT outcome, provenance, COUNT(*) AS n,
+        `SELECT outcome, provenance, skip_attribution, COUNT(*) AS n,
                 MIN(started_at) AS first_at, MAX(started_at) AS last_at
-           FROM play WHERE track_id = ? GROUP BY outcome, provenance`,
+           FROM play WHERE track_id = ? GROUP BY outcome, provenance, skip_attribution`,
       )
       .all(trackId) as {
       outcome: string;
       provenance: string;
+      skip_attribution: string | null;
       n: number;
       first_at: string;
       last_at: string;
@@ -582,18 +585,23 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     const stats: TrackPlayStats = {
       trackId,
       totalPlays: 0,
-      byBucket: { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 },
+      byBucket: { completed: 0, skipped: 0, 'ended-early': 0, inconclusive: 0, 'not-observed': 0 },
       firstPlayedAt: null,
       lastPlayedAt: null,
     };
 
     for (const row of rows) {
-      const bucket =
-        row.provenance === 'backfilled'
-          ? 'not-observed'
-          : row.outcome === 'completed' || row.outcome === 'skipped'
-            ? row.outcome
-            : 'inconclusive';
+      // ⚠️ `bucketOf`, NOT a second copy of the rule. This block used to re-derive the bucket
+      // inline, and on 2026-09-21 that cost a real defect: `bucketOf` was taught that a skip
+      // the listener did not make is not a skip, and this panel went on reporting them as
+      // skips because nobody remembered there were two implementations. Same shape as the
+      // WebSocket `403`.
+      const bucket = bucketOf({
+        startedAt: row.first_at,
+        outcome: row.outcome as PlayOutcome,
+        provenance: row.provenance as Provenance,
+        skipAttribution: row.skip_attribution as SkipAttribution | null,
+      });
 
       stats.byBucket[bucket] += row.n;
       stats.totalPlays += row.n;

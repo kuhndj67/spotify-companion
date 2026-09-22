@@ -255,6 +255,7 @@ describe('/api/history/stats', () => {
     assert.deepEqual(body.track.byBucket, {
       completed: 1,
       skipped: 1,
+      'ended-early': 0,
       inconclusive: 0,
       'not-observed': 1,
     });

@@ -287,6 +287,7 @@ export interface TrackPlayStats {
   byBucket: {
     completed: number;
     skipped: number;
+    'ended-early': number;
     inconclusive: number;
     'not-observed': number;
   };

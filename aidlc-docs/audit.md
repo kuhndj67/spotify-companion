@@ -4000,3 +4000,92 @@ v5, 581 plays) → build (exit code read directly: 0) → up → `migrated 6:` e
 All five Ren tracks and the NF track reattributed.
 
 **Context**: CONSTRUCTION — U4 complete and deployed. 866 tests, typecheck clean, schema v6.
+
+---
+
+## 2026-09-21 — ⚠️ I CORRUPTED `history.db` BY RUNNING A SCRIPT AGAINST THE LIVE CONTAINER
+
+**Fully recovered — 586 plays, 31,336 observations, `integrity_check: ok`, nothing lost.** The
+record below is kept because the mistake was in ignoring a rule this file already contained.
+
+### What happened
+
+`scripts/attribute-skips.mjs --apply` was run **while the container was up**. Two writers on one
+SQLite file — the hazard CLAUDE.md states in capitals:
+
+> ⚠️ **Never run the container and `npm start` at the same time.** ... two writers on one SQLite
+> file. The container runs unattended now, so **assume it is running** and `docker compose down`
+> first.
+
+The rule was read as being about `npm start`. It is about **writers**, and a maintenance script
+holding a write handle is a writer. ⚠️ **The generalisation is the lesson**: "assume it is
+running" applies to every process that opens the database for writing, not to one command.
+
+### How it presented — and why the first reading was wrong
+
+The script reported `Wrote 36 row(s). integrity_check: ok`, and a verification query immediately
+afterwards showed the correct 19/17 split. **It looked like a clean success.**
+
+The damage surfaced later as `skip_attribution` reading `null` on a row that had just been
+written. The tempting conclusion was *"the write did not land"*. It had; the **index** had come
+apart, so a query using `idx_play_skip_attribution` returned wrong rows rather than erroring.
+
+⚠️ **A corrupt index answers queries.** It does not throw until something forces a check. The
+first symptom was a plausible wrong answer, which is this project's recurring shape.
+
+### Extent
+
+`PRAGMA integrity_check` on the live file:
+
+```
+Tree 3 page 3 cell 66: 2nd reference to page 555
+wrong # of entries in index idx_play_skip_attribution / idx_play_artist_id / idx_play_outcome
+  / idx_play_isrc / idx_play_track / idx_play_started / idx_play_label_verdict
+... rows missing from indexes ...
+```
+
+⚠️ **`VACUUM INTO` did not fix it and must not be trusted here.** The rebuilt file inherited
+worse damage — `Rowid out of order`, and NULLs in NOT NULL columns on rows 370/371. VACUUM
+rebuilds from the b-tree it is given; if that is damaged it propagates the damage into a file
+that *looks* fresh.
+
+### Recovery
+
+1. `docker compose down` **first**, before any diagnosis, to stop further writes.
+2. Snapshot the corrupt file to `data/CORRUPT-snapshot-20260921-201444/` — never diagnose on the
+   only copy.
+3. Full table scans read cleanly (586 / 31,336 / 126), confirming the table data survived.
+4. Restore `data/backup-before-migration-006-20260921-200739/history.db` — verified `ok`, v5,
+   581 plays, max id 622.
+5. Migrate it to v6 offline.
+6. Carry plays **623–627** and their 128 observations out of the corrupt snapshot.
+   ⚠️ **Parents before children**: play 624 referenced `label_resolution` 460, created after the
+   backup. Nulling the pointer was the shortcut and would have left a verdict with no
+   provenance, which BR-13 exists to prevent — the resolution row was carried instead.
+7. Re-run the attribution **with the container down**.
+
+`integrity_check: ok`, `foreign_key_check` empty, counts identical to the corrupt file.
+**Zero rows lost.**
+
+⚠️ Decision-log rows from the gap were **not** recovered, deliberately: a decision is
+recomputable from rules plus history, a play row is recomputable from nothing.
+
+### What made recovery possible
+
+The backup taken 7 minutes earlier, as part of the migration-006 checklist. ⚠️ **The checklist
+step that felt like ceremony is the only reason this was a 20-minute detour rather than a
+permanent loss.** `data/` is gitignored; there is no other copy.
+
+### A second defect, found while fixing the first
+
+`trackPlayStats` **re-implemented `bucketOf` inline**. Teaching `bucketOf` that an unattributed
+skip is not a skip therefore fixed the weekly chart and left the per-track panel — the surface
+the user was actually looking at — still reporting skips of artists they never skipped.
+`public/app.js` had no rendering for the new bucket either.
+
+⚠️ Same shape as the WebSocket `403`: one rule, two implementations, and the tests passed because
+they exercised the copy that had been updated. The duplicate is removed — `trackPlayStats` now
+calls `bucketOf`.
+
+**Context**: CONSTRUCTION — U4 complete and deployed. 866 tests, typecheck clean, schema v6,
+586 plays, `integrity_check: ok`, UI `200`.

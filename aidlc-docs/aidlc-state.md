@@ -4,7 +4,30 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U4 COMPLETE, DEPLOYED AND VERIFIED 2026-09-22.
+- **Current Stage**: CONSTRUCTION — **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME
+  VARIABLE WAS WRONG AND IS FIXED.** 851 tests · typecheck clean · schema v6 · 662 plays ·
+  `src/playback/` still absent.
+  **R11**: queue lookahead **depends on the playback context** — album/autoplay/radio expose 20
+  tracks and predict correctly (8 for 8 in order); **the AI DJ exposes none, ever** (0 on all 88
+  samples). `context.type` cannot tell them apart — the DJ and a radio station are both
+  `type: playlist`. At 50–70% DJ listening, **FR-34/35 is the majority path, not the fallback**.
+  Record: [`u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md`](construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md).
+  ⚠️ **The probe found something bigger.** In the DJ context the API stops reporting a track
+  ~18–41 s before it stops playing, so **24 of 46 live skips were completions mis-labelled as
+  skips** — confirmed by the listener hearing them finish, by the same tracks reaching 99–100% on
+  other days, and by a natural experiment (DJ 3 of 12 skipped; album 0 of 20; radio 0 of 16).
+  **Classifier v2** moves the test into the outcome, on the axis the mechanism lives on —
+  **milliseconds of unobserved tail**, not a ratio, because a proportional threshold over a
+  constant-time effect misfiles short tracks. 24 rows re-derived, **552 identical**, live skips
+  **46 -> 22**, all the listener's.
+  ✅ **`skip_attribution` is retired** (v2 subsumes it; the two rules could contradict each other),
+  and **U5 handoff item 1 is CLOSED rather than inherited** — `BackTestService` needed no change.
+  `skip_source` (`user` | `rule`) is untouched and is still what U5 needs.
+  ⚠️ The 2026-09-10 gate ran on those 24 rows as skips. **BR-11.7 still forbids a re-run**;
+  recorded as a defect in the discharged result.
+  See `audit.md` 2026-09-22.
+
+- **Previously**: CONSTRUCTION — **U4 COMPLETE, DEPLOYED AND VERIFIED 2026-09-22.
   All three exit criteria CI could not close are CLOSED. U5 is next.**
   866 tests · typecheck clean · schema **v6** · 613 plays · `src/playback/` absent.
   ✅ Dry-run agreement gate (65 decisions, user agreed) · `partialData` **0 of 65**, max settle

@@ -76,6 +76,8 @@ if (config.historyEnabled) {
       {
         completionThreshold: config.completionThreshold,
         jitterToleranceMs: config.jitterToleranceMs,
+        maxUnobservedTailMs: config.maxUnobservedTailMs,
+        minObservedPositionRatio: config.minObservedPositionRatio,
       },
       {
         // BR-9.1 — sampled at play start because it cannot be recovered afterwards.

@@ -44,9 +44,7 @@ function samplePlay(overrides: Partial<NewPlayRecord> = {}): NewPlayRecord {
     contextType: 'playlist',
     explicit: null,
     albumType: null,
-    skipAttribution: null,
     successorLagMs: null,
-    attributionVersion: null,
     classifierVersion: CLASSIFIER_VERSION,
     ...overrides,
   };
@@ -263,7 +261,6 @@ describe('listening statistics', () => {
     assert.deepEqual(stats.byBucket, {
       completed: 1,
       skipped: 1,
-      'ended-early': 0,
       inconclusive: 1,
       'not-observed': 0,
     });
@@ -283,7 +280,6 @@ describe('listening statistics', () => {
     assert.deepEqual(stats.byBucket, {
       completed: 0,
       skipped: 0,
-      'ended-early': 0,
       inconclusive: 0,
       'not-observed': 0,
     });
@@ -301,7 +297,6 @@ describe('listening statistics', () => {
       samplePlay({
         startedAt: '2026-08-25T10:00:00.000Z',
         outcome: 'skipped',
-        skipAttribution: 'user',
       }),
       [],
     );
@@ -322,13 +317,11 @@ describe('listening statistics', () => {
         startedAt: '2026-08-25T10:00:00.000Z',
         outcome: 'skipped',
         provenance: 'live',
-        skipAttribution: 'user',
       },
       {
         startedAt: '2026-08-27T10:00:00.000Z',
         outcome: 'completed',
         provenance: 'live',
-        skipAttribution: null,
       },
     ]);
     repo.close();

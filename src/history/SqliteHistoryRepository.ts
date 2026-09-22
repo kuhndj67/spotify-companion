@@ -43,7 +43,6 @@ import type {
   UnknownReason,
 } from '../musicbrainz/types.js';
 import { bucketOf } from './playStats.js';
-import type { SkipAttribution } from './skipAttribution.js';
 import type {
   CoverageStats,
   CloseReason,
@@ -83,7 +82,6 @@ interface PlayRow {
   /** Schema v5. Null on a pre-v5 row is UNANSWERABLE, not `false` — decided by the watermark. */
   explicit: number | null;
   album_type: string | null;
-  skip_attribution: string | null;
   successor_lag_ms: number | null;
   attribution_version: number | null;
   ev_listened_ms: number;
@@ -128,9 +126,7 @@ function rowToRecord(row: PlayRow): PlayRecord {
     classifierVersion: row.classifier_version,
     explicit: fromDbBool(row.explicit),
     albumType: row.album_type,
-    skipAttribution: row.skip_attribution as SkipAttribution | null,
     successorLagMs: row.successor_lag_ms,
-    attributionVersion: row.attribution_version,
     evidence: {
       listenedMs: row.ev_listened_ms,
       durationMs: row.ev_duration_ms,
@@ -238,10 +234,12 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
              track_id, isrc, title, artist_name, artist_id, album_name, release_date,
              age_years, following, started_at, ended_at, outcome, close_reason, provenance,
              skip_source, context_type, classifier_version, explicit, album_type,
-             skip_attribution, attribution_version,
+             -- ⚰️ skip_attribution / attribution_version are deliberately NOT listed. Retired
+             -- 2026-09-22 (see skipAttribution.ts); the columns stay in the schema for by-image
+             -- rollback and SQLite defaults them to NULL. Do not re-add them here.
              ev_listened_ms, ev_duration_ms, ev_completion_ratio, ev_max_progress_ms,
              ev_max_gap_ms, ev_observation_count, ev_saw_pause, ev_rewound, ev_ended_with_idle
-           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           play.trackId,
@@ -263,8 +261,6 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
           play.classifierVersion,
           toDbBool(play.explicit),
           play.albumType,
-          play.skipAttribution,
-          play.attributionVersion,
           play.evidence.listenedMs,
           play.evidence.durationMs,
           play.evidence.completionRatio,
@@ -497,11 +493,18 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     return Number.isFinite(parsed) ? parsed : null;
   }
   /**
-   * Record the successor evidence once the next play has been seen (`skipAttribution.ts`).
+   * Record the successor evidence once the next play has been seen: how far into the *next* track
+   * the app was when it first saw it.
    *
-   * ⚠️ Evidence only — it does **not** revise `skip_attribution`. The attribution is decided
-   * at close from the completion ratio, because one hand-checked play sat in the upper cluster
-   * with a successor lag of just 2 s; making the lag a condition would have mis-attributed it.
+   * ⚠️ **Evidence, never a discriminator.** A large head start proves the tracks overlapped; a
+   * small one proves nothing, because the poll can land exactly at the switch. Measured
+   * 2026-09-22: no user skip in the corpus has a successor more than 3.0 s in, while overlapping
+   * closes ran to 31 s — which *corroborated* classifier v2's tail rule on an axis the rule does
+   * not use. That is its value; it must not become a condition.
+   *
+   * ⚠️ **THIS HAS ZERO CALLERS AND `successor_lag_ms` IS NULL ON EVERY ROW.** The field built to
+   * measure the overlap was never wired, and the 2026-09-22 measurement had to reconstruct it from
+   * retained trails instead. Still worth wiring, so the evidence is stored rather than re-derived.
    */
   recordSuccessorLag(playId: number, lagMs: number): void {
     this.#db
@@ -509,12 +512,15 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       .run(lagMs, playId);
   }
 
-  /** Re-derive attribution for one play (FR-20's recompute, applied to the new judgement). */
-  updateSkipAttribution(playId: number, attribution: string | null, version: number): void {
-    this.#db
-      .prepare('UPDATE play SET skip_attribution = ?, attribution_version = ? WHERE id = ?')
-      .run(attribution, version, playId);
-  }
+  /*
+   * ⚰️ `updateSkipAttribution` was removed 2026-09-22 with the rest of `skip_attribution`.
+   *
+   * ⚠️ It had **zero callers for its whole life**, exactly like `recordSuccessorLag` above. Both
+   * were written for `scripts/attribute-skips.mjs`, which then re-implemented the rule in its own
+   * SQL instead of calling either — so the script carried a second copy of
+   * `USER_SKIP_RATIO_CEILING` while the methods built for it sat unused. `noOrphanModules.test.ts`
+   * could not see it: that test walks modules, not methods.
+   */
 
 
   coverage(): CoverageStats {
@@ -569,14 +575,13 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     // listener did not make is likewise not a skip.
     const rows = this.#db
       .prepare(
-        `SELECT outcome, provenance, skip_attribution, COUNT(*) AS n,
+        `SELECT outcome, provenance, COUNT(*) AS n,
                 MIN(started_at) AS first_at, MAX(started_at) AS last_at
-           FROM play WHERE track_id = ? GROUP BY outcome, provenance, skip_attribution`,
+           FROM play WHERE track_id = ? GROUP BY outcome, provenance`,
       )
       .all(trackId) as {
       outcome: string;
       provenance: string;
-      skip_attribution: string | null;
       n: number;
       first_at: string;
       last_at: string;
@@ -585,7 +590,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     const stats: TrackPlayStats = {
       trackId,
       totalPlays: 0,
-      byBucket: { completed: 0, skipped: 0, 'ended-early': 0, inconclusive: 0, 'not-observed': 0 },
+      byBucket: { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 },
       firstPlayedAt: null,
       lastPlayedAt: null,
     };
@@ -600,7 +605,6 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
         startedAt: row.first_at,
         outcome: row.outcome as PlayOutcome,
         provenance: row.provenance as Provenance,
-        skipAttribution: row.skip_attribution as SkipAttribution | null,
       });
 
       stats.byBucket[bucket] += row.n;
@@ -619,7 +623,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   listPlayTimesForArtist(artistId: string, sinceIso: string): PlayTimePoint[] {
     const rows = this.#db
       .prepare(
-        `SELECT started_at, outcome, provenance, skip_attribution FROM play
+        `SELECT started_at, outcome, provenance FROM play
           WHERE artist_id = ? AND started_at >= ?
           ORDER BY started_at`,
       )
@@ -627,14 +631,12 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       started_at: string;
       outcome: string;
       provenance: string;
-      skip_attribution: string | null;
     }[];
 
     return rows.map((row) => ({
       startedAt: row.started_at,
       outcome: row.outcome as PlayOutcome,
       provenance: row.provenance as Provenance,
-      skipAttribution: row.skip_attribution as SkipAttribution | null,
     }));
   }
 

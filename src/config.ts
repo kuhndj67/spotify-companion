@@ -123,6 +123,20 @@ export const config = {
   /** Slack for progress jitter between polls; also bounds the forward-step cap. */
   jitterToleranceMs: int('JITTER_TOLERANCE_MS', 1500),
 
+  /**
+   * Classifier v2. Largest unobserved tail (`duration - maxProgress`) that still counts as a
+   * completion on a `track-change` close, in milliseconds.
+   *
+   * ⚠️ Milliseconds rather than a ratio on purpose — a proportional threshold over a
+   * constant-time effect misfiles short tracks. Derivation in `outcomeClassifier`.
+   * Like `completionThreshold`, changing this does not rewrite stored verdicts; trails allow
+   * retroactive reclassification.
+   */
+  maxUnobservedTailMs: int('MAX_UNOBSERVED_TAIL_MS', 55_000),
+
+  /** Classifier v2. Sanity rail on the rule above; only bites below ~110 s of duration. */
+  minObservedPositionRatio: Number.parseFloat(process.env.MIN_OBSERVED_POSITION_RATIO ?? '0.75'),
+
   // -- U1: export and snapshots (FR-56) ---------------------------------------
 
   snapshotDir: process.env.SNAPSHOT_DIR ?? join(projectRoot, 'data', 'snapshots'),

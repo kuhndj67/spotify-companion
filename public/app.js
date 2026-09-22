@@ -710,13 +710,16 @@ el('export-open').addEventListener('click', () => {
  */
 const DRAWN_SERIES = [
   { key: 'completed', label: 'Completed', fill: 'var(--series-completed)' },
+  // ⚠️ `Skipped` means a rejection again, and there is no longer a fourth series beside it.
+  // An `Ended early` series existed from 2026-09-21 to 2026-09-22, drawn separately because v1's
+  // outcome counted transitions as rejections -- 24 of 46 live skips were tracks that played to
+  // 81-90% and were then replaced by something the listener did not choose.
+  //
+  // Those turned out to be COMPLETIONS: the API had stopped reporting the track while it was
+  // still playing (probed 2026-09-22, DJ context only). Classifier v2 records them as
+  // `completed`, so the series had nothing left to draw. Do not reinstate a display-layer split
+  // -- the correction lives in the outcome now.
   { key: 'skipped', label: 'Skipped', fill: 'var(--series-skipped)' },
-  // ⚠️ Added 2026-09-21, and drawn SEPARATELY from `Skipped` on purpose. The track played to
-  // 81-90% and was then replaced by something the listener did not choose -- 19 of 36 skips on
-  // this corpus. Folding it back into `Skipped` tells someone they rejected music they sat
-  // through, which is how this was found: the panel showed skips of an artist the listener
-  // never skips.
-  { key: 'ended-early', label: 'Ended early', fill: 'var(--series-ended-early)' },
   { key: 'inconclusive', label: 'Inconclusive', fill: 'var(--series-inconclusive)' },
 ];
 
@@ -895,7 +898,6 @@ function renderTrendTable(weeks, totals) {
     'Week of',
     'Completed',
     'Skipped',
-    'Ended early',
     'Inconcl.',
     'Not rec.',
     'Total',
@@ -914,7 +916,6 @@ function renderTrendTable(weeks, totals) {
     for (const value of [
       week.byBucket.completed,
       week.byBucket.skipped,
-      week.byBucket['ended-early'],
       week.byBucket.inconclusive,
       week.byBucket['not-observed'],
       week.total,
@@ -931,7 +932,6 @@ function renderTrendTable(weeks, totals) {
   for (const value of [
     totals.completed,
     totals.skipped,
-    totals['ended-early'],
     totals.inconclusive,
     totals['not-observed'],
     grand,

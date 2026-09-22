@@ -182,34 +182,63 @@ describe('classify — the four branches', () => {
   });
 });
 
-describe('the accepted short-track limitation (U1 FD Q6)', () => {
-  // A fully-played track clears the threshold only when duration >= poll / (1 - threshold),
-  // i.e. 30 s at 0.90 and a 3 s poll. Below that it depends on where the final poll lands —
-  // so the limitation is *intermittent*, not deterministic. That is worse in one way (the same
-  // track can be recorded differently on different plays) and better in another (not every
-  // short track is mislabelled).
+describe('the U1 FD Q6 short-track limitation — CLOSED by classifier v2', () => {
+  /*
+   * Under v1 a fully-played track cleared the threshold only when
+   * `duration >= poll / (1 - threshold)` — 30 s at 0.90 and a 3 s poll. Below that the verdict
+   * depended on where the final poll happened to land, so the same short track could be recorded
+   * differently on different plays. That was *accepted* in U1 (FD Q6), not desired, and
+   * `reclassify` existed partly so it could be corrected later.
+   *
+   * ⚠️ v2 closes it, as a SIDE EFFECT rather than a goal. A track played in full has an
+   * unobserved tail of about one poll interval, which the tail rule admits regardless of duration.
+   * The tests below now pin the *absence* of the limitation. They are kept under the original
+   * heading on purpose: if a future classifier reintroduces poll-alignment sensitivity for short
+   * tracks, this is the block that should fail.
+   */
 
-  it('a short track can be recorded as skipped when the final poll lands badly', () => {
-    assert.equal(verdict(worstCaseTrail(20_000), 'track-change'), 'skipped');
+  it('a short track played in full is completed even when the final poll lands badly', () => {
+    // v1 recorded this as `skipped` — a 20 s track observed to 17 s, ratio 0.85.
+    assert.equal(verdict(worstCaseTrail(20_000), 'track-change'), 'completed');
   });
 
-  it('the same short track is recorded as completed when the poll lands well', () => {
-    // Same duration, same listening — only the sampling alignment differs. This inconsistency
-    // is the honest shape of the accepted limitation.
+  it('poll alignment no longer changes the verdict for the same short track', () => {
+    // The inconsistency itself was the worst part of the limitation: same duration, same
+    // listening, different record.
+    assert.equal(verdict(worstCaseTrail(20_000), 'track-change'), 'completed');
     assert.equal(verdict(completeTrail(20_000, 3000, 100), 'track-change'), 'completed');
   });
 
-  it('a track of 30 s or more is unaffected regardless of alignment', () => {
+  it('longer tracks are unaffected, as they were before', () => {
     assert.equal(verdict(worstCaseTrail(30_000), 'track-change'), 'completed');
     assert.equal(verdict(worstCaseTrail(240_000), 'track-change'), 'completed');
   });
 
-  it('the limitation is correctable by reclassification from the retained trail', () => {
+  it('the position rail still refuses a genuine short-track skip', () => {
+    // 60 s track abandoned at 40 s: a 20 s tail, inside the overlap range, but position 0.67.
+    // This is the case the 0.50 rail would have fabricated into a completion.
+    const trail = buildTrail({
+      trackId: 'short-track-genuine-skip',
+      durationMs: 60_000,
+      startProgressMs: 0,
+      steps: Array.from({ length: 13 }, () => ({ kind: 'play' as const })),
+      pollIntervalMs: 3000,
+    });
+    const evidence = reclassify(trail, 'track-change', T);
+    assert.ok(
+      evidence.evidence.maxProgressMs / 60_000 < T.minObservedPositionRatio,
+      `expected position below the rail, got ${evidence.evidence.maxProgressMs / 60_000}`,
+    );
+    assert.equal(evidence.outcome, 'skipped');
+  });
+
+  it('reclassification from the retained trail is still what makes this correctable', () => {
+    // The mechanism that closed the limitation is the same one that can reopen or re-answer it.
     const trail = worstCaseTrail(20_000);
-    assert.equal(reclassify(trail, 'track-change', T).outcome, 'skipped');
-    // A future classifier with a poll-interval floor, modelled here as a lower threshold.
-    const corrected = reclassify(trail, 'track-change', { ...T, completionThreshold: 0.8 });
-    assert.equal(corrected.outcome, 'completed');
+    assert.equal(reclassify(trail, 'track-change', T).outcome, 'completed');
+    // A stricter tail budget models a classifier that declines to make this inference at all.
+    const strict = reclassify(trail, 'track-change', { ...T, maxUnobservedTailMs: 0 });
+    assert.equal(strict.outcome, 'skipped');
   });
 });
 

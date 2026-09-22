@@ -134,14 +134,33 @@ describe('P-6: reaching the threshold is never a skip', () => {
   });
 });
 
-describe('P-7: never reaching the threshold is never a completion', () => {
-  it('a below-threshold trail ending in a track change is skipped', () => {
+describe('P-7: below the threshold, only a small unobserved tail can still be a completion', () => {
+  /*
+   * ⚠️ P-7 USED TO SAY "never reaching the threshold is never a completion", and classifier v2
+   * deliberately retired that. A play can now close below the ratio threshold and still be a
+   * completion, when the track was still running as the API stopped reporting it (see THE
+   * UNOBSERVED TAIL in outcomeClassifier).
+   *
+   * The invariant is narrowed rather than deleted: below the threshold, `completed` requires a
+   * small tail AND enough observed position. So there is still exactly one way in, and this
+   * property is what stops a third one appearing unnoticed.
+   */
+  it('a below-threshold track change is skipped unless the tail rule admits it', () => {
     fc.assert(
       fc.property(trailArb, (trail) => {
         const evidence = summarise(trail, T);
         if (evidence.durationMs <= 0) return;
         if (evidence.completionRatio >= T.completionThreshold) return;
-        assert.equal(classify(evidence, T, 'track-change').outcome, 'skipped');
+
+        const tailMs = evidence.durationMs - evidence.maxProgressMs;
+        const position = evidence.maxProgressMs / evidence.durationMs;
+        const tailRuleAdmits =
+          tailMs <= T.maxUnobservedTailMs && position >= T.minObservedPositionRatio;
+
+        assert.equal(
+          classify(evidence, T, 'track-change').outcome,
+          tailRuleAdmits ? 'completed' : 'skipped',
+        );
       }),
     );
   });

@@ -39,6 +39,40 @@ if (!existsSync(dbPath)) {
 }
 
 const db = new DatabaseSync(dbPath, { readOnly: true });
+
+/*
+ * ⚠️ THIS SCRIPT CANNOT RUN AFTER CLASSIFIER v2, AND IT MUST FAIL RATHER THAN RETURN ZEROS.
+ *
+ * It reads `skip_attribution`, which was retired and nulled on 2026-09-22 (see
+ * `src/history/skipAttribution.ts`). With the column null, every query below returns 0 and the
+ * output reads as "the confound has disappeared" — a plausible wrong answer presented as a
+ * finding, which is the exact shape this project has been caught by five times.
+ *
+ * Its results are already recorded in CLAUDE.md open item 4 and in `audit.md`. To re-run it
+ * against the pre-retirement data, point HISTORY_DB_PATH at the snapshot in
+ * `data/backup-before-classifier-v2-<stamp>/history.db`.
+ */
+{
+  const attributed = db
+    .prepare(`SELECT COUNT(*) n FROM play WHERE skip_attribution IS NOT NULL`)
+    .get().n;
+  if (attributed === 0) {
+    console.error(
+      `
+✖ REFUSING TO RUN: no row in ${dbPath} has skip_attribution set.
+` +
+        `  The column was retired on 2026-09-22; classifier v2 answers the question in the
+` +
+        `  outcome instead. Every number below would be 0, which would read as a finding.
+` +
+        `  Re-run against data/backup-before-classifier-v2-<stamp>/history.db to reproduce the
+` +
+        `  original measurement. See src/history/skipAttribution.ts.
+`,
+    );
+    process.exit(2);
+  }
+}
 const all = (sql, ...args) => db.prepare(sql).all(...args);
 const one = (sql, ...args) => db.prepare(sql).get(...args);
 

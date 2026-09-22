@@ -27,8 +27,6 @@
 
 import type { HistoryRepository } from './HistoryRepository.js';
 import { CLASSIFIER_VERSION, classify, summarise } from './outcomeClassifier.js';
-import { attributeSkip } from './skipAttribution.js';
-import { ATTRIBUTION_VERSION } from './types.js';
 import type {
   ClassifierTolerances,
   CloseReason,
@@ -219,18 +217,23 @@ export class PlayObserver {
       closeReason: reason,
       evidence,
       provenance: 'live',
-      // US-13, U1 half: every live-observed skip is the user's. `rule` becomes reachable in U5.
-      // Recording it from the first play is what stops Phases 1–3 being permanently
-      // unattributed and needing a migration that *assumes* the answer.
-      // ⚠️ KEPT AS-IS, AND IT IS AN ASSERTION. Before 2026-09-21 this was the only answer,
-      // and the comment below claimed it was safe. It is not: 18 of 35 live skips turned out
-      // to be tracks that played to 81-90% and were then replaced by something the listener
-      // did not choose. The value stays so the historical claim remains visible; the derived
-      // answer is `skipAttribution` beside it.
+      // US-13, U1 half: a live-observed skip is the listener's; `rule` becomes reachable in U5.
+      // Recording it from the first play is what stops Phases 1–3 being permanently unattributed
+      // and needing a migration that *assumes* the answer.
+      //
+      // ⚠️ THIS WAS AN ASSERTION UNTIL CLASSIFIER v2, AND IT WAS WRONG. Before 2026-09-21 the
+      // outcome itself was over-broad: 18 of 35 live skips were tracks that played to 81-90% and
+      // were then replaced by something the listener did not choose, and this line called every
+      // one of them `user`. It was caught by a listener saying "I never skip Ren", not by a test.
+      //
+      // ✅ It is now **sound rather than merely preserved**, because the correction moved upstream
+      // of it: v2 only returns `skipped` when the unobserved tail exceeds its budget, so the
+      // rejections have already been separated from the transitions by the time this runs. The
+      // `skip_attribution` column that used to carry that separation is retired — see
+      // `skipAttribution.ts`. `user` vs `rule` remains a real question, and it is U5's.
       skipSource: outcome === 'skipped' ? 'user' : null,
-      skipAttribution: attributeSkip(outcome, evidence),
-      attributionVersion: outcome === 'skipped' ? ATTRIBUTION_VERSION : null,
-      // Measured when the NEXT play starts; unknowable now.
+      // Measured when the NEXT play starts; unknowable now. ⚠️ Still never measured — see
+      // `recordSuccessorLag`, which has no callers.
       successorLagMs: null,
       contextType: play.sample.contextType,
       classifierVersion: CLASSIFIER_VERSION,

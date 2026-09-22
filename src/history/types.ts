@@ -15,8 +15,6 @@
  * measured (R2), so an unknown that exports as a blank cell hides a bias rather than showing it.
  */
 
-import type { SkipAttribution } from './skipAttribution.js';
-
 /**
  * Three values, exhaustively. `abandoned` was retired in U1 Functional Design (Q7): anything
  * that is not a clean completion or a clean below-threshold track change is `unknown`.
@@ -34,11 +32,11 @@ export type Provenance = 'live' | 'backfilled';
  */
 export type SkipSource = 'user' | 'rule';
 
-/**
- * Bumped when the attribution rule changes, so a partially-reattributed corpus is
- * distinguishable from a consistent one — the same reason `classifierVersion` exists.
+/*
+ * ⚰️ `ATTRIBUTION_VERSION` was removed 2026-09-22 with the rest of `skip_attribution`. Classifier
+ * v2 answers "was this a rejection?" in the outcome itself, so there is no second rule left to
+ * version. `classifierVersion` is the one that matters now. See `skipAttribution.ts`.
  */
-export const ATTRIBUTION_VERSION = 1;
 
 /** Why a play stopped. Feeds classification; also kept as evidence for diagnostics. */
 export type CloseReason =
@@ -82,7 +80,16 @@ export interface OutcomeEvidence {
    * destroy the repeat-listen signal.
    */
   completionRatio: number;
-  /** Furthest point reached. Evidence only — the classifier does not read it. */
+  /**
+   * Furthest point reached.
+   *
+   * ⚠️ **The classifier reads this as of v2.** It used to be evidence only. `durationMs -
+   * maxProgressMs` is the *unobserved tail* — how much of the track was still to run when the
+   * API stopped reporting it — and that is the axis the transition-overlap effect lives on.
+   *
+   * Position, not listened time: a rewind inflates `listenedMs` without moving the tail, and the
+   * question here is "where had the track got to", not "how much was heard".
+   */
   maxProgressMs: number;
   /** Largest gap between samples: the staleness bound on everything above. */
   maxObservationGapMs: number;
@@ -102,6 +109,25 @@ export interface ClassifierTolerances {
    * polls; without tolerance that would read as a rewind. Also bounds the forward-step cap.
    */
   jitterToleranceMs: number;
+  /**
+   * Largest *unobserved tail* (`durationMs - maxProgressMs`) that still counts as a completion
+   * when a play closes on `track-change`. 55 000 ms — see `outcomeClassifier` for the derivation.
+   *
+   * ⚠️ **In milliseconds, not a ratio, and that is the whole point.** The effect removes a roughly
+   * constant number of seconds; a ratio divides by duration, so a proportional threshold over a
+   * constant-time effect misfiles short tracks. Measured 2026-09-22: `ratio < 0.75` whenever
+   * `duration < 4 x tail`, so at a 41 s tail every track under 164 s read as a user skip — and the
+   * corpus's 10th-percentile duration is 146 s.
+   */
+  maxUnobservedTailMs: number;
+  /**
+   * Sanity rail on the rule above: `maxProgressMs / durationMs` must be at least this.
+   *
+   * 0.75. It refuses a genuine short-track skip that the tail rule alone would accept — a 60 s
+   * track abandoned at 40 s has a 20 s tail, inside the overlap range, but only 0.67 of position.
+   * It costs one known-ambiguous row (`Mascara`); see `outcomeClassifier`.
+   */
+  minObservedPositionRatio: number;
 }
 
 /** A single listening event, as persisted. */
@@ -182,24 +208,22 @@ export interface PlayRecord {
   evidence: OutcomeEvidence;
   provenance: Provenance;
   /**
-   * ⚠️ **An assertion, not an observation, and known to be unreliable.** It is written `user`
-   * for every live skip because that is what the app claimed before 2026-09-21. It is kept
-   * as-is — including on historical rows — because rewriting it would erase the evidence that
-   * the claim was ever made. **Read `skipAttribution` instead.**
+   * ⚠️ **HISTORICALLY AN ASSERTION, AND IT WAS WRONG.** Before 2026-09-21 this was written
+   * `user` for every live skip on the assumption that every early track change was the
+   * listener's. It is kept as-is on historical rows because rewriting it would erase the
+   * evidence that the claim was ever made.
+   *
+   * It is still the right column for U5: `user` vs `rule` is a question only U5 can answer, and
+   * recording rule-initiated skips distinctly is a Phase 4 exit criterion. What made the old
+   * values unreliable — transitions being counted as rejections — is now handled in the
+   * **outcome** by classifier v2, so a v2 `skipped` row is a rejection by construction.
    */
   skipSource: SkipSource | null;
-  /**
-   * Who actually ended a skipped play, derived from evidence (`skipAttribution.ts`).
-   * `null` when the play was not a skip, or when nothing has attributed it yet.
-   */
-  skipAttribution: SkipAttribution | null;
   /**
    * How far into the **next** track the app was when it first saw it, in ms. Corroborating
    * evidence for a late-learned transition. `null` means not measured — never zero.
    */
   successorLagMs: number | null;
-  /** Which attribution rule produced `skipAttribution`. Null on rows nothing has attributed. */
-  attributionVersion: number | null;
   contextType: string | null;
   /**
    * U2 label enrichment. Every field is `null` until resolved, and **`null` here means one of
@@ -287,7 +311,6 @@ export interface TrackPlayStats {
   byBucket: {
     completed: number;
     skipped: number;
-    'ended-early': number;
     inconclusive: number;
     'not-observed': number;
   };
@@ -306,14 +329,6 @@ export interface TrackPlayStats {
 export interface PlayTimePoint {
   startedAt: string;
   outcome: PlayOutcome;
-  /**
-   * Who ended it, when it was a skip.
-   *
-   * ⚠️ Required, not optional, for the same reason `provenance` is. A skip the listener made
-   * and a skip nothing can be blamed for are different facts, and the chart must not be able
-   * to render one as the other by simply not being told.
-   */
-  skipAttribution: SkipAttribution | null;
   /**
    * Required, not optional. A backfilled play is `unknown` because the app was not watching, and
    * a live play is `unknown` because it watched and could not tell — the chart must never merge

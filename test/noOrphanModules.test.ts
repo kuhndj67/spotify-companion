@@ -66,6 +66,12 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   'rules/DecisionLogRepository.ts': 'interface only',
   'musicbrainz/types.ts': 'type declarations only',
   'musicbrainz/LabelRepository.ts': 'interface only',
+
+  // ⚰️ Retired 2026-09-22: a tombstone with no runtime code. It is kept, rather than deleted,
+  // because its doc comment records the 2026-09-21 finding, why classifier v2 superseded it, and
+  // why `play.skip_attribution` is nulled rather than dropped. Nothing imports it by design —
+  // that is the point of retiring it, not a coverage gap.
+  'history/skipAttribution.ts': 'retired tombstone: documentation only, exports nothing',
 };
 
 async function walk(dir: string): Promise<string[]> {

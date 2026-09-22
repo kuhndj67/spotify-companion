@@ -23,14 +23,13 @@ function play(
   startedAt: string,
   outcome: PlayTimePoint['outcome'] = 'completed',
   provenance: PlayTimePoint['provenance'] = 'live',
-  skipAttribution: PlayTimePoint['skipAttribution'] = null,
 ): PlayTimePoint {
-  return { startedAt, outcome, provenance, skipAttribution };
+  return { startedAt, outcome, provenance };
 }
 
 /** A play from `recently-played`: the app was not running, so nothing about it was observed. */
 function notObserved(startedAt: string): PlayTimePoint {
-  return { startedAt, outcome: 'unknown', provenance: 'backfilled', skipAttribution: null };
+  return { startedAt, outcome: 'unknown', provenance: 'backfilled' };
 }
 
 describe('startOfWeekUtc', () => {
@@ -127,7 +126,6 @@ describe('weeklyBuckets', () => {
     assert.deepEqual(buckets[0]!.byBucket, {
       completed: 1,
       skipped: 1,
-      'ended-early': 0,
       inconclusive: 2,
       'not-observed': 0,
     });
@@ -142,34 +140,40 @@ describe('weeklyBuckets', () => {
    * Same family as the `unknown` merge above: one label covering two facts, where the wrong
    * reading is the flattering one and nothing on screen admits the difference.
    */
-  it('NEVER counts an unattributed skip as one the listener made', () => {
+  /*
+   * ⚠️ THIS TEST USED TO ASSERT THE OPPOSITE, AND THE CHANGE IS DELIBERATE.
+   *
+   * From 2026-09-21 to 2026-09-22 it read "NEVER counts an unattributed skip as one the listener
+   * made", and split three skipped plays into 1 `skipped` + 2 `ended-early` on the strength of a
+   * `skipAttribution` column. That column is retired: classifier v2 decides the question in the
+   * **outcome**, because the 24 plays it was separating turned out to be completions — the API had
+   * stopped reporting the track while it was still playing.
+   *
+   * So a `skipped` play reaching this function is already a rejection, and every one of them
+   * counts. What must not come back is a second split here; see `bucketOf`.
+   */
+  it('counts every skipped play as a skip, because v2 has already filtered them', () => {
     const buckets = weeklyBuckets(
       [
-        play('2026-08-18T09:00:00.000Z', 'skipped', 'live', 'user'),
-        play('2026-08-19T09:00:00.000Z', 'skipped', 'live', 'unattributed'),
-        play('2026-08-20T09:00:00.000Z', 'skipped', 'live', 'unattributed'),
+        play('2026-08-18T09:00:00.000Z', 'skipped'),
+        play('2026-08-19T09:00:00.000Z', 'skipped'),
+        play('2026-08-20T09:00:00.000Z', 'skipped'),
       ],
       window,
     );
 
-    assert.equal(buckets[0]!.byBucket.skipped, 1, 'only the one the listener actually skipped');
-    assert.equal(buckets[0]!.byBucket['ended-early'], 2);
+    assert.equal(buckets[0]!.byBucket.skipped, 3);
     assert.equal(buckets[0]!.total, 3, 'and none of them are lost');
   });
 
-  /**
-   * ⚠️ An unattributed skip is a JUDGEMENT, so its absence must not be read as one. A skip
-   * nothing has attributed yet stays in `skipped` rather than being promoted — inventing an
-   * attribution is the exact mistake this column was added to correct.
-   */
-  it('leaves a not-yet-attributed skip in skipped rather than guessing', () => {
-    const buckets = weeklyBuckets(
-      [play('2026-08-18T09:00:00.000Z', 'skipped', 'live', null)],
-      window,
-    );
-
-    assert.equal(buckets[0]!.byBucket.skipped, 1);
-    assert.equal(buckets[0]!.byBucket['ended-early'], 0);
+  it('has exactly four buckets — a fifth would mean a split crept back in', () => {
+    const buckets = weeklyBuckets([play('2026-08-18T09:00:00.000Z', 'skipped')], window);
+    assert.deepEqual(Object.keys(buckets[0]!.byBucket).sort(), [
+      'completed',
+      'inconclusive',
+      'not-observed',
+      'skipped',
+    ]);
   });
 
   it('NEVER merges "the app was off" with "the app could not tell"', () => {
@@ -198,7 +202,6 @@ describe('weeklyBuckets', () => {
           startedAt: '2026-08-18T09:00:00.000Z',
           outcome: 'completed',
           provenance: 'backfilled',
-          skipAttribution: null,
         },
       ],
       window,

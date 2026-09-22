@@ -4221,3 +4221,158 @@ silently means arming rules against a target that is half noise.
 
 **Context**: CONSTRUCTION — **U4 COMPLETE**, awaiting user approval. U5 next. 866 tests, schema
 v6, 613 plays, `integrity_check: ok`, `src/playback/` absent.
+
+## 2026-09-22 — R11 probed; the outcome variable was WRONG, not noisy; classifier v2
+
+**Stage**: CONSTRUCTION — start of U5. R11 discharged. A correctness defect in U1's classifier
+found, fixed, and applied retroactively to the corpus **before** U5 design begins.
+
+### R11 is discharged, with an answer neither branch of the execution plan anticipated
+
+`GET /me/player/queue` during active playback **depends on the playback context**:
+
+| Context | `context.type` | Queue depth | `queue[0]` predicts next |
+|---|---|---|---|
+| AI DJ | `playlist` | **0** on all 88 samples | n/a |
+| Album | `album` | 7–20 | **4/4** |
+| Autoplay continuation | `album` (stale) | 20 | 8 tracks in exact order |
+| Spotify radio station | `playlist` | 20, never depleting | — |
+
+⚠️ **The album run is the positive control, and without it the DJ result is unusable** — an empty
+queue alone is equally consistent with Development Mode, a missing scope or a malformed request.
+Same credentials, same endpoint, minutes apart, 10 vs 0. The DJ run's own `currently_playing`
+field was populated with the correct track while `queue` was `[]`.
+
+🔑 **`context.type` cannot predict lookahead.** The DJ and a radio station are both
+`type: playlist` with the same `37i9dQZF1E` prefix and give opposite answers. Nor is "algorithmic"
+the discriminator — autoplay and radio are algorithmic and fully exposed. **Only the DJ hides its
+queue.** FR-36 must therefore ask the queue at runtime; hardcoding the DJ URI would be a recorded
+negative that decays silently.
+
+⚠️ **`context.uri` goes stale.** The album ran to exhaustion and autoplay continued for 33 minutes
+while `context.uri` still reported the album, playing four artists who are not on it. Open item 7's
+`context_type` is necessary but **not sufficient** for a rule input.
+
+⚠️ At 50–70% DJ listening, FR-34/35 is the **majority path**, not the fallback `requirements.md`
+describes. Full record: `construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md`.
+
+### The probe found something bigger: 24 of 46 live skips were not skips
+
+Three of four DJ transitions were recorded `skipped` while the listener was demonstrably not
+touching playback — and reported hearing every track finish. The stored data agrees: the same
+tracks reach 99–100% on other days, so `duration_ms` is not overstated.
+
+Reconstructed from retained trails (FR-20), a play's *first* observed progress shows how far the
+successor had already run:
+
+| A closed as | n | A's unplayed remainder | B's head start | B already >2s in |
+|---|---|---|---|---|
+| `completed` | 455 | 2.0s | 2.0s | 38% |
+| `user` skip | 22 | 145.0s | **2.0s** | **27%** |
+| `unattributed` | 24 | 24.0s | **7.0s** | **75%** |
+
+Opposite shapes. **The audio does not stop; the reporting does.** Confirmed by a natural
+experiment across one afternoon, global settings unchanged:
+
+| Mode | plays | skipped | unattributed | shortfall median |
+|---|---|---|---|---|
+| **AI DJ** | 12 | 3 | **3** | **17.0s** |
+| Album / autoplay | 20 | 0 | **0** | 1.0s |
+| Radio | 16 | 0 | **0** | 2.0s |
+
+⚠️ **Crossfade is OFF on this machine**, Automix is on globally and produces no overlap on album or
+radio. So open item 4's *"crossfade is ruled out because Spotify caps it at 12 s"* failed twice
+over: the inference assumed cut length equals crossfade length, **and the feature was disabled**. A
+UI fact used as a probe result.
+
+### Classifier v2 — the fix is in the outcome, on the axis the mechanism lives on
+
+⚠️ **A RATIO CANNOT WORK HERE, AND THIS IS THE PROJECT'S OWN DOCUMENTED CONFOUND.** The effect
+removes a near-constant number of seconds; a ratio divides by duration. `ratio < 0.75` whenever
+`duration < 4 x tail`, so at a 41 s tail every track under 164 s is misfiled — and the corpus's p10
+duration is 146 s. `Mascara` is the proof: 136 s, 35 s tail, ratio 0.743, filed as a user skip
+purely for being short.
+
+So the threshold is **milliseconds of unobserved tail**, `durationMs - maxProgressMs`:
+
+- `maxUnobservedTailMs = 55 000` — the observed populations have an **empty band**: overlap closes
+  run 18–41 s, user skips 66 s+ (plus `Mascara` at 35 s). Any value in 42 000–65 000 partitions the
+  corpus identically; 55 000 weights the margin toward the tail side, whose upper end is unknown.
+- `minObservedPositionRatio = 0.75` — a rail, not a discriminator. **Raised from a proposed 0.50
+  after the test suite caught it**: 0.50 would have accepted any track under 110 s abandoned at its
+  midpoint, fabricating completions from genuine skips. Both rails capture all 24 measured rows.
+
+⚠️ Chosen **after** seeing the distribution, therefore **not pre-registered**. If plays appear in
+the 41–66 s band the question reopens rather than the number moving.
+
+⚠️ `USER_SKIP_RATIO_CEILING`'s own empty band **stopped being empty**, exactly as its comment
+warned: `Mascara` at 0.7426 landed in the documented 0.489–0.807 gap.
+
+**Result**: 24 of 576 live rows re-derived `skipped` -> `completed`; **552 re-derived identical**.
+Live skips **46 -> 22**. Backups plus a `changes.json` manifest and a 17-column pre-change CSV
+snapshot. `integrity_check: ok`, 662 rows and 36 404 observations intact.
+
+⚠️ **`Mascara` is knowingly left as `skipped`** — its tail is inside the overlap range but its
+position is below the rail. The single ambiguous row. Leaving one over-counted skip is recoverable
+from the trail; inventing a completion is not.
+
+### `skip_attribution` retired — v2 subsumes it, and they contradicted each other
+
+The two rules answered the same question on different axes and could disagree: a 5:00 track skipped
+at 4:00 has a 60 s tail (v2: `skipped`, a rejection) and a 0.80 ratio (attribution:
+`unattributed`, not one). **Zero rows were in that state, but 31% of the corpus's tracks are long
+enough to reach it.** The statistics panel routes on attribution and `BackTestService` counts every
+`skipped` row regardless — display and back-test would have disagreed about the same row, silently.
+
+User decision: rely on v2 for user skips; rule skips are a separate question. So:
+
+- `attributeSkip`, `USER_SKIP_RATIO_CEILING`, `LATE_SUCCESSOR_MS`, `ATTRIBUTION_VERSION` and
+  `updateSkipAttribution` are gone. `skipAttribution.ts` is kept as a **tombstone** carrying the
+  2026-09-21 history — the same reason `skip_source` was kept when it proved to be an assertion.
+- Columns **nulled (22 rows), not dropped**. Migration 004 dropped columns for a comparable
+  removal, but dropping these breaks the by-image rollback guarantee the U4 handoff depends on.
+  Nulling is rollback-safe *and* correct under old code: the pre-v2 `bucketOf` maps a null
+  attribution to `skipped`, and after v2 every remaining skip is one.
+- `ended-early` display bucket removed from `playStats`, the repository, `TrackPlayStats` and the UI.
+- `scripts/attribute-skips.mjs` **deleted** — it carried a second copy of
+  `USER_SKIP_RATIO_CEILING` and would re-derive the retired judgement.
+- `scripts/measure-confound.mjs` now **refuses to run** rather than returning zeros from a nulled
+  column, which would have read as "the confound disappeared".
+
+✅ **U5 handoff item 1 is CLOSED, not inherited.** `BackTestService` needed no change — it reads
+`outcome` and never read attribution, so fixing the outcome fixed it for free. `skip_source`
+(`user` | `rule`) is untouched and is still what U5 needs.
+
+### Two dead writers, both invisible to the suite
+
+`recordSuccessorLag` and `updateSkipAttribution` had **zero callers for their entire lives**, and
+`successor_lag_ms` is null on all 662 rows. Both were built for `attribute-skips.mjs`, which then
+re-implemented the rule in its own SQL instead of calling either. ⚠️ `noOrphanModules.test.ts`
+cannot catch this: **it walks modules, not methods.** `recordSuccessorLag` is still worth wiring —
+the 2026-09-22 measurement had to reconstruct it from trails.
+
+### Other things worth recording
+
+- **U1 FD Q6's short-track limitation is CLOSED**, as a side effect. A short track played in full
+  has a tail of about one poll interval, so poll alignment no longer changes its verdict. The tests
+  that pinned the limitation now pin its absence, under the original heading.
+- **P-7 was retired and narrowed.** "Never reaching the threshold is never a completion" is no
+  longer true; the property now asserts that below the threshold, `completed` requires the tail
+  rule — so there is still exactly one way in.
+- ⚠️ **The gate's inputs were wrong.** The 2026-09-10 confirmatory run's eligibility predicate is
+  `outcome IN ('completed','skipped')`, so those 24 rows entered it as skips. Roughly 12 of its 17
+  skips were affected. **BR-11.7 still forbids a re-run**; this is recorded as a defect in the
+  discharged result, not grounds for another attempt.
+- **Pause tracking**: user decision — the *cause* of a pause is not tracked, only that one occurred
+  and that listened time excludes it. Verified correct on a real 3-minute external pause (204 s
+  listened against 362 s of wall clock).
+- ⚠️ **My own write guard was wrong and was fixed rather than overridden.** It checked for
+  `history.db-wal`, but any *read-only* open recreates that file, so it fired on the normal case. It
+  now takes a real `BEGIN EXCLUSIVE` lock. A guard that cries wolf gets habitually bypassed.
+- ⚠️ **The piped-exit-code trap bit again**: `npm run typecheck | tail && echo OK` reported success
+  while typecheck was failing. CLAUDE.md documents this for `docker compose build`; it applies to
+  every pipe.
+
+**Context**: 851 tests, typecheck clean, schema **v6** (no migration needed), 662 plays, container
+rebuilt and verified — UI `200`, WS same-origin `101`, WS cross-site `403`, `integrity_check: ok`.
+**R11 discharged. U5 Functional Design is the next step.**

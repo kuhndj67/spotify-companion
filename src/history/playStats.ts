@@ -46,14 +46,20 @@ export type { PlayTimePoint };
  */
 export type PlayBucket =
   | 'completed'
-  /** The listener skipped it. */
-  | 'skipped'
   /**
-   * ⚠️ The track played nearly to the end and was then replaced by something the listener did
-   * not choose — **18 of 35 live skips**, and the reason this bucket exists. Folding it back
-   * into `skipped` tells someone they rejected music they sat through.
+   * The listener skipped it.
+   *
+   * ✅ As of classifier v2 this means what it says. A fourth bucket, `ended-early`, existed from
+   * 2026-09-21 to 2026-09-22 to hold plays that ran nearly to the end and were then replaced by
+   * something the listener did not choose — 24 of 46 live skips. Those turned out to be
+   * **completions**: the API had stopped reporting the track while it was still playing. v2
+   * classifies them as `completed`, so there is nothing left for a fourth bucket to hold.
+   *
+   * ⚠️ Do not re-derive that distinction here. It belongs in the outcome, which is where v2 put
+   * it — a display-layer split over a fixed outcome is how the 2026-09-21 defect happened, twice
+   * (`bucketOf` and `trackPlayStats` each had a copy).
    */
-  | 'ended-early'
+  | 'skipped'
   | 'inconclusive'
   | 'not-observed';
 
@@ -61,7 +67,6 @@ export type PlayBucket =
 export const PLAY_BUCKETS: readonly PlayBucket[] = [
   'completed',
   'skipped',
-  'ended-early',
   'inconclusive',
   'not-observed',
 ];
@@ -69,23 +74,26 @@ export const PLAY_BUCKETS: readonly PlayBucket[] = [
 /**
  * Which bucket a play falls in. Provenance decides first — it is the stronger fact.
  *
- * ⚠️ **A skip is not automatically the listener's.** Until 2026-09-21 this returned `skipped`
- * for every `skipped` outcome, and the panel therefore reported skips of artists the listener
- * never skips. The outcome says the track changed early; `skipAttribution` says who did it,
- * and only one of those is a rejection.
+ * ⚠️ **THIS ONCE AGAIN RETURNS `skipped` FOR EVERY `skipped` OUTCOME, AND THAT IS NOT A
+ * REGRESSION — read this before "re-fixing" it.** It did so until 2026-09-21, and that *was* a
+ * defect: the panel reported skips of artists the listener never skips, because v1's outcome
+ * counted transitions as rejections. The fix then was a display-layer split on
+ * `skipAttribution`.
  *
- * `null` attribution on a skip means nothing has attributed it yet — it stays in `skipped`
- * rather than being promoted, because inventing an attribution is the mistake being corrected.
+ * Classifier v2 (2026-09-22) moved the correction into the **outcome**, where it belongs: a
+ * `skipped` row now excludes the overlapping transitions by construction, so there is nothing for
+ * this function to subtract. The old split has been removed, and re-adding one here would
+ * reintroduce the two-copies-of-one-rule shape that cost the 2026-09-21 defect its second
+ * appearance — `bucketOf` and `trackPlayStats` each held a version, and fixing one missed the other.
  */
 export function bucketOf(play: PlayTimePoint): PlayBucket {
   if (play.provenance === 'backfilled') return 'not-observed';
   if (play.outcome === 'unknown') return 'inconclusive';
-  if (play.outcome === 'skipped' && play.skipAttribution === 'unattributed') return 'ended-early';
   return play.outcome;
 }
 
 function emptyCounts(): Record<PlayBucket, number> {
-  return { completed: 0, skipped: 0, 'ended-early': 0, inconclusive: 0, 'not-observed': 0 };
+  return { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 };
 }
 
 /** How far back the artist trend can reach: 26 weeks ≈ 6 months. */

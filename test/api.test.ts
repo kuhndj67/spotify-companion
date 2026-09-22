@@ -68,9 +68,7 @@ function play(overrides: Partial<NewPlayRecord> = {}): NewPlayRecord {
     contextType: 'playlist',
     explicit: null,
     albumType: null,
-    skipAttribution: null,
     successorLagMs: null,
-    attributionVersion: null,
     classifierVersion: CLASSIFIER_VERSION,
     ...overrides,
   };
@@ -255,7 +253,6 @@ describe('/api/history/stats', () => {
     assert.deepEqual(body.track.byBucket, {
       completed: 1,
       skipped: 1,
-      'ended-early': 0,
       inconclusive: 0,
       'not-observed': 1,
     });

@@ -73,7 +73,57 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## Current state (2026-09-10)
+## Current state (2026-09-22)
+
+**U5 STARTED. R11 DISCHARGED. THE OUTCOME VARIABLE WAS WRONG AND IS FIXED.**
+851 tests · typecheck clean · schema v6 · **662 plays** · `src/playback/` still absent.
+
+**R11 — queue lookahead depends on the playback context**, which is neither outcome the execution
+plan anticipated. Album, autoplay and radio expose 20 tracks and predict correctly (8 for 8, in
+order, across a context boundary). **The AI DJ exposes none, ever** — 0 on all 88 samples,
+including at track boundaries. ⚠️ **`context.type` cannot tell them apart**: the DJ and a radio
+station are both `type: playlist` with the same `37i9dQZF1E` prefix. Nor is "algorithmic" the
+discriminator — autoplay and radio are algorithmic and fully exposed. **So FR-36 must ask the queue
+at runtime**, and at 50–70% DJ listening **FR-34/35 is the majority path, not the fallback**
+`requirements.md` calls it. ⚠️ `context.uri` also **goes stale** — it kept naming an album through
+33 minutes of autoplay by other artists, so open item 7's `context_type` is necessary but not
+sufficient. Record:
+`aidlc-docs/construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md`.
+
+### 🔧 24 of 46 live skips were NOT SKIPS — classifier v2, applied retroactively
+
+**In the DJ context the API stops reporting a track ~18–41 s before it stops playing.** The play
+closed on `track-change` at 81–90% and v1 called it `skipped`; the listener heard every one finish.
+Three independent lines agree: the same tracks reach 99–100% on other days (so `duration_ms` is not
+overstated), the successor was already playing in 75% of cases against 27% for real skips, and a
+natural experiment with unchanged settings gave DJ 3 of 12 skipped, album **0 of 20**, radio
+**0 of 16**.
+
+⚠️ **A RATIO CANNOT EXPRESS THIS, AND IT IS THIS FILE'S OWN CONFOUND WARNING.** The effect removes a
+near-constant number of seconds; a ratio divides by duration. `ratio < 0.75` whenever
+`duration < 4 x tail` — at a 41 s tail every track under 164 s is misfiled, and the corpus's p10
+duration is 146 s. So v2 thresholds **milliseconds of unobserved tail** (`durationMs -
+maxProgressMs`): `maxUnobservedTailMs = 55_000`, with a `minObservedPositionRatio = 0.75` rail.
+The tail populations have an **empty band** — overlap closes 18–41 s, user skips 66 s+ — and any
+value in 42–65 s partitions the corpus identically. ⚠️ Chosen **after** seeing the distribution, so
+**not pre-registered**; if plays land in the 41–66 s band the question reopens rather than the
+number moving.
+
+24 rows re-derived `skipped` -> `completed`, **552 re-derived identical**, live skips **46 -> 22**.
+
+✅ **`skip_attribution` is RETIRED** — v2 subsumes it, and the two rules could contradict each other
+(a 5:00 track skipped at 4:00 is `skipped` by tail and `unattributed` by ratio; 0 rows were in that
+state, but 31% of tracks are long enough). The column is **nulled, not dropped**, because dropping
+it breaks by-image rollback. `skipAttribution.ts` is a tombstone carrying the history.
+✅ **U5 handoff item 1 is CLOSED, not inherited** — `BackTestService` reads `outcome` and never read
+attribution, so fixing the outcome fixed it for free. **`skip_source` (`user` | `rule`) is
+untouched and is still what U5 needs.**
+
+⚠️ **The 2026-09-10 gate ran with those 24 rows counted as skips** — roughly 12 of its 17. **BR-11.7
+still forbids a re-run.** Recorded as a defect in the discharged result, not grounds for another
+attempt.
+
+## Earlier state (2026-09-10)
 
 **INCEPTION complete. CONSTRUCTION in progress — U2 of 5 units approved. Next: U3.**
 **The Phase 2 hypothesis gate was discharged 2026-09-10: R1 NOT SUPPORTED. U3 is unblocked.**
@@ -237,12 +287,22 @@ only found by running the system and watching a real failure get *recorded*. A f
 deterministic; it never shows you that the row is never retried. Anywhere a failure is written
 down, ask whether it can be un-written.
 
-**A proportional threshold over a constant-time effect is a confound generator.** The completion
-ratio divides by track duration, so anything that removes a fixed number of seconds — a
-crossfade, a fade-out, an early track change — costs a short track more ratio than a long one.
-If track length correlates with the variable being measured, that is bias rather than noise.
-Measured here: majors run ~30% longer than independents. Watch for this shape anywhere a rate
-or ratio is thresholded.
+**A proportional threshold over a constant-time effect is a confound generator — and on
+2026-09-22 this stopped being a warning and became a measured defect.** The completion ratio
+divides by track duration, so anything that removes a fixed number of seconds costs a short track
+more ratio than a long one.
+
+The DJ removes 18–41 s of *reporting* (not of playback). Expressed as a ratio,
+`ratio < 0.75` whenever `duration < 4 x tail` — at a 41 s tail **every track under 164 s reads as a
+user skip**, and the corpus's p10 duration is 146 s. `Mascara` is the proof: 136 s long, 35 s tail,
+ratio 0.743, filed as a rejection purely for being short. **No ratio separates a constant-time
+effect across a 146–271 s duration spread**, so widening the threshold cannot fix it.
+
+✅ **The fix was to change the axis, not the number.** Classifier v2 thresholds `durationMs -
+maxProgressMs` in **milliseconds** (`maxUnobservedTailMs = 55_000`), with a ratio only as a rail
+for short tracks (`minObservedPositionRatio = 0.75`). Anywhere a rate or ratio is thresholded, ask
+first whether the effect being detected is proportional or constant-time; if it is constant-time,
+the ratio is the wrong instrument however it is tuned.
 
 **A wrong denominator is as indistinguishable from absent data as a wrong request shape.** Caught
 on 2026-09-05 in the hypothesis gate's own coverage table: it averaged *two different causes* of a
@@ -311,7 +371,18 @@ counted as 0% — it cannot drag the average down. On 2026-09-06 the suite repor
 module that never ran — probed with both a directory glob and a file glob. Same family as the
 denominator traps below, and the most dangerous of them, because it reads as good news.
 `test/noOrphanModules.test.ts` now fails on any module nothing executes unless it is in
-`ALLOWED_ORPHANS` **with a reason**. Three files are knowingly untested — `diagnostics.ts`,
+`ALLOWED_ORPHANS` **with a reason**.
+
+⚠️ **THAT TEST WALKS MODULES, NOT METHODS, AND TWO DEAD WRITERS HID BEHIND IT.** Found 2026-09-22:
+`recordSuccessorLag` and `updateSkipAttribution` in `SqliteHistoryRepository` had **zero callers for
+their entire lives**, and `successor_lag_ms` is `null` on all 662 rows. The module is imported and
+heavily executed, so the orphan check is satisfied and coverage looks fine — the dead code is one
+method inside a live file. Both were written for `scripts/attribute-skips.mjs`, which then
+**re-implemented the rule in its own SQL** rather than calling either, so the script carried a second
+copy of the threshold while the methods built for it sat unused. **A column that is structurally
+empty reads as "this never happens"**, which is the absent-data trap again: the 2026-09-22
+measurement had to reconstruct successor lag from retained trails because the field designed to hold
+it was never wired. Three files are knowingly untested — `diagnostics.ts`,
 `export/SnapshotScheduler.ts`, `mcp/spotifyMcpClient.ts` — all constructed only by `server.ts`.
 
 **Routes live in `api.ts`, not `server.ts`, so they can be tested.** `createApi(ApiDeps)` takes
@@ -476,8 +547,9 @@ the phase boundary, not progress.
 | 3 | **⚠️ CORRECTED 2026-09-20 — the old premise was false.** This said *"`recently-played` returns no `external_ids`"*. **It does.** Probed live 2026-09-20: `HTTP 200`, `external_ids.isrc` on 3/3 items. Only **82 rows** lack an ISRC — all backfilled, all dated **2026-08-20 → 08-31**, spanning **72 distinct `track_id`s**. Every other row has one: 457 live + 4 backfilled since 2026-09-03, of 543. So recovery is **72** `GET /tracks/{id}` calls, not 47. ⚠️ **The 2026-09-05 conclusion STANDS and is the decision:** all 82 are `outcome = 'unknown'`, so **0 are gate-eligible** — what the backfill lacks for the gate is the observation trail, which no API returns retroactively. **New in U4**: these 82 are exactly the rows where `label.*` is *unanswerable* rather than *unknown* (BR-27.5b) — discriminator `isrc IS NULL AND label_unknown_reason IS NULL` — so recovering them would improve back-test answerability as well as coverage stats, at 72 Spotify calls plus ~2 MusicBrainz calls each behind a 1 req/sec queue. Decide on that basis → U2 FD **Q7** | Later |
 | 3a | **⚠️ Why those 82 lack an ISRC is UNESTABLISHED — and it is not the code.** `RecentlyPlayedBackfill` has read `track.external_ids?.isrc` since **U1** (`a8136d9`), `webApiClient.ts` has exactly one commit, and the wiring never changed. Live rows carried an ISRC from the very first one (row id 51). The break is clean at **row id 120 → 155** (2026-09-01 → 09-03), with **no code change in that window**. Something outside this repo changed, or the original observation misattributed its cause. **Do not invent one.** ⚠️ **The lesson is the project's own rule pointing the other way**: the four documented traps were all *docs said yes, probe said no*. This is **our own notes said no, and the probe says yes** — a recorded negative decays silently, because nothing ever re-tests it. **Re-probe a "the API doesn't return X" note before building on it.** | ✅ measured |
 | 3b | **MusicBrainz label coverage is recency-biased, and this is now CONFIRMED TWICE.** Ad-hoc probe 2026-08-26: pre-2022 100%, 2022+ **43%**. Shipped code on a larger corpus 2026-09-05: **86%** / **44%**. The gap is real and stable, not an artefact of the first sample, and stays concentrated on the recent independent releases R1 is about. ⚠️ Measure it **only over ISRC-bearing plays** — see the denominator warning above | ✅ confirmed |
-| 4 | **⚠️ REWRITTEN 2026-09-22 — every number in the original was n≈10 and NONE of them replicated.** The original argued: the AI DJ crossfades → crossfade removes constant seconds → a proportional threshold penalises short tracks → majors run ~30% longer (248s vs 191s) → independents take more false skips → **so correcting it could only move the result toward R1**. Re-measured on 586 plays, **all three premises and the conclusion fail**: ① *crossfade is ruled out* — the affected plays lose **21–41s** and Spotify caps crossfade at 12s; ② *the duration gap dissolved* — majors **213s** vs independents **201s** (n=120/162), a 6% gap, not 30%, exactly the chance the original flagged at n=10/11; ③ *threshold crowding dissolved* — **52 of 443** live track-change plays sit within ±0.05 of 0.90 (**11.7%**), not 13 of 27 (48%); ④ ⚠️ **the direction is BACKWARDS.** Unattributed skips are **67% of major skips (6/9)** but only **50% of independent (6/12)**, so correcting removes proportionally *more* from majors. The rates flip sign: all skips major **8.1%** > independent **7.6%**, but user-only skips major **2.7%** < independent **3.8%**. ⚠️ **EXPLORATORY AND NOISE-DOMINATED** — 3 vs 6 events, computed after seeing the data, and **BR-11.7's confirmatory run is spent**. This is *not* evidence against R1; it is grounds for withdrawing the old claim, nothing more. **The concern is now INSTRUMENTED rather than open**: `skip_attribution` (migration 006) labels these plays directly, so analysis can exclude them without moving the pre-registered threshold. 0.90 stays | ⚠️ restated |
-| 5 | R11 — queue lookahead unverified during playback | U5 |
+| 4 | **✅ CLOSED 2026-09-22 — the mechanism was found and the data is fixed.** The overlap is real but it is **not crossfade and not a threshold artefact**: in the DJ context Spotify stops *reporting* a track 18–41 s before it stops *playing*, and the listener hears it finish. ⚠️ **Crossfade is OFF on this machine** (Automix on, gapless on), so the old *"crossfade ruled out because Spotify caps it at 12 s"* argument failed twice over — it assumed cut length equals crossfade length, **and the feature was disabled**. A UI fact used as a probe result. Fixed by classifier v2: 24 rows re-derived `skipped` -> `completed`, live skips 46 -> 22. `skip_attribution` retired. See `audit.md` 2026-09-22 | ✅ |
+| 4-old | **⚠️ SUPERSEDED, kept for the history. REWRITTEN 2026-09-22 — every number in the original was n≈10 and NONE of them replicated.** The original argued: the AI DJ crossfades → crossfade removes constant seconds → a proportional threshold penalises short tracks → majors run ~30% longer (248s vs 191s) → independents take more false skips → **so correcting it could only move the result toward R1**. Re-measured on 586 plays, **all three premises and the conclusion fail**: ① *crossfade is ruled out* — the affected plays lose **21–41s** and Spotify caps crossfade at 12s; ② *the duration gap dissolved* — majors **213s** vs independents **201s** (n=120/162), a 6% gap, not 30%, exactly the chance the original flagged at n=10/11; ③ *threshold crowding dissolved* — **52 of 443** live track-change plays sit within ±0.05 of 0.90 (**11.7%**), not 13 of 27 (48%); ④ ⚠️ **the direction is BACKWARDS.** Unattributed skips are **67% of major skips (6/9)** but only **50% of independent (6/12)**, so correcting removes proportionally *more* from majors. The rates flip sign: all skips major **8.1%** > independent **7.6%**, but user-only skips major **2.7%** < independent **3.8%**. ⚠️ **EXPLORATORY AND NOISE-DOMINATED** — 3 vs 6 events, computed after seeing the data, and **BR-11.7's confirmatory run is spent**. This is *not* evidence against R1; it is grounds for withdrawing the old claim, nothing more. **The concern is now INSTRUMENTED rather than open**: `skip_attribution` (migration 006) labels these plays directly, so analysis can exclude them without moving the pre-registered threshold. 0.90 stays | ⚠️ restated |
+| 5 | **✅ CLOSED 2026-09-22 — R11 probed during active playback.** Context-dependent: album/autoplay/radio expose 20 tracks and predict 8 for 8; **the AI DJ exposes none**. `context.type` cannot distinguish them. FR-36 must probe the queue at runtime rather than infer from context, and FR-34/35 is the majority path at 50–70% DJ listening | ✅ |
 | 8 | **Distinguish a rejection-skip from a session end** — user-raised 2026-09-10, **re-raised 2026-09-19**. Backlog item **W-3** in `requirements.md` §5.1. ⚠️ **Probed twice — the corpus has ZERO instances**, at 427 plays and again at **504**: all 31 skips close on `track-change`, all have a successor within 30 s, and the 12 session-enders are **7 `completed`, 5 `unknown`, 0 `skipped`**. It is unreachable by construction — `classify` returns `skipped` *only* on `closeReason === 'track-change'`, and stopping playback yields `pause-idle`/`playback-stopped`, which fall through to `unknown`. ⚠️ **THE COST RUNS THE OTHER WAY.** Those 5 partial session-enders are not contaminating the outcome variable, they are **missing from it** — the gate's `ELIGIBLE` predicate is `outcome IN ('completed','skipped')`, so every abandoned last-track is silently dropped. **W-3 is data recovery, not a false-skip repair**, and anyone implementing it as stated will write code that does nothing and tests that pass for want of anything to fix. Discriminator (gap from `ended_at` to next `started_at`) needs no new collection and applies retroactively | Later |
 | 7 | **Playback context is never recorded for live plays.** ⚠️ **Re-measured 2026-09-10 at 427 plays: NULL on all 342 LIVE plays, populated on all 85 BACKFILLED ones** (83 playlist, 2 artist) — the earlier "NULL on all 35" predates the backfill carrying it. The MCP `getNowPlaying` returns no context field; `recently-played` does. **So the field is available exactly where the outcome variable is not**, and a rule over it would back-test as populated while being unknown 100% of the time live — see U3 FD **Q5**. Spotify’s `/me/player/currently-playing` **does** return it — probed 2026-09-02, returning `spotify:playlist:37i9dQZF1EYkqdzj48dyYq` (the AI DJ). A DJ play is otherwise indistinguishable from a playlist play, and the DJ is algorithmic selection into the feed — arguably the closest available proxy for what R1 calls *promoted*. **User declined for now** (2026-09-02) | Later |
 | 6 | ~~`label_resolved_at` missing~~ — **closed 2026-08-31.** Superseded by BR-13: resolutions are versioned append-only, and a play stores `label_resolution_id`, the exact version its verdict came from | ✅ |
@@ -498,7 +570,7 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 486 tests
+npm test           # 851 tests
 npm run typecheck  # covers src AND test
 npm run auth       # host-side OAuth, once
 
@@ -506,7 +578,17 @@ node scripts/hypothesis-gate.mjs   # the Phase 2 gate (BR-11). Read-only; writes
 
 # The played_at repair. Dry run by default; --apply takes its own backup first.
 node scripts/repair-backfill-timestamps.mjs
+
+# Re-derive stored outcomes from retained trails under the current classifier (FR-20).
+# Dry run by default and prints the full diff; --apply backs up first. NEEDS the tsx loader,
+# because importing the real classifier is the point -- see the header comment.
+node --import tsx scripts/reclassify-unobserved-tails.mjs
 ```
+
+⚠️ **`scripts/attribute-skips.mjs` was DELETED 2026-09-22** with `skip_attribution`. It carried its
+own copy of `USER_SKIP_RATIO_CEILING` and would re-derive a judgement classifier v2 supersedes, on
+an axis v2 disagrees with. `scripts/measure-confound.mjs` still exists but now **refuses to run**
+against a post-retirement database rather than returning zeros that would read as a finding.
 
 ⚠️ The gate's thresholds are **pre-registered constants, not parameters**. Change them by amending
 `hypothesis-gate/pre-registration.md`, never by editing the script — the point of a

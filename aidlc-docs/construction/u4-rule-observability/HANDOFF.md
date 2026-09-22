@@ -166,7 +166,10 @@ U3's image ignores the new table and columns. ⚠️ **Only while migrations sta
   zero-gate-eligible conclusion is unchanged.
 - **W-3** (session-end discriminator) — backlog; would change the outcome variable back-testing
   compares against
-- **Open item 4** (crossfade confound) and **open item 7** (playback context) — unchanged
+- ⚠️ **Open item 4 — REWRITTEN 2026-09-22, and its direction claim withdrawn.** It is no longer a
+  "crossfade confound": crossfade is ruled out, the duration gap dissolved, and the correction
+  would move the result *away* from R1, not toward it. Now instrumented by `skip_attribution`
+- **Open item 7** (playback context) — unchanged
 
 ---
 

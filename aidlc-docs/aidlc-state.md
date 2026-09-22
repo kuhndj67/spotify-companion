@@ -163,7 +163,12 @@ points of each other.
 
 ⚠️ **Open item 4 rides along and is unresolved.** 12 of the 30 skips sit at ratio 0.80–0.90. The
 crossfade confound inflates the *independent* skip rate, so correcting it could only move the result
-**toward** R1, never further away. Retroactively correctable — trails are retained.
+**toward** R1, never further away.
+⚠️ **WITHDRAWN 2026-09-22.** Crossfade is ruled out (the affected plays lose 21–41 s; Spotify caps
+crossfade at 12 s), the duration gap dissolved at 10× the sample (213 s vs 201 s, not 248 s vs
+191 s), and the direction is backwards: those plays are **67% of major skips but 50% of
+independent**, so the correction removes proportionally more from the *major* arm. See open item 4.
+Retroactively correctable — trails are retained, and `skip_attribution` now labels them directly.
 
 ⚠️ **The runner had no significance test until this run.** Earlier revisions stopped at the
 sufficiency check because the answer was fixed at "insufficient data". The §2 test was added

@@ -4089,3 +4089,82 @@ calls `bucketOf`.
 
 **Context**: CONSTRUCTION — U4 complete and deployed. 866 tests, typecheck clean, schema v6,
 586 plays, `integrity_check: ok`, UI `200`.
+
+---
+
+## 2026-09-22 — Open item 4 rewritten: four numbers, all n≈10, none replicated
+
+Item 4 stood in CLAUDE.md for 20 days. **Every quantitative claim in it has now failed**, and the
+conclusion it drew points the wrong way.
+
+### The original argument, and what it costs
+
+> The AI DJ crossfades → crossfade removes constant seconds → a proportional threshold penalises
+> short tracks → majors run ~30% longer → independents take more false skips → **so correcting it
+> could only move the result toward R1, never further away.**
+
+That last clause was load-bearing. It appeared in CLAUDE.md, `aidlc-state.md` and the
+**hypothesis-gate result document**, where it functioned as a reason not to worry about the
+confound.
+
+### Re-measured on 586 plays
+
+| Claim (2026-09-02) | Sample then | Measured 2026-09-22 | Verdict |
+|---|---|---|---|
+| Crossfade is the mechanism | — | Affected plays lose **21–41 s**; Spotify caps crossfade at **12 s** | ❌ ruled out |
+| Majors ~30% longer: 248 s vs 191 s | n=10/11 | **213 s vs 201 s** (n=120/162) — a **6%** gap | ❌ dissolved |
+| 13 of 27 crowd the threshold (48%) | n=27 | **52 of 443** (**11.7%**) | ❌ dissolved |
+| Correction moves the result **toward** R1 | — | Removes proportionally more from **majors** | ❌ backwards |
+
+### ⚠️ The direction is the important one
+
+The affected plays now carry `skip_attribution = 'unattributed'` (migration 006), so the question
+can be asked directly instead of inferred:
+
+| Group | eligible | all skips | user-attributed only | unattributed share of skips |
+|---|---|---|---|---|
+| `major` | 111 | 9 (8.1%) | **3 (2.7%)** | **6/9 = 67%** |
+| `independent` | 158 | 12 (7.6%) | **6 (3.8%)** | 6/12 = 50% |
+| `unknown` | 211 | 19 (9.0%) | 11 (5.2%) | 8/19 = 42% |
+
+Correcting removes a **larger share** from the major arm, and the sign of the difference flips:
+all skips put `major` above `independent`; user-attributed skips put it below.
+
+⚠️ **EXPLORATORY AND NOISE-DOMINATED.** Three versus six events, computed *after* the data was
+seen. **BR-11.7 spent the single confirmatory evaluation on 2026-09-10** and nothing here re-opens
+it. This is grounds for **withdrawing the old claim and nothing else** — it is emphatically not
+evidence against R1, and treating it as such would be the same error in the opposite direction.
+
+⚠️ **The real consequence is to the instrument.** Roughly half the gate's skips are now known not
+to be rejections, which weakens the outcome variable in **both** arms rather than shifting it one
+way. A future evaluation must decide **in advance and in writing** whether `unattributed` skips
+are eligible.
+
+### The pattern worth carrying forward
+
+⚠️ **Item 4 flagged its own weakness and was believed anyway.** It said, in its own text,
+*"n=10/11, so the duration gap may be chance"* — and that caveat travelled with the number into
+three documents while the number was read as fact.
+
+**A measurement written into prose stops being a measurement and becomes a claim.** Nothing
+re-derives it, and the sample it came from is invisible at the point of reading. The same shape as
+the `release_count = 100` bug and the stale `recently-played` note: *a plausible number, recorded
+once, believed indefinitely.*
+
+`scripts/measure-confound.mjs` now re-derives all four on demand and prints the original claim
+beside each current figure, so the comparison is unavoidable rather than optional.
+
+⚠️ Writing that script surfaced a small instance of the same family: its quantile helper indexed
+one past the end and reported `max 0.0s` — **a plausible wrong number rather than an error**. Fixed
+and noted in place.
+
+### Applied
+
+- **CLAUDE.md** open item 4 — rewritten; the gate section's copy of the direction claim corrected.
+- **`aidlc-state.md`** — the same claim marked withdrawn.
+- **`gate-result-2026-09-10.md`** — ⚠️ an **addendum appended, the original untouched**. It records
+  a confirmatory evaluation, and editing a result after the fact is what pre-registration exists
+  to prevent.
+- **`u4-rule-observability/HANDOFF.md`** — item 4 no longer described as "the crossfade confound".
+
+**Context**: CONSTRUCTION — U4 complete, deployed and verified. 866 tests, schema v6, 591 plays.

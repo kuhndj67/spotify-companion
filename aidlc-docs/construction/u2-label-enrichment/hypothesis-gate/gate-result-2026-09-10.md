@@ -129,3 +129,42 @@ U2 remains a legitimate rule *input* — a user may still write "skip major-labe
 it work — it is simply no longer backed by evidence that it predicts **this** listener's skips.
 
 **R1 was built so it could be disconfirmed. It was, and the design held.**
+
+---
+
+## ⚠️ Addendum, 2026-09-22 — caveat 1 above is WITHDRAWN
+
+**Appended, not edited.** This document records a confirmatory evaluation, and revising a result
+after the fact is precisely what pre-registration exists to prevent. The reasoning below stands as
+what was believed on 2026-09-10; it is wrong, and here is what replaced it.
+
+Caveat 1 argued that the crossfade confound biases the outcome variable *against* R1, so *"a
+correction here could only move the result toward R1, not away from it"*.
+
+Re-measured on 586 plays, **every premise fails**:
+
+| Claim, 2026-09-10 | Measured, 2026-09-22 |
+|---|---|
+| Crossfade is the mechanism | ❌ The affected plays lose **21–41 s**; Spotify caps crossfade at **12 s** |
+| Majors run ~30% longer (248 s vs 191 s, n=10/11) | ❌ **213 s vs 201 s** (n=120/162) — a 6% gap |
+| 13 of 27 plays crowd the 0.90 threshold (48%) | ❌ **52 of 443** (11.7%) |
+| Correcting could only move the result **toward** R1 | ❌ **Backwards** — see below |
+
+The affected plays now carry `skip_attribution = 'unattributed'` (migration 006). They are
+**67% of major skips (6/9)** and **50% of independent (6/12)**, so the correction removes
+proportionally more from the *major* arm. Skip rates by arm:
+
+| | all skips | user-attributed only |
+|---|---|---|
+| `major` | 8.1% | **2.7%** |
+| `independent` | 7.6% | **3.8%** |
+
+⚠️ **This is EXPLORATORY and noise-dominated** — 3 versus 6 events, computed after the data was
+seen. Under **BR-11.7 the single confirmatory evaluation is spent**, and nothing here re-opens it.
+It is grounds for **withdrawing the old directional claim, and nothing more**. It is emphatically
+not evidence against R1.
+
+⚠️ **The real consequence is to the instrument, not the result**: roughly **half the skips in this
+gate are now known not to be rejections**, which weakens the outcome variable in *both* arms. Any
+future evaluation should decide, in advance and in writing, whether `unattributed` skips are
+eligible.

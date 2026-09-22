@@ -3883,3 +3883,120 @@ only, which is what the UI uses. The REST endpoint stays the raw snapshot it has
 **Context**: CONSTRUCTION — U4 code complete and deployed, awaiting hands-on verification.
 811 tests, typecheck clean, schema v5, container healthy, 543 plays, 3 rules active in dry-run.
 `src/playback/` does not exist.
+
+---
+
+## 2026-09-21 — `skip_source = 'user'` was an assertion, and it was wrong on half the skips
+
+**Raised by the user**: *"I've not skipped any NF tracks yet it's showing one. I NEVER skip Ren
+tracks yet it's showing multiple skips for him."*
+
+⚠️ **No test could have found this.** The code did exactly what it said:
+
+```ts
+skipSource: outcome === 'skipped' ? 'user' : null,   // "every live-observed skip is the user's"
+```
+
+An assumption written where an observation belongs, and the only thing that could contradict it
+was a listener's knowledge of their own behaviour.
+
+### The data is bimodal, with an empty band
+
+```
+0.01 0.01 0.08 0.09 0.12 0.12 0.14 0.15 0.23 0.24 0.25 0.25 0.27 0.30 0.44 0.49 0.49
+                          <- nothing between 0.489 and 0.807 ->
+0.81 0.82 0.84 0.85 0.85 0.85 0.85 0.85 0.86 0.86 0.86 0.87 0.87 0.87 0.88 0.89 0.89 0.90
+```
+
+**A second, independent measurement agrees**: how far into the *next* track the app was when it
+first saw it.
+
+| group | median | max |
+|---|---|---|
+| ratio < 0.75 | 2 s | **3 s — not one exceeds a single poll** |
+| ratio ≥ 0.75 | 7 s | **31 s** |
+
+### What was ruled out, and how
+
+| Hypothesis | Verdict |
+|---|---|
+| Recording lost samples | ❌ Trails are regular 3 s polls to the last instant; `listenedMs == maxProgressMs` exactly |
+| The app systematically undercounts | ❌ Median live track-change play leaves only **2.0 s** unplayed across 425 plays |
+| Crossfade | ❌ Spotify caps it at 12 s; these lose **21–41 s** |
+| Wrong `duration_ms` metadata | ❌ The same tracks reach full length on other plays — Ren's *Humble* stopped at 175 s of 176 s once, 142 s another time |
+| The listener skipped them | ❌ Reported behaviour, and the bimodality supports it — genuine skipping would smear, not cluster |
+
+⚠️ **The mechanism remains UNPROVEN.** Successor lag (7–31 s) and unplayed time (21–41 s) are both
+elevated but do not match one-for-one. The strong indication is that the app learns of the
+transition late while the old track's progress keeps advancing (Spotify interpolates it from a
+timestamp) — but that is indicated, not established, and the column value says so by naming no
+cause.
+
+### What was built
+
+`src/history/skipAttribution.ts` ⚙️ PURE — `attributeSkip(outcome, evidence)` → `user` |
+`unattributed` | `null`. **Decided from the ratio alone**, at close, so it needs nothing that has
+not happened yet.
+
+⚠️ **The successor lag is recorded and NOT used as a condition.** One hand-checked play sat at
+ratio 0.858 with a lag of only 2 s; ANDing the two signals would have mis-attributed it.
+`skipAttribution.test.ts` pins that `attributeSkip` takes no successor argument at all.
+
+⚠️ **The threshold sits inside the empty band and is not a tuned parameter.** A test asserts it
+stays between 0.489 and 0.807, so moving it into occupied territory has to be deliberate.
+
+### ⚠️ Why a new column instead of a third `skip_source` value
+
+```sql
+skip_source TEXT CHECK (skip_source IN ('user','rule'))
+```
+
+SQLite has no `ALTER TABLE ... DROP CONSTRAINT`, so widening that CHECK means rebuilding `play`
+through the 12-step procedure — **on the one table that cannot be regenerated** — and it would
+make the migration **non-additive**, retiring the by-image rollback guarantee migration 005 still
+enjoys. Two `ADD COLUMN`s buy the same semantics for none of that risk.
+
+Overloading `NULL` was the other option and is worse: `skip_source` is already NULL for *"this
+play was not a skip"*. Making it also mean *"a skip by an unknown actor"* merges two facts into
+one value — the exact defect being corrected.
+
+⚠️ **`skip_source` is NOT rewritten, on historical rows or new ones.** It keeps saying `user`,
+because that is what the app claimed and erasing it would destroy the evidence that the claim was
+ever made. `skip_attribution` is the answer; `skip_source` is the claim.
+
+### The chart was the visible symptom, so it was fixed too
+
+`PlayBucket` gains **`ended-early`**. `bucketOf` no longer maps every `skipped` outcome to the
+skipped bar. ⚠️ A skip with **no** attribution stays in `skipped` rather than being promoted —
+inventing an attribution is the mistake being corrected.
+
+### `outcome` was deliberately NOT changed
+
+The hypothesis gate's eligibility is `outcome IN ('completed','skipped')` and its thresholds are
+pre-registered constants. Reclassifying after the confirmatory run is precisely what
+pre-registration exists to prevent. The attribution is additive; analysis can now filter, and the
+gate is untouched.
+
+⚠️ **Open item 4 needs revisiting.** It attributes this shape to crossfade and reasons that
+correcting it could only move R1's result *toward* support. Crossfade is now ruled out, and the
+effect is neither small nor obviously constant-time — **so that direction is no longer
+established**.
+
+### Deployed — migration 006, 2026-09-21
+
+`docker compose down` → `data/backup-before-migration-006-20260921-200739/` (`integrity_check: ok`,
+v5, 581 plays) → build (exit code read directly: 0) → up → `migrated 6:` exactly once.
+
+`scripts/attribute-skips.mjs` dry-run first, then `--apply` with its own backup:
+
+| | |
+|---|---|
+| Skipped plays | 36 |
+| `user` | **17** |
+| `unattributed` | **19** |
+| `skip_source` still `user` | 36 — untouched, as designed |
+| After | schema v6, `integrity_check: ok`, 581 plays |
+
+All five Ren tracks and the NF track reattributed.
+
+**Context**: CONSTRUCTION — U4 complete and deployed. 866 tests, typecheck clean, schema v6.

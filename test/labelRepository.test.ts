@@ -38,6 +38,9 @@ function play(over: Partial<NewPlayRecord> = {}): NewPlayRecord {
     contextType: 'playlist',
     explicit: null,
     albumType: null,
+    skipAttribution: null,
+    successorLagMs: null,
+    attributionVersion: null,
     classifierVersion: 1,
     evidence: {
       listenedMs: 180_000,

@@ -123,6 +123,12 @@ export class RecentlyPlayedBackfill {
         // error as writing `completed` onto a row with no observation trail.
         explicit: track.explicit ?? null,
         albumType: track.album?.album_type ?? null,
+        // ⚠️ A backfilled play has no observation trail and therefore no completion ratio, so
+        // there is nothing to attribute FROM. Null means "never asked", and it must stay null:
+        // `recently-played` reports no progress, so no later pass can answer this either.
+        skipAttribution: null,
+        successorLagMs: null,
+        attributionVersion: null,
         // Not looked up: follow status is a *current* fact, and asserting it retroactively for a
         // play that happened hours ago would be a small fabrication in a dataset whose value
         // depends on not making any.

@@ -21,6 +21,14 @@ import { MIGRATIONS, currentVersion, migrate } from '../src/history/migrations.j
 
 const upTo = (v: number) => MIGRATIONS.filter((m) => m.version <= v);
 
+/**
+ * ⚠️ These tests are about migration 005 specifically, so they apply 005 AND NOTHING LATER.
+ * Calling bare `migrate(db)` made them assert on whatever the newest migration happened to be,
+ * which broke the moment 006 landed — and would have kept breaking on every future one. A test
+ * named for a migration should pin that migration.
+ */
+const migrateTo5 = (db: DatabaseSync) => migrate(db, upTo(5));
+
 /** A database at schema v4, i.e. the state the running container is in today. */
 function atV4(): DatabaseSync {
   const db = new DatabaseSync(':memory:');
@@ -48,7 +56,7 @@ describe('migration 005', () => {
     const db = atV4();
     assert.equal(currentVersion(db), 4);
 
-    const report = migrate(db);
+    const report = migrateTo5(db);
 
     assert.equal(report.from, 4);
     assert.equal(report.to, 5);
@@ -58,9 +66,9 @@ describe('migration 005', () => {
 
   it('is idempotent — a second run applies nothing', () => {
     const db = atV4();
-    migrate(db);
+    migrateTo5(db);
 
-    const second = migrate(db);
+    const second = migrateTo5(db);
 
     assert.deepEqual(second.applied, []);
     assert.equal(second.from, 5);
@@ -69,7 +77,7 @@ describe('migration 005', () => {
 
   it('adds explicit and album_type to play, both nullable', () => {
     const db = atV4();
-    migrate(db);
+    migrateTo5(db);
 
     const columns = db.prepare('PRAGMA table_info(play)').all() as { name: string; notnull: number }[];
     const explicit = columns.find((c) => c.name === 'explicit');
@@ -87,7 +95,7 @@ describe('migration 005', () => {
     const db = atV4();
     insertPlay(db, 'track-before', '2026-08-20T10:00:00.000Z');
 
-    migrate(db);
+    migrateTo5(db);
 
     const row = db.prepare('SELECT explicit, album_type FROM play WHERE track_id = ?')
       .get('track-before') as { explicit: number | null; album_type: string | null };
@@ -101,7 +109,7 @@ describe('migration 005', () => {
       insertPlay(db, 'a', '2026-08-20T10:00:00.000Z');
       const last = insertPlay(db, 'b', '2026-08-21T10:00:00.000Z');
 
-      migrate(db);
+      migrateTo5(db);
 
       const row = db.prepare("SELECT value FROM meta WHERE key = 'v5_watermark_play_id'")
         .get() as { value: string };
@@ -111,7 +119,7 @@ describe('migration 005', () => {
     it('is 0 on an empty database, not null or absent', () => {
       const db = atV4();
 
-      migrate(db);
+      migrateTo5(db);
 
       const row = db.prepare("SELECT value FROM meta WHERE key = 'v5_watermark_play_id'")
         .get() as { value: string } | undefined;
@@ -126,7 +134,7 @@ describe('migration 005', () => {
     it('puts a post-v5 row for an OLD play above the watermark', () => {
       const db = atV4();
       insertPlay(db, 'old-and-pre-v5', '2026-08-20T10:00:00.000Z');
-      migrate(db);
+      migrateTo5(db);
 
       const backfilledLater = insertPlay(db, 'old-but-post-v5', '2026-08-19T10:00:00.000Z');
 
@@ -144,7 +152,7 @@ describe('migration 005', () => {
   describe('the decision log', () => {
     it('accepts a row whose play_id is null', () => {
       const db = atV4();
-      migrate(db);
+      migrateTo5(db);
 
       // BR-24.1: the decision precedes its play row by seconds to minutes.
       assert.doesNotThrow(() =>
@@ -169,7 +177,7 @@ describe('migration 005', () => {
      */
     it('has NO unique constraint that would forbid a second decision per play', () => {
       const db = atV4();
-      migrate(db);
+      migrateTo5(db);
 
       const indexes = db.prepare('PRAGMA index_list(decision_log)').all() as { unique: number }[];
       const unique = indexes.filter((i) => i.unique === 1);
@@ -183,7 +191,7 @@ describe('migration 005', () => {
 
     it('creates the three indexes the listing, grouping and back-fill paths need', () => {
       const db = atV4();
-      migrate(db);
+      migrateTo5(db);
 
       const names = (db.prepare('PRAGMA index_list(decision_log)').all() as { name: string }[])
         .map((i) => i.name);

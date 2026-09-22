@@ -78,6 +78,9 @@ function livePlay(): NewPlayRecord {
     contextType: 'playlist',
     explicit: null,
     albumType: null,
+    skipAttribution: null,
+    successorLagMs: null,
+    attributionVersion: null,
     classifierVersion: CLASSIFIER_VERSION,
   };
 }

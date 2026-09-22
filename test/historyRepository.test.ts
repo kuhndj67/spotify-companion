@@ -44,6 +44,9 @@ function samplePlay(overrides: Partial<NewPlayRecord> = {}): NewPlayRecord {
     contextType: 'playlist',
     explicit: null,
     albumType: null,
+    skipAttribution: null,
+    successorLagMs: null,
+    attributionVersion: null,
     classifierVersion: CLASSIFIER_VERSION,
     ...overrides,
   };
@@ -291,7 +294,13 @@ describe('listening statistics', () => {
     const repo = makeRepo();
     repo.recordPlay(samplePlay({ startedAt: '2026-08-01T10:00:00.000Z' }), []);
     repo.recordPlay(
-      samplePlay({ startedAt: '2026-08-25T10:00:00.000Z', outcome: 'skipped' }),
+      // Stored WITH an attribution, so this asserts a round-trip rather than a default: the
+      // repository must carry the judgement, never manufacture one.
+      samplePlay({
+        startedAt: '2026-08-25T10:00:00.000Z',
+        outcome: 'skipped',
+        skipAttribution: 'user',
+      }),
       [],
     );
     repo.recordPlay(samplePlay({ startedAt: '2026-08-27T10:00:00.000Z' }), []);
@@ -305,8 +314,20 @@ describe('listening statistics', () => {
     // watched from one it watched and could not classify, which is the whole reason the chart
     // was reporting uptime as though it were listening.
     assert.deepEqual(points, [
-      { startedAt: '2026-08-25T10:00:00.000Z', outcome: 'skipped', provenance: 'live' },
-      { startedAt: '2026-08-27T10:00:00.000Z', outcome: 'completed', provenance: 'live' },
+      // ⚠️ A skip carries WHO with it now. The chart cannot be handed an outcome without its
+      // attribution, for the same reason it cannot be handed one without provenance.
+      {
+        startedAt: '2026-08-25T10:00:00.000Z',
+        outcome: 'skipped',
+        provenance: 'live',
+        skipAttribution: 'user',
+      },
+      {
+        startedAt: '2026-08-27T10:00:00.000Z',
+        outcome: 'completed',
+        provenance: 'live',
+        skipAttribution: null,
+      },
     ]);
     repo.close();
   });

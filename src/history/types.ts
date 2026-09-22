@@ -15,6 +15,8 @@
  * measured (R2), so an unknown that exports as a blank cell hides a bias rather than showing it.
  */
 
+import type { SkipAttribution } from './skipAttribution.js';
+
 /**
  * Three values, exhaustively. `abandoned` was retired in U1 Functional Design (Q7): anything
  * that is not a clean completion or a clean below-threshold track change is `unknown`.
@@ -31,6 +33,12 @@ export type Provenance = 'live' | 'backfilled';
  * would have to *assume* they were user skips rather than having recorded it.
  */
 export type SkipSource = 'user' | 'rule';
+
+/**
+ * Bumped when the attribution rule changes, so a partially-reattributed corpus is
+ * distinguishable from a consistent one — the same reason `classifierVersion` exists.
+ */
+export const ATTRIBUTION_VERSION = 1;
 
 /** Why a play stopped. Feeds classification; also kept as evidence for diagnostics. */
 export type CloseReason =
@@ -173,7 +181,25 @@ export interface PlayRecord {
   closeReason: CloseReason;
   evidence: OutcomeEvidence;
   provenance: Provenance;
+  /**
+   * ⚠️ **An assertion, not an observation, and known to be unreliable.** It is written `user`
+   * for every live skip because that is what the app claimed before 2026-09-21. It is kept
+   * as-is — including on historical rows — because rewriting it would erase the evidence that
+   * the claim was ever made. **Read `skipAttribution` instead.**
+   */
   skipSource: SkipSource | null;
+  /**
+   * Who actually ended a skipped play, derived from evidence (`skipAttribution.ts`).
+   * `null` when the play was not a skip, or when nothing has attributed it yet.
+   */
+  skipAttribution: SkipAttribution | null;
+  /**
+   * How far into the **next** track the app was when it first saw it, in ms. Corroborating
+   * evidence for a late-learned transition. `null` means not measured — never zero.
+   */
+  successorLagMs: number | null;
+  /** Which attribution rule produced `skipAttribution`. Null on rows nothing has attributed. */
+  attributionVersion: number | null;
   contextType: string | null;
   /**
    * U2 label enrichment. Every field is `null` until resolved, and **`null` here means one of
@@ -279,6 +305,14 @@ export interface TrackPlayStats {
 export interface PlayTimePoint {
   startedAt: string;
   outcome: PlayOutcome;
+  /**
+   * Who ended it, when it was a skip.
+   *
+   * ⚠️ Required, not optional, for the same reason `provenance` is. A skip the listener made
+   * and a skip nothing can be blamed for are different facts, and the chart must not be able
+   * to render one as the other by simply not being told.
+   */
+  skipAttribution: SkipAttribution | null;
   /**
    * Required, not optional. A backfilled play is `unknown` because the app was not watching, and
    * a live play is `unknown` because it watched and could not tell — the chart must never merge

@@ -42,6 +42,7 @@ import type {
   SignalVote,
   UnknownReason,
 } from '../musicbrainz/types.js';
+import type { SkipAttribution } from './skipAttribution.js';
 import type {
   CoverageStats,
   CloseReason,
@@ -81,6 +82,9 @@ interface PlayRow {
   /** Schema v5. Null on a pre-v5 row is UNANSWERABLE, not `false` — decided by the watermark. */
   explicit: number | null;
   album_type: string | null;
+  skip_attribution: string | null;
+  successor_lag_ms: number | null;
+  attribution_version: number | null;
   ev_listened_ms: number;
   ev_duration_ms: number;
   ev_completion_ratio: number;
@@ -123,6 +127,9 @@ function rowToRecord(row: PlayRow): PlayRecord {
     classifierVersion: row.classifier_version,
     explicit: fromDbBool(row.explicit),
     albumType: row.album_type,
+    skipAttribution: row.skip_attribution as SkipAttribution | null,
+    successorLagMs: row.successor_lag_ms,
+    attributionVersion: row.attribution_version,
     evidence: {
       listenedMs: row.ev_listened_ms,
       durationMs: row.ev_duration_ms,
@@ -230,9 +237,10 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
              track_id, isrc, title, artist_name, artist_id, album_name, release_date,
              age_years, following, started_at, ended_at, outcome, close_reason, provenance,
              skip_source, context_type, classifier_version, explicit, album_type,
+             skip_attribution, attribution_version,
              ev_listened_ms, ev_duration_ms, ev_completion_ratio, ev_max_progress_ms,
              ev_max_gap_ms, ev_observation_count, ev_saw_pause, ev_rewound, ev_ended_with_idle
-           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(
           play.trackId,
@@ -254,6 +262,8 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
           play.classifierVersion,
           toDbBool(play.explicit),
           play.albumType,
+          play.skipAttribution,
+          play.attributionVersion,
           play.evidence.listenedMs,
           play.evidence.durationMs,
           play.evidence.completionRatio,
@@ -485,6 +495,26 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     const parsed = Number(row.value);
     return Number.isFinite(parsed) ? parsed : null;
   }
+  /**
+   * Record the successor evidence once the next play has been seen (`skipAttribution.ts`).
+   *
+   * ⚠️ Evidence only — it does **not** revise `skip_attribution`. The attribution is decided
+   * at close from the completion ratio, because one hand-checked play sat in the upper cluster
+   * with a successor lag of just 2 s; making the lag a condition would have mis-attributed it.
+   */
+  recordSuccessorLag(playId: number, lagMs: number): void {
+    this.#db
+      .prepare('UPDATE play SET successor_lag_ms = ? WHERE id = ? AND successor_lag_ms IS NULL')
+      .run(lagMs, playId);
+  }
+
+  /** Re-derive attribution for one play (FR-20's recompute, applied to the new judgement). */
+  updateSkipAttribution(playId: number, attribution: string | null, version: number): void {
+    this.#db
+      .prepare('UPDATE play SET skip_attribution = ?, attribution_version = ? WHERE id = ?')
+      .run(attribution, version, playId);
+  }
+
 
   coverage(): CoverageStats {
     const count = (sql: string): number => {
@@ -581,7 +611,7 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   listPlayTimesForArtist(artistId: string, sinceIso: string): PlayTimePoint[] {
     const rows = this.#db
       .prepare(
-        `SELECT started_at, outcome, provenance FROM play
+        `SELECT started_at, outcome, provenance, skip_attribution FROM play
           WHERE artist_id = ? AND started_at >= ?
           ORDER BY started_at`,
       )
@@ -589,12 +619,14 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       started_at: string;
       outcome: string;
       provenance: string;
+      skip_attribution: string | null;
     }[];
 
     return rows.map((row) => ({
       startedAt: row.started_at,
       outcome: row.outcome as PlayOutcome,
       provenance: row.provenance as Provenance,
+      skipAttribution: row.skip_attribution as SkipAttribution | null,
     }));
   }
 

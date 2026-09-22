@@ -44,24 +44,48 @@ export type { PlayTimePoint };
  * look like 38% completion overall. That is the `null` ≠ `0` rule applied to a chart: the absence
  * of a measurement is not a measurement with an absent value.
  */
-export type PlayBucket = 'completed' | 'skipped' | 'inconclusive' | 'not-observed';
+export type PlayBucket =
+  | 'completed'
+  /** The listener skipped it. */
+  | 'skipped'
+  /**
+   * ⚠️ The track played nearly to the end and was then replaced by something the listener did
+   * not choose — **18 of 35 live skips**, and the reason this bucket exists. Folding it back
+   * into `skipped` tells someone they rejected music they sat through.
+   */
+  | 'ended-early'
+  | 'inconclusive'
+  | 'not-observed';
 
 /** The four display buckets, in stack order: real observations first, absence last. */
 export const PLAY_BUCKETS: readonly PlayBucket[] = [
   'completed',
   'skipped',
+  'ended-early',
   'inconclusive',
   'not-observed',
 ];
 
-/** Which bucket a play falls in. Provenance decides first — it is the stronger fact. */
+/**
+ * Which bucket a play falls in. Provenance decides first — it is the stronger fact.
+ *
+ * ⚠️ **A skip is not automatically the listener's.** Until 2026-09-21 this returned `skipped`
+ * for every `skipped` outcome, and the panel therefore reported skips of artists the listener
+ * never skips. The outcome says the track changed early; `skipAttribution` says who did it,
+ * and only one of those is a rejection.
+ *
+ * `null` attribution on a skip means nothing has attributed it yet — it stays in `skipped`
+ * rather than being promoted, because inventing an attribution is the mistake being corrected.
+ */
 export function bucketOf(play: PlayTimePoint): PlayBucket {
   if (play.provenance === 'backfilled') return 'not-observed';
-  return play.outcome === 'unknown' ? 'inconclusive' : play.outcome;
+  if (play.outcome === 'unknown') return 'inconclusive';
+  if (play.outcome === 'skipped' && play.skipAttribution === 'unattributed') return 'ended-early';
+  return play.outcome;
 }
 
 function emptyCounts(): Record<PlayBucket, number> {
-  return { completed: 0, skipped: 0, inconclusive: 0, 'not-observed': 0 };
+  return { completed: 0, skipped: 0, 'ended-early': 0, inconclusive: 0, 'not-observed': 0 };
 }
 
 /** How far back the artist trend can reach: 26 weeks ≈ 6 months. */

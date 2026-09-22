@@ -454,6 +454,64 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    description: 'skip attribution: who ended a skipped play, and the evidence for it',
+    up(db) {
+      db.exec(`
+        -- ============================================================================
+        -- WHY THIS IS A NEW COLUMN RATHER THAN A NEW skip_source VALUE
+        --
+        -- The obvious change is to let skip_source hold a third value. It cannot:
+        --
+        --     skip_source TEXT CHECK (skip_source IN ('user','rule'))
+        --
+        -- SQLite has no ALTER TABLE ... DROP CONSTRAINT, so widening that CHECK means
+        -- rebuilding \`play\` through the 12-step procedure -- on the one table in this
+        -- project that cannot be regenerated, and it would make this migration
+        -- NON-ADDITIVE, retiring the by-image rollback guarantee that migration 005
+        -- still enjoys. Two ADD COLUMNs buy the same semantics for none of that risk.
+        --
+        -- Overloading NULL was the other tempting option and is worse: skip_source is
+        -- NULL today for "this play was not a skip". Making it also mean "a skip by
+        -- an unknown actor" merges two facts into one value, which is the exact defect
+        -- this whole column exists to correct.
+        --
+        -- ⚠️ skip_source IS NOT BACKFILLED AND IS NOT CORRECTED. It keeps saying 'user'
+        -- on every historical skip, because that is what the app asserted at the time and
+        -- rewriting it would destroy the evidence that the assertion was ever made.
+        -- skip_attribution is the answer; skip_source is the claim.
+        -- ============================================================================
+
+        -- 'user' | 'unattributed'. NULL when the play was not a skip, exactly as
+        -- skip_source has always been NULL for a non-skip.
+        --
+        -- 'unattributed' says NOT THE LISTENER and deliberately names no cause. Crossfade
+        -- is ruled out (Spotify caps it at 12s; these lose 21-41s) and wrong duration
+        -- metadata is ruled out (the same tracks reach full length on other plays). What
+        -- remains is indicated but unproven, and a column value is the wrong place to
+        -- record a guess.
+        ALTER TABLE play ADD COLUMN skip_attribution TEXT;
+
+        -- How far into the NEXT track the app was when it first observed it, in ms.
+        -- Corroborating evidence, recorded and never fed back into the attribution --
+        -- one hand-checked play sat at ratio 0.858 with a successor lag of only 2s, so
+        -- requiring both signals would have mis-attributed it.
+        --
+        -- NULL means not measured (no successor yet, or a pre-v6 row), NEVER zero.
+        ALTER TABLE play ADD COLUMN successor_lag_ms INTEGER;
+
+        -- The attribution is derived, so a partially-reattributed corpus must be
+        -- distinguishable from a consistent one -- the same reason classifier_version
+        -- exists for the outcome. Without it, "these rows say user because the listener
+        -- skipped them" and "these rows say user because nothing has looked yet" are
+        -- indistinguishable.
+        ALTER TABLE play ADD COLUMN attribution_version INTEGER;
+
+        CREATE INDEX idx_play_skip_attribution ON play(skip_attribution);
+      `);
+    },
+  },
 ];
 
 /**

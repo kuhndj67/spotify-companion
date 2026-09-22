@@ -32,6 +32,9 @@ const PURE_MODULES = [
   // The trend window is a function of `now` — passed in, never read. A Date.now() here would
   // make the chart untestable at exactly the boundary that goes wrong, the week seam.
   'history/playStats.ts',
+  // Decides WHO ended a skip. A clock or a query here would make the judgement depend on when
+  // it was asked, and FR-20's whole point is that it can be re-derived from the trail later.
+  'history/skipAttribution.ts',
   'export/serialisers.ts',
   'mcp/parseNowPlaying.ts',
   // U2. labelClassifier decides the independent variable the promotion hypothesis rests on:

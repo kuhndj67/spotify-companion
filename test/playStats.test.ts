@@ -23,13 +23,14 @@ function play(
   startedAt: string,
   outcome: PlayTimePoint['outcome'] = 'completed',
   provenance: PlayTimePoint['provenance'] = 'live',
+  skipAttribution: PlayTimePoint['skipAttribution'] = null,
 ): PlayTimePoint {
-  return { startedAt, outcome, provenance };
+  return { startedAt, outcome, provenance, skipAttribution };
 }
 
 /** A play from `recently-played`: the app was not running, so nothing about it was observed. */
 function notObserved(startedAt: string): PlayTimePoint {
-  return { startedAt, outcome: 'unknown', provenance: 'backfilled' };
+  return { startedAt, outcome: 'unknown', provenance: 'backfilled', skipAttribution: null };
 }
 
 describe('startOfWeekUtc', () => {
@@ -126,10 +127,49 @@ describe('weeklyBuckets', () => {
     assert.deepEqual(buckets[0]!.byBucket, {
       completed: 1,
       skipped: 1,
+      'ended-early': 0,
       inconclusive: 2,
       'not-observed': 0,
     });
     assert.equal(buckets[0]!.total, 4);
+  });
+
+  /**
+   * ⚠️ The 2026-09-21 split. A `skipped` outcome says the track changed early; it does NOT say
+   * the listener did it. Until this bucket existed the panel reported skips of artists the
+   * listener never skips — 18 of 35 live skips were tracks played to 81-90% and then replaced.
+   *
+   * Same family as the `unknown` merge above: one label covering two facts, where the wrong
+   * reading is the flattering one and nothing on screen admits the difference.
+   */
+  it('NEVER counts an unattributed skip as one the listener made', () => {
+    const buckets = weeklyBuckets(
+      [
+        play('2026-08-18T09:00:00.000Z', 'skipped', 'live', 'user'),
+        play('2026-08-19T09:00:00.000Z', 'skipped', 'live', 'unattributed'),
+        play('2026-08-20T09:00:00.000Z', 'skipped', 'live', 'unattributed'),
+      ],
+      window,
+    );
+
+    assert.equal(buckets[0]!.byBucket.skipped, 1, 'only the one the listener actually skipped');
+    assert.equal(buckets[0]!.byBucket['ended-early'], 2);
+    assert.equal(buckets[0]!.total, 3, 'and none of them are lost');
+  });
+
+  /**
+   * ⚠️ An unattributed skip is a JUDGEMENT, so its absence must not be read as one. A skip
+   * nothing has attributed yet stays in `skipped` rather than being promoted — inventing an
+   * attribution is the exact mistake this column was added to correct.
+   */
+  it('leaves a not-yet-attributed skip in skipped rather than guessing', () => {
+    const buckets = weeklyBuckets(
+      [play('2026-08-18T09:00:00.000Z', 'skipped', 'live', null)],
+      window,
+    );
+
+    assert.equal(buckets[0]!.byBucket.skipped, 1);
+    assert.equal(buckets[0]!.byBucket['ended-early'], 0);
   });
 
   it('NEVER merges "the app was off" with "the app could not tell"', () => {
@@ -153,7 +193,14 @@ describe('weeklyBuckets', () => {
     // Provenance decides first: it is the stronger fact. A backfilled row has no trail, so no
     // outcome it carries could have been measured.
     const buckets = weeklyBuckets(
-      [{ startedAt: '2026-08-18T09:00:00.000Z', outcome: 'completed', provenance: 'backfilled' }],
+      [
+        {
+          startedAt: '2026-08-18T09:00:00.000Z',
+          outcome: 'completed',
+          provenance: 'backfilled',
+          skipAttribution: null,
+        },
+      ],
       window,
     );
     assert.equal(buckets[0]!.byBucket['not-observed'], 1);

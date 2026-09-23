@@ -513,6 +513,64 @@ describe('buildReportingDb', () => {
     });
   });
 
+  it('ranks artists deterministically, with ties broken by name', () => {
+    // ⚠️ An unstable rank silently reshuffles the report's COLUMNS between rebuilds, so the same
+    // dashboard would show different artists on different days with nothing saying why. Ties are
+    // broken by name so a rebuild is reproducible.
+    withTempDirs(({ history, output }) => {
+      seed(history);
+      const options = {
+        historyDbPath: history,
+        outputPath: output,
+        timeZone: NY,
+        generatedAt: '2026-09-23T00:00:00.000Z',
+        credits: {
+          track1234567890123456: {
+            title: 'A Track',
+            artists: [
+              { name: 'Ren', id: 'artist1234567890123456' },
+              { name: 'Zed Guest', id: null },
+            ],
+            source: 'split-live-credit',
+          },
+          track2222222222222222: {
+            title: 'Backfilled Track',
+            artists: [
+              { name: 'Ren', id: 'artist1234567890123456' },
+              { name: 'Alpha Guest', id: null },
+            ],
+            source: 'spotify-track',
+          },
+        },
+      };
+      buildReportingDb(options);
+
+      const readRanks = () => {
+        const db = new DatabaseSync(output, { readOnly: true });
+        try {
+          return (
+            db
+              .prepare(
+                `SELECT DISTINCT artist_name, artist_rank, artist_total_plays
+                   FROM play_artist ORDER BY artist_rank`,
+              )
+              .all() as { artist_name: string; artist_rank: number; artist_total_plays: number }[]
+          ).map((row) => `${row.artist_rank}:${row.artist_name}:${row.artist_total_plays}`);
+        } finally {
+          db.close();
+        }
+      };
+
+      const first = readRanks();
+      // Ren has 2 plays so leads; the two guests have 1 each and tie, broken alphabetically.
+      assert.deepEqual(first, ['1:Ren:2', '2:Alpha Guest:1', '3:Zed Guest:1']);
+
+      // Rebuilding must produce the identical ordering.
+      buildReportingDb({ ...options, generatedAt: '2026-09-23T02:00:00.000Z' });
+      assert.deepEqual(readRanks(), first, 'rank must be stable across rebuilds');
+    });
+  });
+
   it('rebuilds in place over an existing database without duplicating anything', () => {
     // ⚠️ THE REGRESSION GUARD FOR THE IN-PLACE DESIGN. The first implementation built a temp file
     // and renamed it over the target, which fails on Windows with EPERM once anything holds the

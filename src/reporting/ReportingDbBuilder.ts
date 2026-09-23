@@ -141,6 +141,18 @@ const CAVEATS: { severity: string; topic: string; caveat: string }[] = [
   },
   {
     severity: 'warning',
+    topic: 'artist_rank is corpus-wide and does NOT follow a time filter',
+    caveat:
+      'artist_rank orders artists by total credited plays across the WHOLE corpus, so "artist_rank '
+      + '<= 20" means the 20 most played overall -- NOT the top 20 within whatever time range is '
+      + 'filtered. That is deliberate: it keeps the pivot columns identical between a one-week view '
+      + 'and a one-month view so the two can be compared, the same trade-off the app trend makes by '
+      + 'anchoring its axis on the corpus. The consequence is that an artist who dominated a single '
+      + 'week may be absent from a top-20 pivot of that week. For a genuine within-range ranking, '
+      + 'aggregate the range yourself and order by the count rather than by artist_rank.',
+  },
+  {
+    severity: 'warning',
     topic: 'skipped means a rejection, as of classifier v2',
     caveat:
       'Until 2026-09-22 a skipped row could be a transition rather than a rejection: in the AI DJ '
@@ -237,6 +249,13 @@ CREATE TABLE play_artist (
   -- How this credit was obtained. 'lead-only-fallback' means the full credit was NOT available and
   -- this row undercounts; it is recorded per row so a question can exclude or surface it.
   credit_source   TEXT    NOT NULL,
+  -- Rank of this artist by total credited plays across the WHOLE corpus, 1 = most played.
+  -- ⚠️ CORPUS-WIDE ON PURPOSE, so a pivot filtered to one week keeps the same columns as one
+  -- filtered to a month and the two can be compared. It therefore does NOT re-rank when a time
+  -- filter is applied: "top 20" means top 20 overall, not top 20 that week. Same trade-off the
+  -- app's artist trend already makes by anchoring its axis on the corpus rather than per artist.
+  artist_rank        INTEGER NOT NULL,
+  artist_total_plays INTEGER NOT NULL,
   -- Dimensions duplicated from play_fact so an artist pivot needs no join. ~850 rows; free.
   local_day       TEXT    NOT NULL,
   local_week      TEXT    NOT NULL,
@@ -255,6 +274,7 @@ CREATE TABLE play_artist (
 );
 
 CREATE INDEX idx_pa_name  ON play_artist(artist_name);
+CREATE INDEX idx_pa_rank  ON play_artist(artist_rank);
 CREATE INDEX idx_pa_id    ON play_artist(artist_id);
 CREATE INDEX idx_pa_week  ON play_artist(local_week);
 CREATE INDEX idx_pa_day   ON play_artist(local_day);
@@ -262,6 +282,7 @@ CREATE INDEX idx_pa_day   ON play_artist(local_day);
 -- The ranking the Artist Play Summary should use: every credited appearance, not just leads.
 CREATE VIEW artist_credit_totals AS
   SELECT artist_name,
+         MIN(artist_rank)                           AS artist_rank,
          MAX(artist_id)                             AS artist_id,
          COUNT(*)                                   AS artist_plays,
          SUM(is_lead)                               AS lead_plays,
@@ -403,12 +424,21 @@ export function buildReportingDb(options: BuildOptions): BuildResult {
     const insertArtist = out.prepare(
       `INSERT INTO play_artist (
          play_id, artist_position, artist_name, artist_id, is_lead, credit_source,
+         artist_rank, artist_total_plays,
          local_day, local_week, local_month, local_hour, local_weekday, local_weekday_ord,
          track_id, track_title, play_bucket, provenance, observed, completion_ratio, label_verdict
-       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     );
 
-    let artistRows = 0;
+    /**
+     * Built in memory first so the ranks can be computed before anything is inserted.
+     *
+     * ⚠️ Rank has to be a stored column rather than something Metabase derives. A pivot with 234
+     * artists on its column axis is unreadable, so the report filters to a top N — and computing
+     * that ranking in the BI tool would be a second place the "which artists matter" question gets
+     * answered, in a tool that cannot see the credit rules.
+     */
+    const artistAssignments: { fact: FactRow; position: number; name: string; id: string | null; source: string }[] = [];
     let playsWithFullCredit = 0;
     for (const fact of facts) {
       const credit = credits[fact.track_id];
@@ -426,31 +456,57 @@ export function buildReportingDb(options: BuildOptions): BuildResult {
       if (credit !== undefined) playsWithFullCredit++;
 
       for (const [position, artist] of artists.entries()) {
-        insertArtist.run(
-          fact.play_id,
+        artistAssignments.push({
+          fact,
           position,
-          artist.name,
+          name: artist.name,
           // Position 0 is the lead, and play.artist_id is exactly that, so prefer the stored id
           // over the cache for it: the cache may carry a null where the corpus has the real value.
-          position === 0 ? (fact.artist_id ?? artist.id) : artist.id,
-          position === 0 ? 1 : 0,
-          creditSource,
-          fact.local_day,
-          fact.local_week,
-          fact.local_month,
-          fact.local_hour,
-          fact.local_weekday,
-          fact.local_weekday_ord,
-          fact.track_id,
-          fact.track_title,
-          fact.play_bucket,
-          fact.provenance,
-          fact.observed,
-          fact.completion_ratio,
-          fact.label_verdict,
-        );
-        artistRows++;
+          id: position === 0 ? (fact.artist_id ?? artist.id) : artist.id,
+          source: creditSource,
+        });
       }
+    }
+
+    // Rank by total credited plays, ties broken by name so a rebuild is deterministic — an
+    // unstable rank would silently reshuffle a report's columns between builds.
+    const totals = new Map<string, number>();
+    for (const assignment of artistAssignments) {
+      totals.set(assignment.name, (totals.get(assignment.name) ?? 0) + 1);
+    }
+    const ranked = [...totals.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    );
+    const rankOf = new Map<string, number>();
+    ranked.forEach(([name], index) => rankOf.set(name, index + 1));
+
+    let artistRows = 0;
+    for (const assignment of artistAssignments) {
+      const { fact } = assignment;
+      insertArtist.run(
+        fact.play_id,
+        assignment.position,
+        assignment.name,
+        assignment.id,
+        assignment.position === 0 ? 1 : 0,
+        assignment.source,
+        rankOf.get(assignment.name)!,
+        totals.get(assignment.name)!,
+        fact.local_day,
+        fact.local_week,
+        fact.local_month,
+        fact.local_hour,
+        fact.local_weekday,
+        fact.local_weekday_ord,
+        fact.track_id,
+        fact.track_title,
+        fact.play_bucket,
+        fact.provenance,
+        fact.observed,
+        fact.completion_ratio,
+        fact.label_verdict,
+      );
+      artistRows++;
     }
 
     const caveat = out.prepare(

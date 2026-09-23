@@ -94,6 +94,7 @@ function serve(overrides: Partial<ApiDeps> = {}) {
     backTest: null,
     reloadRules: null,
     now: () => NOW,
+    reportTimeZone: 'America/New_York',
     ...overrides,
   };
 

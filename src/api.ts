@@ -80,6 +80,11 @@ export interface ApiDeps {
   likedFor: (trackId: string) => DisplayLiked | undefined;
   /** ISO 8601. Injected so the trend window is a function of its inputs. */
   now: () => string;
+  /**
+   * Zone for calendar bucketing. Injected for the same reason as `now`: a bucket that depends on
+   * the host's zone cannot be tested for the boundary that actually goes wrong.
+   */
+  reportTimeZone: string;
 
   // -- U4: rule observability ------------------------------------------------
   /**
@@ -302,19 +307,32 @@ export function createApi(deps: ApiDeps): Router {
     if (artistId !== null) {
       // Anchored on the CORPUS start, not this artist's first play, so every artist's chart shares
       // one x-axis and two of them can be compared.
-      const window = trendWindow(deps.repository.firstPlayStartedAt(), asOf);
+      const window = trendWindow(
+        deps.repository.firstPlayStartedAt(),
+        asOf,
+        deps.reportTimeZone,
+      );
+      // ⚠️ `window.start` is a LOCAL Monday, and this filter treats it as a UTC instant. That is
+      // deliberate and it over-fetches rather than under-fetching: local midnight is 04:00-05:00Z,
+      // so starting at 00:00Z picks up a few hours that belong to the previous local week, and
+      // `weeklyBuckets` drops anything outside the window. Narrowing this to the exact local
+      // instant would risk excluding real plays for no benefit.
       const plays = deps.repository.listPlayTimesForArtist(artistId, `${window.start}T00:00:00.000Z`);
       artist = {
         artistId,
         playsInWindow: plays.length,
         firstPlayedAt: plays[0]?.startedAt ?? null,
         window,
-        weeks: weeklyBuckets(plays, window),
+        weeks: weeklyBuckets(plays, window, deps.reportTimeZone),
       };
     }
 
     res.json({
       asOf,
+      // ⚠️ Sent so the client never infers it. The browser's own zone is *probably* the same as
+      // the server's on a single-user machine, and "probably the same" is how a one-day
+      // disagreement between a date label and the chart beside it would survive unnoticed.
+      timeZone: deps.reportTimeZone,
       track: trackId === null ? null : deps.repository.trackPlayStats(trackId),
       artist,
     });

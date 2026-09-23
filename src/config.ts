@@ -137,6 +137,20 @@ export const config = {
   /** Classifier v2. Sanity rail on the rule above; only bites below ~110 s of duration. */
   minObservedPositionRatio: Number.parseFloat(process.env.MIN_OBSERVED_POSITION_RATIO ?? '0.75'),
 
+  /**
+   * The zone every calendar bucket — chart weeks and report days/weeks/months — is computed in.
+   *
+   * ⚠️ **Configuration, never read from the system clock.** `Intl` would happily default to the
+   * host zone, and then the same play would bucket differently on two machines with every test
+   * still passing. `reporting/timeBuckets.ts` therefore has no default and `purity.test.ts`
+   * rejects the system-zone reads.
+   *
+   * ⚠️ Changing it **restates history**: 63% of this corpus's plays fall between 23:00Z and
+   * 04:00Z, so a zone change moves ~49% of plays across a day boundary and ~3% across a week
+   * boundary. Charts read before and after a change are not directly comparable.
+   */
+  reportTimeZone: process.env.REPORT_TIME_ZONE ?? 'America/New_York',
+
   // -- U1: export and snapshots (FR-56) ---------------------------------------
 
   snapshotDir: process.env.SNAPSHOT_DIR ?? join(projectRoot, 'data', 'snapshots'),

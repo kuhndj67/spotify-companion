@@ -557,6 +557,7 @@ app.use(
     diagnostics: runDiagnosticsReport,
     likedFor,
     now: () => new Date().toISOString(),
+    reportTimeZone: config.reportTimeZone,
     // ⚠️ The rule set comes from the WATCHER, which owns it. `RuleStore` has no `current()`
     // to wire this to by mistake (BR-26.3b).
     ruleSet: ruleWatcher === null ? null : () => ruleWatcher!.current(),

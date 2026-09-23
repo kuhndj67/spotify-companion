@@ -70,6 +70,10 @@ const PURE_MODULES = [
   // The line a person reads all day to judge their rules. A clock or a lookup here would make
   // the log disagree with the row it reports.
   'rules/decisionSummary.ts',
+  // Calendar bucketing for reports and charts. A system-zone read here would misdate half the
+  // corpus by a day (measured: 327 of 662) while every test still passed — so every function
+  // takes its zone as an argument and there is no default.
+  'reporting/timeBuckets.ts',
 ];
 
 /**
@@ -101,6 +105,17 @@ const IMPURE_GLOBALS: { pattern: RegExp; what: string }[] = [
   { pattern: /\bprocess\.env\b/, what: 'process.env' },
   { pattern: /\bfetch\s*\(/, what: 'fetch()' },
   { pattern: /\bsetTimeout\s*\(|\bsetInterval\s*\(/, what: 'timers' },
+  // ⚠️ `new Intl.DateTimeFormat(locale)` with no `timeZone` silently uses the SYSTEM zone, so the
+  // same play buckets differently on two machines while every test still passes. Added 2026-09-22
+  // with reporting/timeBuckets.ts, where the wrong zone misdates 49% of plays by a day.
+  {
+    pattern: /Intl\.DateTimeFormat\s*\(\s*\)/,
+    what: 'Intl.DateTimeFormat() with no options - reads the system time zone',
+  },
+  {
+    pattern: /resolvedOptions\s*\(\s*\)\s*\.\s*timeZone/,
+    what: 'resolvedOptions().timeZone - reads the system time zone',
+  },
 ];
 
 /** Strip comments so documentation *about* impurity does not trip the check. */

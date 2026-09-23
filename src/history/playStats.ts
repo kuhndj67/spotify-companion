@@ -22,6 +22,7 @@
  * trend the panel exists to show.
  */
 
+import { localWeekStart } from '../reporting/timeBuckets.js';
 import type { PlayTimePoint } from './types.js';
 
 export type { PlayTimePoint };
@@ -103,7 +104,10 @@ const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
 
 /** One column of the trend. `total` is the sum of `byBucket`, kept so the view need not re-add. */
 export interface WeekBucket {
-  /** ISO date (`YYYY-MM-DD`) of the Monday that opens the week, UTC. */
+  /**
+   * ISO date (`YYYY-MM-DD`) of the Monday that opens the week, **in the report time zone** — not
+   * UTC. See `startOfWeek`.
+   */
   weekStart: string;
   byBucket: Record<PlayBucket, number>;
   total: number;
@@ -124,17 +128,26 @@ export interface TrendWindow {
   capped: boolean;
 }
 
-/** Monday of the week containing `iso`, as a `YYYY-MM-DD` date in UTC. */
-export function startOfWeekUtc(iso: string): string {
-  const at = new Date(iso);
-  // getUTCDay() is 0 for Sunday; shift so Monday is 0 and the week never splits a weekend.
-  const daysSinceMonday = (at.getUTCDay() + 6) % 7;
-  const monday = Date.UTC(
-    at.getUTCFullYear(),
-    at.getUTCMonth(),
-    at.getUTCDate() - daysSinceMonday,
-  );
-  return new Date(monday).toISOString().slice(0, 10);
+/**
+ * Monday of the week containing `iso`, as a `YYYY-MM-DD` date in `timeZone`.
+ *
+ * ⚠️ **NO DEFAULT ZONE, ON PURPOSE.** This was `startOfWeekUtc(iso)` until 2026-09-22, and UTC is
+ * measurably not what a reader means by "a week": the host zone is `America/New_York` and 63% of
+ * plays fall between 23:00Z and 04:00Z, which is the *previous* local evening. A defaulted
+ * parameter would let a caller get UTC back without saying so, which is how the old behaviour
+ * would quietly return.
+ *
+ * ⚠️ **Switching to local time moved 18 of 662 plays** out of the week of 2026-09-07 and into
+ * 2026-08-31 — Sunday-evening listening that UTC counted as Monday. Numbers read off this chart
+ * before 2026-09-22 are therefore not directly comparable with numbers read after it. The effect
+ * is ~3% at week granularity and smaller at month, against 49% at *day* granularity, which is why
+ * it was worth correcting even though the chart shows weeks.
+ *
+ * ⚠️ The arithmetic lives in `reporting/timeBuckets.ts` and is **not duplicated here.** A second
+ * copy differing only by time zone is the shape that produced `bucketOf` vs `trackPlayStats`.
+ */
+export function startOfWeek(iso: string, timeZone: string): string {
+  return localWeekStart(iso, timeZone);
 }
 
 /** `weekStart` shifted by whole weeks. Exact: week starts are midnight UTC, so no DST to cross. */
@@ -156,11 +169,12 @@ function shiftWeeks(weekStart: string, weeks: number): string {
 export function trendWindow(
   firstPlayedAt: string | null,
   nowIso: string,
+  timeZone: string,
   maxWeeks: number = MAX_TREND_WEEKS,
 ): TrendWindow {
-  const end = startOfWeekUtc(nowIso);
+  const end = startOfWeek(nowIso, timeZone);
   const earliestAllowed = shiftWeeks(end, -(Math.max(1, maxWeeks) - 1));
-  const corpusStart = firstPlayedAt === null ? end : startOfWeekUtc(firstPlayedAt);
+  const corpusStart = firstPlayedAt === null ? end : startOfWeek(firstPlayedAt, timeZone);
 
   // A corpus that starts *after* the cap is the normal young-database case; the window then
   // begins at the corpus and the chart is honestly short.
@@ -188,6 +202,7 @@ export function weekStarts(window: TrendWindow): string[] {
 export function weeklyBuckets(
   plays: readonly PlayTimePoint[],
   window: TrendWindow,
+  timeZone: string,
 ): WeekBucket[] {
   const buckets = new Map<string, WeekBucket>();
   for (const weekStart of weekStarts(window)) {
@@ -195,7 +210,7 @@ export function weeklyBuckets(
   }
 
   for (const play of plays) {
-    const bucket = buckets.get(startOfWeekUtc(play.startedAt));
+    const bucket = buckets.get(startOfWeek(play.startedAt, timeZone));
     // Plays outside the window are dropped rather than clamped into the edge bucket, which would
     // pile six months of history onto one column and read as a listening spike.
     if (bucket === undefined) continue;

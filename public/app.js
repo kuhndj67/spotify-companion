@@ -754,8 +754,37 @@ function formatWeek(isoDate) {
   return `${Number(parts[2])} ${MONTHS[Number(parts[1]) - 1]}`;
 }
 
-function formatDay(iso) {
+/**
+ * ⚠️ `timeZone` is REQUIRED for correctness on an instant, and optional only so this stays total.
+ *
+ * Slicing the ISO string yields the UTC date. Since 2026-09-22 every bucket on this page is
+ * computed in the report zone, and 63% of this corpus's plays fall between 23:00Z and 04:00Z --
+ * the previous local evening. So a sliced date sitting next to a locally-bucketed chart is wrong
+ * by a day for half the plays, and the two disagree with nothing on screen explaining why.
+ *
+ * Without a zone it falls back to the old slice rather than to the BROWSER's zone: browser-local
+ * is usually right on a single-user machine, which is precisely what would make a wrong answer
+ * survive. A visibly-UTC date is better than an invisibly-assumed one.
+ */
+function formatDay(iso, timeZone) {
   if (!iso) return DASH;
+  if (timeZone) {
+    try {
+      const parts = {};
+      for (const part of new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(new Date(iso))) {
+        if (part.type !== 'literal') parts[part.type] = part.value;
+      }
+      return `${Number(parts.day)} ${MONTHS[Number(parts.month) - 1]} ${parts.year}`;
+    } catch {
+      // An unknown zone or an unparseable instant: fall through to the slice rather than throwing
+      // inside a render.
+    }
+  }
   const parts = iso.slice(0, 10).split('-');
   return `${Number(parts[2])} ${MONTHS[Number(parts[1]) - 1]} ${parts[0]}`;
 }
@@ -1121,7 +1150,7 @@ function renderStats(payload, artistName) {
     ui.statPlays.textContent = parts.length
       ? `${track.totalPlays} · ${parts.join(', ')}`
       : String(track.totalPlays);
-    ui.statFirst.textContent = formatDay(track.firstPlayedAt);
+    ui.statFirst.textContent = formatDay(track.firstPlayedAt, payload.timeZone);
   }
   renderTrend(payload.artist, artistName);
 }

@@ -21,7 +21,9 @@
     "check:rules-schema": "node --import tsx scripts/check-rules-schema.mjs",
     "reporting:build": "node --import tsx scripts/build-reporting-db.mjs",
     "reclassify": "node --import tsx scripts/reclassify-unobserved-tails.mjs",
-    "reporting:credits": "node scripts/resolve-artist-credits.mjs"
+    "reporting:credits": "node scripts/resolve-artist-credits.mjs",
+    "reporting:metabase": "node scripts/metabase-setup.mjs",
+    "reporting:refresh": "npm run reporting:credits && npm run reporting:build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

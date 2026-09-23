@@ -13,6 +13,7 @@ dist/
 secrets/*
 !secrets/spotify-config.example.json
 !secrets/musicbrainz.example.json
+!secrets/metabase.example.json
 spotify-config.json
 .env
 .env.local

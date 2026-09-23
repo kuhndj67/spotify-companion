@@ -17,20 +17,30 @@
  * `reporting.db` is derived and disposable — regenerable from `history.db` at any time — which is
  * the opposite of `history.db`, the one artefact in this project that comes back from nowhere.
  *
- * ## ⚠️ It is rewritten whole, which is why the container mounts a DIRECTORY
+ * ## ⚠️ It is rebuilt IN PLACE, in one transaction — and the first design was wrong
  *
- * Each build writes a temporary file and renames it into place, so a reader never sees a
- * half-built database. **That rename replaces the inode.** A single-file bind mount binds an
- * inode, so `./data/reporting/reporting.db:/reporting/reporting.db` would either fail or silently
- * detach the container's view from the host file after the first rebuild — the container would
- * serve the original file for ever while the host kept updating a different one. The compose file
- * therefore mounts `./data/reporting` as a directory, for the same reason `./data` is a directory
- * mount for SQLite's `-wal` and `-shm` siblings.
+ * The first version built a temporary file and renamed it over the target, for filesystem-level
+ * atomicity. **That fails on Windows with `EPERM` once anything holds the target open**, because
+ * Windows will not rename over an open file. It worked while Metabase merely had the directory
+ * mounted and broke the moment Metabase became a live data source — so it passed every check until
+ * the whole system was actually running, which is the only place it could have been caught.
+ *
+ * The rebuild now drops and recreates every object inside a single transaction on the existing
+ * file. That is **better, not merely a workaround**: atomicity comes from SQLite rather than from
+ * the filesystem, a crash mid-build rolls back to the previous contents instead of leaving a
+ * `.building-*.db` behind, and the inode never changes, so a reader's open handle stays valid.
+ *
+ * `busy_timeout` is set because Metabase holds a pooled read connection: the exclusive lock is
+ * available between its queries, not during one, so the writer waits rather than failing.
+ *
+ * ⚠️ **The container still mounts a DIRECTORY, and it must.** An in-place transaction writes a
+ * `reporting.db-journal` sibling, which has to live beside the database — the same reason `./data`
+ * is a directory mount for SQLite's `-wal` and `-shm` siblings.
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, renameSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import { FACT_COLUMNS, toFactRow, type FactRow, type SourcePlay } from './factRow.js';
 
@@ -351,20 +361,39 @@ export function buildReportingDb(options: BuildOptions): BuildResult {
   const facts: FactRow[] = plays.map((play) => toFactRow(play, timeZone));
 
   mkdirSync(dirname(outputPath), { recursive: true });
-  // Build beside the target, then rename: a reader never sees a partial database. See the note at
-  // the top about why this makes a directory mount mandatory.
-  const temporaryPath = join(dirname(outputPath), `.building-${process.pid}.db`);
-  rmSync(temporaryPath, { force: true });
 
-  const out = new DatabaseSync(temporaryPath);
+  const out = new DatabaseSync(outputPath);
   try {
+    // ⚠️ Metabase holds a POOLED READ CONNECTION to this file. The exclusive lock is free between
+    // its queries but not during one, so without a timeout a rebuild fails with SQLITE_BUSY
+    // whenever it happens to land on a query. Wait instead of failing.
+    out.exec('PRAGMA busy_timeout = 15000');
+    // DELETE rather than WAL: the container mounts this directory READ-ONLY, and a reader that has
+    // to create a -shm beside a WAL database may be unable to. Set before the transaction, because
+    // journal_mode cannot change inside one.
+    out.exec('PRAGMA journal_mode = DELETE');
+
+    // ⚠️ IMMEDIATE, not deferred. A deferred transaction takes its write lock at the first write,
+    // by which point the schema has already been dropped — so a busy reader would abort the build
+    // with the tables gone. IMMEDIATE acquires the lock up front: either the whole rebuild proceeds
+    // or nothing is touched.
+    out.exec('BEGIN IMMEDIATE');
+    // Drop in reverse dependency order: views reference the tables.
+    out.exec(`
+      DROP VIEW  IF EXISTS artist_credit_totals;
+      DROP VIEW  IF EXISTS artist_totals;
+      DROP VIEW  IF EXISTS track_totals;
+      DROP TABLE IF EXISTS play_artist;
+      DROP TABLE IF EXISTS play_fact;
+      DROP TABLE IF EXISTS report_caveat;
+      DROP TABLE IF EXISTS report_meta;
+    `);
     out.exec(DDL);
 
     const placeholders = FACT_COLUMNS.map(() => '?').join(',');
     const insert = out.prepare(
       `INSERT INTO play_fact (${FACT_COLUMNS.join(',')}) VALUES (${placeholders})`,
     );
-    out.exec('BEGIN');
     for (const fact of facts) {
       insert.run(...FACT_COLUMNS.map((column) => fact[column] as never));
     }
@@ -488,20 +517,22 @@ export function buildReportingDb(options: BuildOptions): BuildResult {
     }
 
     out.exec('COMMIT');
-    // Fold the WAL in so the published file is self-contained: the container mounts the directory
-    // read-only, and a reader that needs to create a -shm beside a WAL database may not be able to.
-    out.exec('PRAGMA journal_mode = DELETE');
     out.close();
-
-    renameSync(temporaryPath, outputPath);
     return summary;
   } catch (error) {
+    // Roll back so the file keeps its PREVIOUS contents. A failed rebuild must leave the last good
+    // report in place rather than an empty or half-populated one: a report that is quietly missing
+    // rows reads as a finding about the listening, not as a failed build.
+    try {
+      out.exec('ROLLBACK');
+    } catch {
+      // No transaction open — the failure happened before BEGIN, so there is nothing to undo.
+    }
     try {
       out.close();
     } catch {
-      // Already closed on the success path; closing twice is not an error worth masking this one.
+      // Closing twice is not an error worth masking the real one.
     }
-    rmSync(temporaryPath, { force: true });
     throw error;
   }
 }

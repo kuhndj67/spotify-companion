@@ -513,7 +513,77 @@ describe('buildReportingDb', () => {
     });
   });
 
-  it('refuses to publish a partial database if the build fails', () => {
+  it('rebuilds in place over an existing database without duplicating anything', () => {
+    // ⚠️ THE REGRESSION GUARD FOR THE IN-PLACE DESIGN. The first implementation built a temp file
+    // and renamed it over the target, which fails on Windows with EPERM once anything holds the
+    // target open -- and Metabase does, as a live data source. The rebuild now drops and recreates
+    // every object inside one transaction on the existing file, so the failure mode moved from
+    // "cannot write" to "wrote twice". A lingering view or a missed DROP would either throw or
+    // silently double every count, and a doubled count reads as listening, not as a bug.
+    withTempDirs(({ history, output }) => {
+      seed(history);
+      const options = {
+        historyDbPath: history,
+        outputPath: output,
+        timeZone: NY,
+        generatedAt: '2026-09-23T00:00:00.000Z',
+      };
+
+      const first = buildReportingDb(options);
+
+      // Counted after the FIRST build rather than hardcoded. A literal here breaks every time a
+      // caveat is added, which trains whoever hits it to bump the number — and this test is about
+      // duplication, not about how many caveats there happen to be.
+      const afterFirst = (() => {
+        const db = new DatabaseSync(output, { readOnly: true });
+        try {
+          const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+          return {
+            caveats: count('SELECT COUNT(*) AS n FROM report_caveat'),
+            meta: count('SELECT COUNT(*) AS n FROM report_meta'),
+          };
+        } finally {
+          db.close();
+        }
+      })();
+
+      const second = buildReportingDb({ ...options, generatedAt: '2026-09-23T01:00:00.000Z' });
+
+      assert.equal(second.rows, first.rows);
+      assert.equal(second.artistRows, first.artistRows);
+
+      const db = new DatabaseSync(output, { readOnly: true });
+      try {
+        const count = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+        assert.equal(count('SELECT COUNT(*) AS n FROM play_fact'), first.rows);
+        assert.equal(count('SELECT COUNT(*) AS n FROM play_artist'), first.artistRows);
+        // Caveats and meta are re-inserted every build, so a missed DROP doubles them here first
+        // and loudest.
+        assert.equal(count('SELECT COUNT(*) AS n FROM report_caveat'), afterFirst.caveats);
+        assert.equal(count('SELECT COUNT(*) AS n FROM report_meta'), afterFirst.meta);
+        assert.equal(
+          count('SELECT COUNT(*) AS n FROM report_meta'),
+          count('SELECT COUNT(DISTINCT key) AS n FROM report_meta'),
+          'report_meta keys must stay unique across rebuilds',
+        );
+
+        // The second build's metadata won, so the file is the newer one rather than a merge.
+        const generated = db
+          .prepare(`SELECT value FROM report_meta WHERE key = 'generated_at'`)
+          .get() as { value: string };
+        assert.equal(generated.value, '2026-09-23T01:00:00.000Z');
+
+        // journal_mode must survive a rebuild: WAL here would need a -shm the read-only container
+        // mount cannot create.
+        const mode = db.prepare('PRAGMA journal_mode').get() as { journal_mode: string };
+        assert.equal(mode.journal_mode.toLowerCase(), 'delete');
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('leaves no output at all when the SOURCE cannot be opened', () => {
     withTempDirs(({ output }) => {
       assert.throws(() =>
         buildReportingDb({

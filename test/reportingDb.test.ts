@@ -354,11 +354,20 @@ describe('buildReportingDb', () => {
 
       const db = new DatabaseSync(output, { readOnly: true });
       try {
-        const critical = db
-          .prepare(`SELECT topic FROM report_caveat WHERE severity = 'critical' ORDER BY topic`)
-          .all() as { topic: string }[];
-        // These three are the ones that produce a confident wrong answer rather than an error.
-        assert.equal(critical.length, 3, critical.map((row) => row.topic).join(' | '));
+        const critical = (
+          db
+            .prepare(`SELECT topic FROM report_caveat WHERE severity = 'critical' ORDER BY topic`)
+            .all() as { topic: string }[]
+        ).map((row) => row.topic);
+        // ⚠️ Asserted by TOPIC, not by count. A count says nothing about which warning is present,
+        // and it breaks whenever a caveat is added — which trains whoever hits it to bump the number
+        // rather than read the list. These are the traps that yield a confident wrong answer.
+        for (const expected of ['artist_id is the LEAD artist only', 'not-observed is not a zero']) {
+          assert.ok(
+            critical.some((topic) => topic.includes(expected)),
+            `missing critical caveat "${expected}"; got: ${critical.join(' | ')}`,
+          );
+        }
 
         const meta = Object.fromEntries(
           (db.prepare('SELECT key, value FROM report_meta').all() as {
@@ -370,6 +379,134 @@ describe('buildReportingDb', () => {
         assert.equal(meta.generated_at, '2026-09-23T00:00:00.000Z');
         assert.equal(meta.rows, '2');
         assert.equal(meta.credit_unknown_rows, '1');
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('expands a collaboration into one play_artist row per credited artist', () => {
+    withTempDirs(({ history, output }) => {
+      seed(history);
+      const result = buildReportingDb({
+        historyDbPath: history,
+        outputPath: output,
+        timeZone: NY,
+        generatedAt: '2026-09-23T00:00:00.000Z',
+        credits: {
+          track1234567890123456: {
+            title: 'A Track',
+            artists: [
+              { name: 'Ren', id: 'artist1234567890123456' },
+              { name: 'Eden Nash', id: null },
+            ],
+            source: 'split-live-credit',
+          },
+          track2222222222222222: {
+            title: 'Backfilled Track',
+            artists: [
+              { name: 'Ren', id: 'artist1234567890123456' },
+              { name: 'Chris Webby', id: 'webby00000000000000000' },
+            ],
+            source: 'spotify-track',
+          },
+        },
+      });
+
+      // 2 plays, 2 artists each.
+      assert.equal(result.rows, 2);
+      assert.equal(result.artistRows, 4);
+      assert.equal(result.playsWithFullCredit, 2);
+
+      const db = new DatabaseSync(output, { readOnly: true });
+      try {
+        const totals = db
+          .prepare(
+            `SELECT artist_name, artist_plays, lead_plays, guest_plays
+               FROM artist_credit_totals ORDER BY artist_plays DESC, artist_name`,
+          )
+          .all() as {
+          artist_name: string;
+          artist_plays: number;
+          lead_plays: number;
+          guest_plays: number;
+        }[];
+
+        // Ren leads both; the guests are credited without leading. A guest-only artist is exactly
+        // the case a lead-only view renders INVISIBLE — 99 of 234 artists on the real corpus.
+        const ren = totals.find((row) => row.artist_name === 'Ren')!;
+        assert.equal(ren.artist_plays, 2);
+        assert.equal(ren.lead_plays, 2);
+
+        const webby = totals.find((row) => row.artist_name === 'Chris Webby')!;
+        assert.equal(webby.artist_plays, 1);
+        assert.equal(webby.lead_plays, 0, 'invisible in a lead-only view');
+        assert.equal(webby.guest_plays, 1);
+
+        // ⚠️ The sum across artists EXCEEDS the play count, by design. Pinned so nobody "fixes" it.
+        const summed = totals.reduce((total, row) => total + row.artist_plays, 0);
+        assert.equal(summed, 4);
+        const plays = db.prepare('SELECT COUNT(*) AS n FROM play_fact').get() as { n: number };
+        assert.equal(plays.n, 2);
+        assert.ok(summed > plays.n, 'artist-plays must exceed plays when collaborations exist');
+
+        // Every play keeps exactly one lead, so `is_lead` can be trusted as a de-duplicator.
+        const leads = db
+          .prepare('SELECT COUNT(*) AS n FROM play_artist WHERE is_lead = 1')
+          .get() as { n: number };
+        assert.equal(leads.n, 2);
+
+        // A guest id that was never recorded stays null rather than becoming an empty string.
+        const eden = db
+          .prepare(`SELECT artist_id FROM play_artist WHERE artist_name = 'Eden Nash'`)
+          .get() as { artist_id: string | null };
+        assert.equal(eden.artist_id, null);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  it('falls back to lead-only when credits are absent, and SAYS SO', () => {
+    withTempDirs(({ history, output }) => {
+      seed(history);
+      // No `credits`: the degraded mode. It must be announced, because a lead-only report looks
+      // exactly like a correct one from inside a chart.
+      const result = buildReportingDb({
+        historyDbPath: history,
+        outputPath: output,
+        timeZone: NY,
+        generatedAt: '2026-09-23T00:00:00.000Z',
+      });
+
+      assert.equal(result.playsWithFullCredit, 0);
+      assert.equal(result.artistRows, 2, 'one lead per play, no guests recovered');
+
+      const db = new DatabaseSync(output, { readOnly: true });
+      try {
+        const sources = db
+          .prepare('SELECT DISTINCT credit_source FROM play_artist')
+          .all() as { credit_source: string }[];
+        assert.deepEqual(sources.map((row) => row.credit_source), ['lead-only-fallback']);
+
+        // The coverage shortfall is raised to `critical`, not left as a footnote.
+        const critical = (
+          db
+            .prepare(`SELECT topic FROM report_caveat WHERE severity = 'critical'`)
+            .all() as { topic: string }[]
+        ).map((row) => row.topic);
+        assert.ok(
+          critical.some((topic) => topic.includes('coverage')),
+          `expected a critical coverage caveat, got: ${critical.join(' | ')}`,
+        );
+
+        const meta = Object.fromEntries(
+          (db.prepare('SELECT key, value FROM report_meta').all() as {
+            key: string;
+            value: string;
+          }[]).map((row) => [row.key, row.value]),
+        );
+        assert.equal(meta.artist_credit_coverage, '0.0%');
       } finally {
         db.close();
       }

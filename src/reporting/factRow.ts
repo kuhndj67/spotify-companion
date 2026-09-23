@@ -130,14 +130,28 @@ export interface FactRow {
   /**
    * Always 1, and it is a warning rather than a fact about the play.
    *
-   * ⚠️ `artist_id` is `track.artists[0]` — the **lead** artist only. A feature credit is filed
-   * under the lead and is absent from the guest's totals. Measured 2026-09-22 over 662 plays:
-   * Ren 44 as lead against 79 in credit (44% low), Prof 38% low, Token 59% low, **Macklemore 9
-   * against 50 (82% low)**, with 148 of 662 rows carrying a multi-artist credit.
+   * ⚠️ `artist_id` is `track.artists[0]` — the **lead** artist only, so a feature credit is filed
+   * under the lead and absent from the guest's totals. Resolved and measured 2026-09-22 over 662
+   * plays and 234 credited artists:
    *
-   * So a report ranking artists by play count ranks them **wrongly**, not merely low: Macklemore
-   * places 5th by lead credit and 2nd by real credit. The column exists so that a question built
-   * in the BI tool carries the warning with it instead of leaving it in CLAUDE.md.
+   * ```
+   *   99 of 234 artists are INVISIBLE here   (0 lead plays, 185 artist-plays between them)
+   *   112 of 234 are understated at all
+   *   Ren          55 lead -> 87 credited   (37% understated)
+   *   Macklemore   29 lead -> 50 credited   (42%)  -- 5th lead-only, 3rd corrected
+   *   Chris Webby   0 lead -> 24 credited   (invisible)
+   *   Ryan Lewis    0 lead -> 17 credited   (invisible)
+   *   Token/Prof   unaffected -- they always lead
+   * ```
+   *
+   * ⚠️ Earlier revisions of this comment quoted "Ren 44 vs 79 (44%), Macklemore 9 vs 50 (82%),
+   * Token 59%". **Those were wrong**: they compared exact bare-string matches against
+   * credit-contains matches, so `"Macklemore, Kesha"` never counted as a Macklemore *lead*, which
+   * made every lead figure too low and every percentage too high. The numbers above come from the
+   * resolved credits.
+   *
+   * ⚠️ **`play_artist` is the fix, and this column marks the rows that still need it.** Rank
+   * artists on `artist_credit_totals.artist_plays`, never on a count over `play_fact`.
    */
   artist_lead_only: number;
 }

@@ -1,0 +1,78 @@
+# Metabase — the reporting surface. A SEPARATE compose project from the app.
+#
+# Why separate: `docker compose down` in the project root must not take reporting with it, and a
+# Metabase restart must not touch the recorder. The app is the only writer of history.db and that
+# property is worth protecting structurally rather than by remembering.
+#
+#   cd reporting && docker compose up -d      # http://localhost:3020
+#   cd reporting && docker compose down
+#
+# Build or refresh the data first, from the project root:
+#
+#   npm run reporting:build
+#
+# ⚠️ SAFE TO RUN WHILE THE APP IS UP. The builder opens history.db READ-ONLY and writes a separate
+# file. It is not a writer, unlike the maintenance scripts — see the warning in CLAUDE.md, which is
+# about writers rather than about `npm start` specifically.
+name: spotify-reporting
+
+services:
+  metabase:
+    image: metabase/metabase:v0.50.21
+    container_name: spotify-metabase
+    restart: unless-stopped
+
+    # ⚠️ 127.0.0.1 ONLY, like the app. Metabase has its own login and this is a single-user local
+    # deployment; publishing it on 0.0.0.0 would put an admin console holding a database connection
+    # on the LAN. 3020 because the app holds 3010 and ANOTHER PROJECT holds 3000 on this machine —
+    # see the warning in CLAUDE.md about localhost:3000 being a different app.
+    ports:
+      - '127.0.0.1:3020:3000'
+
+    volumes:
+      # Metabase's own application database (questions, dashboards, users). H2 in a named volume:
+      # this is Metabase's state, not ours, and it is regenerable by re-creating the questions.
+      - metabase-app-db:/metabase.db
+
+      # ⚠️ A DIRECTORY MOUNT, AND IT MUST STAY ONE.
+      #
+      # `ReportingDbBuilder` writes a temp file and renames it into place, so a reader never sees a
+      # half-built database. That rename REPLACES THE INODE, and a single-file bind mount binds an
+      # inode — so `reporting.db:/reporting/reporting.db` would either fail or silently detach this
+      # container's view from the host file after the first rebuild. Metabase would then serve the
+      # original data for ever while the host kept updating a different file, with nothing on screen
+      # saying so.
+      #
+      # Same reason `./data` is a directory mount for SQLite's -wal and -shm siblings.
+      - ../data/reporting:/reporting:ro
+
+    environment:
+      # H2 file, inside the named volume above.
+      MB_DB_FILE: /metabase.db/metabase.db
+
+      # ⚠️ Pin the report zone to the one the data was BUCKETED in. The local_day / local_week /
+      # local_month columns are finished strings computed in America/New_York; if Metabase applies a
+      # different zone to anything date-shaped it would disagree with columns it cannot re-derive.
+      # Keep this in step with REPORT_TIME_ZONE in the app.
+      MB_REPORT_TIMEZONE: America/New_York
+      JAVA_TIMEZONE: America/New_York
+
+      # No phoning home from a local analytics box.
+      MB_ANON_TRACKING_ENABLED: 'false'
+      MB_CHECK_FOR_UPDATES: 'false'
+
+    # Metabase is a JVM app and will happily consume everything available. This box also runs
+    # Rancher Desktop, the app container and a Kubernetes control plane.
+    mem_limit: 2g
+
+    healthcheck:
+      # Metabase's own readiness endpoint. `start_period` is generous because first boot migrates
+      # the H2 application database, which takes far longer than a restart.
+      test: ['CMD', 'curl', '-sf', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+volumes:
+  metabase-app-db:

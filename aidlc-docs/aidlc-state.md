@@ -4,7 +4,11 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME
+- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN, PAUSED 2026-09-23 awaiting answers (9 questions).**
+  ▶ **READ [`construction/u5-automated-skipping/RESUME-HERE.md`](construction/u5-automated-skipping/RESUME-HERE.md) FIRST.**
+  It carries the recommended next step — **run probe P-U5-1**, which needs the user present and
+  listening — and the full protocol. This is a *decision* pause, not a build pause: `src/` is
+  untouched and the container is healthy and recording. Previously: **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME
   VARIABLE WAS WRONG AND IS FIXED.** 851 tests · typecheck clean · schema v6 · 662 plays ·
   `src/playback/` still absent.
   **R11**: queue lookahead **depends on the playback context** — album/autoplay/radio expose 20
@@ -26,6 +30,29 @@
   ⚠️ The 2026-09-10 gate ran on those 24 rows as skips. **BR-11.7 still forbids a re-run**;
   recorded as a defect in the discharged result.
   See `audit.md` 2026-09-22.
+
+- **2026-09-23 — U5 FUNCTIONAL DESIGN PLAN WRITTEN, awaiting answers.**
+  [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md)
+  — 9 questions, each with a recommendation, and a checklist.
+  ⚠️ **It raises a hazard the U5 handoff did not contain, and it gates FR-46.** In the DJ context
+  the API reports track B while A is still audible for 18–41 s (classifier v2's finding), and
+  `EvaluationCoordinator` takes its play boundary from that reported state. If
+  `POST /me/player/next` acts on the *player's* real state, a rule matching B would **truncate A**
+  — an unmatched track the listener was enjoying — and B would then play unskipped, in the context
+  used 50–70% of the time. **The last step is unproven**: whether the lag is in Spotify's reporting
+  or in its state store is not inferable from what we have. **Probe P-U5-1 before designing FR-46**,
+  on the R11 precedent. ⚠️ The same lag makes the obvious FR-48 skip-confirmation check
+  (*"is a different track reported now?"*) one that can pass when nothing audible happened.
+  ✅ **U5 handoff item 1 is CLOSED, not inherited** — classifier v2 fixed the outcome itself.
+  All **22** remaining skips are `skip_source = 'user'`. ⚠️ But 22 events is the *entire* evidence
+  base for arming a rule, and the 2026-09-10 gate's n=17 precedent says what that can and cannot
+  decide. Corpus facts measured for the plan: longest consecutive user-skip run **2**
+  (18 runs of 1, 2 of 2) · **median 12 plays/hr**, p90 21 · `context_type` **NULL on all 577 live
+  plays** (open item 7, re-raised because it is now load-bearing for a *safety* question).
+  Also recorded 2026-09-23, **noted not built**: wishlist **W-4** — group aliases (`Inpatient` =
+  Ren + Chris Webby) rank as independent artists in the reporting DB, and a `", "` inside an artist
+  name would split silently. ⚠️ `Inpatient` **is a real artist**, probed — do not "fix" the
+  splitter on that example. Two new API traps in CLAUDE.md. See `audit.md` 2026-09-23.
 
 - **Previously**: CONSTRUCTION — **U4 COMPLETE, DEPLOYED AND VERIFIED 2026-09-22.
   All three exit criteria CI could not close are CLOSED. U5 is next.**

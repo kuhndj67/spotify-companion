@@ -429,6 +429,7 @@ this way, one of them a security bypass.
 | **Exemption / allow rules and rule precedence** | Q-B = OR-only for Unit 1. Deferred, not rejected — seams preserved in §3.4 |
 | **In-app analysis, dashboards, charts, statistical modelling** | User decision 2026-08-25 — mature tools exist. The app's obligation is export quality (§3.5), not analysis |
 | **HTTP data API / live dashboard integration** | User decision 2026-08-25 — needs a security architecture this project does not have. See §5.1 |
+| **Group-alias and comma-in-name artist resolution** | User decision 2026-09-23 — noted, not built. Affects the derived reporting DB only, no rule or gate input. See §5.1 **W-4** |
 
 ### 5.1 Wishlist — deferred, not rejected
 
@@ -616,6 +617,81 @@ Consequences that make this cheap:
 **Prerequisite**: none technically. But it should be sequenced **after** the Phase 2 gate is
 discharged, so that a change to the outcome variable cannot be made while a result that depends on
 it is being decided.
+
+#### W-4 — Resolve artist-credit ambiguity: group aliases, and commas inside a name
+
+**Raised by the user, 2026-09-23**, on seeing `Inpatient, Ren, Chris Webby` in the display and
+reading `Inpatient` as the track name rather than an artist.
+
+**That reading was wrong, and the probe is worth keeping.** `Inpatient` is a genuine Spotify
+artist (`5Qqx3JIJnK5mtk7U4tC4Vb`, `GET /artists/{id}` -> 200) and is `artists[0]` on all 15 tracks
+of the album **Asylum** *and* on the album itself. It is a **project alias**: its entire
+discography is 10 releases, every one of them `Inpatient | Ren | Chris Webby`. There is no track
+called `Inpatient`. ⚠️ **So neither Spotify nor the comma-split is wrong here** — do not "fix" the
+splitter on the strength of this example.
+
+**What it would enable**: an artist ranking in which every row is a distinct act.
+
+There are **two separate problems**, and they need different mechanisms.
+
+**(a) Group aliases are counted as independent artists.** A duo entity is credited *alongside* its
+own members, so one play yields three credits, one of which denotes the other two. Measured over
+the 662-play corpus in `artist_credit_totals`:
+
+| rank | artist | artist_plays | |
+|---|---|---|---|
+| 1 | Ren | 87 | |
+| 3 | Macklemore | 50 | |
+| 7 | Chris Webby | 24 | |
+| **8** | **Inpatient** | **24** | alias of Ren + Chris Webby |
+| **12** | **Macklemore & Ryan Lewis** | **17** | alias of Macklemore + Ryan Lewis |
+| 13 | Ryan Lewis | 17 | all 17 are the duo's tracks |
+
+⚠️ **This is NOT the by-design overcount.** `SUM(artist_plays) > play count` is correct and pinned
+by a test, because a collaboration counts for each *real* collaborator. This is different: a single
+credit that denotes a **set of the other credits on the same row**.
+
+⚠️ **A structural detector is not sufficient.** The signature "always lead, identical co-credit set,
+>= 2 tracks" finds 4 candidates in this corpus and **3 are false positives** — `Rudimental`,
+`Petravita` and `Dal Av` are real bands that merely have fixed collaborators at this sample size.
+It is a flag for review, never an automatic rule.
+
+**(b) An artist whose name contains `", "` splits into two artists, silently.** The live path has
+**no `artists[]` array at all**: `parseNowPlaying.ts` reads `artist: field(raw, 'Artist')`, and the
+MCP `getNowPlaying` returns a pre-joined string. Splitting on `', '` is therefore the only signal
+available, not an implementation shortcut, and `Tyler, The Creator` / `Earth, Wind & Fire` /
+`Crosby, Stills & Nash` would each become two names.
+
+⚠️ **A wrong split is indistinguishable from a right one in the stored data** — 93 of 234 credited
+names carry no Spotify id, because a split record only knows the lead's. Same family as the
+`inc=releases` 200: plausible wrong data, not a loud failure. **None are present in the corpus as
+of 2026-09-23** — all six `The ...` fragments (`The Big Push`, `The Skinner Brothers`,
+`The Plot In You`, `The Devil Makes Three`, `The Haunted Windchimes`, `The Goo Goo Dolls`) are real
+bands in lead position, verified. The risk is prospective.
+
+**Two mechanisms proposed (user, 2026-09-23), not mutually exclusive:**
+
+1. **A manual alias tag.** An authored mapping that marks a credit as an alias of a set of other
+   credits. Cheap, exact, and auditable; scales with the user's attention rather than the corpus.
+2. **A GenAI resolver.** Ask a model whether `Earth, Wind and Fire` is one band or three artists,
+   and whether a credit is a group alias. The user's point is that this is a question a language
+   model answers well and a parser cannot answer at all, because the information is not in the
+   string. ⚠️ **It must write a suggestion for review, never a fact** — `null` means unknown here
+   as everywhere else, and a fabricated resolution reaches the artist ranking with nothing marking
+   it as inferred. Treat its output as a third provenance alongside `split-live-credit` and
+   `spotify-track`.
+
+**Authoritative fallback, if neither is wanted**: `GET /tracks/{id}` returns the true `artists[]`
+with ids. ⚠️ **The batch form `GET /tracks?ids=` is 403 in Development Mode** (confirmed with a
+single id), so verifying the 119 split-derived multi-artist tracks costs **119 requests**, not one.
+
+**Why it is deferred**: it affects only the *derived* reporting database, not `history.db`, and it
+changes no rule input and no gate input. `artist_id` remains the lead artist throughout the app.
+
+**Recommended interim posture**: **mark, do not merge.** Folding an alias's plays into its members
+would destroy the fact that the user played the duo's record, which is real listening information.
+
+**Prerequisite**: none. Independent of U5.
 
 ---
 

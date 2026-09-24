@@ -50,17 +50,24 @@ what was rejected.
 > **Probe the live API. Do not reason from documentation.**
 
 Spotify's Development Mode has been restricted twice since 2024, and the docs do not reflect it.
-This project has drawn wrong conclusions from documentation **four times**, each caught only by a
+This project has drawn wrong conclusions from documentation **six times**, each caught only by a
 live probe:
 
 - `GET /me/following/contains` → **403** despite a valid scope
 - `GET /artists/{id}` → returns **no `genres` field at all**
 - `GET /me/tracks/contains` → **403**, while `GET /me/tracks` works
 - MusicBrainz `GET /ws/2/isrc/{id}?inc=releases` → **200 with the `inc` silently ignored**
+- `GET /tracks?ids=` → **403**, while `GET /tracks/{id}` works — confirmed with a batch of a
+  *single* id, which rules out payload size and rate limiting
+- `GET /artists/{id}/albums?limit=20` → **400 `"Invalid limit"`**; `limit=10` works, and the
+  documented maximum of 50 fails too. `album_group` is **absent** from the items
 
-**Pattern (Spotify)**: Development Mode blocks the `/contains` membership-check family while
-leaving list endpoints open. Workaround is always the same — fetch the set once, cache it, resolve
-locally.
+**Pattern (Spotify)**: Development Mode blocks the `/contains` membership-check family and the
+"several items at once" endpoints, while leaving the single-item and list endpoints open.
+Workaround is always the same — fetch the set once, cache it, resolve locally. ⚠️ **The 400 is the
+nastiest of the family**: `"Invalid limit"` reads as *your query string is malformed*, so it sends
+you auditing your own code instead of suspecting the sandbox. A restriction that misnames itself
+costs more than one that returns 403.
 
 ⚠️ **The fourth one is the dangerous shape.** The first three failed loudly. MusicBrainz returned
 **200 and plausible-looking data** — 19 ISRCs that appeared to have no releases at all. It read as
@@ -73,7 +80,21 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## Current state (2026-09-22)
+## ▶ Current state (2026-09-23) — U5 PAUSED MID-DESIGN, resume file written
+
+**Read [`aidlc-docs/construction/u5-automated-skipping/RESUME-HERE.md`](aidlc-docs/construction/u5-automated-skipping/RESUME-HERE.md) before anything else.**
+U5's Functional Design plan is written and waiting on 9 answers. **The recommended next step is
+probe P-U5-1**, which needs the user present and listening, because the instrument is their ear.
+
+⚠️ **It gates FR-46.** In the DJ context the API reports track B while A is still audible for
+18–41 s, and the evaluator takes its play boundary from that reported state — so a rule matching B
+may fire `POST /me/player/next` against a player still on A, **truncating an unmatched track** and
+letting B play unskipped. Every step of that is established **except** whether the lag is in
+Spotify's reporting or its state store. **Probe it; do not reason about it.**
+
+Documentation-only pause: `src/` untouched, no migration, container healthy.
+
+## Earlier state (2026-09-22)
 
 **U5 STARTED. R11 DISCHARGED. THE OUTCOME VARIABLE WAS WRONG AND IS FIXED.**
 851 tests · typecheck clean · schema v6 · **662 plays** · `src/playback/` still absent.
@@ -412,6 +433,20 @@ confined to `unknown` points at the backfill and not at the classifier.
 rather than joining it, so the start-based version cannot be reached for this again. `played_at`
 is the one value Spotify reports exactly — deduping on a start *derived* from it would repeat the
 mistake one layer down.
+
+**The artist credit is a JOINED STRING on the live path, and the split cannot see a comma in a
+name.** `parseNowPlaying.ts` reads `artist: field(raw, 'Artist')` — the MCP `getNowPlaying` returns
+names already joined, so there is **no `artists[]` array anywhere on the live path**. Splitting on
+`', '` is the only signal available, not a shortcut. It is exact today (119 of 119 multi-artist
+tracks checked against Spotify's own `artists[]`), and **zero** comma-bearing names are in the
+corpus — but `Tyler, The Creator` would silently become two artists, and a split record knows only
+the lead's id, so **93 of 234 credited names have no id** and a wrong split is indistinguishable
+from a right one. Separately, a **group alias** (`Inpatient` = Ren + Chris Webby;
+`Macklemore & Ryan Lewis`) is credited *beside* its own members, so it ranks as an independent
+artist — ⚠️ **not** the by-design `SUM(artist_plays) > play count`, which is one play counting for
+each *real* collaborator. Both are deferred as **W-4**, affect the derived reporting DB only, and
+are **not** rule or gate inputs. ⚠️ Do not "fix" the splitter because `Inpatient` looks like a
+track name: it is a real artist with a 10-release discography, and that was probed.
 
 **`artist_id` is the PRIMARY artist, and grouping by it undercounts.** The schema stores one id
 per play — `track.artists[0]` — while `artist_name` is the joined display string

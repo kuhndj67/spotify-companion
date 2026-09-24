@@ -4376,3 +4376,85 @@ the 2026-09-22 measurement had to reconstruct it from trails.
 **Context**: 851 tests, typecheck clean, schema **v6** (no migration needed), 662 plays, container
 rebuilt and verified — UI `200`, WS same-origin `101`, WS cross-site `403`, `integrity_check: ok`.
 **R11 discharged. U5 Functional Design is the next step.**
+
+---
+
+## 2026-09-23 — Artist credit: a false alarm, a real reporting defect, and a new API trap
+
+**User observation**: in `Inpatient, Ren, Chris Webby`, `Inpatient` looked like the *track* name
+sitting in the artist slot — suspected to be an album mis-set-up in Spotify.
+
+### The premise was wrong, and probing is what showed it
+
+Reasoned from the display it is a plausible reading. It does not survive a probe:
+
+- `GET /artists/5Qqx3JIJnK5mtk7U4tC4Vb` -> **200**, `name: "Inpatient"`, own `uri` and `images`.
+- It is `artists[0]` on **all 15 tracks** of the album **Asylum** (2026-07-22) *and* on the album.
+- The album is `Asylum`; `Asylum` is **track 6**. **There is no track called `Inpatient`.**
+- `GET /artists/5Qqx.../albums` -> **10 releases, every one `Inpatient | Ren | Chris Webby`.**
+
+So `Inpatient` is a **project alias** — the name Ren and Chris Webby release under — and that is
+verified from the discography, not inferred from the credit pattern. **Spotify is right, the album
+is set up correctly, and the comma-split is exact here.** ⚠️ Do not "fix" the splitter on the
+strength of this example; the example is not a defect.
+
+### But it exposed one: aliases rank as independent artists
+
+`artist_credit_totals` has no notion of an alias, so a duo entity is counted beside its own
+members. Two of the top 13 rows are aliases of other rows in the same table — `Inpatient` at rank 8
+(24 plays, = Ren + Chris Webby) and `Macklemore & Ryan Lewis` at rank 12 (17 plays; Ryan Lewis's
+entire 17 are the duo's tracks).
+
+⚠️ **This is NOT the by-design overcount.** `SUM(artist_plays) > play count` is correct — a
+collaboration counts for each *real* collaborator, and a test pins it. This is a single credit
+denoting a **set of the other credits on the same row**, which is a different thing.
+
+⚠️ **The structural detector is not trustworthy enough to automate.** "Always lead, identical
+co-credit set, >= 2 tracks" returns 4 candidates and **3 are false positives** (`Rudimental`,
+`Petravita`, `Dal Av` — real bands with fixed collaborators at this sample size). A flag for
+review, never a rule.
+
+### The larger, prospective risk: `", "` inside an artist name
+
+`parseNowPlaying.ts:108` reads `artist: field(raw, 'Artist')` — the MCP `getNowPlaying` returns a
+**pre-joined string**, and the live path has **no `artists[]` array at any point**. Splitting on
+`', '` is the only signal available, not a shortcut that could be removed. `Tyler, The Creator`,
+`Earth, Wind & Fire` and `Crosby, Stills & Nash` would each silently become two artists.
+
+⚠️ **A wrong split is indistinguishable from a right one once stored** — a split record knows only
+the lead's id, so **93 of 234** credited names carry no id at all. Same family as the
+`inc=releases` 200: plausible wrong data rather than a loud failure. **Zero instances in the corpus
+at 2026-09-23** — all six `The ...` fragments present are real bands in lead position, checked
+individually. The risk is prospective, which is precisely why it is written down now.
+
+### ⚠️ NEW API TRAP — `GET /artists/{id}/albums` rejects `limit > 10`
+
+`limit=10` -> **200**. `limit=20` -> **400 `{"error":{"status":400,"message":"Invalid limit"}}`**.
+`limit=50` (the documented maximum) -> **400**. Also `album_group` is **absent** from the items,
+the same shape as `genres` missing from `GET /artists/{id}`.
+
+⚠️ **The message is the trap**: "Invalid limit" reads as a malformed request, so it sends you
+checking your own query string rather than suspecting Development Mode. Same family as the
+`/contains` and `GET /tracks?ids=` findings — the restriction is real, the error does not name it.
+
+### Decision (user, 2026-09-23): note it, do not build it
+
+Recorded as wishlist **W-4**. Two future mechanisms named, not mutually exclusive:
+
+1. **A manual alias tag** — an authored mapping; cheap, exact, auditable.
+2. **A GenAI resolver** — the user's point being that "is `Earth, Wind and Fire` one band or
+   three?" is answerable by a language model and **not answerable by a parser at all**, because the
+   information is not in the string. ⚠️ It must write a **suggestion for review, never a fact**, as
+   a third provenance beside `split-live-credit` and `spotify-track`.
+
+Authoritative fallback if neither is wanted: `GET /tracks/{id}` carries the true `artists[]`, at
+**119 requests** for the split-derived multi-artist tracks — `GET /tracks?ids=` is 403.
+
+**Interim posture: mark, do not merge.** Folding an alias's plays into its members would destroy
+the fact that the user played the duo's record.
+
+**Nothing was changed.** `history.db` untouched, reporting DB untouched, no code change, no
+migration. The defect is confined to the derived reporting database and is **not** a rule input or
+a gate input; `artist_id` remains the lead artist throughout the app.
+
+**Next**: U5 Functional Design.

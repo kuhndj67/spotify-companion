@@ -4555,3 +4555,119 @@ current, which is exactly why it was the more dangerous one to trust** — recen
 rather than adding a parallel file. ⚠️ **Before deleting any document, grep for inbound references
 and for content that exists nowhere else** — the obvious-looking duplicate is not always the
 disposable one.
+
+
+---
+
+## 2026-09-26 — U5's nine design questions answered, and three stale statements found in the handoff
+
+**Stage**: CONSTRUCTION · U5 Functional Design. **Documents only.** `src/` untouched, no migration,
+container healthy throughout.
+
+### The answers, and the three that changed the design
+
+All nine answered. §5.1 of the design plan is now the authoritative reading; §5 keeps the user's own
+words with a ⚙ note where a clarification changed something. Six were accepted as recommended
+(Q1 dry-run-as-gate, Q2 depth-3 pre-warm, Q3 asymmetric re-evaluation, Q4 hold deadline, Q5 kill
+switch, Q9 record `context_type`). Three moved:
+
+**Q6 — the runaway halt is a THIRD latch, not the kill switch.** The recommendation was (b) **+** (c);
+the user chose **(c) only**, scope **global**: *tripping the halt indicates something isn't working
+right, and the user should review*. ⚠️ Declining (b) has a design consequence that had to be written
+down rather than inferred: the halt **must not** be implemented by flipping the FR-38 kill switch,
+because that makes the system's own halt indistinguishable from a choice the user made, and clearing
+it would read as *re-arming* rather than *acknowledging*. Two independent latches; automation is live
+only when neither is set. Both persist, both fail closed.
+
+**Q7 — FR-40 declined as written, and the guard re-keyed onto the PLAY ROW.** Two things were tangled
+in one `Must`. The user rejected *"never skip the same track twice within one session"* on the
+grounds that if the rules match a track, it should be skipped — **the same reasoning that forbids
+clamping `completionRatio` to 1.0**: a recurring track is a real listening signal. That correctly
+kills the recommended *(A)+(D)* (one attempt per `track_id` per process), which would have refused a
+genuine repeat listen permanently. But `requirements.md` says FR-40 exists for a *different* failure:
+*"a skip does not take effect and the engine re-evaluates the same track forever."* Against a 3 s poll
+that is an unbounded `POST /me/player/next` stream.
+
+✅ **Keying the cap on the PLAY ROW rather than the `track_id` satisfies both, and needs no session
+definition at all** — which is what made the original question hard. A repeat listen is a new row, so
+it stays skippable; a skip that did not land cannot re-fire against the same row. ⚠️ §3's hazard makes
+an ineffective skip **more** likely, not less, and Q8 establishes the obvious confirmation cannot
+reliably detect it — so the row-keyed cap is the backstop that holds regardless of how P-U5-1
+resolves.
+
+**Q8 — clarified, and the clarification does NOT retire the probe.** The user was not proposing new
+instrumentation, but that *at some point we review the monitor data for the occurrence of this issue*.
+Three separate consequences: (a) FR-48's confirmation is still **built** — it is a `Must`, and it is
+one read on a path already reading player state; (b) the skip path must **record what it saw** —
+reported track id and `progress_ms` before *and* after the `POST` — or the later review has nothing
+to review, which is `successor_lag_ms` again: a column nothing wrote, so the mechanism it existed to
+measure had to be reconstructed from trails; and (c) ⚠️ **the review cannot substitute for P-U5-1**,
+because §3 establishes that the log's own signal is the suspect one. In the DJ context the reported
+track already changed 18–41 s before the audible one, so a logged *"different track reported now"*
+reads as success when nothing audible happened. **Measuring the suspect effect with the suspect
+instrument returns a plausible answer that means nothing** — the `inc=releases` 200 and
+`measure-confound.mjs` zeros, a third time. The costs are asymmetric: the probe is 4–6 read-mostly
+trials with the user's ear; the review pays for its evidence in real truncations of tracks the
+listener was enjoying, in the context used 50–70% of the time.
+
+### ⚠️ Q4's colour cue collides with a colour scheme that already exists
+
+The user asked for the hold/evaluation state to show as colour on the `Rules v#` indicator rather
+than more text on the primary screen — explicitly *not dictating the solution*. **Checked the code
+before designing to it, and all four `IndicatorLevel` values are already allocated** in
+`rulesIndicator` (`src/ui/statusBar.ts`) to **rules-file load health**: `unknown` = not running or
+nothing loaded, `warn` = reloading, `fail` = a newer file was **rejected**, `ok` = applied. Its
+docstring pins why: **red names the version still in force (FQ5)**, because a light that only says
+*"something failed"* leaves exactly the ambiguity the indicator exists to remove, and a silent
+last-known-good is indistinguishable from a successful reload.
+
+Recolouring it would make **red ambiguous between *your rules file is broken* and *a rule matched and
+the skip failed*** — two independent variables on one light, destroying the distinction it was built
+to carry. ✅ **Resolved as a second, adjacent compact indicator**, which still meets the stated goal
+of no added prose. ⚠️ The user's six states exceed the four `IndicatorLevel` members, so the union
+widens — it has no `default:`, so the compiler names every site that must change, the same deliberate
+pattern as `applyOnUnknown`.
+
+### ⚠️ Three stale statements in `HANDOFF.md`, all saying R11 had never been probed
+
+R11 was discharged **2026-09-22**. `CLAUDE.md` open item 5 is ✅, `aidlc-state.md` records it, the
+probe record exists, and the design plan's Q2 opens *"R11 is discharged"*. `HANDOFF.md` nonetheless
+still said, in two places, that it *"has never been probed while music is playing"* — **one of them
+under the heading *The rule that has not changed***, which is the sharpest possible place for a stale
+claim to stand. It also said *five* wrong conclusions where `CLAUDE.md` now lists **six**. All three
+corrected in place with the correction visible.
+
+⚠️ **`ec73798` fixed this same file's item 1 for exactly this reason, four days ago, and left R11
+stale two sections further down in the same pass.** The lesson is narrower than *documents go stale*:
+**a correction pass that fixes the one stale statement it was looking for, and does not re-check the
+rest of the file against current state, leaves the file still wrong while appearing freshly
+reviewed** — and dated *Updated 2026-09-26*, which reads as authority. Recency is not authority; that
+is the rule `ec73798` itself recorded, applied to its own output.
+
+### ✅ `requirements.md` amended — held for sign-off, then approved the same day
+
+Two items needed amending in an **approved inception deliverable**, so they were **not** applied
+unilaterally; they were recorded as §5.2 of the design plan and put to the user, who approved both.
+
+**FR-40** now reads *"a failed skip must not loop — at most one skip attempt per play"*, with the
+withdrawal reasoned in place. ⚠️ The note records that the session clause was **wrong, not merely
+unnecessary** — suppressing a skip because the same `track_id` was attempted earlier would refuse a
+rule the user authored, for a track they chose to hear again, which is the `completionRatio` clamp
+mistake in another costume. It also records the clause's **hidden cost**: it silently required a
+*"session"* entity the corpus has never modelled, and the amended guard needs none.
+
+**R11's caveats discharged** in §FR-36 (struck through, with the context-dependent result and the
+runtime-query consequence in place) and in the R11 risk row.
+
+⚠️ **Applying them made FOUR OTHER PLACES stale in the same breath** — `CLAUDE.md`, `aidlc-state.md`
+(twice: the current-state block **and** a second R11 row in its own *Known Risks* table) and the plan's
+own Q7 note all said *"awaits sign-off"* or *"still reads"*. Caught by re-grepping for the old strings
+**after** editing rather than before. **That is the discipline item 3 above is about, applied
+immediately to this session's own output**: the second `aidlc-state.md` row would have been missed by
+anyone grepping only the section they had just edited.
+
+### Next step
+
+**Probe P-U5-1**, protocol in the design plan §3. It gates **FR-46 and FR-48** and is now the only
+thing blocking the FD documents. It needs the user present and listening — no endpoint reports what
+it measures.

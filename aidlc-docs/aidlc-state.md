@@ -4,11 +4,23 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN, PAUSED 2026-09-23 awaiting answers (9 questions).**
+- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN. ALL 9 QUESTIONS ANSWERED 2026-09-26; now PAUSED ON ONE PROBE.**
   ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — it is U5's single entry point, and its top block carries the current state.
-  It carries the recommended next step — **run probe P-U5-1**, which needs the user present and
-  listening — and the full protocol. This is a *decision* pause, not a build pause: `src/` is
-  untouched and the container is healthy and recording. Previously: **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME
+  ✅ **The settled specification is [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md) §5.1** — the authoritative reading of the
+  nine answers; §5 keeps the user's own words with a ⚙ note where a clarification changed something.
+  **The only thing now blocking the FD is probe P-U5-1**, which needs the user present and listening
+  — protocol in §3. Everything else in §5.1 can be designed today; **FR-46's action point and FR-48's
+  confirmation cannot.** ⚠️ Q8 settled that reviewing logged skip behaviour **does not substitute**
+  for the probe — the log's own signal is the one under suspicion, so the review would measure the
+  suspect effect with the suspect instrument (the `inc=releases` 200 a third time).
+  ✅ **The two `requirements.md` amendments were approved and APPLIED 2026-09-26** (§5.2 of the plan).
+  **FR-40 amended**: *"never skip the same track twice within one session"* is **withdrawn** and
+  replaced by **one skip attempt per PLAY ROW**, never per `track_id` — a repeat listen is a new row
+  so it stays skippable, while a skip that did not land cannot re-fire, and it needs **no definition
+  of "session"** at all. ⚠️ The clause was *wrong*, not merely unnecessary: a recurring track is real
+  signal, the same argument that forbids clamping `completionRatio` to 1.0.
+  **R11's caveats discharged** in §FR-36 and the risk row, both of which had read as open since
+  2026-09-22. `src/` is untouched and the container is healthy and recording. Previously: **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME
   VARIABLE WAS WRONG AND IS FIXED.** 851 tests · typecheck clean · schema v6 · 662 plays ·
   `src/playback/` still absent.
   **R11**: queue lookahead **depends on the playback context** — album/autoplay/radio expose 20
@@ -929,7 +941,7 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
 | **Major/indie has no clean definition** (imprints, majors' "indie" sublabels, distributors) | Classification disagrees with intuition | ⚠️ Open — R3. Store per-signal votes, not a boolean |
 | **Skip inference is heuristic** — pause, seek, replay, session end all confound it | Noisy outcome variable weakens the model | ⚠️ Open — R4. Store raw evidence; property-test the classifier |
 | **A runaway rule could skip an entire queue** — higher risk now that rules are user-authored over arbitrary fields | User-visible loss of control | ⚠️ Open — R5. Dry-run, kill switch, rate limit, no-repeat-skip, off by default |
-| **Slow fields can't resolve before a track starts** — a label lookup is 2 MusicBrainz calls behind a 1 req/sec queue | Label-based rules fire late or never — and those are the rules that test the promotion hypothesis | ⚠️ Open — R11. Pre-warm from queue endpoint (verified reachable); **lookahead unconfirmed during active playback** |
+| **Slow fields can't resolve before a track starts** — a label lookup is 2 MusicBrainz calls behind a 1 req/sec queue | Label-based rules fire late or never — and those are the rules that test the promotion hypothesis | ✅ **Closed — R11, probed during active playback 2026-09-22** (this cell read *"unconfirmed during active playback"* until 2026-09-26). **Context-dependent**: album/autoplay/radio expose 7–20 tracks, **the AI DJ none, ever**; ⚠️ `context.type` cannot distinguish them, so **FR-36 must ask the queue at runtime**. The same probe found the **18–41 s reporting lag** now gating FR-46/FR-48 |
 | **A rule language over arbitrary fields invites `eval`** | Arbitrary code execution reachable from the rule store, collapsing the local-only posture | ⚠️ Open — R12. Structured predicate tree; code evaluation prohibited by requirement |
 | **`node:sqlite` is experimental** in Node 22.17 | API may change under us | ⚠️ Open — R10. Repository interface makes the engine swappable |
 | MCP server's `getAlbums` uses a **removed batch endpoint** | That tool is already broken in Dev Mode | Noted; unused by this app |

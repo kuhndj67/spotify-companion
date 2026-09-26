@@ -235,9 +235,36 @@ they start, making the label known by the time the rule runs. FR-34/FR-35 remain
 for the cases pre-warming cannot cover — a manually chosen track, a context switch, an empty
 queue.
 
-*Caveat*: the queue endpoint was probed while nothing was playing and returned an empty queue.
+~~*Caveat*: the queue endpoint was probed while nothing was playing and returned an empty queue.
 It is confirmed **reachable**, not confirmed **populated during playback**. Verify against
-active playback before FR-36 is designed on the assumption it yields useful lookahead.
+active playback before FR-36 is designed on the assumption it yields useful lookahead.~~
+
+##### ✅ CAVEAT DISCHARGED 2026-09-22 — probed during active playback, and the answer is *it depends*
+
+Record: [`../../construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md`](../../construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md).
+⚠️ **Neither outcome the execution plan anticipated.** Lookahead is **context-dependent**:
+
+| Context | Queue depth | Prediction |
+|---|---|---|
+| Album, autoplay, radio | **7–20 tracks** | Correct **8 for 8**, in order, across a context boundary |
+| **The AI DJ** | **0, always** | ⚠️ **0 on all 88 samples**, including at track boundaries |
+
+⚠️ **`context.type` CANNOT tell them apart.** The DJ and a radio station are both `type: playlist`
+with the same `37i9dQZF1E` prefix. Nor is *"algorithmic"* the discriminator — autoplay and radio are
+algorithmic and fully exposed. **So FR-36 must ask the queue at RUNTIME** and adapt to the answer; it
+cannot infer lookahead from the context. Pre-warm depth settled at **3**, re-checked each poll
+(U5 plan Q2) — the queue offers up to 20, but each unresolved label is ~2 MusicBrainz calls behind a
+1 req/sec queue that label backfill also needs.
+
+⚠️ **This makes the FR-34/FR-35 "fallback" above a heavily-used path, not an edge case** — DJ
+listening runs at **50–70%**. **User decision 2026-09-26**: the DJ path is deliberately **not**
+relabelled *primary*, because the listening mix will change over time — but **both paths get equal
+design attention, and neither may be built as a degraded catch-all.**
+
+⚠️ **The probe also found something bigger than what it was sent to measure**: in the DJ context the
+API stops *reporting* a track **18–41 s before it stops playing**. That invalidated 24 of 46 recorded
+skips (classifier v2 re-derived them to `completed`) and it now gates **FR-46 and FR-48** — see probe
+**P-U5-1** in the U5 Functional Design plan §3.
 
 #### Safety
 
@@ -246,7 +273,7 @@ active playback before FR-36 is designed on the assumption it yields useful look
 | FR-37 | Provide a **dry-run mode** logging what *would* have been skipped, without acting | Must | ⬜ New |
 | FR-38 | Provide a **global kill switch** halting all automated action immediately | Must | ⬜ New |
 | FR-39 | **Rate-limit** automated skips and halt after consecutive skips exceed a threshold | Must | ⬜ New |
-| FR-40 | Never skip the same track twice within one session — a failed skip must not loop | Must | ⬜ New |
+| FR-40 | **A failed skip must not loop** — at most **one skip attempt per play**. ⚠️ **AMENDED 2026-09-26**, see below | Must | ⬜ New |
 | FR-41 | Log every evaluation and action with the **rule, the field values seen, and the verdict** | Must | ⬜ New |
 | FR-42 | **Back-test a rule against accumulated history** — "what would this have skipped last month, and did I actually skip those?" | Should | ⬜ New |
 
@@ -255,6 +282,37 @@ rules are user-authored over arbitrary fields. A rule that matches everything is
 indistinguishable, from inside the loop, from a rule working correctly — the only difference is
 that the first one empties the queue in seconds. FR-40 covers the specific failure where a skip
 does not take effect and the engine re-evaluates the same track forever.
+
+##### ⚠️ FR-40 AMENDED 2026-09-26 — the session clause is withdrawn; the guard is keyed on the PLAY
+
+**It previously read**: *"Never skip the same track twice within one session — a failed skip must not
+loop."* **User decision 2026-09-26** (U5 Functional Design plan, Q7), approved for amendment.
+
+⚠️ **Two different things were tangled in one `Must`, and only one of them was the real requirement.**
+
+| | |
+|---|---|
+| *"Never skip the same track twice within one session"* | **Withdrawn.** |
+| *"A failed skip must not loop"* | **Kept — and it was always the point**, as the paragraph above already says |
+
+**Why the session clause is wrong, not merely unnecessary.** A recurring track is a **real listening
+signal**, which is why `completionRatio` is deliberately never clamped to 1.0. Suppressing a skip
+because the same `track_id` was attempted earlier would refuse a rule the user authored, silently,
+for a track they chose to hear again — the same class of error as clamping the ratio: hygiene that
+destroys signal. The user's words: *if it DOES happen and the rules say skip the track — we should
+skip the track.*
+
+**Why the loop guard still has to exist.** Against a 3 s poll loop, a skip that does not take effect
+is an unbounded `POST /me/player/next` stream. ⚠️ U5 established that this is **more** likely than it
+looked: in the AI DJ context the API stops reporting a track 18–41 s before it stops playing, and the
+obvious confirmation check (*"is a different track reported now?"*) **can pass when nothing audible
+happened**, so an ineffective skip may not announce itself.
+
+✅ **The amended guard: at most one skip attempt per PLAY ROW, never per `track_id`.** A repeat listen
+is a new play row, so it stays skippable; a skip that did not land cannot re-fire against the same
+row. ⚠️ **And it needs no definition of "session" at all** — the corpus has no session concept, and
+the term was the user's informal name for one continuous listening period, never a modelled entity.
+Requiring one was the clause's hidden cost.
 
 **FR-42 is where the rules engine and the promotion hypothesis meet.** Once history accumulates,
 a proposed rule can be replayed against real listening and scored against what the user actually
@@ -704,7 +762,7 @@ would destroy the fact that the user played the duo's record, which is real list
 | R3 | **Major/indie has no clean definition.** Distribution deals, imprints and majors' "indie" sublabels blur the line | Classification disagrees with intuition | FR-13 stores per-signal votes rather than a boolean verdict |
 | R4 | **Skip inference is heuristic**, with several confounders (§3.3) | Noisy outcome variable weakens the model | FR-19/FR-20; NFR-22 property tests; FR-23 excludes app-initiated skips. **W-3** names the session-end confounder specifically and records the discriminator for it (probed 2026-09-10 and **re-probed 2026-09-19 at 504 plays: still zero instances**). ⚠️ The measured cost runs the *other* way — session-enders land in `unknown` and are excluded from the gate's eligible set, so W-3 is a data-**recovery** item, not a false-skip repair |
 | R5 | **A runaway rule** skips an entire queue. Higher now that rules are user-authored over arbitrary fields | User-visible loss of control | FR-37 dry-run, FR-38 kill switch, FR-39 rate limit, FR-40 no-repeat-skip, FR-47 off by default |
-| R11 | **Slow fields cannot be resolved before a track starts.** A label lookup is 2 MusicBrainz calls behind a 1 req/sec queue | Label-based rules fire late or not at all — and those are the rules that test R1 | FR-36 pre-warms from the queue endpoint (verified reachable 2026-08-25); FR-34/FR-35 bound the fallback. **Queue lookahead unconfirmed during active playback** |
+| R11 | **Slow fields cannot be resolved before a track starts.** A label lookup is 2 MusicBrainz calls behind a 1 req/sec queue | Label-based rules fire late or not at all — and those are the rules that test R1 | ✅ **DISCHARGED 2026-09-22 — probed during active playback** (this cell read *"Queue lookahead unconfirmed during active playback"* until 2026-09-26). **Lookahead is context-dependent**: album/autoplay/radio expose 7–20 tracks and predict 8 for 8 in order; **the AI DJ exposes none, ever** (0 on all 88 samples). ⚠️ `context.type` cannot distinguish them — both are `type: playlist`. **So FR-36 must ask the queue at runtime**, pre-warming depth 3; and FR-34/FR-35 is a **heavily-used path at 50–70% DJ listening**, not an edge case. ⚠️ The same probe found the **18–41 s reporting lag** that invalidated 24 of 46 recorded skips and now gates FR-46/FR-48 (probe P-U5-1). §[record](../../construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md) |
 | R12 | **A rule language over arbitrary fields invites `eval`** | Arbitrary code execution reachable from the rule store, collapsing the §4.1 posture | FR-43 structured predicate tree, FR-44 prohibits code evaluation, FR-45 validates at creation |
 | R6 | Upstream `getNowPlaying` returns **markdown**; a template change breaks parsing silently | Display and data collection both stop | NFR-19; raw text surfaced; parser property-tested |
 | ~~R7~~ | `MCP_SERVER_REF` was **unpinned** in `compose.yaml` | Silent upstream drift | ✅ **CLOSED 2026-08-25** — pinned to `7b5fde6309a52a7874768c63deda7880ee85935b` (2026-08-21) during U1 Infrastructure Design. The CI Docker-build job is now a genuine drift detector |

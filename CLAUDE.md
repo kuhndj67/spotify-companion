@@ -80,17 +80,34 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-09-23) — U5 PAUSED MID-DESIGN, resume file written
+## ▶ Current state (2026-09-26) — U5 DESIGN QUESTIONS ALL ANSWERED, PAUSED ON ONE PROBE
 
 **Read [`aidlc-docs/construction/u5-automated-skipping/HANDOFF.md`](aidlc-docs/construction/u5-automated-skipping/HANDOFF.md) before anything else** — U5's single entry point; the current state is its top block.
-U5's Functional Design plan is written and waiting on 9 answers. **The recommended next step is
-probe P-U5-1**, which needs the user present and listening, because the instrument is their ear.
+✅ **All 9 Functional Design questions are answered.** The authoritative reading is
+[**`u5-functional-design-plan.md` §5.1**](aidlc-docs/construction/plans/u5-functional-design-plan.md) — not the raw answers in §5.
+**The next step is probe P-U5-1**, which needs the user present and listening, because the instrument
+is their ear. It is now the **only** thing blocking the FD documents.
 
-⚠️ **It gates FR-46.** In the DJ context the API reports track B while A is still audible for
-18–41 s, and the evaluator takes its play boundary from that reported state — so a rule matching B
-may fire `POST /me/player/next` against a player still on A, **truncating an unmatched track** and
+⚠️ **It gates FR-46 AND FR-48.** In the DJ context the API reports track B while A is still audible
+for 18–41 s, and the evaluator takes its play boundary from that reported state — so a rule matching
+B may fire `POST /me/player/next` against a player still on A, **truncating an unmatched track** and
 letting B play unskipped. Every step of that is established **except** whether the lag is in
 Spotify's reporting or its state store. **Probe it; do not reason about it.**
+
+⚠️ **Reviewing logged skip behaviour is NOT a substitute for the probe** (Q8, 2026-09-26). The
+obvious confirmation — *"is a different track reported now?"* — **is the signal under suspicion**, so
+the review would measure the suspect effect with the suspect instrument and get a plausible answer
+that means nothing. The `inc=releases` 200 a third time.
+
+✅ **Two `requirements.md` amendments were approved and APPLIED 2026-09-26** (§5.2 of the plan):
+- **FR-40 amended.** *"Never skip the same track twice within one session"* is **withdrawn** — it
+  would refuse a genuine repeat listen for ever, which is the same mistake as clamping
+  `completionRatio` to 1.0. Replaced by **one skip attempt per PLAY ROW**, never per `track_id`: a
+  repeat listen is a new row so it stays skippable, while a skip that did not land cannot re-fire.
+  ⚠️ **It needs no definition of "session" at all**, which the corpus has never modelled — requiring
+  one was the withdrawn clause's hidden cost.
+- **R11's caveats discharged** — §FR-36's *"Verify against active playback"* and the R11 risk row's
+  *"unconfirmed during active playback"* had read as open since **2026-09-22**.
 
 Documentation-only pause: `src/` untouched, no migration, container healthy.
 

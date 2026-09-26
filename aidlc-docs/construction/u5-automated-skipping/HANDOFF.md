@@ -7,16 +7,28 @@ point for U5.
 
 ## ▶ CURRENT STATE AND NEXT STEP (2026-09-26)
 
-**U5 Functional Design is PAUSED awaiting answers to 9 questions** in
-[`../../plans/u5-functional-design-plan.md`](../../plans/u5-functional-design-plan.md).
-It is a **decision** pause, not a build pause: `src/` is untouched, no migration, container healthy
-and recording. If `git status src/` is not clean, something was started that this file does not
-know about.
+✅ **All 9 design questions are ANSWERED** (2026-09-26). The settled specification is
+[**§5.1 of the design plan**](../../plans/u5-functional-design-plan.md) — read that, not the raw
+answers, as the authoritative reading.
 
-### The recommended next step is **probe P-U5-1** — protocol in the plan, §3
+**U5 Functional Design is now PAUSED on one PROBE, not on decisions.** `src/` is untouched, no
+migration, container healthy and recording. If `git status src/` is not clean, something was started
+that this file does not know about.
+
+⚠️ **Two §5.2 amendments need the user's sign-off** before the FD documents are written: FR-40's
+wording (Q7 declines it **as written** — the guard is now one attempt per **play row**, not per
+`track_id`), and R11's stale caveat in `requirements.md`. Both are in stage-gated inception
+deliverables, so they were deliberately **not** applied unilaterally.
+
+### The next step is **probe P-U5-1** — protocol in the plan, §3
 
 ⚠️ **It cannot be run unattended.** The instrument is the user's ear, not an endpoint. The user said
 on 2026-09-23 that they could not start it immediately.
+
+⚠️ **It is the ONLY thing blocking the FD now.** Everything else in §5.1 can be designed today;
+**FR-46's action point and FR-48's confirmation cannot.** Q8 settled that reviewing logged skip
+behaviour **does not substitute** for it — the log's own signal is the suspect one, so that review
+would measure the suspect effect with the suspect instrument.
 
 **Why it gates FR-46**: classifier v2 established that in the AI DJ context the API stops reporting
 a track **18–41 s before it stops playing**. `EvaluationCoordinator` takes its play boundary from
@@ -29,9 +41,12 @@ state or on the same lagged state the read endpoints report. **Not inferable —
 lag also makes the obvious FR-48 confirmation (*"is a different track reported now?"*) one that can
 pass when nothing audible happened.
 
-A second decision is open: **CLAUDE.md open item 7** (`context_type` live, NULL on all 577 live
-plays). Declined 2026-09-02 as a standalone enrichment; re-raised because it is now load-bearing for
-a *safety* question, which is a different trade.
+✅ **CLAUDE.md open item 7 is DECIDED** (Q9, 2026-09-26). `context_type` **and** `context_uri` will
+be recorded on live plays in migration 007 — **as evidence only, with no rule field in U5**, because
+`context.uri` goes stale (it named an album through 33 minutes of autoplay by other artists). It was
+declined 2026-09-02 as a standalone enrichment and re-raised because it became load-bearing for a
+*safety* question, which is a different trade. ⚠️ It is still NULL on all 577 live plays today, so
+§3's hazard **cannot be measured by context** until this ships.
 
 ---
 
@@ -174,7 +189,7 @@ reason the U4 incident was a detour rather than a loss.
 | # | Item |
 |---|---|
 | **4** | ⚠️ Rewritten 2026-09-22. No longer a "crossfade confound"; now instrumented by `skip_attribution`. Its old direction claim is **withdrawn** |
-| **5** | R11 — queue lookahead unverified during playback. **FR-36 depends on it**, and it has never been probed while music is playing |
+| **5** | ✅ **CLOSED 2026-09-22 — R11 WAS probed during active playback.** ⚠️ This row said *"it has never been probed"* until 2026-09-26; it was already false when written. Answer: **context-dependent** — album/autoplay/radio expose 7–20 tracks and predict 8 for 8 in order; **the AI DJ exposes none, ever** (0 on all 88 samples). `context.type` **cannot** tell the DJ from a radio station. So **FR-36 must ask the queue at runtime**. Record: [`probes/r11-queue-lookahead-2026-09-22.md`](probes/r11-queue-lookahead-2026-09-22.md) |
 | **8** | W-3, session-end discriminator. ⚠️ **Data recovery, not a false-skip repair** — anyone implementing it as stated writes code that does nothing |
 | 7 | Playback context never recorded live. The AI DJ is arguably the closest available proxy for *promoted* |
 
@@ -184,10 +199,17 @@ reason the U4 incident was a detour rather than a loss.
 
 > **Probe the live API. Do not reason from documentation.**
 
-Five wrong conclusions have been drawn from docs in this project, each caught only by a probe.
-The fifth was found during U4 and inverts the usual shape: **the project's own note said
-`recently-played` returns no `external_ids`, and it does.** A recorded negative decays silently
-because nothing re-tests it.
+**Six** wrong conclusions have been drawn from docs in this project, each caught only by a probe
+(this said *five* until 2026-09-26; `CLAUDE.md` is the authoritative list). One of them inverts the
+usual shape: **the project's own note said `recently-played` returns no `external_ids`, and it
+does.** A recorded negative decays silently because nothing re-tests it.
 
-⚠️ **R11 is the one U5 needs and nobody has probed**: whether the queue endpoint returns useful
-lookahead *during active playback*. FR-36 is designed on the assumption that it does.
+⚠️ **This section used to end by saying R11 was the one U5 needs and nobody had probed it. That
+was already false when written** — R11 was discharged 2026-09-22 (see open item 5 above), and the
+probe is what found the 18–41 s reporting lag that classifier v2 then corrected. Corrected
+2026-09-26. **A stale claim standing under the heading *The rule that has not changed* is the
+sharpest possible illustration of the rule itself.**
+
+⚠️ **The open probe is now [`P-U5-1`](../plans/u5-functional-design-plan.md) (design plan §3)**:
+whether `POST /me/player/next` acts on the player's real state or on the same lagged state the read
+endpoints report. It gates **FR-46 and FR-48**, and it needs the user's ear — no endpoint reports it.

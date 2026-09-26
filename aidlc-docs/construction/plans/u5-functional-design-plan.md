@@ -124,7 +124,40 @@ endpoint can report it.
 - The user is at the machine, listening, and can report what they *hear*.
 - Playback confirmed in the **AI DJ** context (`spotify:playlist:37i9dQZF1EYkqdzj48dyYq` was the URI
   in the R11 probe; ⚠️ **verify rather than assume — a recorded negative decays**).
-- The container may stay **up**. This probe does not write to `history.db`.
+- ⚠️ **`docker compose down` FIRST.** Corrected 2026-09-26 — see below.
+
+#### ⚠️ CORRECTED 2026-09-26 — this said *"the container may stay up; this probe does not write to `history.db`"*
+
+**That was inherited from R11 and is wrong here.** R11 only **read** (`currently-playing`, `queue`),
+so the container was irrelevant to it. **P-U5-1 writes to the player**, and the container is
+recording, so it writes down the consequences.
+
+Each trial POSTs `next` about 0–3 s into track B. `PlayObserver` closes that play on `track-change`
+at near-zero progress, and in [`outcomeClassifier.ts`](../../../src/history/outcomeClassifier.ts)
+**both v2 conditions fail** — `unobservedTailMs` is nearly the whole duration against a 55 s cap, and
+`observedPositionRatio` is ~0.01 against a 0.75 rail — so it records **`skipped`**, with
+`skip_source = 'user'`.
+
+⚠️ **4–6 trials would therefore inject 4–6 skips that are probe artefacts into a corpus of 22.** Up
+to **27% contamination of the entire evidence base** Q1 depends on, and `BackTestService` counts every
+`skipped` row. **That is precisely the defect class classifier v2 just spent a day removing**: rows
+labelled `skipped` that are not rejections.
+
+✅ **`docker compose down` for the duration.** The probe needs **no** container: it reads
+`spotify-config.json` and holds its access token in memory, and
+[`webApiClient.ts`](../../../src/spotify/webApiClient.ts) documents why that cannot race the MCP
+server — token handling **deliberately never writes back**, and Spotify's refresh tokens are
+long-lived and reusable. The music comes from Spotify, not from this app. Cost: ~15 minutes of
+unrecorded listening.
+
+⚠️ **A swap-in test database was considered and rejected for this** (user proposal, 2026-09-26). It
+keeps a writer running against a database to be discarded and then restores the real one while the
+engine may still hold it open — the shape of the U4 incident, which reported `integrity_check: ok` at
+the time and surfaced later as a just-written value reading `null`. And it is not one file:
+`history.db-wal` is **currently 4.1 MB against a 3.3 MB `history.db`**, so a swap that does not
+checkpoint first moves less than half the data. **An untested restore path is more risk than the
+fifteen-minute window it would protect.** The underlying need is real and is now backlog item
+**W-5**; its near-term slice is a §4 checklist entry for migration 007.
 
 **Per trial**
 1. Poll `GET /me/player/currently-playing` until the reported track id **changes** (A → B). Note the
@@ -174,6 +207,14 @@ in the user's own words with a ⚙ note where a clarification changed something.
 - [ ] Specify the **skip-attempt evidence fields** (Q8b) — reported track id and `progress_ms`
       before *and* after the `POST`, so the later review has something to review
 - [ ] Pre-register the Q6 safety thresholds **before** any rule is armed
+- [ ] **Minimal `history.db` backup + RESTORE, before migration 007.** ⚠️ `data/` already holds ten
+      ad-hoc backups in five naming conventions written by three scripts, **and not one of them has a
+      restore path** — every script writes a backup, none reads one back. Must checkpoint the WAL
+      first (`history.db-wal` is currently **larger** than `history.db`, so a naive copy loses over
+      half the corpus) and refuse to run while the container is up. ⚠️ **Verify the restore** — an
+      unverified restore path is the defect this item exists to fix. Full-inventory version is
+      backlog **W-5**, which includes the `metabase-app-db` named volume that no tree-walking backup
+      would find, and an undecided `secrets/` security question
 - [ ] Define the live-verification protocol discharging Phase 4's seven exit criteria
 
 ---

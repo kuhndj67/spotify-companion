@@ -109,6 +109,20 @@ that means nothing. The `inc=releases` 200 a third time.
 - **R11's caveats discharged** — §FR-36's *"Verify against active playback"* and the R11 risk row's
   *"unconfirmed during active playback"* had read as open since **2026-09-22**.
 
+⚠️ **Run P-U5-1 with the container DOWN.** It **writes to the player**, and the recording container
+writes down the result — each trial POSTs `next` 0–3 s into a track, which `outcomeClassifier` files
+as **`skipped`**, so 4–6 trials inject **4–6 artefact skips into a corpus of 22**. The probe needs no
+container (host-side script; token handling never writes back, so it cannot race the MCP server).
+⚠️ The plan said *"the container may stay up"* until 2026-09-26 — inherited from R11, which only read.
+
+⚠️ **A backup is NOT a file copy: `history.db-wal` is currently LARGER than `history.db`**
+(4.1 MB vs 3.3 MB), so copying the `.db` alone loses over half the corpus — and the copy opens cleanly
+and looks plausible. Checkpoint the WAL first, as `reclassify-unobserved-tails.mjs` does. ⚠️ **And
+`data/` holds ten ad-hoc backups in five naming conventions with NO restore path — every script writes
+one, none reads one back.** A minimal backup **and verified restore** is a **migration 007
+prerequisite** (U5 plan §4); the full-inventory version is backlog **W-5**, which includes the
+`metabase-app-db` **named Docker volume** that no tree-walking backup would find.
+
 Documentation-only pause: `src/` untouched, no migration, container healthy.
 
 ## Earlier state (2026-09-22)

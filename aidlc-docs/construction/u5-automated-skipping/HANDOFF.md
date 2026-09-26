@@ -25,6 +25,14 @@ deliverables, so they were deliberately **not** applied unilaterally.
 ⚠️ **It cannot be run unattended.** The instrument is the user's ear, not an endpoint. The user said
 on 2026-09-23 that they could not start it immediately.
 
+⚠️ **`docker compose down` FIRST — corrected 2026-09-26.** The protocol used to say the container
+could stay up, inherited from R11, which only **read**. P-U5-1 **writes to the player**, and the
+recording container writes down the result: each trial POSTs `next` 0–3 s into a track, which
+`outcomeClassifier` records as **`skipped`** (both v2 conditions fail at near-zero progress). 4–6
+trials would inject **4–6 artefact skips into a corpus of 22** — the defect class classifier v2 just
+removed. The probe needs no container: it reads `spotify-config.json` and cannot race the MCP server,
+because token handling deliberately never writes back. Cost: ~15 min of unrecorded listening.
+
 ⚠️ **It is the ONLY thing blocking the FD now.** Everything else in §5.1 can be designed today;
 **FR-46's action point and FR-48's confirmation cannot.** Q8 settled that reviewing logged skip
 behaviour **does not substitute** for it — the log's own signal is the suspect one, so that review

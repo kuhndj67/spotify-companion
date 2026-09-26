@@ -488,6 +488,7 @@ this way, one of them a security bypass.
 | **In-app analysis, dashboards, charts, statistical modelling** | User decision 2026-08-25 — mature tools exist. The app's obligation is export quality (§3.5), not analysis |
 | **HTTP data API / live dashboard integration** | User decision 2026-08-25 — needs a security architecture this project does not have. See §5.1 |
 | **Group-alias and comma-in-name artist resolution** | User decision 2026-09-23 — noted, not built. Affects the derived reporting DB only, no rule or gate input. See §5.1 **W-4** |
+| **Full user-data backup and restore** | User decision 2026-09-26 — deferred, not dismissed. See §5.1 **W-5**. ⚠️ A **minimal** `history.db` backup/restore is a **U5 prerequisite** for migration 007; W-5 is the full-inventory version, and it includes the `metabase-app-db` named volume that no tree-walking backup would find |
 
 ### 5.1 Wishlist — deferred, not rejected
 
@@ -750,6 +751,90 @@ changes no rule input and no gate input. `artist_id` remains the lead artist thr
 would destroy the fact that the user played the duo's record, which is real listening information.
 
 **Prerequisite**: none. Independent of U5.
+
+---
+
+#### W-5 — Full user-data backup and restore
+
+**Raised by the user, 2026-09-26**, while deciding how to protect `history.db` during probe P-U5-1:
+*"We eventually need a way to FULLY back up all the user specific information (configuration, data,
+etc…) and restore it."*
+
+**What it would enable**: one command to capture everything this machine holds that cannot be
+rebuilt, and one command to put it back — before a migration, before a risky probe, or after a
+failure.
+
+### ⚠️ Why this is not "copy `history.db`" — measured 2026-09-26
+
+| File | Size |
+|---|---|
+| `data/history.db` | **3.3 MB** |
+| `data/history.db-wal` | **4.1 MB** |
+
+**The write-ahead log is currently LARGER than the database it belongs to.** A naive copy of
+`history.db` alone would capture **less than half** the corpus, and the copy would open cleanly and
+look plausible — the absent-data trap again, in the one artefact that comes back from nowhere.
+`reclassify-unobserved-tails.mjs` already knows this and checkpoints the WAL before copying; that
+knowledge lives in one script rather than in a shared facility.
+
+### ⚠️ The evidence that the ad-hoc approach has already failed
+
+`data/` currently holds **ten** backups in **five** naming conventions, written by three different
+scripts, plus `CORRUPT-snapshot-20260921-201444` and `history-rebuilt.db` left over from the U4
+index-corruption incident. **Nothing records which of them is good, what schema version each holds,
+or how to restore one.**
+
+⚠️ **And restore has never been written, let alone run.** Every one of those scripts backs up; **not
+one reads a backup back.** A backup that has never been restored is a hypothesis, not a backup — the
+same standing the project applies to anything unprobed.
+
+### What "fully" has to include — inventory taken 2026-09-26
+
+**Irreplaceable — comes back from nowhere:**
+
+| | |
+|---|---|
+| `data/history.db` **+ `-wal` + `-shm`** | The play corpus. ⚠️ WAL checkpoint required first — see above |
+| `config/rules.json` | User-authored rules |
+| **`metabase-app-db`** | ⚠️ **A named Docker volume in a DIFFERENT compose project** (`reporting/compose.yaml`), holding the dashboards and questions built over the Metabase API. It is **not** a bind mount, so it does not appear anywhere in `data/` and would be missed by any backup that walks the project tree. Restoring it needs `docker run --rm -v metabase-app-db:/v …` tar work — a different mechanism from copying a file |
+| `config/automation-state.json` | **From U5** — the kill switch and runaway-halt latches. Does not exist yet |
+
+**Derived — regenerable, so restore may skip it:** `data/reporting/reporting.db` (rebuilt in place),
+`data/snapshots/` (re-exportable from `history.db`), `data/artist-credits.json`.
+
+**⚠️ Credentials — and this is a SECURITY-POSTURE DECISION, not a packaging detail:**
+`secrets/spotify-config.json` is mounted **`rw`** because the MCP server rewrites the refresh token
+on its own schedule, and that token is **long-lived and reusable**
+([`webApiClient.ts`](../../../src/spotify/webApiClient.ts) documents why nothing else may write the
+file). `secrets/musicbrainz.json` and `secrets/metabase.json` sit beside it.
+
+A backup that includes `secrets/` puts **live reusable credentials in plaintext outside the
+gitignored tree**, in an archive whose whole purpose is to be copied somewhere safer — which is also
+somewhere else. ⚠️ They are also the **only** category that is genuinely recoverable without them
+(`npm run auth` re-authorises). **Surfaced, not decided**, per the project's standing rule on
+security-posture questions. The obvious candidate answer — *exclude `secrets/`, and have restore
+print "now run `npm run auth`"* — should still be chosen deliberately rather than by default.
+
+**Why it is deferred**: the immediate need it was raised against dissolved — probe P-U5-1 does not
+need the container running, so `docker compose down` protects the corpus with no new code. Building
+an untested restore path to protect a fifteen-minute window would have added risk rather than removed
+it.
+
+⚠️ **But it is deferred, not dismissed, and it has a near-term trigger: migration 007.** The U5 plan
+and `CLAUDE.md` both require a backup of `data/` before it, and `CLAUDE.md` records that the U4
+incident was *"a detour rather than a loss"* **only because a backup happened to exist**. A minimal
+`history.db`-only backup/restore with a WAL checkpoint and a refusal to run while the container is up
+is therefore a **U5 prerequisite**, tracked on the U5 plan's §4 checklist. W-5 is the full-inventory
+version that follows it.
+
+**Requirements this would imply** (numbered when W-5 is scheduled, not before): capture and restore
+the full inventory above § checkpoint WAL before any copy § refuse to run against a live writer §
+record schema version and app commit in the archive § **verify a restore, because an unverified
+restore path is the defect this item exists to fix** § decide the `secrets/` question explicitly.
+
+**Prerequisite**: none technically. ⚠️ The `secrets/` question should be settled before the first
+archive is written, because changing your mind afterwards means the earlier archives are already the
+thing you decided against.
 
 ---
 

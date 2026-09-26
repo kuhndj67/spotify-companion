@@ -4671,3 +4671,88 @@ anyone grepping only the section they had just edited.
 **Probe P-U5-1**, protocol in the design plan §3. It gates **FR-46 and FR-48** and is now the only
 thing blocking the FD documents. It needs the user present and listening — no endpoint reports what
 it measures.
+
+
+---
+
+## 2026-09-26 (later) — P-U5-1 does not need the container, and W-5 is opened
+
+**Stage**: CONSTRUCTION · U5 Functional Design. **Documents only.**
+
+### ⚠️ The probe protocol would have contaminated the corpus, and the plan said it was safe
+
+§3 of the U5 plan said *"the container may stay up. This probe does not write to `history.db`."*
+**That was inherited from R11 and is wrong for this probe.** R11 only **read**, so the container was
+irrelevant to it. P-U5-1 **writes to the player**, and the container is recording, so it writes down
+the consequences.
+
+Each trial POSTs `next` about 0–3 s into track B. `PlayObserver` closes that play on `track-change`
+at near-zero progress, and in `outcomeClassifier.ts` **both v2 conditions fail** — `unobservedTailMs`
+is nearly the whole duration against the 55 s cap, `observedPositionRatio` is ~0.01 against the 0.75
+rail — so it records **`skipped`**, `skip_source = 'user'`.
+
+⚠️ **4–6 trials inject 4–6 artefact skips into a corpus of 22** — up to **27% contamination of the
+entire evidence base Q1 depends on**, and `BackTestService` counts every `skipped` row. **The same
+defect class classifier v2 had just spent a day removing.** A protocol that reassures the reader about
+the hazard it does not have is worse than one that says nothing.
+
+✅ **Resolved without new code: `docker compose down` for the duration.** The probe needs no container
+— `webApiClient.ts` documents that token handling **deliberately never writes back** to
+`spotify-config.json` (the MCP server rewrites it on its own schedule, and two writers would clobber
+each other's refresh token), and Spotify's refresh tokens are long-lived and reusable. So a host-side
+script reads the credential file, holds its access token in memory, and cannot race the container. The
+music comes from Spotify, not from this app. Cost: ~15 minutes of unrecorded listening.
+
+### The user proposed a swap-in test database; rejected for this, and it opened a real gap
+
+**Proposal (user, 2026-09-26)**: back up the live database, stand up a temporary test database for the
+probe, restore afterwards, accepting the loss of activity during the test.
+
+**Rejected for this probe**, for two reasons and neither is the idea's merit:
+
+1. It keeps a writer running against a database to be discarded, then restores the real one while the
+   engine may still hold it open. ⚠️ **That is the shape of the U4 incident** — which reported
+   `integrity_check: ok` at the time and surfaced later as a just-written value reading `null`.
+2. ⚠️ **It is not one file.** `history.db-wal` is **currently 4.1 MB against a 3.3 MB `history.db`**
+   — the write-ahead log is **larger than the database it belongs to**. A swap that does not
+   checkpoint first moves **less than half the corpus**, and the result opens cleanly and looks
+   plausible. The absent-data trap, in the one artefact that comes back from nowhere.
+
+**An untested restore path is more risk than the fifteen-minute window it protects.**
+
+### ✅ But the instinct was right, and the gap is worse than it looked — W-5 opened
+
+The user extended the proposal to a general facility: *"We eventually need a way to FULLY back up all
+the user specific information (configuration, data, etc…) and restore it."* Recorded as **W-5** in
+`requirements.md` §5.1, with the inventory taken rather than guessed. Three findings from taking it:
+
+⚠️ **`data/` already holds TEN backups in FIVE naming conventions**, written by three different
+scripts, plus `CORRUPT-snapshot-20260921-201444` and `history-rebuilt.db` left from the U4 incident.
+Nothing records which is good, what schema version each holds, or how to restore one. **The ad-hoc
+approach has already failed; the pile is the evidence.**
+
+⚠️ **RESTORE HAS NEVER BEEN WRITTEN.** Every one of those scripts backs up; **not one reads a backup
+back.** A backup that has never been restored is a hypothesis, not a backup — the standing this
+project gives anything unprobed. The half nobody built is the half needed under pressure.
+
+⚠️ **`metabase-app-db` is a named Docker volume in a DIFFERENT compose project** (`reporting/`),
+holding the dashboards and questions built over the Metabase API in `b299bf7`. It is **not** a bind
+mount, so it appears nowhere in `data/` and **any backup that walks the project tree would silently
+miss it.** Restoring it needs `docker run --rm -v metabase-app-db:/v …` tar work — a different
+mechanism from copying a file.
+
+**Surfaced, not decided — the `secrets/` question.** `secrets/spotify-config.json` is mounted **`rw`**
+and holds a long-lived reusable refresh token. Including it puts live plaintext credentials in an
+archive whose purpose is to be copied somewhere else; excluding it is safe precisely because
+credentials are the **only** category that is recoverable without a backup (`npm run auth`). Per the
+project's standing rule, this is put to the user rather than answered. ⚠️ It must be settled **before
+the first archive is written** — changing your mind later means the existing archives are already the
+thing you decided against.
+
+### Sequencing
+
+W-5 is the full-inventory version and is deferred. ⚠️ **Its near-term slice is not**: a minimal
+`history.db` backup **and restore** — WAL checkpointed, refusing to run against a live writer, and
+**with the restore actually verified** — is now a §4 checklist entry as a **migration 007
+prerequisite**. `CLAUDE.md` records that the U4 incident was *"a detour rather than a loss"* **only
+because a backup happened to exist**; migration 007 should not depend on that happening again.

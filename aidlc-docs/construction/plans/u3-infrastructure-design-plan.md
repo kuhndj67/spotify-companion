@@ -120,8 +120,13 @@ C
 
 ### Question 4 — Is `config/rules.json` tracked in git?
 
-**This repository is public** — `compose.yaml` says so where it explains why the MusicBrainz
-contact address lives in `secrets/` instead.
+⚠️ **CORRECTED 2026-09-26 — the premise below was false, and the decision it supported still
+stands.** This said *"**This repository is public** — `compose.yaml` says so"*. The repository is
+**private** (`gh repo view` -> `"visibility": "PRIVATE"`), and `compose.yaml` was simply asserting
+it; **this doc then cited that assertion as the authority**, which is how one unverified claim
+became the stated basis for a decision in three documents. The reason that actually holds is that
+`config/` is **user-authored data rather than project configuration**, which does not depend on
+visibility. Kept as written below for the history.
 
 Rules are not credentials, but they are a fairly direct statement of musical taste and of which
 artists the user wants filtered out. `data/` is gitignored; `secrets/*` is gitignored with

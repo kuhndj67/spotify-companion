@@ -4458,3 +4458,52 @@ migration. The defect is confined to the derived reporting database and is **not
 a gate input; `artist_id` remains the lead artist throughout the app.
 
 **Next**: U5 Functional Design.
+
+---
+
+## 2026-09-26 — A stated reason was false, and it had propagated to six places
+
+**Found while pushing.** `.gitignore` justified ignoring `config/` with *"this repository is
+public"*. `gh repo view` says `"visibility": "PRIVATE"`.
+
+### The decisions were right; only the reason was wrong
+
+Nothing leaked and nothing needed re-deciding. `secrets/`, `data/` and `config/` are all correctly
+ignored, and only the three `*.example.json` templates are tracked. **Every affected decision
+stands on a better reason than the one recorded**: a personal contact address and user-authored
+rules are *the user's data rather than project configuration*, and `compose.yaml` is *tracked in
+git*. Neither depends on the repository's visibility, so neither changes if that visibility does.
+
+### ⚠️ The propagation is the finding, not the error
+
+One unverified assertion became the stated basis for a decision in three documents:
+
+```
+compose.yaml            asserted "the repository is public"
+  -> u3-infrastructure-design-plan.md  cited compose.yaml AS THE AUTHORITY, verbatim
+     -> the Q4 decision on tracking config/rules.json rested on it
+u2 .../infrastructure-design.md        asserted it independently
+.gitignore, README.md, u3-rule-model   repeated it
+```
+
+Nobody checked it, because it had a citation. ⚠️ **A claim with a source inside the repo reads as
+verified, and a repo is not a source for a fact about itself.** Same family as open item 3a — *our
+own notes said no, and the probe says yes* — and it is the **second** instance, so the pattern is
+now confirmed rather than anecdotal: **a recorded premise decays silently, because nothing ever
+re-tests it.** The first instance was an API note. This one was a fact about our own infrastructure,
+which is if anything easier to check and was checked less.
+
+⚠️ It is also the **divergent-copies** shape that caused the `localGuard` `403`: the same statement
+written in six places, where correcting one and leaving five is the likely half-fix.
+
+### What changed
+
+- **Live files corrected** — `.gitignore`, `compose.yaml`, `README.md`. Each now gives the reason
+  that holds (tracked-in-git / user data) and records what the old one said and why it was wrong.
+- **Design documents marked, not rewritten** — `u3-infrastructure-design-plan.md`,
+  `u2-label-enrichment/infrastructure-design.md`, `u3-rule-model/infrastructure-design.md` carry a
+  ⚠️ **CORRECTED 2026-09-26** note above the original text. They are records of decisions taken;
+  the decisions did not change, so the prose stays and the premise is annotated.
+- `docker compose config --quiet` -> exit 0. Comments only; no code, no schema, no behaviour.
+
+**Do not "fix" this by making the repository public.** The reason was wrong; the posture was right.

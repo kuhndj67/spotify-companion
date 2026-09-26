@@ -151,11 +151,16 @@ already exist, and **refuses to overwrite**. It creates `config/` first.
 
 ```gitignore
 # Rule definitions (U3). User-authored, and a fairly direct statement of listening
-# preference — this repository is public. Same shape as secrets/: the directory is
-# ignored, the example template is committed.
+# preference, so it is the user's data rather than project configuration. Same shape
+# as secrets/: the directory is ignored, the example template is committed.
 config/*
 !config/rules.example.json
 ```
+
+⚠️ **The comment was CORRECTED 2026-09-26** and the block above shows the current text. It used to
+end the first sentence with *"— this repository is public"*. The repository is **private**, so the
+stated reason was false; the rule itself is unchanged, because user-authored content does not belong
+in the repo on its own merits, whatever the visibility.
 
 ---
 

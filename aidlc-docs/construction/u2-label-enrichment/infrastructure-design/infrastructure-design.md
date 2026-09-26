@@ -27,8 +27,13 @@ deliberately non-durable (P-5).
 
 ## The contact address — `secrets/musicbrainz.json`
 
-**Decision Q1 = B.** NFR-14 requires a `User-Agent` carrying a real contact address; the repository
-is public and `compose.yaml` is tracked. The value therefore cannot live in `compose.yaml`.
+**Decision Q1 = B.** NFR-14 requires a `User-Agent` carrying a real contact address; `compose.yaml`
+is tracked in git. The value therefore cannot live in `compose.yaml`.
+
+⚠️ **CORRECTED 2026-09-26.** This originally read *"the repository is public and `compose.yaml` is
+tracked"*. The repository is **private**. **The decision is unchanged** — a personal contact address
+is the user's data, and *tracked in git* is sufficient on its own. Recorded because the false half
+of that premise had propagated to three documents.
 
 ```json
 {

@@ -27,8 +27,14 @@ spotify-config.json
 data/
 
 # Rule definitions (U3). User-authored, and a fairly direct statement of listening
-# preference — this repository is public. Same shape as secrets/: the directory is
-# ignored, the committed example template is not.
+# preference, so it is the user's data rather than project configuration. Same shape as
+# secrets/: the directory is ignored, the committed example template is not.
+#
+# ⚠️ This does NOT depend on the repository's visibility, and an earlier version of this
+# comment said "this repository is public" — which was wrong (it is private) and, worse, was
+# the kind of premise that decays silently because nothing re-tests it. The reason is that
+# user-authored content does not belong in the repo on its own merits; that holds whether the
+# repo is public, private, or later flipped.
 config/*
 !config/rules.example.json
 

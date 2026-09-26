@@ -375,7 +375,9 @@ while believing you are compliant is worse than a loud refusal at startup. To ru
 enrichment entirely, set `LABELS_ENABLED=false`.
 
 `secrets/` is gitignored, which is why the contact address lives there rather than in
-`compose.yaml` — that file is tracked and this repository is public.
+`compose.yaml` — that file is **tracked in git**, and a personal contact address is the user's
+data rather than project configuration. (This sentence used to add *"and this repository is
+public"*. It is not — it is private. The tracked-in-git reason is the one that holds either way.)
 
 ### What leaves the machine
 

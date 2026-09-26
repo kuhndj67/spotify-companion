@@ -135,10 +135,15 @@ services:
       # here would exist only to violate the policy -- most likely while debugging,
       # and then forgotten. They are constants in code.
       #
-      # The NFR-14 contact address is NOT here either: this file is tracked in git
-      # and the repository is public. It lives in secrets/musicbrainz.json, mounted
-      # below, and the app fails to start without it rather than sending anonymous
-      # traffic.
+      # The NFR-14 contact address is NOT here either: this file is TRACKED IN GIT,
+      # and a personal contact address is the user's data rather than project
+      # configuration. It lives in secrets/musicbrainz.json, mounted below, and the
+      # app fails to start without it rather than sending anonymous traffic.
+      #
+      # NOTE: this used to say "and the repository is public". That was WRONG -- the
+      # repo is private (checked 2026-09-26) -- and it had been cited elsewhere as
+      # the authority for the same claim. Tracked-in-git is the reason that actually
+      # holds; it does not change if the repo's visibility does.
 
     volumes:
       # Question 6, option A: authenticate once on the host, mount the token file in.

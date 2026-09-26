@@ -82,7 +82,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ## ▶ Current state (2026-09-23) — U5 PAUSED MID-DESIGN, resume file written
 
-**Read [`aidlc-docs/construction/u5-automated-skipping/RESUME-HERE.md`](aidlc-docs/construction/u5-automated-skipping/RESUME-HERE.md) before anything else.**
+**Read [`aidlc-docs/construction/u5-automated-skipping/HANDOFF.md`](aidlc-docs/construction/u5-automated-skipping/HANDOFF.md) before anything else** — U5's single entry point; the current state is its top block.
 U5's Functional Design plan is written and waiting on 9 answers. **The recommended next step is
 probe P-U5-1**, which needs the user present and listening, because the instrument is their ear.
 

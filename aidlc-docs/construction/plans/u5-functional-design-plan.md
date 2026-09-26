@@ -113,11 +113,43 @@ we have.**
 R11 was probed before FR-36 — and R11 is the precedent for why that ordering pays: the answer was
 "it depends on the context", which neither branch of the execution plan anticipated.
 
-**Proposed probe P-U5-1** (read-mostly, one write per trial, user present and listening): during
-confirmed DJ playback, wait for a reported `track-change`, then immediately issue
-`POST /me/player/next` and record what the user *hears* against what the API reports. A handful of
-trials answers it. **The listener's ear is the instrument here** — that is what caught the
-mis-classification in the first place, and no endpoint can report it.
+### Probe P-U5-1 — the protocol
+
+Read-mostly: one write per trial. **It cannot be run unattended** — the instrument is the user's
+ear, not an endpoint. That is what caught the mis-classification in the first place, and no
+endpoint can report it.
+
+**Preconditions**
+- The user is at the machine, listening, and can report what they *hear*.
+- Playback confirmed in the **AI DJ** context (`spotify:playlist:37i9dQZF1EYkqdzj48dyYq` was the URI
+  in the R11 probe; ⚠️ **verify rather than assume — a recorded negative decays**).
+- The container may stay **up**. This probe does not write to `history.db`.
+
+**Per trial**
+1. Poll `GET /me/player/currently-playing` until the reported track id **changes** (A → B). Note the
+   wall-clock instant and both track ids.
+2. **Immediately** issue `POST /me/player/next`.
+3. Record within a few seconds: what the API now reports (track id and `progress_ms`), and **what
+   the user says they HEARD** — did the audio cut mid-track, and was the track that got cut the one
+   they had been hearing (A), or had B genuinely started?
+4. Let playback settle before the next trial.
+
+**Reading the result**
+
+| What the user heard | What it means |
+|---|---|
+| Audio cut a track that had been playing a while, then B started | **Hazard is REAL.** The player's state is A. FR-46 must not act on a fresh `track-change` in the DJ context without a guard |
+| B had already started audibly, and B got cut | **Hazard is NOT real.** Reported and player state agree; FR-46 as designed is safe |
+| Mixed across trials | Report it as mixed. ⚠️ **Do not average it into a conclusion** — a context-dependent answer is exactly what R11 found |
+
+**Trials**: 4–6 distinguishes these. ⚠️ **Run a positive control**, as R11 did — repeat 2 trials
+during **album** playback, where no reporting lag is known. If the album trials behave differently
+from the DJ trials, that difference *is* the finding. Without the control, an ambiguous DJ result is
+unusable.
+
+⚠️ **The probe script is deliberately NOT yet written.** It issues a real write against live
+playback, and the shape of that write is one of the things U5 has not decided. Write it at the start
+of the probe session, with the user present.
 
 ---
 
@@ -168,7 +200,7 @@ mediocre one.
 genuinely informative and hiding it would be worse. The dry-run is the gate that has already
 demonstrated it works on this project.
 
----
+--- C
 
 ### Question 2 — FR-36 pre-warming, when the queue is context-dependent
 
@@ -190,7 +222,7 @@ So FR-36 must **ask the queue at runtime and adapt**. The question is what to do
 Depth 3 covers the realistic window between a track appearing in the queue and playing, without
 monopolising the MusicBrainz queue.
 
----
+--- I accept  the Recommendation. Regarding the behavior when the DJ is running I think my app usage preferences are likely to change over time so I don't think changing the DJ to the primary path is necessary... but both paths should be given equal attention since they will both be heavily used.
 
 ### Question 3 — FR-34 re-evaluation vs BR-22.1's one decision per play
 
@@ -230,7 +262,7 @@ pointless.
 FR-35 partial-data path. ⚠️ **Express the cap in milliseconds, not as a ratio of duration alone** —
 CLAUDE.md's constant-time-effect warning applies directly here.
 
----
+--- I accepe the recommendation and add that the status line should provide a visual queue of the state of this process. To keep the status line clean I suggest not adding more text but rather providing color/flashing queues to identify the state... Maybe of the "Rules v#" status indicator, something like "White-idle, Grey-disabled, Yellow-hold, Yellowgreen-passed with missing info, Green-passed, Red-Failed" (not dictating the solution just suggesting a path, ideally UI elements should be designed for ease of use).
 
 ### Question 5 — FR-38 kill switch: surface, latency, persistence
 
@@ -251,7 +283,7 @@ across restart*.
 **Recommendation**: persist to `config/automation-state.json` (directory mount, atomic rename),
 expose a UI button **and** an API route, check at the action point, and **fail closed**.
 
----
+--- Agree - put the UI button on the Rules pop-up (Primary screen needs to be kept as clean as possible). 
 
 ### Question 6 — FR-39 rate limit and runaway halt: the numbers
 
@@ -273,7 +305,7 @@ one rule is uniquely bad, and the user should have to look at the decision log b
 ⚠️ **These thresholds are safety limits, not tuning parameters.** If a legitimate rule trips the
 halt at 3, that is information about the rule, not grounds to raise the number.
 
----
+--- C only.
 
 ### Question 7 — FR-40: what is a "session"?
 
@@ -290,7 +322,7 @@ read a genuine repeat listen as a failed skip loop.
 attempt per `track_id` per process. The failure FR-40 guards is a skip that does not take effect and
 re-fires every poll; one attempt closes it **without needing a session definition at all**.
 
----
+--- A "session" is my name for one continuous listening period (which is why it's not defined), however... I don't believe we need a functional rule saying "never skip the same track twice within one session", the liklihood of that happening is low and if it DOES happen and the rules say skip the track - we should skip the track.
 
 ### Question 8 — FR-48: confirming a skip took effect
 
@@ -311,7 +343,7 @@ answered with the obvious check.
 **Provisional**: confirm on `progress_ms` **resetting** *plus* a track-id change, and treat an
 unconfirmed skip as failed — **surfaced, not retried** (FR-40).
 
----
+--- This is not really a question since it's not asking me anything. However... I think we should monitor skip behavior to see if this is a concern (I suspect it's not)
 
 ### Question 9 — Record `context_type` live? (open item 7)
 
@@ -337,7 +369,7 @@ assumed.
 **Recommendation**: record `context_type` and `context_uri` on live plays in migration 007, **as
 evidence only** — no rule field in U5, given the staleness.
 
----
+--- agree with recommendation
 
 ## 6. Out of scope for U5 — recorded so it is not re-litigated
 

@@ -4507,3 +4507,51 @@ written in six places, where correcting one and leaving five is the likely half-
 - `docker compose config --quiet` -> exit 0. Comments only; no code, no schema, no behaviour.
 
 **Do not "fix" this by making the repository public.** The reason was wrong; the posture was right.
+
+---
+
+## 2026-09-26 — Two "read this first" files in one directory; consolidated to one
+
+**User raised it**: `u5-automated-skipping/` held both `HANDOFF.md` and `RESUME-HERE.md`, and asked
+whether `HANDOFF.md` could be removed.
+
+### ⚠️ The disposable file was the NEW one, not the old one
+
+`HANDOFF.md` is the AI-DLC process deliverable — **U4 has one too** — and is referenced from
+`aidlc-state.md`, `audit.md` (an append-only entry) and `u4-code-generation-plan.md`.
+`RESUME-HERE.md` was invented in the 2026-09-23 session and referenced from nothing but the two
+pointers that session wrote.
+
+**Deleting `HANDOFF.md` would have lost content that exists nowhere else** — checked by grep across
+all three U5 documents before touching anything:
+
+| Only in `HANDOFF.md` | |
+|---|---|
+| `fs.watch` over the bind mount | **Dead** — 0 events in 12 s. *Do not retry it* |
+| `partialData` rate | 0 of 65 |
+| Blind spot | Plays ending before the cap log nothing: 2.8% of plays, 4 of 31 skips |
+| `FactCache` (LC-12, P-16) | Closed as superseded by U4; **U5 re-opens it** |
+| `DecisionLogRepository` | 195 rows, retention capped at 100,000, pruner fenced |
+
+Several are explicit *"do not re-derive this"* measurements. ⚠️ **The newer file looked more
+current, which is exactly why it was the more dangerous one to trust** — recency is not authority.
+
+### What changed
+
+- **`HANDOFF.md` is now U5's single entry point.** A `▶ CURRENT STATE AND NEXT STEP` block was
+  added at the top: the pause, probe P-U5-1 and why it gates FR-46, and open item 7.
+- ⚠️ **Its item 1 was STALE AND FIRST.** It opened *"The outcome variable is half noise — this is
+  the most important thing on the page"*, which classifier v2 closed **hours after the handoff was
+  written**. Marked ✅ CLOSED in place with the correction above it and the original text kept
+  below, per the convention used elsewhere. A wrong statement that announces itself as the most
+  important thing on the page is the worst possible thing to leave stale.
+- **The P-U5-1 protocol moved into the design plan §3**, beside the hazard it tests.
+- **`RESUME-HERE.md` deleted.** Recoverable at `73e3ce0`; nothing referenced it after the two
+  pointers in `aidlc-state.md` and `CLAUDE.md` were repointed. Verified by grep.
+
+### The rule going forward
+
+**One entry point per unit: `<unit>/HANDOFF.md`.** A session pausing mid-unit updates the top of it
+rather than adding a parallel file. ⚠️ **Before deleting any document, grep for inbound references
+and for content that exists nowhere else** — the obvious-looking duplicate is not always the
+disposable one.

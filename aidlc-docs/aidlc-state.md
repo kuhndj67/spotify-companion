@@ -5,7 +5,7 @@
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
 - **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN, PAUSED 2026-09-23 awaiting answers (9 questions).**
-  ▶ **READ [`construction/u5-automated-skipping/RESUME-HERE.md`](construction/u5-automated-skipping/RESUME-HERE.md) FIRST.**
+  ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — it is U5's single entry point, and its top block carries the current state.
   It carries the recommended next step — **run probe P-U5-1**, which needs the user present and
   listening — and the full protocol. This is a *decision* pause, not a build pause: `src/` is
   untouched and the container is healthy and recording. Previously: **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME

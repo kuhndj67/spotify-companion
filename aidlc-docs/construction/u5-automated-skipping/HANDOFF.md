@@ -1,10 +1,37 @@
 # U5 Handoff — read this before starting Functional Design
 
-**Written 2026-09-22**, at the U4/U5 boundary. Everything committed and pushed; working tree
-clean; schema **v6**; container healthy and recording on the U4 image.
+**Written 2026-09-22** at the U4/U5 boundary. **Updated 2026-09-26**; this is the single entry
+point for U5.
 
-> **Where we are**: U4 is **complete, deployed and verified** — all three exit criteria that CI
-> could not close are closed. **U5 is the next unit, and it is the only one that can cause harm.**
+---
+
+## ▶ CURRENT STATE AND NEXT STEP (2026-09-26)
+
+**U5 Functional Design is PAUSED awaiting answers to 9 questions** in
+[`../../plans/u5-functional-design-plan.md`](../../plans/u5-functional-design-plan.md).
+It is a **decision** pause, not a build pause: `src/` is untouched, no migration, container healthy
+and recording. If `git status src/` is not clean, something was started that this file does not
+know about.
+
+### The recommended next step is **probe P-U5-1** — protocol in the plan, §3
+
+⚠️ **It cannot be run unattended.** The instrument is the user's ear, not an endpoint. The user said
+on 2026-09-23 that they could not start it immediately.
+
+**Why it gates FR-46**: classifier v2 established that in the AI DJ context the API stops reporting
+a track **18–41 s before it stops playing**. `EvaluationCoordinator` takes its play boundary from
+that reported state — so a rule matching the newly-reported track B may fire
+`POST /me/player/next` against a player still on **A**, truncating an unmatched track the listener
+was enjoying while B plays on unskipped, in the context used **50–70%** of the time.
+
+⚠️ **Every step of that is established except the last**: whether the skip acts on the player's real
+state or on the same lagged state the read endpoints report. **Not inferable — probe it.** The same
+lag also makes the obvious FR-48 confirmation (*"is a different track reported now?"*) one that can
+pass when nothing audible happened.
+
+A second decision is open: **CLAUDE.md open item 7** (`context_type` live, NULL on all 577 live
+plays). Declined 2026-09-02 as a standalone enrichment; re-raised because it is now load-bearing for
+a *safety* question, which is a different trade.
 
 ---
 
@@ -22,9 +49,22 @@ clean; schema **v6**; container healthy and recording on the U4 image.
 
 ## ⚠️ The five things most likely to be got wrong
 
-### 1. The outcome variable is half noise, and the back-test does not know it
+### 1. ~~The outcome variable is half noise~~ — ✅ **CLOSED 2026-09-22, not inherited**
 
-**This is the most important thing on the page.**
+⚠️ **This was "the most important thing on the page" and it is now RESOLVED. Do not act on the text
+below.** Classifier v2 landed hours after this handoff was written and fixed the **outcome itself**:
+24 rows re-derived `skipped` → `completed`, `skip_attribution` **retired**, live skips 46 → 22.
+`BackTestService` needed no change — it reads `outcome` and never read attribution. **All 22
+remaining skips are `skip_source = 'user'`.**
+
+⚠️ **But the evidence base got SMALLER, not cleaner-and-bigger.** 22 events is everything there is
+for validating a rule before arming it, and the 2026-09-10 gate's n=17 precedent says what that can
+and cannot decide. That is **Q1** of the design plan, which recommends back-test as an advisory
+number and dry-run as the actual gate.
+
+The original text is kept below for the history.
+
+**This was the most important thing on the page.**
 
 `skip_attribution` (migration 006) splits skips into `user` and `unattributed`. Currently **22
 user, 21 unattributed** — an `unattributed` skip is a track that played to 81–90% and was then

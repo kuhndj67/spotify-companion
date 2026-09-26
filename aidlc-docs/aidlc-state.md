@@ -8,6 +8,16 @@
   ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — it is U5's single entry point, and its top block carries the current state.
   ✅ **The settled specification is [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md) §5.1** — the authoritative reading of the
   nine answers; §5 keeps the user's own words with a ⚙ note where a clarification changed something.
+  ✅ **The Functional Design is WRITTEN** — `construction/u5-automated-skipping/functional-design/`:
+  `business-rules.md` (**BR-33 … BR-43**), `domain-entities.md`, `business-logic-model.md`,
+  `frontend-components.md`. **Only FR-46's action point and FR-48's confirmation are unspecified**,
+  and BR-43 records that deliberately rather than guessing past it.
+  ⚠️ **Three code findings made while writing it**: `DecisionExecutor.execute` is **synchronous and
+  unawaited**, so the skip must be **queued** and drained asynchronously (BR-42 — which also puts the
+  safety check at the action point, where FR-38 needs it); **`config/` is mounted `:ro`** and U5 is the
+  first unit that writes there, so the kill switch would work in the UI and not persist (BR-34.4); and
+  Q4's colour cue **collides with `Rules v#`**, whose four levels are already bound to load health
+  where `fail` names the version still in force (FC-U5-1).
   **The only thing now blocking the FD is probe P-U5-1**, which needs the user present and listening
   — protocol in §3. Everything else in §5.1 can be designed today; **FR-46's action point and FR-48's
   confirmation cannot.** ⚠️ Q8 settled that reviewing logged skip behaviour **does not substitute**

@@ -4756,3 +4756,104 @@ W-5 is the full-inventory version and is deferred. ⚠️ **Its near-term slice 
 **with the restore actually verified** — is now a §4 checklist entry as a **migration 007
 prerequisite**. `CLAUDE.md` records that the U4 incident was *"a detour rather than a loss"* **only
 because a backup happened to exist**; migration 007 should not depend on that happening again.
+
+
+---
+
+## 2026-09-26 (later still) — U5 Functional Design written, except the two things the probe gates
+
+**Stage**: CONSTRUCTION · U5 Functional Design. **Documents only.** `src/` untouched, no migration.
+
+Four documents in `construction/u5-automated-skipping/functional-design/`: `business-rules.md`
+(**BR-33 … BR-43**, continuing from U4's BR-32.4), `domain-entities.md`, `business-logic-model.md`,
+`frontend-components.md`.
+
+⚠️ **BR-43 is deliberately empty of specification.** FR-46's action point and FR-48's confirmation
+depend on probe P-U5-1 and are recorded as unspecified rather than guessed past. What *is* specified
+there is only what holds either way: an unconfirmed skip is **failed, surfaced, never retried**; the
+before/after evidence fields; and BR-36's one-attempt-per-play backstop.
+
+### ⚠️ Three things the FD found in the CODE, not in the requirements
+
+**1. `DecisionExecutor.execute` is SYNCHRONOUS, and U5's action is not.** `execute` returns `string`,
+not `Promise<string>` (`LoggingExecutor.ts:31`), and `EvaluationCoordinator` calls it **unawaited**
+(`EvaluationCoordinator.ts:228`). An HTTP `POST` cannot live there. **The contract as it stands cannot
+express U5's action at all.**
+
+Resolved by **BR-42**: `SkipExecutor.execute` writes the decision rows and **enqueues a `SkipAttempt`**;
+a separate asynchronous path drains it. Making `execute` async was the obvious move and was rejected
+for three reasons, the third being the one that matters:
+
+- It changes `LoggingExecutor`'s signature to serve a collaborator it does not have — exactly what
+  **BR-30** exists to prevent (*added alongside, never grown out of*).
+- An unawaited promise inside a **timer** is how a swallowed rejection becomes a skip that silently
+  never happened.
+- ⚠️ **It would put the safety check in the wrong place.** An awaited `execute` checks the kill switch
+  where the *decision* is taken — but a decision is taken up to 10 s before anything could act on it,
+  and FR-38 requires that **no skip is issued after the switch is thrown**. Queueing makes the action
+  point the only place the check can live.
+
+✅ The queue also makes Q3's *"re-evaluation may cancel a pending skip"* implementable rather than
+aspirational: there is a pending entry to cancel.
+
+**2. ⚠️ `config/` is mounted `:ro`, and U5 is the first unit that writes to it.** `compose.yaml:202`.
+CLAUDE.md predicted this exact surfacing — *"U3 only reads, so the bug is invisible here and would
+surface the first time the U4 rule editor saves"* — and U4 shipped a **read-only** panel, so it still
+has not. **U5 is where it comes due.**
+
+⚠️ **It will present as a kill switch that works in the UI and does not persist**, which is the worst
+failure mode this particular control could have: the button flips, the page re-renders from client
+state, and a restart silently re-arms automation. So FC-U5-2 requires the button to reflect **what was
+read back from disk**, never optimistic client state, and Phase 4's exit criterion 3 must be verified
+**through the container** — on the host the write succeeds and the bug is invisible.
+
+**3. ⚠️ Q4's colour cue collides with a scheme that already exists, and the collision destroys a
+deliberate distinction.** Checked the code before designing to the request. `rulesIndicator`
+(`src/ui/statusBar.ts`) already binds **all four** `IndicatorLevel` values to rules-**file** load
+health, and its docstring pins why `fail` is load-bearing (**FQ5**): *a light that only says "something
+failed" leaves exactly the ambiguity the indicator exists to remove, and a silent last-known-good is
+indistinguishable from a successful reload.* Red **names the version still in force**.
+
+Recolouring it would make red mean either *your rules file is broken* or *a rule matched and the skip
+failed* — and a user seeing red would not know whether to open their rules file or their decision log.
+✅ Resolved as a **second, adjacent compact indicator**, which still meets the stated goal of no added
+prose on the primary screen.
+
+⚠️ **And the `Indicator` contract already says colour cannot be the only channel** — `glyph` exists as
+*"a distinct glyph per level, for the same reason"*. So each new state needs a glyph as well as a
+colour. That is not a departure from the request; it is what keeps the indicator readable to someone
+who cannot distinguish the proposed `Green` from `Yellowgreen`, which is the hardest pair in it.
+
+⚠️ **Flashing recommended against, and said so rather than quietly dropping it**: an accessibility
+hazard on a display meant to sit visible for hours, unable to encode seven states, and on an
+always-on display motion reads as *something is wrong* whichever state is flashing. Offered instead as
+a transient pulse on change, with sustained flashing available for `failed` and `halted` if the user
+wants it — the two states where demanding attention is the point. **The user's call, not the FD's.**
+
+### Two smaller design decisions worth recording
+
+**`SafetyCounters` are derived, never stored.** A stored counter is a second source of truth that
+drifts invisibly from the rows it summarises. Consequence accepted: counters reset on restart, but the
+**halt itself persists** (BR-35.7) — a restart cannot clear a halt, only the count that would have led
+to one.
+
+**⚠️ `FactCache` re-opens, and a cache would make FR-34 a silent no-op.** U4 closed it as superseded
+because one decision per play calls `historyCountsBefore` once; re-evaluation is a second assembly for
+the same play, which is the case it was specified for. **But the point of re-evaluating is that the
+facts changed** — a cache serving the first assembly's values to the second makes FR-34 do nothing
+while every test passes. BR-37 permits caching the point-in-time history counts and **never the
+enrichment fields**.
+
+### ⚠️ A new instance of an old trap, flagged in advance
+
+BR-43.2's before/after evidence fields are **`successor_lag_ms` wearing a different hat**.
+`recordSuccessorLag` had **zero callers for its entire life**, so the field designed to hold successor
+lag was never wired and the 2026-09-22 measurement had to reconstruct it from trails. **A column that
+is structurally empty reads as "this never happens."** If BR-43.2's fields are specified and not
+written, the user's later review finds nothing and concludes the hazard is absent — *"we'll look at
+the data later"* silently becoming *"there is no data."* BR-43.3 makes writing them a rule rather than
+an intention.
+
+### Next step, unchanged
+
+**Probe P-U5-1**, with the container **down**. It is the only thing left blocking the FD.

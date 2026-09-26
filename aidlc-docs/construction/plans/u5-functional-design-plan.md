@@ -196,16 +196,13 @@ in the user's own words with a ⚙ note where a clarification changed something.
 - [ ] ▶ **Probe P-U5-1** — **THE NEXT STEP.** Resolve §3 before FR-46 **or FR-48** is designed.
       ⚠️ Needs the user present and listening; cannot be run unattended
 - [ ] Get sign-off on the two **§5.2** amendments (FR-40's wording; R11's stale caveat)
-- [ ] Write `business-logic-model.md` — decision-to-action pipeline, safety interlocks
-- [ ] Write `domain-entities.md` — `SkipAttempt`, `AutomationState`, `SafetyCounters`,
-      **`RunawayHalt`** (Q6 made it a latch distinct from the kill switch)
-- [ ] Write `business-rules.md` — numbered BRs continuing from **BR-33**
-- [ ] **Specify the UI workstream**, which the answers created and this checklist did not have:
-      the evaluation-state indicator (Q4) and the kill-switch button on the Rules pop-up (Q5).
-      ⚠️ Widening `IndicatorLevel` is a typed change — the union has no `default:`, so the compiler
-      names every site that must change
-- [ ] Specify the **skip-attempt evidence fields** (Q8b) — reported track id and `progress_ms`
-      before *and* after the `POST`, so the later review has something to review
+- [x] Write `business-rules.md` — **BR-33 … BR-43**, continuing from U4's BR-32.4
+- [x] Write `domain-entities.md` — `SkipAttempt`, `AutomationState`, `RunawayHalt`, `SafetyCounters`,
+      migration 007
+- [x] Write `business-logic-model.md` — the pipeline, **six refusal points and one action point**
+- [x] Write `frontend-components.md` — the UI workstream (Q4 indicator, Q5 kill switch, BR-35.6
+      acknowledgement)
+- [x] Specify the **skip-attempt evidence fields** (Q8b) — BR-43.2
 - [ ] Pre-register the Q6 safety thresholds **before** any rule is armed
 - [ ] **Minimal `history.db` backup + RESTORE, before migration 007.** ⚠️ `data/` already holds ten
       ad-hoc backups in five naming conventions written by three scripts, **and not one of them has a

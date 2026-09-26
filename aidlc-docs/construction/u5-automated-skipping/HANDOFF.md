@@ -20,6 +20,30 @@ wording (Q7 declines it **as written** — the guard is now one attempt per **pl
 `track_id`), and R11's stale caveat in `requirements.md`. Both are in stage-gated inception
 deliverables, so they were deliberately **not** applied unilaterally.
 
+✅ **Functional Design is WRITTEN** — `u5-automated-skipping/functional-design/`:
+`business-rules.md` (**BR-33 … BR-43**), `domain-entities.md`, `business-logic-model.md`,
+`frontend-components.md`. Everything except FR-46's action point and FR-48's confirmation, which
+**BR-43 records as deliberately unspecified** pending probe P-U5-1.
+
+⚠️ **Three things the FD found in the code while being written:**
+1. **`DecisionExecutor.execute` is SYNCHRONOUS and unawaited** (`LoggingExecutor.ts:31`,
+   `EvaluationCoordinator.ts:228`) — an HTTP `POST` cannot live there. Resolved by **BR-42**:
+   `SkipExecutor.execute` enqueues a `SkipAttempt` and a separate async path drains it. Making
+   `execute` async was rejected — it would change `LoggingExecutor` to serve a collaborator it does
+   not have (BR-30), put an unawaited promise in a timer, and check the kill switch in the **wrong
+   place**. Queueing makes the action point the only place, and makes BR-37.5's *cancel a pending
+   skip* implementable rather than aspirational.
+2. ⚠️ **`config/` is mounted `:ro`** (`compose.yaml:202`) and **U5 is the first unit that writes
+   there.** CLAUDE.md predicted this would surface *"the first time the U4 rule editor saves"*; U4
+   shipped read-only, so it has not. **It will present as a kill switch that works in the UI and does
+   not persist.** BR-34.4.
+3. ⚠️ **Q4's colour cue collides with an existing scheme.** All four `IndicatorLevel` values are
+   already bound to rules-**file** load health, where `fail` **names the version still in force**
+   (FQ5). Recolouring would make red mean either *your rules file is broken* or *a skip failed*.
+   Resolved as a **second adjacent indicator**; and the contract already says **colour is never the
+   only channel**, so each state needs a glyph too — which matters most for the proposed
+   `Green`/`Yellowgreen` pair.
+
 ### The next step is **probe P-U5-1** — protocol in the plan, §3
 
 ⚠️ **It cannot be run unattended.** The instrument is the user's ear, not an endpoint. The user said

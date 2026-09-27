@@ -24,7 +24,9 @@
     "reporting:credits": "node scripts/resolve-artist-credits.mjs",
     "reporting:metabase": "node scripts/metabase-setup.mjs",
     "reporting:refresh": "npm run reporting:credits && npm run reporting:build",
-    "reporting:report": "node scripts/metabase-report.mjs"
+    "reporting:report": "node scripts/metabase-report.mjs",
+    "probe:p-u5-1:rehearse": "node scripts/probe-p-u5-1.mjs --rehearse",
+    "probe:p-u5-1": "node scripts/probe-p-u5-1.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

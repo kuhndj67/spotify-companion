@@ -181,9 +181,36 @@ during **album** playback, where no reporting lag is known. If the album trials 
 from the DJ trials, that difference *is* the finding. Without the control, an ambiguous DJ result is
 unusable.
 
-⚠️ **The probe script is deliberately NOT yet written.** It issues a real write against live
-playback, and the shape of that write is one of the things U5 has not decided. Write it at the start
-of the probe session, with the user present.
+### ✅ The script exists: `scripts/probe-p-u5-1.mjs` (written 2026-09-26)
+
+~~⚠️ **The probe script is deliberately NOT yet written.** It issues a real write against live
+playback, and the shape of that write is one of the things U5 has not decided.~~ **Superseded** —
+`POST /me/player/next` has exactly one shape and needs no decision U5 has not made.
+
+```bash
+npm run probe:p-u5-1:rehearse    # ⚠️ START HERE. Detects boundaries, issues NO write.
+                                 # Read-only, so the container may stay UP.
+docker compose down
+npm run probe:p-u5-1             # the real thing: 4 DJ trials + 2 album controls
+docker compose up -d
+```
+
+**What it does, in order:**
+
+| Step | |
+|---|---|
+| Preflight 1 | ⚠️ **Refuses to run if `spotify-now-playing` is up.** If `docker` is unreachable it says the state is *unproven, not proven-down* and asks. **Rehearsal is exempt** — it makes no writes, so requiring a shutdown for the safe path would make it cost more than the risky one |
+| Preflight 2 | ⚠️ **Verifies the token actually carries `user-modify-playback-state`.** The refresh response returns the granted scopes for free. `auth.mjs` requests it, but the refresh token on disk was minted under whatever set was in force when the user last authorised — **a recorded positive decays as silently as a recorded negative.** ✅ Verified present 2026-09-26 |
+| Context | Prints `context.type` / `context.uri` and **asks** which context it is. ⚠️ It does **not** classify from the uri — R11 established the DJ and a radio station are both `type: playlist` with the same `37i9dQZF1E` prefix. It flags that prefix and says the answer decides, not the uri |
+| Per trial | Polls `currently-playing` at 1 s until the reported id changes, then POSTs **immediately** and records the latency. Re-reads at **+1.5 s and +6 s** |
+| ⚠️ The measurement | Prints *"everything above is what the API SAYS, and the API is the suspect"*, then asks **what you heard**: did audio cut · had the new track **already** started audibly · roughly how long the audio you were hearing had been playing |
+| Reading | Prints a **tentative** per-trial reading only. ⚠️ The conclusion is drawn across trials with the control, by a human — a confident per-trial verdict would invite exactly the averaging R11 forbids |
+| Control | Prompts you to switch to an **album**, then repeats. ⚠️ If album differs from the DJ, **that difference is the finding** |
+| Record | Writes `probes/p-u5-1-<stamp>.json`. **Never opens `history.db`** |
+
+⚠️ **A third outcome the protocol table above does not list**: *nothing cut at all*. The script
+captures it, and it is a finding about **FR-48** rather than about the action point — a skip that did
+not take effect.
 
 ---
 

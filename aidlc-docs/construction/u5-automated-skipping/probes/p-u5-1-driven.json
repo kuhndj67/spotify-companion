@@ -1,0 +1,150 @@
+{
+  "probe": "P-U5-1",
+  "question": "does POST /me/player/next act on the player's real state, or on the lagged state the read endpoints report?",
+  "startedAt": "2026-09-27T00:53:23.250Z",
+  "note": "Driven step by step. The listener's account of what they HEARD is added per trial afterwards — it is the measurement, and no endpoint supplies it.",
+  "trials": [
+    {
+      "label": "AI DJ",
+      "recordedAt": "2026-09-27T00:53:23.250Z",
+      "rehearsal": false,
+      "watchStartedAt": "2026-09-27T00:50:58.546Z",
+      "a": {
+        "trackId": "4ZAmN9iPKZkRjLPZnuyOo3",
+        "title": "The Chaos",
+        "artist": "Father Of Peace",
+        "progressMs": 179604,
+        "durationMs": 208158,
+        "remainingMs": 28554,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "lastReportedAt": "2026-09-27T00:53:15.675Z"
+      },
+      "b": {
+        "trackId": "0mROspyBziPHPyxTPFvKaH",
+        "title": "God Is A Weapon",
+        "artist": "Falling In Reverse, Marilyn Manson",
+        "progressMs": 5038,
+        "durationMs": 215444,
+        "remainingMs": 210406,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "firstReportedAt": "2026-09-27T00:53:16.813Z"
+      },
+      "aRemainingMsAtLastSight": 28554,
+      "lagAssessment": {
+        "band": "in-measured-band",
+        "testsHazard": true,
+        "why": "29s unreported tail — inside the 18-41s band classifier v2 measured. This trial tests the hazard."
+      },
+      "post": {
+        "at": "2026-09-27T00:53:16.926Z",
+        "status": 200,
+        "body": null
+      },
+      "postLatencyMsAfterBoundaryDetected": 113,
+      "after": [
+        {
+          "afterMs": 1500,
+          "status": 200,
+          "playing": {
+            "trackId": "3YuaBvuZqcwN3CEAyyoaei",
+            "title": "Like a Stone",
+            "artist": "Audioslave",
+            "progressMs": 1472,
+            "durationMs": 293960,
+            "remainingMs": 292488,
+            "isPlaying": true,
+            "contextType": "playlist",
+            "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+          }
+        },
+        {
+          "afterMs": 6000,
+          "status": 200,
+          "playing": {
+            "trackId": "3YuaBvuZqcwN3CEAyyoaei",
+            "title": "Like a Stone",
+            "artist": "Audioslave",
+            "progressMs": 6198,
+            "durationMs": 293960,
+            "remainingMs": 287762,
+            "isPlaying": true,
+            "contextType": "playlist",
+            "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+          }
+        }
+      ],
+      "heard": {
+        "reportedBy": "listener, 2026-09-27",
+        "didCut": true,
+        "bEverAudible": false,
+        "audibleSequence": [
+          "The Chaos (A)",
+          "Like a Stone (C)"
+        ],
+        "bSkippedWithoutBeingHeard": true,
+        "transitionCharacter": "abrupt, NOT the expected crossfade/automix blend",
+        "aTruncated": "UNCERTAIN - listener says it MIGHT have cut before The Chaos actually finished",
+        "verbatim": "God is a Weapon never started playing (audio jumped directly to Audioslave), but also the transition from Father of Peace to Audioslave was not the normal crossfade I had expected, it was abrupt and MIGHT have happened before The Chaos actually finished."
+      },
+      "durationCheck": {
+        "concern": "listener reported Spotify UI showing 3:00 for The Chaos vs API duration_ms 208158 (3:28)",
+        "resolved": "API duration_ms is CORRECT. GET /tracks/{id} independently returns 208158, and the corpus has observed this exact track reach max_progress_ms 207000 of 208000 (ratio 0.995) on 2026-09-07 AND 2026-09-10. Real audio cannot exceed its own length, so 3:28 is real and the 28.5s unreported tail is a genuine reporting lag, not a duration artefact.",
+        "method": "verified against a case where the answer was already known - CLAUDE.md rule"
+      },
+      "interpretation": {
+        "status": "ADMISSIBLE, and it found a THIRD mechanism",
+        "finding": "Reported state and the player STATE STORE agree (both B) - proven by next advancing B->C rather than A->B. But the AUDIO lagged both, still playing A. So the hypothesis framing (lag in reporting vs lag in state store) was a false dichotomy: the lag is in AUDIO OUTPUT.",
+        "consequence": "A skip fired at the reported A->B boundary truncates A (unmatched) AND consumes B without it ever being heard. The rule achieves its goal, at the cost of an unmatched track tail.",
+        "openQuestion": "Whether A was actually truncated is UNCONFIRMED - the listener is uncertain. That is what trial 2 must settle."
+      }
+    },
+    {
+      "label": "AI DJ (observation, no write)",
+      "recordedAt": "2026-09-27T01:04:35.479Z",
+      "rehearsal": true,
+      "watchStartedAt": "2026-09-27T01:00:43.043Z",
+      "a": {
+        "trackId": "3YuaBvuZqcwN3CEAyyoaei",
+        "title": "Like a Stone",
+        "artist": "Audioslave",
+        "progressMs": 285673,
+        "durationMs": 293960,
+        "remainingMs": 8287,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "lastReportedAt": "2026-09-27T01:04:34.326Z"
+      },
+      "b": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 966,
+        "durationMs": 141968,
+        "remainingMs": 141002,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "firstReportedAt": "2026-09-27T01:04:35.479Z"
+      },
+      "aRemainingMsAtLastSight": 8287,
+      "lagAssessment": {
+        "band": "below-band",
+        "testsHazard": true,
+        "why": "8s unreported tail — outside the measured 18-41s band but still a real discrepancy, so the trial is admissible. ⚠️ Note the band moving."
+      },
+      "post": {
+        "skipped": true,
+        "reason": "--no-post (rehearsal): boundary detected, no write issued"
+      },
+      "postLatencyMsAfterBoundaryDetected": null,
+      "after": [],
+      "heard": null
+    }
+  ],
+  "updatedAt": "2026-09-27T01:04:35.479Z"
+}

@@ -1,0 +1,2663 @@
+{
+  "probe": "P-U5-1",
+  "instrument": "listener-marked transitions, correlated against API polling",
+  "question": "does Spotify audio output lag the state its API reports, such that a skip at the reported boundary truncates a still-audible track?",
+  "startedAt": "2026-09-27T01:14:12.611Z",
+  "finishedAt": "2026-09-27T01:17:28.237Z",
+  "pollMs": 1000,
+  "constants": {
+    "LAG_BAND_MS": {
+      "low": 18000,
+      "high": 41000
+    },
+    "AUTOMIX_TAIL_CEILING_MS": 10000,
+    "MARK_WINDOW_MS": 90000
+  },
+  "caveats": [
+    "Automix is ON on this machine (CLAUDE.md), and trims trailing fades while duration_ms still counts them. A small reported tail is therefore expected and uninformative.",
+    "Human reaction latency (~200-500ms) is constant across marks and negligible against an 18-41s effect.",
+    "Marks are paired with the NEAREST api flip, not the next one — a mark may legitimately precede a flip, and assuming otherwise would build the expected answer into the instrument."
+  ],
+  "apiFlips": [
+    {
+      "at": "2026-09-27T01:15:57.016Z",
+      "from": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 133627,
+        "durationMs": 141968,
+        "remainingMs": 8341,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "lastReportedAt": "2026-09-27T01:15:55.863Z"
+      },
+      "to": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 14666,
+        "durationMs": 204768,
+        "remainingMs": 190102,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "firstReportedAt": "2026-09-27T01:15:57.016Z"
+      },
+      "fromRemainingMsAtLastSight": 8341
+    }
+  ],
+  "marks": [],
+  "correlated": [
+    {
+      "apiFlipAt": "2026-09-27T01:15:57.016Z",
+      "from": "Scoop",
+      "to": "EoO",
+      "reportedTailMs": 8341,
+      "informative": false,
+      "tailBand": "small-automix-explainable",
+      "audioLagMs": null,
+      "uiLagMs": null,
+      "anomalyNearby": false
+    }
+  ],
+  "sampleCount": 173,
+  "samples": [
+    {
+      "at": "2026-09-27T01:14:12.611Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:13.722Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:14.843Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:15.943Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:17.040Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:18.149Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:19.259Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:20.358Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:21.463Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:22.749Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:23.877Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:25.006Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:26.123Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:27.231Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:28.332Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:29.430Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:30.541Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:31.647Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:32.760Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:34.019Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:35.108Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:36.236Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:37.493Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 55445,
+        "durationMs": 141968,
+        "remainingMs": 86523,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:38.668Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 56756,
+        "durationMs": 141968,
+        "remainingMs": 85212,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:39.772Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 57936,
+        "durationMs": 141968,
+        "remainingMs": 84032,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:40.892Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 59049,
+        "durationMs": 141968,
+        "remainingMs": 82919,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:42.008Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 60172,
+        "durationMs": 141968,
+        "remainingMs": 81796,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:43.121Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 61270,
+        "durationMs": 141968,
+        "remainingMs": 80698,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:44.356Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 62389,
+        "durationMs": 141968,
+        "remainingMs": 79579,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:45.488Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 63621,
+        "durationMs": 141968,
+        "remainingMs": 78347,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:46.588Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 64759,
+        "durationMs": 141968,
+        "remainingMs": 77209,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:47.719Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 65873,
+        "durationMs": 141968,
+        "remainingMs": 76095,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:48.898Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 66997,
+        "durationMs": 141968,
+        "remainingMs": 74971,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:49.997Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 68164,
+        "durationMs": 141968,
+        "remainingMs": 73804,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:51.104Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 69269,
+        "durationMs": 141968,
+        "remainingMs": 72699,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:52.253Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 70394,
+        "durationMs": 141968,
+        "remainingMs": 71574,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:53.452Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 71520,
+        "durationMs": 141968,
+        "remainingMs": 70448,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:54.593Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 72719,
+        "durationMs": 141968,
+        "remainingMs": 69249,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:55.747Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 73859,
+        "durationMs": 141968,
+        "remainingMs": 68109,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:56.856Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 75010,
+        "durationMs": 141968,
+        "remainingMs": 66958,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:57.969Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 76133,
+        "durationMs": 141968,
+        "remainingMs": 65835,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:14:59.132Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 77238,
+        "durationMs": 141968,
+        "remainingMs": 64730,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:00.262Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 78408,
+        "durationMs": 141968,
+        "remainingMs": 63560,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:01.382Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 79541,
+        "durationMs": 141968,
+        "remainingMs": 62427,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:02.484Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 80655,
+        "durationMs": 141968,
+        "remainingMs": 61313,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:03.580Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 81750,
+        "durationMs": 141968,
+        "remainingMs": 60218,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:04.761Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 82849,
+        "durationMs": 141968,
+        "remainingMs": 59119,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:05.905Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 84038,
+        "durationMs": 141968,
+        "remainingMs": 57930,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:07.006Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 85176,
+        "durationMs": 141968,
+        "remainingMs": 56792,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:08.258Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 86271,
+        "durationMs": 141968,
+        "remainingMs": 55697,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:09.366Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 87529,
+        "durationMs": 141968,
+        "remainingMs": 54439,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:10.470Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 88633,
+        "durationMs": 141968,
+        "remainingMs": 53335,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:11.586Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 89742,
+        "durationMs": 141968,
+        "remainingMs": 52226,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:12.753Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 90860,
+        "durationMs": 141968,
+        "remainingMs": 51108,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:13.863Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 92025,
+        "durationMs": 141968,
+        "remainingMs": 49943,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:15.010Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 93135,
+        "durationMs": 141968,
+        "remainingMs": 48833,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:16.126Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 94275,
+        "durationMs": 141968,
+        "remainingMs": 47693,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:17.229Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 95397,
+        "durationMs": 141968,
+        "remainingMs": 46571,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:18.356Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 96505,
+        "durationMs": 141968,
+        "remainingMs": 45463,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:19.622Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 97621,
+        "durationMs": 141968,
+        "remainingMs": 44347,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:20.744Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 98899,
+        "durationMs": 141968,
+        "remainingMs": 43069,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:21.862Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 100014,
+        "durationMs": 141968,
+        "remainingMs": 41954,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:23.003Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 101133,
+        "durationMs": 141968,
+        "remainingMs": 40835,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:24.110Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 102269,
+        "durationMs": 141968,
+        "remainingMs": 39699,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:25.214Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 103376,
+        "durationMs": 141968,
+        "remainingMs": 38592,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:26.346Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 104491,
+        "durationMs": 141968,
+        "remainingMs": 37477,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:27.446Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 105615,
+        "durationMs": 141968,
+        "remainingMs": 36353,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:28.724Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 106717,
+        "durationMs": 141968,
+        "remainingMs": 35251,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:29.928Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 107991,
+        "durationMs": 141968,
+        "remainingMs": 33977,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:31.039Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 109193,
+        "durationMs": 141968,
+        "remainingMs": 32775,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:32.284Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 110304,
+        "durationMs": 141968,
+        "remainingMs": 31664,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:33.380Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 111553,
+        "durationMs": 141968,
+        "remainingMs": 30415,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:34.475Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 112645,
+        "durationMs": 141968,
+        "remainingMs": 29323,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:35.581Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 113747,
+        "durationMs": 141968,
+        "remainingMs": 28221,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:36.684Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 114855,
+        "durationMs": 141968,
+        "remainingMs": 27113,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:37.782Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 115953,
+        "durationMs": 141968,
+        "remainingMs": 26015,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:38.897Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 117059,
+        "durationMs": 141968,
+        "remainingMs": 24909,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:40.026Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 118167,
+        "durationMs": 141968,
+        "remainingMs": 23801,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:41.163Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 119307,
+        "durationMs": 141968,
+        "remainingMs": 22661,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:42.319Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 120436,
+        "durationMs": 141968,
+        "remainingMs": 21532,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:43.435Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 121590,
+        "durationMs": 141968,
+        "remainingMs": 20378,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:44.544Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 122710,
+        "durationMs": 141968,
+        "remainingMs": 19258,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:45.675Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 123830,
+        "durationMs": 141968,
+        "remainingMs": 18138,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:46.786Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 124952,
+        "durationMs": 141968,
+        "remainingMs": 17016,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:47.992Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 126071,
+        "durationMs": 141968,
+        "remainingMs": 15897,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:49.097Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 127267,
+        "durationMs": 141968,
+        "remainingMs": 14701,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:50.242Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 128374,
+        "durationMs": 141968,
+        "remainingMs": 13594,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:51.418Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 129523,
+        "durationMs": 141968,
+        "remainingMs": 12445,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:52.539Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 130685,
+        "durationMs": 141968,
+        "remainingMs": 11283,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:53.640Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 131808,
+        "durationMs": 141968,
+        "remainingMs": 10160,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:54.740Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 132513,
+        "durationMs": 141968,
+        "remainingMs": 9455,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:55.863Z",
+      "status": 200,
+      "playing": {
+        "trackId": "3p0oJ49MMIunnbXnhVhh1J",
+        "title": "Scoop",
+        "artist": "Paperboys, Connor Price, Nic D",
+        "progressMs": 133627,
+        "durationMs": 141968,
+        "remainingMs": 8341,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:57.016Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 14666,
+        "durationMs": 204768,
+        "remainingMs": 190102,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:58.184Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 15833,
+        "durationMs": 204768,
+        "remainingMs": 188935,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:15:59.291Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:00.474Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:01.616Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:02.727Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:03.824Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:04.924Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:06.015Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:07.117Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:08.297Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:09.415Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:10.531Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:11.625Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:12.768Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:13.973Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:15.101Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:16.220Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:17.362Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:18.569Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:19.666Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:20.783Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:21.978Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:23.103Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:24.212Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:25.333Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:26.460Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:27.553Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:28.675Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:29.781Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:30.917Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:32.014Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:33.145Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:34.284Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:35.416Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:36.549Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:37.652Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:38.753Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:39.883Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 16157,
+        "durationMs": 204768,
+        "remainingMs": 188611,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:41.065Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 18008,
+        "durationMs": 204768,
+        "remainingMs": 186760,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:42.196Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 19201,
+        "durationMs": 204768,
+        "remainingMs": 185567,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:43.315Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 19885,
+        "durationMs": 204768,
+        "remainingMs": 184883,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:44.415Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 21000,
+        "durationMs": 204768,
+        "remainingMs": 183768,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:45.544Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 22100,
+        "durationMs": 204768,
+        "remainingMs": 182668,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:46.641Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 23235,
+        "durationMs": 204768,
+        "remainingMs": 181533,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:47.803Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 24325,
+        "durationMs": 204768,
+        "remainingMs": 180443,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:48.899Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 25487,
+        "durationMs": 204768,
+        "remainingMs": 179281,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:50.013Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 26590,
+        "durationMs": 204768,
+        "remainingMs": 178178,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:51.120Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 27707,
+        "durationMs": 204768,
+        "remainingMs": 177061,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:52.236Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 28809,
+        "durationMs": 204768,
+        "remainingMs": 175959,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:53.347Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 29915,
+        "durationMs": 204768,
+        "remainingMs": 174853,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:54.452Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 31036,
+        "durationMs": 204768,
+        "remainingMs": 173732,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:55.560Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 32139,
+        "durationMs": 204768,
+        "remainingMs": 172629,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:56.673Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 33254,
+        "durationMs": 204768,
+        "remainingMs": 171514,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:57.875Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 34357,
+        "durationMs": 204768,
+        "remainingMs": 170411,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:16:58.991Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 35554,
+        "durationMs": 204768,
+        "remainingMs": 169214,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:00.099Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 36678,
+        "durationMs": 204768,
+        "remainingMs": 168090,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:01.231Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 37779,
+        "durationMs": 204768,
+        "remainingMs": 166989,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:02.394Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 38929,
+        "durationMs": 204768,
+        "remainingMs": 165839,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:03.490Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 40077,
+        "durationMs": 204768,
+        "remainingMs": 164691,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:04.623Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 41178,
+        "durationMs": 204768,
+        "remainingMs": 163590,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:05.751Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 42317,
+        "durationMs": 204768,
+        "remainingMs": 162451,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:06.842Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 43433,
+        "durationMs": 204768,
+        "remainingMs": 161335,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:07.989Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 44538,
+        "durationMs": 204768,
+        "remainingMs": 160230,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:09.104Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 45682,
+        "durationMs": 204768,
+        "remainingMs": 159086,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:10.213Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 46803,
+        "durationMs": 204768,
+        "remainingMs": 157965,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:11.316Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 47900,
+        "durationMs": 204768,
+        "remainingMs": 156868,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:12.419Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 49006,
+        "durationMs": 204768,
+        "remainingMs": 155762,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:13.518Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 50108,
+        "durationMs": 204768,
+        "remainingMs": 154660,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:14.684Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 51202,
+        "durationMs": 204768,
+        "remainingMs": 153566,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:15.789Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 52378,
+        "durationMs": 204768,
+        "remainingMs": 152390,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:16.950Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 53479,
+        "durationMs": 204768,
+        "remainingMs": 151289,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:18.085Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 54642,
+        "durationMs": 204768,
+        "remainingMs": 150126,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:19.229Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 55776,
+        "durationMs": 204768,
+        "remainingMs": 148992,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:20.519Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 56915,
+        "durationMs": 204768,
+        "remainingMs": 147853,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:21.671Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 58208,
+        "durationMs": 204768,
+        "remainingMs": 146560,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:22.790Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 59359,
+        "durationMs": 204768,
+        "remainingMs": 145409,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:23.914Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 60482,
+        "durationMs": 204768,
+        "remainingMs": 144286,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:25.001Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 61593,
+        "durationMs": 204768,
+        "remainingMs": 143175,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:26.109Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 62697,
+        "durationMs": 204768,
+        "remainingMs": 142071,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:17:27.221Z",
+      "status": 200,
+      "playing": {
+        "trackId": "6J5kc12BW5HuP3d7C3vvx8",
+        "title": "EoO",
+        "artist": "Bad Bunny",
+        "progressMs": 63800,
+        "durationMs": 204768,
+        "remainingMs": 140968,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    }
+  ]
+}

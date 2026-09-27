@@ -213,6 +213,8 @@ ${dim('and the container may stay up. Run it as long as you like.')}
   ${b('c')}           this transition was a ${green('CROSSFADE')}
   ${b('h')}           this transition was a ${green('HARD CUT')} (no crossfade)
   ${b('t')}           this transition had ${green('DJ TALKING')} over it
+  ${b('s')}           ${yellow('I SEEKED')} during this track ${dim('(speeds collection up; kept separate,')}
+              ${dim('because a seek may change how the DJ segues)')}
 
 ${red('⚠ THIS TERMINAL MUST HAVE KEYBOARD FOCUS.')} ${dim('Keys go to whatever window is focused.')}
 ${red('⚠ SPACE in the Spotify window is PLAY/PAUSE')} ${dim('— a leaked mark stops your music.')}
@@ -256,7 +258,13 @@ if (isTty) {
                 ? 'type-hardcut'
                 : key === 't'
                   ? 'type-djtalk'
-                  : null;
+                  : // ⚠️ Seeking is allowed to speed collection up, but it is NOT assumed harmless: if
+                    // the DJ decides its segue in real time, a seek could disrupt it and manufacture
+                    // the very variability being measured. Labelled so seeked and natural transitions
+                    // can be compared instead of pooled.
+                    key === 's'
+                    ? 'seeked'
+                    : null;
     if (!kind) return;
     const mark = {
       kind,

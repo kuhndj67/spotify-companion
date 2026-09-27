@@ -133,6 +133,9 @@ const rows = (record.apiFlips ?? []).map((flip, i) => {
     to: flip.to?.title ?? '?',
     reportedTailMs: tail,
     declaredType: typed ? TYPE_KEYS[typed.k] : flip.throughNullGap ? 'gap (unlabelled)' : null,
+    // ⚠️ A seeked track is kept separate rather than pooled. Not because seeking is known to
+    // change the segue, but because it is NOT known not to.
+    seeked: nearestMark(flip.at, 'seeked', 45_000) != null,
     throughNullGap: flip.throughNullGap ?? false,
     nullGapMs: flip.nullGapMs ?? null,
     audioLagMs: audioLag,
@@ -201,7 +204,8 @@ for (const [label, group] of [
 // applied to transition types instead of playback contexts.
 const byType = {};
 for (const r of usable.filter((x) => x.context === 'DJ')) {
-  (byType[r.declaredType ?? 'unlabelled'] ??= []).push(r);
+  const key = (r.declaredType ?? 'unlabelled') + (r.seeked ? ' [seeked]' : '');
+  (byType[key] ??= []).push(r);
 }
 const typeKeys = Object.keys(byType);
 if (typeKeys.length > 0 && !(typeKeys.length === 1 && typeKeys[0] === 'unlabelled')) {

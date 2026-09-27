@@ -94,6 +94,16 @@ const argOf = (flag, fallback) => {
   return i >= 0 && process.argv[i + 1] ? Number(process.argv[i + 1]) : fallback;
 };
 const POLL_MS = argOf('--poll', 1000);
+/**
+ * ⚠️ The playback context, DECLARED by the operator. It cannot be inferred: R11 established that
+ * the AI DJ and a radio station are both `type: playlist` sharing the `37i9dQZF1E` prefix, so the
+ * uri cannot tell them apart. One probe session is one context.
+ *     --context "AI DJ" | "radio" | "album"
+ */
+const CONTEXT = (() => {
+  const i = process.argv.indexOf('--context');
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
+})();
 
 /** Tail bands, for labelling a transition's usefulness. From classifier v2's measurement. */
 const LAG_BAND_MS = { low: 18_000, high: 41_000 };
@@ -203,6 +213,9 @@ ${b('Probe P-U5-1 — mark the transition')}
 
 ${dim('This script only READS. No skips are issued, history.db is never opened,')}
 ${dim('and the container may stay up. Run it as long as you like.')}
+
+${CONTEXT ? `context declared as ${b(CONTEXT)}` : red('⚠ NO --context GIVEN. Pass --context "AI DJ" | "radio" | "album".')}
+${CONTEXT ? '' : dim('   The uri CANNOT identify it: the DJ and a radio station share the 37i9dQZF1E prefix (R11).')}
 
   ${b('a')} ${dim('or')} ${b('SPACE')}   the ${cyan('AUDIO')} just changed track   ${dim('<- the measurement')}
   ${b('u')}           the ${cyan('SPOTIFY UI')} just changed track
@@ -503,6 +516,7 @@ if (correlated.length === 0) {
 
 const record = {
   probe: 'P-U5-1',
+  declaredContext: CONTEXT,
   instrument: 'listener-marked transitions, correlated against API polling',
   question:
     'does Spotify audio output lag the state its API reports, such that a skip at the reported boundary truncates a still-audible track?',

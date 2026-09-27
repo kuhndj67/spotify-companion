@@ -77,6 +77,22 @@ const excludeArg = (() => {
   return i >= 0 && argv[i + 1] ? argv[i + 1].split(',').map(Number) : [];
 })();
 const explicitPath = argv.find((a) => a.endsWith('.json'));
+/**
+ * ⚠️ CONTEXT MUST BE DECLARED, NOT INFERRED.
+ *
+ * This script used to classify context as DJ when `context.uri` contained `37i9dQZF1E`. **R11
+ * established that a RADIO STATION carries the same prefix** -- the DJ and a radio station are both
+ * `type: playlist` and cannot be told apart from the uri. So the inference silently labelled radio
+ * as DJ and pooled the two, which is R11's own finding reproduced as a defect in the tool built to
+ * test it.
+ *
+ * One probe session is one playback context, so the operator declares it:
+ *     --context "AI DJ" | "radio" | "album" | ...
+ */
+const contextOverride = (() => {
+  const i = argv.indexOf('--context');
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
+})();
 
 const b = (s) => `\x1b[1m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
@@ -128,7 +144,13 @@ const rows = (record.apiFlips ?? []).map((flip, i) => {
     .sort((a, z) => Math.abs(a.c.delta) - Math.abs(z.c.delta))[0];
   return {
     n: i + 1,
-    context: isDj(flip.to?.contextUri) ? 'DJ' : (flip.to?.contextType ?? 'other'),
+    context:
+      contextOverride ??
+      // ⚠️ Without --context this can only say "playlist-like", never which KIND. It must not
+      // guess "DJ", because radio is indistinguishable by uri (R11).
+      (isDj(flip.to?.contextUri)
+        ? 'dj-or-radio?'
+        : (flip.to?.contextType ?? 'other')),
     from: flip.from?.title ?? '?',
     to: flip.to?.title ?? '?',
     reportedTailMs: tail,
@@ -180,12 +202,16 @@ for (const r of rows) {
 }
 
 const usable = rows.filter((r) => !r.excluded);
-const dj = usable.filter((r) => r.context === 'DJ');
-const album = usable.filter((r) => r.context === 'album');
-const other = usable.filter((r) => r.context !== 'DJ' && r.context !== 'album');
+const isAlbumish = (c) => /album/i.test(c);
+// The "primary" group is whatever this session's context was, album excluded -- the album is the
+// control it is being compared against.
+const dj = usable.filter((r) => !isAlbumish(r.context));
+const album = usable.filter((r) => isAlbumish(r.context));
+const other = [];
+const primaryLabel = contextOverride ?? (dj[0]?.context ?? 'primary');
 
 for (const [label, group] of [
-  ['AI DJ', dj],
+  [primaryLabel.toUpperCase(), dj],
   ['ALBUM (control)', album],
   ['other contexts', other],
 ]) {
@@ -203,14 +229,14 @@ for (const [label, group] of [
 // several mechanisms describes none of them -- R11's "do not average a context-dependent answer",
 // applied to transition types instead of playback contexts.
 const byType = {};
-for (const r of usable.filter((x) => x.context === 'DJ')) {
+for (const r of usable.filter((x) => !isAlbumish(x.context))) {
   const key = (r.declaredType ?? 'unlabelled') + (r.seeked ? ' [seeked]' : '');
   (byType[key] ??= []).push(r);
 }
 const typeKeys = Object.keys(byType);
 if (typeKeys.length > 0 && !(typeKeys.length === 1 && typeKeys[0] === 'unlabelled')) {
   console.log(`
-${b('DJ transitions BY DECLARED TYPE')} ${dim('-- never pooled')}`);
+${b(primaryLabel.toUpperCase() + ' transitions BY DECLARED TYPE')} ${dim('-- never pooled')}`);
   for (const [type, group] of Object.entries(byType)) {
     const t = stats(group.map((r) => r.reportedTailMs));
     const a = stats(group.map((r) => r.audioLagMs));

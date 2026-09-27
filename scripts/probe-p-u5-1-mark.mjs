@@ -181,6 +181,22 @@ const playbackToggles = [];
 
 let latest = null;
 let running = true;
+/**
+ * ⚠️ The last sample that actually CARRIED A TRACK, which is not the same as the last sample.
+ *
+ * Measured 2026-09-27: between two DJ tracks the endpoint returned **HTTP 200 with `item: null`**
+ * for 7 consecutive seconds -- not a 204, a 200 with no track in it. The listener's audio and UI
+ * marks landed at the instant it went null, so this is the DJ talking: commentary is not a track,
+ * so there is nothing to report.
+ *
+ * ⚠️ **The original flip detector missed those transitions entirely**, because it compared
+ * consecutive samples and required both to carry a track. A whole transition type was therefore
+ * invisible, and would have been counted as "no transition happened" -- absent data reading as a
+ * negative finding, which is this project's most expensive recurring mistake.
+ */
+let lastWithTrack = null;
+/** When the current null-item run began, so the gap can be measured rather than inferred. */
+let nullRunStartedAt = null;
 
 console.log(`
 ${b('Probe P-U5-1 — mark the transition')}
@@ -190,8 +206,13 @@ ${dim('and the container may stay up. Run it as long as you like.')}
 
   ${b('a')} ${dim('or')} ${b('SPACE')}   the ${cyan('AUDIO')} just changed track   ${dim('<- the measurement')}
   ${b('u')}           the ${cyan('SPOTIFY UI')} just changed track
-  ${b('x')}           something odd (abrupt cut, gap, DJ talking)
+  ${b('x')}           something odd, unclassifiable
   ${b('q')}           stop, correlate, write the record
+
+  ${dim('and LABEL the transition type — the DJ is not consistent, so types must not be averaged:')}
+  ${b('c')}           this transition was a ${green('CROSSFADE')}
+  ${b('h')}           this transition was a ${green('HARD CUT')} (no crossfade)
+  ${b('t')}           this transition had ${green('DJ TALKING')} over it
 
 ${red('⚠ THIS TERMINAL MUST HAVE KEYBOARD FOCUS.')} ${dim('Keys go to whatever window is focused.')}
 ${red('⚠ SPACE in the Spotify window is PLAY/PAUSE')} ${dim('— a leaked mark stops your music.')}
@@ -226,7 +247,16 @@ if (isTty) {
           ? 'ui'
           : key === 'x'
             ? 'anomaly'
-            : null;
+            : // ⚠️ Transition TYPE, labelled at the moment it is observed. Measured 2026-09-27:
+              // the DJ's transition behaviour is NOT consistent, so averaging across types is the
+              // R11 mistake -- a median over several mechanisms describes none of them.
+              key === 'c'
+              ? 'type-crossfade'
+              : key === 'h'
+                ? 'type-hardcut'
+                : key === 't'
+                  ? 'type-djtalk'
+                  : null;
     if (!kind) return;
     const mark = {
       kind,
@@ -241,7 +271,14 @@ if (isTty) {
         : null,
     };
     marks.push(mark);
-    const glyph = kind === 'audio' ? cyan('♪ AUDIO') : kind === 'ui' ? cyan('▣ UI   ') : yellow('⚠ ODD  ');
+    const glyph =
+      kind === 'audio'
+        ? cyan('♪ AUDIO')
+        : kind === 'ui'
+          ? cyan('▣ UI   ')
+          : kind === 'anomaly'
+            ? yellow('⚠ ODD  ')
+            : green(`◇ ${kind.replace('type-', '').toUpperCase().padEnd(6)}`);
     console.log(
       `${dim(clock())} ${glyph} marked  ${dim(
         `api currently says: ${mark.apiSaidAtThatMoment?.title ?? '(nothing)'}`,
@@ -286,13 +323,41 @@ while (running) {
     }
   }
 
+  // ⚠️ Track the null-item run so a transition THROUGH a gap is still detected as a transition.
+  if (!sample.playing) {
+    if (nullRunStartedAt == null) {
+      nullRunStartedAt = sample.at;
+      console.log(
+        `${dim(clock())} ${yellow('○ API returned 200 with NO ITEM')} ${dim(
+          '— likely DJ commentary. Not a 204. Timing the gap...',
+        )}`,
+      );
+    }
+  }
+
   if (sample.playing) {
-    if (latest?.playing && latest.playing.trackId !== sample.playing.trackId) {
+    const gapMs = nullRunStartedAt ? new Date(sample.at) - new Date(nullRunStartedAt) : null;
+    if (nullRunStartedAt) {
+      console.log(
+        `${dim(clock())} ${yellow('● item returned after')} ${b(`${(gapMs / 1000).toFixed(1)}s`)} ${dim('of 200-with-null')}`,
+      );
+      nullRunStartedAt = null;
+    }
+
+    if (lastWithTrack && lastWithTrack.playing.trackId !== sample.playing.trackId) {
+      const throughGap = gapMs != null;
       const flip = {
         at: sample.at,
-        from: { ...latest.playing, lastReportedAt: latest.at },
+        from: { ...lastWithTrack.playing, lastReportedAt: lastWithTrack.at },
         to: { ...sample.playing, firstReportedAt: sample.at },
-        fromRemainingMsAtLastSight: latest.playing.remainingMs,
+        fromRemainingMsAtLastSight: lastWithTrack.playing.remainingMs,
+        // ⚠️ A transition may pass through a 200-with-null gap. Recorded explicitly, because a
+        // gap is a DIFFERENT transition type and must not be pooled with a direct flip.
+        throughNullGap: throughGap,
+        nullGapMs: gapMs,
+        // How far into the new track the API already was when it reappeared. On a gap transition
+        // this is how much of B played unobserved.
+        toProgressMsAtFirstSight: sample.playing.progressMs,
       };
       apiFlips.push(flip);
       const tail = flip.fromRemainingMsAtLastSight;
@@ -305,19 +370,20 @@ while (running) {
               ? green(`tail ${(tail / 1000).toFixed(1)}s — IN BAND, this one counts`)
               : yellow(`tail ${(tail / 1000).toFixed(1)}s — outside 18-41s but non-trivial`);
       console.log(
-        `${dim(clock())} ${b('→ API FLIP')} ${flip.from.title} ${dim('->')} ${flip.to.title}   ${band}`,
+        `${dim(clock())} ${b('→ API FLIP')} ${flip.from.title} ${dim('->')} ${flip.to.title}   ${band}` +
+          (flip.throughNullGap
+            ? yellow(`  [through a ${(flip.nullGapMs / 1000).toFixed(1)}s gap, B already ${(flip.toProgressMsAtFirstSight / 1000).toFixed(1)}s in]`)
+            : ''),
       );
-    } else if (!latest?.playing) {
+    } else if (!lastWithTrack) {
       console.log(
         `${dim(clock())} ${dim('watching')} ${sample.playing.title} — ${sample.playing.artist} ` +
           dim(`[${Math.round((sample.playing.remainingMs ?? 0) / 1000)}s left]`),
       );
     }
-    latest = sample;
-  } else if (latest?.playing) {
-    console.log(`${dim(clock())} ${yellow('playback stopped or idle')}`);
-    latest = sample;
+    lastWithTrack = sample;
   }
+  latest = sample;
 
   await sleep(POLL_MS);
 }
@@ -345,11 +411,25 @@ const correlated = apiFlips.map((flip) => {
     return candidates[0] ?? null;
   };
   const tail = flip.fromRemainingMsAtLastSight;
+  // ⚠️ The listener's own TYPE label wins over any inference from the numbers. The numbers are
+  // what is being explained; letting them pick their own explanation is circular.
+  const typeMark =
+    nearest('type-crossfade') ?? nearest('type-hardcut') ?? nearest('type-djtalk') ?? null;
+  const declaredType = typeMark
+    ? Object.entries({
+        'type-crossfade': 'crossfade',
+        'type-hardcut': 'hard-cut',
+        'type-djtalk': 'dj-talk',
+      }).find(([k]) => typeMark.mark.kind === k)?.[1] ?? null
+    : null;
   return {
     apiFlipAt: flip.at,
     from: flip.from.title,
     to: flip.to.title,
     reportedTailMs: tail,
+    declaredType,
+    throughNullGap: flip.throughNullGap ?? false,
+    nullGapMs: flip.nullGapMs ?? null,
     informative:
       tail == null ? null : tail > AUTOMIX_TAIL_CEILING_MS,
     tailBand:
@@ -362,6 +442,8 @@ const correlated = apiFlips.map((flip) => {
             : 'outside-band-but-nontrivial',
     audioLagMs: nearest('audio')?.deltaMs ?? null,
     uiLagMs: nearest('ui')?.deltaMs ?? null,
+    impliedTrimMs:
+      tail != null && nearest('audio') != null ? tail - nearest('audio').deltaMs : null,
     anomalyNearby: nearest('anomaly') != null,
   };
 });
@@ -371,17 +453,33 @@ if (correlated.length === 0) {
   console.log(dim('  no API track flips were observed.\n'));
 } else {
   console.log(
-    `  ${'from -> to'.padEnd(44)} ${'tail'.padStart(7)} ${'audio lag'.padStart(10)} ${'ui lag'.padStart(8)}  band`,
+    `  ${'from -> to'.padEnd(38)} ${'type'.padEnd(10)} ${'tail'.padStart(7)} ${'audio'.padStart(7)} ${'ui'.padStart(7)} ${'trim'.padStart(7)}`,
   );
   for (const row of correlated) {
-    const label = `${row.from} -> ${row.to}`.slice(0, 43).padEnd(44);
-    const tail = row.reportedTailMs == null ? '   ?  ' : `${(row.reportedTailMs / 1000).toFixed(1)}s`.padStart(7);
-    const al = row.audioLagMs == null ? '  (none)  ' : `${(row.audioLagMs / 1000).toFixed(1)}s`.padStart(10);
-    const ul = row.uiLagMs == null ? ' (none) ' : `${(row.uiLagMs / 1000).toFixed(1)}s`.padStart(8);
+    const label = `${row.from} -> ${row.to}`.slice(0, 37).padEnd(38);
+    const f = (v, w) => (v == null ? '  —  '.padStart(w) : `${(v / 1000).toFixed(1)}s`.padStart(w));
     const colour = row.informative === false ? dim : (s) => s;
     console.log(
-      `  ${colour(label)} ${colour(tail)} ${colour(al)} ${colour(ul)}  ${colour(row.tailBand)}` +
-        (row.anomalyNearby ? yellow('  ⚠ odd') : ''),
+      `  ${colour(label)} ${colour((row.declaredType ?? '?').padEnd(10))} ${colour(f(row.reportedTailMs, 7))} ${colour(f(row.audioLagMs, 7))} ${colour(f(row.uiLagMs, 7))} ${colour(f(row.impliedTrimMs, 7))}` +
+        (row.throughNullGap ? yellow(`  gap ${(row.nullGapMs / 1000).toFixed(1)}s`) : '') +
+        (row.anomalyNearby ? yellow('  ⚠') : ''),
+    );
+  }
+  // ⚠️ Group by DECLARED TYPE, never pooled. The DJ's behaviour is inconsistent, so one median
+  // over several mechanisms describes none of them -- R11's warning, applied here.
+  const byType = {};
+  for (const row of correlated) {
+    const k = row.declaredType ?? (row.throughNullGap ? 'gap (unlabelled)' : 'unlabelled');
+    (byType[k] ??= []).push(row);
+  }
+  console.log(`
+  ${b('by declared transition type')} ${dim('-- never pooled across types')}`);
+  for (const [type, group] of Object.entries(byType)) {
+    const lags = group.map((r) => r.audioLagMs).filter((v) => v != null);
+    const tails = group.map((r) => r.reportedTailMs).filter((v) => v != null);
+    const avg = (v) => (v.length ? (v.reduce((a, z) => a + z, 0) / v.length / 1000).toFixed(1) + 's' : '—');
+    console.log(
+      `    ${type.padEnd(18)} n=${String(group.length).padEnd(3)} mean tail ${avg(tails).padStart(7)}   mean audio lag ${avg(lags).padStart(7)}`,
     );
   }
   console.log(`

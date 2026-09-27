@@ -1,0 +1,3607 @@
+{
+  "probe": "P-U5-1",
+  "instrument": "listener-marked transitions, correlated against API polling",
+  "question": "does Spotify audio output lag the state its API reports, such that a skip at the reported boundary truncates a still-audible track?",
+  "startedAt": "2026-09-27T01:29:17.081Z",
+  "finishedAt": "2026-09-27T01:33:41.078Z",
+  "pollMs": 1000,
+  "constants": {
+    "LAG_BAND_MS": {
+      "low": 18000,
+      "high": 41000
+    },
+    "AUTOMIX_TAIL_CEILING_MS": 10000,
+    "MARK_WINDOW_MS": 90000
+  },
+  "caveats": [
+    "Automix is ON on this machine (CLAUDE.md), and trims trailing fades while duration_ms still counts them. A small reported tail is therefore expected and uninformative.",
+    "Human reaction latency (~200-500ms) is constant across marks and negligible against an 18-41s effect.",
+    "Marks are paired with the NEAREST api flip, not the next one — a mark may legitimately precede a flip, and assuming otherwise would build the expected answer into the instrument."
+  ],
+  "apiFlips": [
+    {
+      "at": "2026-09-27T01:31:32.514Z",
+      "from": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 238840,
+        "durationMs": 249359,
+        "remainingMs": 10519,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "lastReportedAt": "2026-09-27T01:31:31.405Z"
+      },
+      "to": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 617,
+        "durationMs": 207712,
+        "remainingMs": 207095,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq",
+        "firstReportedAt": "2026-09-27T01:31:32.514Z"
+      },
+      "fromRemainingMsAtLastSight": 10519
+    }
+  ],
+  "marks": [],
+  "playbackToggles": [
+    {
+      "at": "2026-09-27T01:29:21.703Z",
+      "isPlaying": true,
+      "msSinceLastMark": null,
+      "looksLikeLeakedMark": false
+    },
+    {
+      "at": "2026-09-27T01:33:34.497Z",
+      "isPlaying": false,
+      "msSinceLastMark": null,
+      "looksLikeLeakedMark": true
+    }
+  ],
+  "correlated": [
+    {
+      "apiFlipAt": "2026-09-27T01:31:32.514Z",
+      "from": "Joseph",
+      "to": "SEROTONIN",
+      "reportedTailMs": 10519,
+      "informative": true,
+      "tailBand": "outside-band-but-nontrivial",
+      "audioLagMs": null,
+      "uiLagMs": null,
+      "anomalyNearby": false
+    }
+  ],
+  "sampleCount": 235,
+  "samples": [
+    {
+      "at": "2026-09-27T01:29:17.081Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 111013,
+        "durationMs": 249359,
+        "remainingMs": 138346,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:18.185Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 111013,
+        "durationMs": 249359,
+        "remainingMs": 138346,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:19.357Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 111013,
+        "durationMs": 249359,
+        "remainingMs": 138346,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:20.465Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 111013,
+        "durationMs": 249359,
+        "remainingMs": 138346,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:21.703Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 111939,
+        "durationMs": 249359,
+        "remainingMs": 137420,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:22.808Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 113185,
+        "durationMs": 249359,
+        "remainingMs": 136174,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:23.907Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 114291,
+        "durationMs": 249359,
+        "remainingMs": 135068,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:25.028Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 115398,
+        "durationMs": 249359,
+        "remainingMs": 133961,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:26.161Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 116539,
+        "durationMs": 249359,
+        "remainingMs": 132820,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:27.252Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 117638,
+        "durationMs": 249359,
+        "remainingMs": 131721,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:28.348Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 118728,
+        "durationMs": 249359,
+        "remainingMs": 130631,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:29.545Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 119831,
+        "durationMs": 249359,
+        "remainingMs": 129528,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:30.685Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 121029,
+        "durationMs": 249359,
+        "remainingMs": 128330,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:31.825Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 122165,
+        "durationMs": 249359,
+        "remainingMs": 127194,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:32.971Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 123310,
+        "durationMs": 249359,
+        "remainingMs": 126049,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:34.083Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 124450,
+        "durationMs": 249359,
+        "remainingMs": 124909,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:35.202Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 125562,
+        "durationMs": 249359,
+        "remainingMs": 123797,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:36.302Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 126677,
+        "durationMs": 249359,
+        "remainingMs": 122682,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:37.419Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 127778,
+        "durationMs": 249359,
+        "remainingMs": 121581,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:38.523Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 128892,
+        "durationMs": 249359,
+        "remainingMs": 120467,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:39.650Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 129997,
+        "durationMs": 249359,
+        "remainingMs": 119362,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:40.750Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 131129,
+        "durationMs": 249359,
+        "remainingMs": 118230,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:41.862Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 132235,
+        "durationMs": 249359,
+        "remainingMs": 117124,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:43.030Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 133336,
+        "durationMs": 249359,
+        "remainingMs": 116023,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:44.127Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 134504,
+        "durationMs": 249359,
+        "remainingMs": 114855,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:45.232Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 135610,
+        "durationMs": 249359,
+        "remainingMs": 113749,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:46.348Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 136718,
+        "durationMs": 249359,
+        "remainingMs": 112641,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:47.441Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 137820,
+        "durationMs": 249359,
+        "remainingMs": 111539,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:48.546Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 138923,
+        "durationMs": 249359,
+        "remainingMs": 110436,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:49.654Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 140029,
+        "durationMs": 249359,
+        "remainingMs": 109330,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:50.769Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 141135,
+        "durationMs": 249359,
+        "remainingMs": 108224,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:51.919Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 142252,
+        "durationMs": 249359,
+        "remainingMs": 107107,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:53.116Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 143405,
+        "durationMs": 249359,
+        "remainingMs": 105954,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:54.314Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 144599,
+        "durationMs": 249359,
+        "remainingMs": 104760,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:55.428Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 145797,
+        "durationMs": 249359,
+        "remainingMs": 103562,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:56.514Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 146903,
+        "durationMs": 249359,
+        "remainingMs": 102456,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:57.652Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 147994,
+        "durationMs": 249359,
+        "remainingMs": 101365,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:58.749Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 149124,
+        "durationMs": 249359,
+        "remainingMs": 100235,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:29:59.876Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 150228,
+        "durationMs": 249359,
+        "remainingMs": 99131,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:00.978Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 151349,
+        "durationMs": 249359,
+        "remainingMs": 98010,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:02.131Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 152458,
+        "durationMs": 249359,
+        "remainingMs": 96901,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:03.407Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 153605,
+        "durationMs": 249359,
+        "remainingMs": 95754,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:04.508Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 154880,
+        "durationMs": 249359,
+        "remainingMs": 94479,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:05.642Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 155979,
+        "durationMs": 249359,
+        "remainingMs": 93380,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:06.751Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 157114,
+        "durationMs": 249359,
+        "remainingMs": 92245,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:07.860Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 158236,
+        "durationMs": 249359,
+        "remainingMs": 91123,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:08.968Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 159345,
+        "durationMs": 249359,
+        "remainingMs": 90014,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:10.208Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 160458,
+        "durationMs": 249359,
+        "remainingMs": 88901,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:11.314Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 161682,
+        "durationMs": 249359,
+        "remainingMs": 87677,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:12.576Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 162798,
+        "durationMs": 249359,
+        "remainingMs": 86561,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:13.685Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 164056,
+        "durationMs": 249359,
+        "remainingMs": 85303,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:14.786Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 165165,
+        "durationMs": 249359,
+        "remainingMs": 84194,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:15.911Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 166268,
+        "durationMs": 249359,
+        "remainingMs": 83091,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:17.036Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 167388,
+        "durationMs": 249359,
+        "remainingMs": 81971,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:18.131Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 168511,
+        "durationMs": 249359,
+        "remainingMs": 80848,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:19.233Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 169615,
+        "durationMs": 249359,
+        "remainingMs": 79744,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:20.366Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 170709,
+        "durationMs": 249359,
+        "remainingMs": 78650,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:21.491Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 171840,
+        "durationMs": 249359,
+        "remainingMs": 77519,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:22.709Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 172976,
+        "durationMs": 249359,
+        "remainingMs": 76383,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:23.803Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 174185,
+        "durationMs": 249359,
+        "remainingMs": 75174,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:24.940Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 175275,
+        "durationMs": 249359,
+        "remainingMs": 74084,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:26.070Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 176416,
+        "durationMs": 249359,
+        "remainingMs": 72943,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:27.175Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 177553,
+        "durationMs": 249359,
+        "remainingMs": 71806,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:28.291Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 178655,
+        "durationMs": 249359,
+        "remainingMs": 70704,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:29.437Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 179780,
+        "durationMs": 249359,
+        "remainingMs": 69579,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:30.543Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 180915,
+        "durationMs": 249359,
+        "remainingMs": 68444,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:31.653Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 182026,
+        "durationMs": 249359,
+        "remainingMs": 67333,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:32.754Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 183133,
+        "durationMs": 249359,
+        "remainingMs": 66226,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:33.880Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 184242,
+        "durationMs": 249359,
+        "remainingMs": 65117,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:34.992Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 185356,
+        "durationMs": 249359,
+        "remainingMs": 64003,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:36.105Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 186465,
+        "durationMs": 249359,
+        "remainingMs": 62894,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:37.203Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 187588,
+        "durationMs": 249359,
+        "remainingMs": 61771,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:38.296Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 188677,
+        "durationMs": 249359,
+        "remainingMs": 60682,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:39.410Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 189777,
+        "durationMs": 249359,
+        "remainingMs": 59582,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:40.541Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 190901,
+        "durationMs": 249359,
+        "remainingMs": 58458,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:41.643Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 192019,
+        "durationMs": 249359,
+        "remainingMs": 57340,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:42.833Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 193129,
+        "durationMs": 249359,
+        "remainingMs": 56230,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:44.010Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 194312,
+        "durationMs": 249359,
+        "remainingMs": 55047,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:45.142Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 195485,
+        "durationMs": 249359,
+        "remainingMs": 53874,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:46.259Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 196618,
+        "durationMs": 249359,
+        "remainingMs": 52741,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:47.387Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 197745,
+        "durationMs": 249359,
+        "remainingMs": 51614,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:48.506Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 198873,
+        "durationMs": 249359,
+        "remainingMs": 50486,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:49.609Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 199988,
+        "durationMs": 249359,
+        "remainingMs": 49371,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:50.730Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 201088,
+        "durationMs": 249359,
+        "remainingMs": 48271,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:51.839Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 202210,
+        "durationMs": 249359,
+        "remainingMs": 47149,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:52.947Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 203313,
+        "durationMs": 249359,
+        "remainingMs": 46046,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:54.072Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 204429,
+        "durationMs": 249359,
+        "remainingMs": 44930,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:55.192Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 205553,
+        "durationMs": 249359,
+        "remainingMs": 43806,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:56.292Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 206671,
+        "durationMs": 249359,
+        "remainingMs": 42688,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:57.395Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 207775,
+        "durationMs": 249359,
+        "remainingMs": 41584,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:58.519Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 208876,
+        "durationMs": 249359,
+        "remainingMs": 40483,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:30:59.625Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 209999,
+        "durationMs": 249359,
+        "remainingMs": 39360,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:00.768Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 211141,
+        "durationMs": 249359,
+        "remainingMs": 38218,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:01.887Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 212253,
+        "durationMs": 249359,
+        "remainingMs": 37106,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:03.010Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 213370,
+        "durationMs": 249359,
+        "remainingMs": 35989,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:04.106Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 214488,
+        "durationMs": 249359,
+        "remainingMs": 34871,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:05.263Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 215581,
+        "durationMs": 249359,
+        "remainingMs": 33778,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:06.360Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 216743,
+        "durationMs": 249359,
+        "remainingMs": 32616,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:07.470Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 217834,
+        "durationMs": 249359,
+        "remainingMs": 31525,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:08.580Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 218953,
+        "durationMs": 249359,
+        "remainingMs": 30406,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:09.699Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 220055,
+        "durationMs": 249359,
+        "remainingMs": 29304,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:10.918Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 221171,
+        "durationMs": 249359,
+        "remainingMs": 28188,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:12.013Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 222395,
+        "durationMs": 249359,
+        "remainingMs": 26964,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:13.117Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 223501,
+        "durationMs": 249359,
+        "remainingMs": 25858,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:14.224Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 224603,
+        "durationMs": 249359,
+        "remainingMs": 24756,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:15.358Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 225701,
+        "durationMs": 249359,
+        "remainingMs": 23658,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:16.523Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 226840,
+        "durationMs": 249359,
+        "remainingMs": 22519,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:17.646Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 228003,
+        "durationMs": 249359,
+        "remainingMs": 21356,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:18.739Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 229119,
+        "durationMs": 249359,
+        "remainingMs": 20240,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:19.844Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 230224,
+        "durationMs": 249359,
+        "remainingMs": 19135,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:20.969Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 231327,
+        "durationMs": 249359,
+        "remainingMs": 18032,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:22.150Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 232449,
+        "durationMs": 249359,
+        "remainingMs": 16910,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:23.259Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 233630,
+        "durationMs": 249359,
+        "remainingMs": 15729,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:24.485Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 234742,
+        "durationMs": 249359,
+        "remainingMs": 14617,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:25.655Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 235965,
+        "durationMs": 249359,
+        "remainingMs": 13394,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:26.892Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 237142,
+        "durationMs": 249359,
+        "remainingMs": 12217,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:28.019Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 238367,
+        "durationMs": 249359,
+        "remainingMs": 10992,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:29.125Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 238840,
+        "durationMs": 249359,
+        "remainingMs": 10519,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:30.259Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 238840,
+        "durationMs": 249359,
+        "remainingMs": 10519,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:31.405Z",
+      "status": 200,
+      "playing": {
+        "trackId": "1BdI8NEvZx61tnkbuAxC5x",
+        "title": "Joseph",
+        "artist": "Falling In Reverse, Corey Taylor, Serj Tankian",
+        "progressMs": 238840,
+        "durationMs": 249359,
+        "remainingMs": 10519,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:32.514Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 617,
+        "durationMs": 207712,
+        "remainingMs": 207095,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:33.613Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 1732,
+        "durationMs": 207712,
+        "remainingMs": 205980,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:34.733Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 2831,
+        "durationMs": 207712,
+        "remainingMs": 204881,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:35.890Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 3973,
+        "durationMs": 207712,
+        "remainingMs": 203739,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:36.980Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 5103,
+        "durationMs": 207712,
+        "remainingMs": 202609,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:38.213Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 6206,
+        "durationMs": 207712,
+        "remainingMs": 201506,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:39.315Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 7432,
+        "durationMs": 207712,
+        "remainingMs": 200280,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:40.423Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 8536,
+        "durationMs": 207712,
+        "remainingMs": 199176,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:41.523Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 9638,
+        "durationMs": 207712,
+        "remainingMs": 198074,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:42.624Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 10739,
+        "durationMs": 207712,
+        "remainingMs": 196973,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:43.744Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 11844,
+        "durationMs": 207712,
+        "remainingMs": 195868,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:44.949Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 12969,
+        "durationMs": 207712,
+        "remainingMs": 194743,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:46.134Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 14167,
+        "durationMs": 207712,
+        "remainingMs": 193545,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:47.228Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 15349,
+        "durationMs": 207712,
+        "remainingMs": 192363,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:48.397Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 16444,
+        "durationMs": 207712,
+        "remainingMs": 191268,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:49.494Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 17617,
+        "durationMs": 207712,
+        "remainingMs": 190095,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:50.588Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 18707,
+        "durationMs": 207712,
+        "remainingMs": 189005,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:51.704Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 19819,
+        "durationMs": 207712,
+        "remainingMs": 187893,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:52.808Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 20925,
+        "durationMs": 207712,
+        "remainingMs": 186787,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:53.908Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 22026,
+        "durationMs": 207712,
+        "remainingMs": 185686,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:55.045Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 23132,
+        "durationMs": 207712,
+        "remainingMs": 184580,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:56.253Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 24268,
+        "durationMs": 207712,
+        "remainingMs": 183444,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:57.365Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 25476,
+        "durationMs": 207712,
+        "remainingMs": 182236,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:58.505Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 26592,
+        "durationMs": 207712,
+        "remainingMs": 181120,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:31:59.617Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 27722,
+        "durationMs": 207712,
+        "remainingMs": 179990,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:00.714Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 28840,
+        "durationMs": 207712,
+        "remainingMs": 178872,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:01.816Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 29940,
+        "durationMs": 207712,
+        "remainingMs": 177772,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:02.917Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 31039,
+        "durationMs": 207712,
+        "remainingMs": 176673,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:04.044Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 32138,
+        "durationMs": 207712,
+        "remainingMs": 175574,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:05.135Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 33255,
+        "durationMs": 207712,
+        "remainingMs": 174457,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:06.238Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 34355,
+        "durationMs": 207712,
+        "remainingMs": 173357,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:07.358Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 35460,
+        "durationMs": 207712,
+        "remainingMs": 172252,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:08.472Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 36578,
+        "durationMs": 207712,
+        "remainingMs": 171134,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:09.581Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 37696,
+        "durationMs": 207712,
+        "remainingMs": 170016,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:10.671Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 38796,
+        "durationMs": 207712,
+        "remainingMs": 168916,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:11.765Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 39884,
+        "durationMs": 207712,
+        "remainingMs": 167828,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:12.904Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 40999,
+        "durationMs": 207712,
+        "remainingMs": 166713,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:13.997Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 42117,
+        "durationMs": 207712,
+        "remainingMs": 165595,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:15.109Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 43224,
+        "durationMs": 207712,
+        "remainingMs": 164488,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:16.202Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 44322,
+        "durationMs": 207712,
+        "remainingMs": 163390,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:17.332Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 45414,
+        "durationMs": 207712,
+        "remainingMs": 162298,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:18.448Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 46548,
+        "durationMs": 207712,
+        "remainingMs": 161164,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:19.609Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 47670,
+        "durationMs": 207712,
+        "remainingMs": 160042,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:20.729Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 48824,
+        "durationMs": 207712,
+        "remainingMs": 158888,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:21.836Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 49943,
+        "durationMs": 207712,
+        "remainingMs": 157769,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:22.976Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 51073,
+        "durationMs": 207712,
+        "remainingMs": 156639,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:24.095Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 52200,
+        "durationMs": 207712,
+        "remainingMs": 155512,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:25.220Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 53311,
+        "durationMs": 207712,
+        "remainingMs": 154401,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:26.355Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 54431,
+        "durationMs": 207712,
+        "remainingMs": 153281,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:27.460Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 55574,
+        "durationMs": 207712,
+        "remainingMs": 152138,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:28.577Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 56680,
+        "durationMs": 207712,
+        "remainingMs": 151032,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:29.733Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 57796,
+        "durationMs": 207712,
+        "remainingMs": 149916,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:30.868Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 58948,
+        "durationMs": 207712,
+        "remainingMs": 148764,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:32.093Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 60087,
+        "durationMs": 207712,
+        "remainingMs": 147625,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:33.191Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 61311,
+        "durationMs": 207712,
+        "remainingMs": 146401,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:34.289Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 62413,
+        "durationMs": 207712,
+        "remainingMs": 145299,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:35.385Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 63502,
+        "durationMs": 207712,
+        "remainingMs": 144210,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:36.506Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 64604,
+        "durationMs": 207712,
+        "remainingMs": 143108,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:37.668Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 65720,
+        "durationMs": 207712,
+        "remainingMs": 141992,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:38.792Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 66890,
+        "durationMs": 207712,
+        "remainingMs": 140822,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:40.034Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 68011,
+        "durationMs": 207712,
+        "remainingMs": 139701,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:41.147Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 69250,
+        "durationMs": 207712,
+        "remainingMs": 138462,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:42.249Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 70374,
+        "durationMs": 207712,
+        "remainingMs": 137338,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:43.342Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 71461,
+        "durationMs": 207712,
+        "remainingMs": 136251,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:44.460Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 72568,
+        "durationMs": 207712,
+        "remainingMs": 135144,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:45.560Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 73683,
+        "durationMs": 207712,
+        "remainingMs": 134029,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:46.673Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 74777,
+        "durationMs": 207712,
+        "remainingMs": 132935,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:47.768Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 75888,
+        "durationMs": 207712,
+        "remainingMs": 131824,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:48.886Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 76995,
+        "durationMs": 207712,
+        "remainingMs": 130717,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:49.998Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 78105,
+        "durationMs": 207712,
+        "remainingMs": 129607,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:51.103Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 79223,
+        "durationMs": 207712,
+        "remainingMs": 128489,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:52.207Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 80323,
+        "durationMs": 207712,
+        "remainingMs": 127389,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:53.323Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 81428,
+        "durationMs": 207712,
+        "remainingMs": 126284,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:54.421Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 82539,
+        "durationMs": 207712,
+        "remainingMs": 125173,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:55.557Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 83639,
+        "durationMs": 207712,
+        "remainingMs": 124073,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:56.672Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 84776,
+        "durationMs": 207712,
+        "remainingMs": 122936,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:57.819Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 85888,
+        "durationMs": 207712,
+        "remainingMs": 121824,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:32:58.920Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 87039,
+        "durationMs": 207712,
+        "remainingMs": 120673,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:00.056Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 88145,
+        "durationMs": 207712,
+        "remainingMs": 119567,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:01.161Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 89279,
+        "durationMs": 207712,
+        "remainingMs": 118433,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:02.265Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 90387,
+        "durationMs": 207712,
+        "remainingMs": 117325,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:03.373Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 91489,
+        "durationMs": 207712,
+        "remainingMs": 116223,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:04.476Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 92596,
+        "durationMs": 207712,
+        "remainingMs": 115116,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:05.576Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 93688,
+        "durationMs": 207712,
+        "remainingMs": 114024,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:06.668Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 94794,
+        "durationMs": 207712,
+        "remainingMs": 112918,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:07.772Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 95885,
+        "durationMs": 207712,
+        "remainingMs": 111827,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:08.893Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 96987,
+        "durationMs": 207712,
+        "remainingMs": 110725,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:10.019Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 98107,
+        "durationMs": 207712,
+        "remainingMs": 109605,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:11.108Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 99230,
+        "durationMs": 207712,
+        "remainingMs": 108482,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:12.243Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 100335,
+        "durationMs": 207712,
+        "remainingMs": 107377,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:13.338Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 101455,
+        "durationMs": 207712,
+        "remainingMs": 106257,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:14.440Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 102556,
+        "durationMs": 207712,
+        "remainingMs": 105156,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:15.545Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 103651,
+        "durationMs": 207712,
+        "remainingMs": 104061,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:16.648Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 104768,
+        "durationMs": 207712,
+        "remainingMs": 102944,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:17.758Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 105875,
+        "durationMs": 207712,
+        "remainingMs": 101837,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:18.859Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 106978,
+        "durationMs": 207712,
+        "remainingMs": 100734,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:19.970Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 108075,
+        "durationMs": 207712,
+        "remainingMs": 99637,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:21.053Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 109181,
+        "durationMs": 207712,
+        "remainingMs": 98531,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:22.152Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 110271,
+        "durationMs": 207712,
+        "remainingMs": 97441,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:23.276Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 111379,
+        "durationMs": 207712,
+        "remainingMs": 96333,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:24.435Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 112493,
+        "durationMs": 207712,
+        "remainingMs": 95219,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:25.568Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 113652,
+        "durationMs": 207712,
+        "remainingMs": 94060,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:26.662Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 114787,
+        "durationMs": 207712,
+        "remainingMs": 92925,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:27.766Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 115878,
+        "durationMs": 207712,
+        "remainingMs": 91834,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:28.866Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 116980,
+        "durationMs": 207712,
+        "remainingMs": 90732,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:29.973Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 118086,
+        "durationMs": 207712,
+        "remainingMs": 89626,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:31.073Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 119188,
+        "durationMs": 207712,
+        "remainingMs": 88524,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:32.289Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 120296,
+        "durationMs": 207712,
+        "remainingMs": 87416,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:33.380Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121505,
+        "durationMs": 207712,
+        "remainingMs": 86207,
+        "isPlaying": true,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:34.497Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121624,
+        "durationMs": 207712,
+        "remainingMs": 86088,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:35.598Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121624,
+        "durationMs": 207712,
+        "remainingMs": 86088,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:36.716Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121624,
+        "durationMs": 207712,
+        "remainingMs": 86088,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:37.861Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121624,
+        "durationMs": 207712,
+        "remainingMs": 86088,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:38.963Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121624,
+        "durationMs": 207712,
+        "remainingMs": 86088,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    },
+    {
+      "at": "2026-09-27T01:33:40.072Z",
+      "status": 200,
+      "playing": {
+        "trackId": "5kypt2rXsZzGEG0OwOuDZo",
+        "title": "SEROTONIN",
+        "artist": "LaLion",
+        "progressMs": 121624,
+        "durationMs": 207712,
+        "remainingMs": 86088,
+        "isPlaying": false,
+        "contextType": "playlist",
+        "contextUri": "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"
+      }
+    }
+  ]
+}

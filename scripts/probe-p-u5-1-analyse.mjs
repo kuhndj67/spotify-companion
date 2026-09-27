@@ -108,18 +108,33 @@ const nearestMark = (flipAt, kind, windowMs = 90_000) =>
     .filter((c) => Math.abs(c.delta) <= windowMs)
     .sort((x, y) => Math.abs(x.delta) - Math.abs(y.delta))[0] ?? null;
 
+const TYPE_KEYS = {
+  'type-crossfade': 'crossfade',
+  'type-hardcut': 'hard-cut',
+  'type-djtalk': 'dj-talk',
+};
+
 const rows = (record.apiFlips ?? []).map((flip, i) => {
   const tail = flip.fromRemainingMsAtLastSight;
   const audio = nearestMark(flip.at, 'audio');
   const ui = nearestMark(flip.at, 'ui');
   const anomaly = nearestMark(flip.at, 'anomaly', 30_000);
   const audioLag = audio?.delta ?? null;
+  // ⚠️ The listener's DECLARED type wins over any inference from the numbers. Inferring the type
+  // from the timings would be circular -- the timings are what the type is meant to explain.
+  const typed = Object.keys(TYPE_KEYS)
+    .map((k) => ({ k, c: nearestMark(flip.at, k, 30_000) }))
+    .filter((x) => x.c != null)
+    .sort((a, z) => Math.abs(a.c.delta) - Math.abs(z.c.delta))[0];
   return {
     n: i + 1,
     context: isDj(flip.to?.contextUri) ? 'DJ' : (flip.to?.contextType ?? 'other'),
     from: flip.from?.title ?? '?',
     to: flip.to?.title ?? '?',
     reportedTailMs: tail,
+    declaredType: typed ? TYPE_KEYS[typed.k] : flip.throughNullGap ? 'gap (unlabelled)' : null,
+    throughNullGap: flip.throughNullGap ?? false,
+    nullGapMs: flip.nullGapMs ?? null,
     audioLagMs: audioLag,
     uiLagMs: ui?.delta ?? null,
     impliedTrimMs: tail != null && audioLag != null ? tail - audioLag : null,
@@ -180,7 +195,38 @@ for (const [label, group] of [
 }
 
 // ── verdicts, stated against the predictions ──────────────────────────────────────────────────
+// -- by declared type -------------------------------------------------------------------------
+// ⚠️ The DJ's transition behaviour is NOT consistent (measured 2026-09-27). A single median over
+// several mechanisms describes none of them -- R11's "do not average a context-dependent answer",
+// applied to transition types instead of playback contexts.
+const byType = {};
+for (const r of usable.filter((x) => x.context === 'DJ')) {
+  (byType[r.declaredType ?? 'unlabelled'] ??= []).push(r);
+}
+const typeKeys = Object.keys(byType);
+if (typeKeys.length > 0 && !(typeKeys.length === 1 && typeKeys[0] === 'unlabelled')) {
+  console.log(`
+${b('DJ transitions BY DECLARED TYPE')} ${dim('-- never pooled')}`);
+  for (const [type, group] of Object.entries(byType)) {
+    const t = stats(group.map((r) => r.reportedTailMs));
+    const a = stats(group.map((r) => r.audioLagMs));
+    const tr = stats(group.map((r) => r.impliedTrimMs));
+    console.log(
+      `  ${type.padEnd(18)} n=${String(group.length).padEnd(3)} tail ${t ? s(t.median) : '   -  '}  audio ${a ? s(a.median) : '   -  '}  trim ${tr ? s(tr.median) : '   -  '}  ${dim('(medians)')}`,
+    );
+  }
+  if (byType.unlabelled?.length) {
+    console.log(
+      `  ${yellow('⚠')} ${byType.unlabelled.length} transition(s) carry NO type label -- shown, but not attributable to a mechanism.`,
+    );
+  }
+}
+
 console.log(`\n${b('Verdicts')}\n`);
+console.log(dim('  ⚠ Verdicts 1-3 pool ALL DJ transitions. If the by-type table above shows'));
+console.log(dim('    the types behaving differently, prefer THAT table -- prediction 1 assumed a'));
+console.log(dim('    single mechanism, and a pooled median over several mechanisms describes none.'));
+console.log('');
 
 const djTail = stats(dj.map((r) => r.reportedTailMs));
 const djAudio = stats(dj.map((r) => r.audioLagMs));

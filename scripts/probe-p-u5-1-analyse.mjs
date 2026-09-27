@@ -165,6 +165,14 @@ const rows = (record.apiFlips ?? []).map((flip, i) => {
     impliedTrimMs: tail != null && audioLag != null ? tail - audioLag : null,
     anomalyNearby: anomaly != null,
     informative: tail == null ? null : tail > AUTOMIX_TAIL_CEILING_MS,
+    // ⚠️ A huge tail with NO listener marks is almost always the operator switching context by
+    // hand, not a transition. It must be flagged rather than spotted by eye: pooled in, one such row
+    // moved the radio mean tail from 0.4s to 37.6s -- a manual switch reading as a finding.
+    contextUriChanged:
+      flip.from?.contextUri != null &&
+      flip.to?.contextUri != null &&
+      flip.from.contextUri !== flip.to.contextUri,
+    likelyManualSwitch: tail != null && tail > 60_000 && audio == null && ui == null,
     excluded: excludeArg.includes(i + 1),
   };
 });
@@ -201,7 +209,18 @@ for (const r of rows) {
   );
 }
 
+// ⚠️ Excluded LOUDLY, never silently: a dropped row has to be visible or the n is a lie.
+const flaggedSwitches = rows.filter((r) => r.likelyManualSwitch || r.contextUriChanged);
+for (const r of flaggedSwitches) r.excluded = true;
 const usable = rows.filter((r) => !r.excluded);
+if (flaggedSwitches.length) {
+  console.log(
+    `
+${yellow('⚠ auto-excluded as a manual context switch, not a transition:')} ${flaggedSwitches
+      .map((r) => `#${r.n}`)
+      .join(', ')}`,
+  );
+}
 const isAlbumish = (c) => /album/i.test(c);
 // The "primary" group is whatever this session's context was, album excluded -- the album is the
 // control it is being compared against.
@@ -253,10 +272,21 @@ ${b(primaryLabel.toUpperCase() + ' transitions BY DECLARED TYPE')} ${dim('-- nev
 }
 
 console.log(`\n${b('Verdicts')}\n`);
-console.log(dim('  ⚠ Verdicts 1-3 pool ALL DJ transitions. If the by-type table above shows'));
-console.log(dim('    the types behaving differently, prefer THAT table -- prediction 1 assumed a'));
-console.log(dim('    single mechanism, and a pooled median over several mechanisms describes none.'));
-console.log('');
+console.log(
+  dim(`  ⚠ Verdicts 1-3 pool ALL ${primaryLabel} transitions, and were PRE-REGISTERED ABOUT THE DJ.`),
+);
+if (!/dj/i.test(primaryLabel)) {
+  console.log(
+    yellow(`  ⚠ primary context is "${primaryLabel}", NOT the DJ. Predictions 1-3 describe what the`),
+  );
+  console.log(
+    yellow('    DJ should do, so a FAILED here may be the account CONFIRMED in the control direction.'),
+  );
+  console.log(yellow('    Read this run as a COMPARISON against the DJ numbers, not as a test of them.'));
+}
+console.log(dim('  ⚠ If the by-type table shows the types behaving differently, prefer THAT table --'));
+console.log(dim('    prediction 1 assumed a single mechanism, and a pooled median over several'));
+console.log(dim('    mechanisms describes none of them.'));
 
 const djTail = stats(dj.map((r) => r.reportedTailMs));
 const djAudio = stats(dj.map((r) => r.audioLagMs));
@@ -293,7 +323,7 @@ else
   say(
     3,
     djTrim.median > 8000 ? 'held' : djTrim.median < 3000 ? 'failed' : 'insufficient',
-    `implied trim median ${(djTrim.median / 1000).toFixed(1)}s — audio the DJ appears never to have played`,
+    `implied trim median ${(djTrim.median / 1000).toFixed(1)}s — audio ${primaryLabel} appears never to have played`,
   );
 
 if (djUi == null || djUi.n < 2) say(4, 'insufficient', `need ≥2 DJ ui marks, have ${djUi?.n ?? 0}`);

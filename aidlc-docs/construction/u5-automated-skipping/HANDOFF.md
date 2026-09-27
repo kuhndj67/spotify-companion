@@ -44,7 +44,29 @@ deliverables, so they were deliberately **not** applied unilaterally.
    only channel**, so each state needs a glyph too — which matters most for the proposed
    `Green`/`Yellowgreen` pair.
 
-### The next step is **probe P-U5-1** — protocol in the plan, §3
+### ✅ Probe P-U5-1 is DISCHARGED (2026-09-27) — the FD is COMPLETE
+
+**The predicted hazard is FALSE.** Audio follows the reported track boundary within **~2 s** in the DJ
+and essentially simultaneously in radio and album, so a skip there costs **2–3 s**, not 18–41 s.
+**FR-46 needs no lag guard**, FR-48's confirmation is validated, and **BR-43 is written**.
+
+⚠️ **The hypothesis was backwards.** The API never lagged — **the DJ stops *playing* 18–50 s before
+nominal end and reports it accurately** (`B@first`: ~1 s in radio/album, **up to 23.6 s** in the DJ).
+**Classifier v2's fix stands; its stated mechanism does not.** No re-derivation, and BR-11.7 untouched.
+
+✅ **Discriminator: PRE-DETERMINED vs PRODUCED-LIVE**, not *algorithmic* — radio is algorithmic and
+behaves like an album. **This explains R11 with the same cause**, and means **the queue probe FR-36
+already performs is also the transition-regime probe**. No new field.
+
+⚠️ **New API fact**: DJ commentary returns **`200` with `item: null`** (not 204) for 6.5–7.2 s. An
+**open question** about the MCP live path follows from it — see BR-43.8; **do not conclude it from
+P-U5-1**.
+
+Record:
+[`probes/p-u5-1-transition-behaviour-2026-09-27.md`](probes/p-u5-1-transition-behaviour-2026-09-27.md).
+**Next: the Code Generation plan.**
+
+### The original protocol, kept for the history — §3 of the plan
 
 ⚠️ **It cannot be run unattended.** The instrument is the user's ear, not an endpoint. The user said
 on 2026-09-23 that they could not start it immediately.
@@ -62,7 +84,12 @@ because token handling deliberately never writes back. Cost: ~15 min of unrecord
 behaviour **does not substitute** for it — the log's own signal is the suspect one, so that review
 would measure the suspect effect with the suspect instrument.
 
-**Why it gates FR-46**: classifier v2 established that in the AI DJ context the API stops reporting
+⚠️ **EVERYTHING BELOW WAS THE HYPOTHESIS, AND IT IS FALSE.** Probed 2026-09-27: the audio follows the
+reported boundary within ~2 s, so a skip costs 2–3 s rather than 18–41 s, and the API was never
+reporting early — **the DJ stops *playing* early.** Kept for the history; act on the block at the top of
+this file.
+
+~~**Why it gates FR-46**~~: classifier v2 established that in the AI DJ context the API stops reporting
 a track **18–41 s before it stops playing**. `EvaluationCoordinator` takes its play boundary from
 that reported state — so a rule matching the newly-reported track B may fire
 `POST /me/player/next` against a player still on **A**, truncating an unmatched track the listener

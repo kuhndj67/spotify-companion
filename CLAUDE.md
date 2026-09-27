@@ -80,24 +80,38 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-09-26) — U5 DESIGN QUESTIONS ALL ANSWERED, PAUSED ON ONE PROBE
+## ▶ Current state (2026-09-27) — U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED.
 
 **Read [`aidlc-docs/construction/u5-automated-skipping/HANDOFF.md`](aidlc-docs/construction/u5-automated-skipping/HANDOFF.md) before anything else** — U5's single entry point; the current state is its top block.
 ✅ **All 9 Functional Design questions are answered.** The authoritative reading is
 [**`u5-functional-design-plan.md` §5.1**](aidlc-docs/construction/plans/u5-functional-design-plan.md) — not the raw answers in §5.
-**The next step is probe P-U5-1**, which needs the user present and listening, because the instrument
-is their ear. It is now the **only** thing blocking the FD documents.
+✅ **Probe P-U5-1 is DISCHARGED (2026-09-27), and BR-43 is written.** Record:
+[`aidlc-docs/construction/u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`](aidlc-docs/construction/u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md).
 
-⚠️ **It gates FR-46 AND FR-48.** In the DJ context the API reports track B while A is still audible
-for 18–41 s, and the evaluator takes its play boundary from that reported state — so a rule matching
-B may fire `POST /me/player/next` against a player still on A, **truncating an unmatched track** and
-letting B play unskipped. Every step of that is established **except** whether the lag is in
-Spotify's reporting or its state store. **Probe it; do not reason about it.**
+✅ **THE PREDICTED HAZARD IS FALSE. FR-46 needs no lag guard.** Audio follows the reported track
+boundary within **~2 s** in the DJ and essentially simultaneously in radio and album, so a skip at that
+boundary costs **2–3 s** of the outgoing track — not the 18–41 s the design plan predicted.
 
-⚠️ **Reviewing logged skip behaviour is NOT a substitute for the probe** (Q8, 2026-09-26). The
-obvious confirmation — *"is a different track reported now?"* — **is the signal under suspicion**, so
-the review would measure the suspect effect with the suspect instrument and get a plausible answer
-that means nothing. The `inc=releases` 200 a third time.
+⚠️ **Because the original hypothesis was backwards.** The API never lagged: **the DJ stops *playing*
+18–50 s before nominal end and reports it accurately.** `B@first` is the proof — radio/album name the
+incoming track at ~1 s of progress, **the DJ at up to 23.6 s**. Classifier v2's **fix stands; its
+stated mechanism does not.** No re-derivation needed, and **BR-11.7 is untouched by a change of
+explanation.**
+
+✅ **The discriminator is PRE-DETERMINED vs PRODUCED-LIVE** (user's observation) — *not* algorithmic:
+radio is algorithmic and behaves exactly like an album. Radio's tracks are chosen ahead of time, the
+DJ's as it goes. **This explains R11 with the same cause**: a pre-determined list can be exposed to the
+queue endpoint, a live mix has nothing to expose. ⚠️ **So the queue probe FR-36 already performs is
+also the transition-regime probe** — `context.type` cannot do it (DJ and radio share the
+`37i9dQZF1E` prefix), the queue can. No new field.
+
+⚠️ **New API fact: DJ commentary returns `200` with `item: null`** — not a 204 — for 6.5–7.2 s.
+⚠️ **Open question, deliberately NOT concluded**: the live path parses MCP *text*, not this endpoint, so
+if a gap there reads as *nothing playing* a commentary gap would close the play and fall through to
+`unknown` — meaning part of the `unknown` population would be commentary, not app downtime. **Probe the
+MCP surface; do not assert it from P-U5-1.**
+
+✅ FR-48's confirmation is validated: `progress_ms` reset **+** track-id change, with a **~3 s grace**.
 
 ✅ **Two `requirements.md` amendments were approved and APPLIED 2026-09-26** (§5.2 of the plan):
 - **FR-40 amended.** *"Never skip the same track twice within one session"* is **withdrawn** — it
@@ -109,21 +123,25 @@ that means nothing. The `inc=releases` 200 a third time.
 - **R11's caveats discharged** — §FR-36's *"Verify against active playback"* and the R11 risk row's
   *"unconfirmed during active playback"* had read as open since **2026-09-22**.
 
-⚠️ **Run P-U5-1 with the container DOWN.** It **writes to the player**, and the recording container
-writes down the result — each trial POSTs `next` 0–3 s into a track, which `outcomeClassifier` files
-as **`skipped`**, so 4–6 trials inject **4–6 artefact skips into a corpus of 22**. The probe needs no
-container (host-side script; token handling never writes back, so it cannot race the MCP server).
-⚠️ The plan said *"the container may stay up"* until 2026-09-26 — inherited from R11, which only read.
+⚠️ **A probe that WRITES to the player must run with the container DOWN.** P-U5-1 did
+(2026-09-27). Each trial skips a track ~0–3 s in, which `outcomeClassifier` files as **`skipped`**, so
+4–6 trials would inject artefact skips into a corpus of only 22 real ones. ⚠️ **But "container down"
+does not mean nothing records** — `recently-played` remembers, and the backfill imports it on restart.
+What protects the evidence base is that backfilled rows are **`unknown`**, which the gate's `ELIGIBLE`
+predicate and `BackTestService` both exclude. **Verified after the probe: 0 skipped rows on 2026-09-27.**
+A read-only probe (`probe:p-u5-1:mark`) needs no shutdown.
 
-⚠️ **A backup is NOT a file copy: `history.db-wal` is currently LARGER than `history.db`**
-(4.1 MB vs 3.3 MB), so copying the `.db` alone loses over half the corpus — and the copy opens cleanly
+⚠️ **A backup is NOT a file copy: `history.db-wal` can be LARGER than `history.db`** (measured
+4.1 MB vs 3.3 MB), so copying the `.db` alone loses over half the corpus — and the copy opens cleanly
 and looks plausible. Checkpoint the WAL first, as `reclassify-unobserved-tails.mjs` does. ⚠️ **And
 `data/` holds ten ad-hoc backups in five naming conventions with NO restore path — every script writes
 one, none reads one back.** A minimal backup **and verified restore** is a **migration 007
 prerequisite** (U5 plan §4); the full-inventory version is backlog **W-5**, which includes the
 `metabase-app-db` **named Docker volume** that no tree-walking backup would find.
 
-Documentation-only pause: `src/` untouched, no migration, container healthy.
+**Functional Design is COMPLETE**: `business-rules.md` (BR-33…BR-43), `domain-entities.md`,
+`business-logic-model.md`, `frontend-components.md`. Still documentation-only — `src/` untouched, no
+migration, container healthy and recording. **Next: the Code Generation plan.**
 
 ## Earlier state (2026-09-22)
 
@@ -144,7 +162,15 @@ sufficient. Record:
 
 ### 🔧 24 of 46 live skips were NOT SKIPS — classifier v2, applied retroactively
 
-**In the DJ context the API stops reporting a track ~18–41 s before it stops playing.** The play
+⚠️ **THIS MECHANISM STATEMENT IS BACKWARDS — corrected 2026-09-27 by probe P-U5-1. The FIX below
+stands unchanged; only the explanation was wrong.** The API never lagged: **the DJ stops *playing* a
+track 18–50 s before its nominal end, and reports that accurately.** Proof is `B@first` — radio and
+album name the incoming track at ~1 s of progress, the DJ at up to **23.6 s**. So `progress_ms` is
+accurate in pre-determined contexts and the tails are **real edits**. Record:
+`construction/u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`. The original
+text follows.
+
+~~**In the DJ context the API stops reporting a track ~18–41 s before it stops playing.**~~ The play
 closed on `track-change` at 81–90% and v1 called it `skipped`; the listener heard every one finish.
 Three independent lines agree: the same tracks reach 99–100% on other days (so `duration_ms` is not
 overstated), the successor was already playing in 75% of cases against 27% for real skips, and a
@@ -344,7 +370,10 @@ down, ask whether it can be un-written.
 divides by track duration, so anything that removes a fixed number of seconds costs a short track
 more ratio than a long one.
 
-The DJ removes 18–41 s of *reporting* (not of playback). Expressed as a ratio,
+⚠️ **Corrected 2026-09-27**: the DJ removes 18–50 s **of playback**, not of reporting — it plays the
+track short and the API reports that accurately (probe P-U5-1). **The arithmetic below is unaffected**,
+because a constant-time effect is a constant-time effect whichever layer produces it, and that is the
+point the warning exists to make. Expressed as a ratio,
 `ratio < 0.75` whenever `duration < 4 x tail` — at a 41 s tail **every track under 164 s reads as a
 user skip**, and the corpus's p10 duration is 146 s. `Mascara` is the proof: 136 s long, 35 s tail,
 ratio 0.743, filed as a rejection purely for being short. **No ratio separates a constant-time
@@ -613,7 +642,7 @@ the phase boundary, not progress.
 | 3 | **⚠️ CORRECTED 2026-09-20 — the old premise was false.** This said *"`recently-played` returns no `external_ids`"*. **It does.** Probed live 2026-09-20: `HTTP 200`, `external_ids.isrc` on 3/3 items. Only **82 rows** lack an ISRC — all backfilled, all dated **2026-08-20 → 08-31**, spanning **72 distinct `track_id`s**. Every other row has one: 457 live + 4 backfilled since 2026-09-03, of 543. So recovery is **72** `GET /tracks/{id}` calls, not 47. ⚠️ **The 2026-09-05 conclusion STANDS and is the decision:** all 82 are `outcome = 'unknown'`, so **0 are gate-eligible** — what the backfill lacks for the gate is the observation trail, which no API returns retroactively. **New in U4**: these 82 are exactly the rows where `label.*` is *unanswerable* rather than *unknown* (BR-27.5b) — discriminator `isrc IS NULL AND label_unknown_reason IS NULL` — so recovering them would improve back-test answerability as well as coverage stats, at 72 Spotify calls plus ~2 MusicBrainz calls each behind a 1 req/sec queue. Decide on that basis → U2 FD **Q7** | Later |
 | 3a | **⚠️ Why those 82 lack an ISRC is UNESTABLISHED — and it is not the code.** `RecentlyPlayedBackfill` has read `track.external_ids?.isrc` since **U1** (`a8136d9`), `webApiClient.ts` has exactly one commit, and the wiring never changed. Live rows carried an ISRC from the very first one (row id 51). The break is clean at **row id 120 → 155** (2026-09-01 → 09-03), with **no code change in that window**. Something outside this repo changed, or the original observation misattributed its cause. **Do not invent one.** ⚠️ **The lesson is the project's own rule pointing the other way**: the four documented traps were all *docs said yes, probe said no*. This is **our own notes said no, and the probe says yes** — a recorded negative decays silently, because nothing ever re-tests it. **Re-probe a "the API doesn't return X" note before building on it.** | ✅ measured |
 | 3b | **MusicBrainz label coverage is recency-biased, and this is now CONFIRMED TWICE.** Ad-hoc probe 2026-08-26: pre-2022 100%, 2022+ **43%**. Shipped code on a larger corpus 2026-09-05: **86%** / **44%**. The gap is real and stable, not an artefact of the first sample, and stays concentrated on the recent independent releases R1 is about. ⚠️ Measure it **only over ISRC-bearing plays** — see the denominator warning above | ✅ confirmed |
-| 4 | **✅ CLOSED 2026-09-22 — the mechanism was found and the data is fixed.** The overlap is real but it is **not crossfade and not a threshold artefact**: in the DJ context Spotify stops *reporting* a track 18–41 s before it stops *playing*, and the listener hears it finish. ⚠️ **Crossfade is OFF on this machine** (Automix on, gapless on), so the old *"crossfade ruled out because Spotify caps it at 12 s"* argument failed twice over — it assumed cut length equals crossfade length, **and the feature was disabled**. A UI fact used as a probe result. Fixed by classifier v2: 24 rows re-derived `skipped` -> `completed`, live skips 46 -> 22. `skip_attribution` retired. See `audit.md` 2026-09-22 | ✅ |
+| 4 | **✅ CLOSED 2026-09-22; MECHANISM CORRECTED 2026-09-27.** The overlap is real and the data fix stands — 24 rows re-derived `skipped` -> `completed`, live skips 46 -> 22, `skip_attribution` retired. ⚠️ **But the mechanism was stated backwards**: it is not that Spotify stops *reporting* early, it is that **the DJ stops *playing* early** (18–50 s) and reports it accurately. Probe P-U5-1, 2026-09-27. ⚠️ **And the crossfade argument has now failed a THIRD time.** It previously read *"crossfade is OFF on this machine, so the old argument failed twice over — it assumed cut length equals crossfade length, **and the feature was disabled**."* The setting **is** off, and **the DJ crossfades anyway, ~5 s, on 3 of 8 transitions.** So the setting was never the relevant fact in the DJ context — the only context where the anomaly appears. A UI fact used as a probe result, twice over. See `audit.md` 2026-09-22 and 2026-09-27 | ✅ |
 | 4-old | **⚠️ SUPERSEDED, kept for the history. REWRITTEN 2026-09-22 — every number in the original was n≈10 and NONE of them replicated.** The original argued: the AI DJ crossfades → crossfade removes constant seconds → a proportional threshold penalises short tracks → majors run ~30% longer (248s vs 191s) → independents take more false skips → **so correcting it could only move the result toward R1**. Re-measured on 586 plays, **all three premises and the conclusion fail**: ① *crossfade is ruled out* — the affected plays lose **21–41s** and Spotify caps crossfade at 12s; ② *the duration gap dissolved* — majors **213s** vs independents **201s** (n=120/162), a 6% gap, not 30%, exactly the chance the original flagged at n=10/11; ③ *threshold crowding dissolved* — **52 of 443** live track-change plays sit within ±0.05 of 0.90 (**11.7%**), not 13 of 27 (48%); ④ ⚠️ **the direction is BACKWARDS.** Unattributed skips are **67% of major skips (6/9)** but only **50% of independent (6/12)**, so correcting removes proportionally *more* from majors. The rates flip sign: all skips major **8.1%** > independent **7.6%**, but user-only skips major **2.7%** < independent **3.8%**. ⚠️ **EXPLORATORY AND NOISE-DOMINATED** — 3 vs 6 events, computed after seeing the data, and **BR-11.7's confirmatory run is spent**. This is *not* evidence against R1; it is grounds for withdrawing the old claim, nothing more. **The concern is now INSTRUMENTED rather than open**: `skip_attribution` (migration 006) labels these plays directly, so analysis can exclude them without moving the pre-registered threshold. 0.90 stays | ⚠️ restated |
 | 5 | **✅ CLOSED 2026-09-22 — R11 probed during active playback.** Context-dependent: album/autoplay/radio expose 20 tracks and predict 8 for 8; **the AI DJ exposes none**. `context.type` cannot distinguish them. FR-36 must probe the queue at runtime rather than infer from context, and FR-34/35 is the majority path at 50–70% DJ listening | ✅ |
 | 8 | **Distinguish a rejection-skip from a session end** — user-raised 2026-09-10, **re-raised 2026-09-19**. Backlog item **W-3** in `requirements.md` §5.1. ⚠️ **Probed twice — the corpus has ZERO instances**, at 427 plays and again at **504**: all 31 skips close on `track-change`, all have a successor within 30 s, and the 12 session-enders are **7 `completed`, 5 `unknown`, 0 `skipped`**. It is unreachable by construction — `classify` returns `skipped` *only* on `closeReason === 'track-change'`, and stopping playback yields `pause-idle`/`playback-stopped`, which fall through to `unknown`. ⚠️ **THE COST RUNS THE OTHER WAY.** Those 5 partial session-enders are not contaminating the outcome variable, they are **missing from it** — the gate's `ELIGIBLE` predicate is `outcome IN ('completed','skipped')`, so every abandoned last-track is silently dropped. **W-3 is data recovery, not a false-skip repair**, and anyone implementing it as stated will write code that does nothing and tests that pass for want of anything to fix. Discriminator (gap from `ended_at` to next `started_at`) needs no new collection and applies retroactively | Later |

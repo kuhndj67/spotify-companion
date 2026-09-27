@@ -4857,3 +4857,152 @@ an intention.
 ### Next step, unchanged
 
 **Probe P-U5-1**, with the container **down**. It is the only thing left blocking the FD.
+
+
+---
+
+## 2026-09-27 — Probe P-U5-1: the hazard is false, and classifier v2's mechanism was backwards
+
+**Stage**: CONSTRUCTION · U5 Functional Design — **now COMPLETE.** Documents and probe scripts only;
+`src/` untouched, no migration. Record:
+`construction/u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`.
+
+### ✅ The answer: FR-46 needs no lag guard
+
+The design plan predicted that a skip at the reported track boundary would truncate **18–41 s** of a
+track the listener was enjoying, in the context used 50–70% of the time. **It does not.**
+
+| | AI DJ (n=8) | radio (n=3) | album (n=4) |
+|---|---|---|---|
+| **audio lag** behind the reported flip | **+0.9 to +2.2 s** | −0.3 to +0.5 s | −0.4 to −0.5 s |
+| reported tail | 1.4 – 50.9 s | 0.0 – 0.7 s | 0.0 – 0.3 s |
+| **`B@first`** | 0.6 – **23.6 s** | 0.0 – 0.7 s | 0.8 – 1.2 s |
+
+**A skip at the reported boundary costs at most ~2–3 s.** BR-43 is written; FR-48's provisional
+confirmation (`progress_ms` reset **+** track-id change) is validated with a **~3 s grace**.
+
+### ⚠️ The hypothesis was BACKWARDS, and that is the bigger finding
+
+`CLAUDE.md` recorded *"in the DJ context the API stops reporting a track 18–41 s before it stops
+playing."* **The API never lagged. The DJ stops PLAYING the track 18–50 s before its nominal end and
+reports that accurately.**
+
+**`B@first` is what settled it** — how far into the incoming track the API already is the first time it
+names it. Radio and album: **~1 s**. The DJ: **up to 23.6 s**. On one transition the API went from
+*"Can't Deny, 50.9 s remaining"* to *"Not Today, already 23.6 s in"* across a **1.1 s** poll interval.
+So `progress_ms` is accurate in pre-determined contexts, and the DJ's tails are **real edits**.
+
+✅ **Classifier v2's FIX STANDS UNCHANGED.** `maxUnobservedTailMs = 55_000` thresholds the right
+quantity for the wrong stated reason; the 24 re-derived rows stay correct, because the listener heard
+those tracks finish — as the DJ presented them, they did. **No re-derivation. And BR-11.7 is untouched
+by a change of explanation** — a better story about the mechanism is not grounds to re-run anything.
+
+⚠️ **This was very nearly the opposite conclusion.** Mid-probe, `B@first` looked like evidence that
+`progress_ms` was unreliable *generally*, which would have put a question mark on v2's threshold input.
+The album and radio controls are the only reason that reading was rejected: they show `B@first` ≈ 1 s.
+**Without the control the probe would have produced a plausible, wrong, and much more alarming answer.**
+
+### ✅ The mechanism came from the user, and it unifies this probe with R11
+
+⚠️ **"Algorithmic" is not the discriminator** — radio is algorithmic and behaves exactly like an album.
+
+The user's observation: **radio's tracks are chosen ahead of time** (the full tracklist is shown, as
+with an album) **while the DJ chooses as it goes.** So the discriminator is **pre-determined vs
+produced-live**. A pre-determined list plays sequentially and the API reports each change as it
+happens; a mix composed live must *produce* each transition — which is exactly when trimming,
+crossfades and an already-running incoming `progress_ms` are what you would expect.
+
+✅ **It explains R11 with the same cause.** R11 found album/autoplay/radio expose a 7–20 track queue
+while the DJ exposes none, and could not say why: **a pre-determined list can be exposed; a live mix
+has nothing to expose yet.** One mechanism, two findings.
+
+✅ **So FR-46 needs no new signal.** The queue probe FR-36 already performs discriminates the regimes,
+and it sidesteps R11's blocker that `context.type` cannot tell the DJ from a radio station —
+re-confirmed here (`37i9dQZF1EYkqdzj48dyYq` DJ vs `37i9dQZF1E4xunLN1DdaFF` radio). `context_type` stays
+evidence only.
+
+### ⚠️ New API fact: DJ commentary returns `200` with `item: null`
+
+Not a 204 — a **200 with no track in the body**, for **6.5–7.2 s**, on 3 of 8 DJ transitions.
+
+**An open question follows, and it is deliberately NOT concluded.** The live path parses the MCP
+`getNowPlaying` **text**, not this endpoint. If a gap there reads as *nothing playing*, `PlayObserver`
+would close the play on `pause-idle`, and since `classify` returns `skipped` only on `track-change`
+such plays fall through to **`unknown`** — systematically. That would mean a slice of the `unknown`
+population is DJ commentary rather than instrument downtime, which reaches R2 and open item 8.
+⚠️ **It must be probed on the MCP surface and must not be asserted from P-U5-1**, which never observed
+that surface.
+
+### ⚠️ The crossfade argument has failed a THIRD time
+
+CLAUDE.md ruled crossfade out partly because *"the feature was disabled"*. The setting **is** off — and
+**the DJ crossfades anyway, ~5 s, on 3 of 8 transitions.** The setting was never the relevant fact in
+the DJ context, which is the only context where the anomaly appears. **A UI fact used as a probe
+result, twice over.**
+
+### The DJ has at least three transition behaviours, and the sign of the offset varies
+
+| type | n | tail (median) | audio lag |
+|---|---|---|---|
+| hard-cut | 3 | 8.0 s | +0.9 s |
+| crossfade | 3 | 25.1 s | +2.0 s |
+| **dj-talk** | 2 | 1.6 s | **−6.9 s** — the audio changes *before* the API names the next track |
+
+Nothing in the API predicts which is coming, so **BR-43.1 compensates for nothing rather than
+compensating by an average.** R11's shape again: the answer is *it depends*, and the field you would
+branch on does not exist.
+
+### ⚠️ EIGHT instrument failures, recorded because each nearly cost the result
+
+| | Failure | Fix |
+|---|---|---|
+| 1 | Operator polled then **asked** the listener what they heard. ⚠️ The round trip was slower than the effect — *"I hear the new track"* 12 s after an 8 s lag is consistent with a lag **and** with no lag | Listener marks by keypress; correlate afterwards |
+| 2 | Read the reported tail as if it were a lag. ⚠️ **A tail is not a lag** — an 8.3 s tail sounded perfectly natural on video | Measure the audio separately |
+| 3 | ⚠️ Marks went to the **Spotify window, where SPACE is play/pause**, stopping the music instead of recording it | `a` is the key; banner explains focus vs visibility; script watches `is_playing` and reports a probable leaked mark |
+| 4 | ⚠️ Flip detection needed two consecutive samples carrying a track, so **commentary-gap transitions were invisible** | `lastWithTrack`; `nullGapMs` recorded |
+| 5 | ⚠️ Context **inferred** from a uri containing `37i9dQZF1E` — **which radio also matches** | `--context` is declared; the analyser prints `dj-or-radio?` rather than guess |
+| 6 | ⚠️ A **manual context switch** pooled as a transition. One 149 s row moved the radio mean tail from 0.4 s to **37.6 s** | Auto-excluded on tail > 60 s with no marks, or a changed context uri; printed, never silent |
+| 7 | ⚠️ Verdicts hardcoded to say "DJ", so a control run printed *"FAILED — audio the DJ never played"* when trim ≈ 0 is the account **confirmed** | Verdicts name the declared context |
+| 8 | ⚠️ The analyser computed **pooled medians** while its own header carried R11's *"do not average a context-dependent answer"* warning | Groups by declared type; never pools |
+
+**Failures 4 and 5 are this project's own recurring traps.** 4 is absent data reading as a negative
+finding. **5 is worse: R11's own finding — that the DJ and radio are indistinguishable by uri —
+reproduced as a defect inside the tool built to test it.** The user caught it only by volunteering
+*"this is a radio station"*; had they not, radio would have been pooled into the DJ group invisibly and
+the control would have vanished into the treatment.
+
+### Pre-registered predictions, and one that failed usefully
+
+Committed at `53f15ff` **before** the repetitions were read.
+
+| # | Verdict |
+|---|---|
+| 1 | ⚠️ **FAILED** — value wrong (~2 s, not ~5 s) and `dj-talk` is *negative*, which the prediction never contemplated |
+| 2 | ✅ HELD |
+| 3 | ✅ HELD for the DJ, ≈ 0 for radio/album — the control direction |
+| 4 | ✅ HELD — ui lag median −0.2 s; the UI moves with the API |
+| 5 | ✅ **HELD** — album tail median 0.3 s vs DJ 8.0 s |
+
+⚠️ **`impliedTrim = tail − audioLag` is invalid for negative lags.** On a `dj-talk` row the audio mark
+is A's *end* while the flip is B's *start*, with commentary between, so the subtraction conflates two
+intervals. The 9.9 s there is arithmetic, not measurement — my metric, my error.
+
+### Corpus protection, and a claim of mine that was wrong
+
+Two real `POST /me/player/next` calls were issued with the container **down**. ⚠️ **"Container down
+means nothing records" was not quite true**: `recently-played` remembers and the backfill imports on
+restart. What protects the evidence base is that backfilled rows are **`unknown`**, excluded by both
+the gate's `ELIGIBLE` predicate and `BackTestService`. **Verified afterwards: 0 skipped rows on
+2026-09-27**, and the 22→30 live-skip increase is the user's own listening on 09-25 and 09-26.
+
+### Limits
+
+**n is small**: 8 DJ / 3 radio / 4 album, one machine, one account, one evening. Enough to separate
+~2 s from ~25 s; **not** enough to characterise the distribution of DJ trim lengths (observed
+6.8–48.7 s implied, on 6 transitions). **Autoplay was never tested** — R11 says it exposes a queue, so
+it *should* be pre-determined, but that is inference.
+
+### Next
+
+**The Code Generation plan.** The FD is complete: `business-rules.md` (BR-33…BR-43),
+`domain-entities.md`, `business-logic-model.md`, `frontend-components.md`.

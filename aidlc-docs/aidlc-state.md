@@ -4,58 +4,60 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN. ALL 9 QUESTIONS ANSWERED 2026-09-26; now PAUSED ON ONE PROBE.**
-  ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — it is U5's single entry point, and its top block carries the current state.
-  ✅ **The settled specification is [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md) §5.1** — the authoritative reading of the
-  nine answers; §5 keeps the user's own words with a ⚙ note where a clarification changed something.
-  ✅ **The Functional Design is WRITTEN** — `construction/u5-automated-skipping/functional-design/`:
-  `business-rules.md` (**BR-33 … BR-43**), `domain-entities.md`, `business-logic-model.md`,
-  `frontend-components.md`. **Only FR-46's action point and FR-48's confirmation are unspecified**,
-  and BR-43 records that deliberately rather than guessing past it.
-  ⚠️ **Three code findings made while writing it**: `DecisionExecutor.execute` is **synchronous and
-  unawaited**, so the skip must be **queued** and drained asynchronously (BR-42 — which also puts the
-  safety check at the action point, where FR-38 needs it); **`config/` is mounted `:ro`** and U5 is the
-  first unit that writes there, so the kill switch would work in the UI and not persist (BR-34.4); and
-  Q4's colour cue **collides with `Rules v#`**, whose four levels are already bound to load health
-  where `fail` names the version still in force (FC-U5-1).
-  **The only thing now blocking the FD is probe P-U5-1**, which needs the user present and listening
-  — protocol in §3. Everything else in §5.1 can be designed today; **FR-46's action point and FR-48's
-  confirmation cannot.** ⚠️ Q8 settled that reviewing logged skip behaviour **does not substitute**
-  for the probe — the log's own signal is the one under suspicion, so the review would measure the
-  suspect effect with the suspect instrument (the `inc=releases` 200 a third time).
-  ✅ **The two `requirements.md` amendments were approved and APPLIED 2026-09-26** (§5.2 of the plan).
-  **FR-40 amended**: *"never skip the same track twice within one session"* is **withdrawn** and
-  replaced by **one skip attempt per PLAY ROW**, never per `track_id` — a repeat listen is a new row
-  so it stays skippable, while a skip that did not land cannot re-fire, and it needs **no definition
-  of "session"** at all. ⚠️ The clause was *wrong*, not merely unnecessary: a recurring track is real
-  signal, the same argument that forbids clamping `completionRatio` to 1.0.
-  **R11's caveats discharged** in §FR-36 and the risk row, both of which had read as open since
-  2026-09-22. `src/` is untouched and the container is healthy and recording. Previously: **U5 STARTED 2026-09-22. R11 DISCHARGED. THE OUTCOME
-  VARIABLE WAS WRONG AND IS FIXED.** 851 tests · typecheck clean · schema v6 · 662 plays ·
-  `src/playback/` still absent.
-  **R11**: queue lookahead **depends on the playback context** — album/autoplay/radio expose 20
-  tracks and predict correctly (8 for 8 in order); **the AI DJ exposes none, ever** (0 on all 88
-  samples). `context.type` cannot tell them apart — the DJ and a radio station are both
-  `type: playlist`. At 50–70% DJ listening, **FR-34/35 is the majority path, not the fallback**.
-  Record: [`u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md`](construction/u5-automated-skipping/probes/r11-queue-lookahead-2026-09-22.md).
-  ⚠️ **The probe found something bigger.** In the DJ context the API stops reporting a track
-  ~18–41 s before it stops playing, so **24 of 46 live skips were completions mis-labelled as
-  skips** — confirmed by the listener hearing them finish, by the same tracks reaching 99–100% on
-  other days, and by a natural experiment (DJ 3 of 12 skipped; album 0 of 20; radio 0 of 16).
-  **Classifier v2** moves the test into the outcome, on the axis the mechanism lives on —
-  **milliseconds of unobserved tail**, not a ratio, because a proportional threshold over a
-  constant-time effect misfiles short tracks. 24 rows re-derived, **552 identical**, live skips
-  **46 -> 22**, all the listener's.
-  ✅ **`skip_attribution` is retired** (v2 subsumes it; the two rules could contradict each other),
-  and **U5 handoff item 1 is CLOSED rather than inherited** — `BackTestService` needed no change.
-  `skip_source` (`user` | `rule`) is untouched and is still what U5 needs.
-  ⚠️ The 2026-09-10 gate ran on those 24 rows as skips. **BR-11.7 still forbids a re-run**;
-  recorded as a defect in the discharged result.
-  See `audit.md` 2026-09-22.
+- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED 2026-09-27. Next: Code Generation plan.**
+  ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — U5's single entry point.
+  ✅ The FD is `construction/u5-automated-skipping/functional-design/`: `business-rules.md`
+  (**BR-33…BR-43**), `domain-entities.md`, `business-logic-model.md`, `frontend-components.md`.
+  The settled answers are [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md) §5.1.
+  `src/` untouched, no migration, container healthy and recording.
+
+  ✅ **PROBE P-U5-1: THE PREDICTED HAZARD IS FALSE.** Audio follows the reported track boundary within
+  **~2 s** in the AI DJ and essentially simultaneously in radio and album, so a skip at that boundary
+  costs **2–3 s** of the outgoing track — not the 18–41 s the design plan predicted. **FR-46 needs no
+  lag guard** (BR-43.1) and FR-48's confirmation is validated (`progress_ms` reset **+** track-id
+  change, **~3 s grace**). Record:
+  [`construction/u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`](construction/u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md).
+
+  ⚠️ **AND CLASSIFIER V2'S STATED MECHANISM WAS BACKWARDS.** It said *"the API stops reporting a
+  track 18–41 s before it stops playing"*. The API never lagged: **the DJ stops *playing* 18–50 s
+  before nominal end and reports that accurately.** Proof is **`B@first`** — how far into the incoming
+  track the API already is when it first names it: **~1 s in radio and album, up to 23.6 s in the DJ**.
+  So `progress_ms` is accurate in pre-determined contexts and the DJ's tails are **real edits**.
+  ✅ **v2's FIX STANDS UNCHANGED** — `maxUnobservedTailMs` thresholds the right quantity for the wrong
+  stated reason, the 24 re-derived rows stay correct, **no re-derivation is needed, and BR-11.7 is
+  untouched by a change of explanation.**
+
+  ✅ **The discriminator is PRE-DETERMINED vs PRODUCED-LIVE** — the user's observation, and *not*
+  "algorithmic": radio is algorithmic and behaves exactly like an album. Radio's tracks are chosen
+  ahead of time, the DJ's as it goes. **This explains R11 with the same cause** — a pre-determined list
+  can be exposed to the queue endpoint, a live mix has nothing to expose yet. ⚠️ **So the queue probe
+  FR-36 already performs is ALSO the transition-regime probe**, and `context.type` cannot do it (DJ and
+  radio share the `37i9dQZF1E` prefix). **No new field is needed**; `context_type` stays evidence only.
+
+  ⚠️ **New API fact: DJ commentary returns HTTP `200` with `item: null`** — not a 204 — for 6.5–7.2 s,
+  on 3 of 8 DJ transitions. **Open question, deliberately NOT concluded**: the live path parses MCP
+  *text*, not this endpoint, so if a gap there reads as *nothing playing*, a commentary gap would close
+  the play and fall through to **`unknown`** — meaning part of the `unknown` population would be
+  commentary rather than app downtime, which reaches R2 and open item 8. **Probe the MCP surface; it
+  must not be asserted from P-U5-1.**
+
+  ⚠️ **The crossfade argument has failed a THIRD time.** CLAUDE.md ruled crossfade out partly because
+  *"the feature was disabled"*. The setting **is** off — and **the DJ crossfades anyway, ~5 s, on 3 of 8
+  transitions.** The setting was never the relevant fact in the DJ context, the only context where the
+  anomaly appears.
+
+  ⚠️ **n is small**: 8 DJ / 3 radio / 4 album, one machine, one evening. Enough to separate ~2 s from
+  ~25 s; **not** enough to characterise the distribution of DJ trim lengths. Eight instrument failures
+  are recorded in the probe document, two of them this project's own recurring traps — commentary-gap
+  transitions were **invisible** to the flip detector (absent data reading as *"no transition
+  happened"*), and context was inferred from a uri prefix **that radio also matches**, which is R11's
+  own finding reproduced as a defect in the tool built to test it. See `audit.md` 2026-09-27.
 
 - **2026-09-23 — U5 FUNCTIONAL DESIGN PLAN WRITTEN, awaiting answers.**
   [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md)
   — 9 questions, each with a recommendation, and a checklist.
+  ⚠️ **THE HAZARD BELOW WAS PROBED 2026-09-27 AND IS FALSE**, and its mechanism was backwards — see
+  the current-state block above. Kept as written because it is what was believed at the time.
   ⚠️ **It raises a hazard the U5 handoff did not contain, and it gates FR-46.** In the DJ context
   the API reports track B while A is still audible for 18–41 s (classifier v2's finding), and
   `EvaluationCoordinator` takes its play boundary from that reported state. If

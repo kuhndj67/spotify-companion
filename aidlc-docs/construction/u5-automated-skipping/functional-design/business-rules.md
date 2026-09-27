@@ -19,12 +19,15 @@ at 3 consecutive / 10 per hour, global, acknowledged · one skip attempt **per p
 > **a skip that should have happened and did not is recoverable by the listener pressing a button.
 > A skip that should not have happened is not recoverable at all.**
 
-> ### ⚠️ Two sections of this document are deliberately empty
+> ### ✅ BR-43 was deliberately empty until 2026-09-27; probe P-U5-1 filled it
 >
-> **FR-46's action point and FR-48's confirmation are not specified here**, and that is not an
-> oversight. Both depend on probe **P-U5-1** (design plan §3): whether `POST /me/player/next` acts
-> on the player's real state or on the same lagged state the read endpoints report. See **BR-43**,
-> which records the gap rather than guessing past it.
+> FR-46's action point and FR-48's confirmation were left unspecified rather than guessed. **P-U5-1
+> settled both**, and the answer was that **the predicted hazard is false**: audio follows the reported
+> track boundary within ~2 s, so a skip there costs 2–3 s, not 18–41 s.
+>
+> ⚠️ **And the original hypothesis was backwards.** The API never lagged — the DJ stops *playing* a
+> track 18–50 s early and reports that accurately. Classifier v2's **fix stands; its stated mechanism
+> does not.** See BR-43.
 
 ---
 
@@ -274,53 +277,110 @@ HTTP `POST`, which is asynchronous. **The contract as it stands cannot express U
 
 ---
 
-## BR-43: ⚠️ DEFERRED PENDING PROBE P-U5-1 — FR-46's action point and FR-48's confirmation
+## BR-43: FR-46's action point and FR-48's confirmation — ✅ RESOLVED by probe P-U5-1
 
-**Nothing in this section is specified, and that is deliberate.** Both depend on an answer this
-project does not have and cannot reason its way to.
+⚠️ **This section was deliberately empty until 2026-09-27.** It is now settled by measurement, not
+reasoning. Record:
+[`../probes/p-u5-1-transition-behaviour-2026-09-27.md`](../probes/p-u5-1-transition-behaviour-2026-09-27.md).
 
-### What is established
+### ✅ The hazard the design plan predicted is FALSE
 
-Classifier v2 established that **in the AI DJ context the API stops reporting a track 18–41 s before
-it stops playing**. `EvaluationCoordinator` takes its play boundary from `PlayObserver`, which
-consumes `tick` — the API's notion of the current track. So in the DJ context the engine opens a
-decision for track B while track A is **still audible**.
+The plan predicted that a skip at the reported boundary would truncate **18–41 s** of a track the
+listener was enjoying, in the context used 50–70% of the time. **It does not.** Measured across three
+contexts:
 
-### What is not established
+| | AI DJ (n=8) | radio (n=3) | album (n=4) |
+|---|---|---|---|
+| **audio lag** behind the reported flip | **+0.9 to +2.2 s** | −0.3 to +0.5 s | −0.4 to −0.5 s |
+| reported tail | 1.4 – 50.9 s | 0.0 – 0.7 s | 0.0 – 0.3 s |
+| `B@first` | 0.6 – **23.6 s** | 0.0 – 0.7 s | 0.8 – 1.2 s |
 
-⚠️ **Whether `POST /me/player/next` acts on the player's real state or on the same lagged state the
-read endpoints report.** If the lag is in Spotify's *reporting*, a skip fires against a player still
-on A and **truncates an unmatched track the listener was enjoying**, while B plays on unskipped — in
-the context used 50–70% of the time. If the lag is in Spotify's *state store*, the skip lands on B
-and there is no problem at all.
+**A skip at the reported boundary costs at most ~2–3 s of the outgoing track.**
 
-### Why FR-48 cannot be specified either
-
-The obvious confirmation — *after the `POST`, is a different track reported?* — is **exactly the
-signal the DJ context is known to report early**. It can return *skip confirmed* when nothing
-audible happened. **A confirmation guaranteed to pass is not a confirmation**, and the failure is
-the `inc=releases` 200 again: a plausible success that means nothing.
-
-### What is specified now, because it holds either way
+⚠️ **The reason is that the original hypothesis was backwards.** The API was never lagging: **the DJ
+stops *playing* the track 18–50 s before its nominal end**, and the API reports that accurately. See
+the classifier-v2 correction below.
 
 | # | Rule | Source |
 |---|---|---|
-| **BR-43.1** | An unconfirmed skip is treated as **failed**, and is **surfaced, never retried** | FR-48, FR-40 |
-| **BR-43.2** | Every skip attempt records the reported **track id and `progress_ms` immediately before the `POST`, and the same pair after** | Q8 |
-| **BR-43.3** | ⚠️ BR-43.2 is **not** optional instrumentation. The user's Q8 answer defers a *review* of skip behaviour to later; a review needs the evidence to have been recorded at the time | Q8 (user) |
-| **BR-43.4** | BR-36's one-attempt-per-play guard holds regardless of how the probe resolves | BR-36.4 |
-| **BR-43.5** | **Provisional only**: confirmation on `progress_ms` **resetting** *plus* a track-id change. ⚠️ To be confirmed or replaced by P-U5-1 — recorded so it is not mistaken for settled | Q8 |
+| **BR-43.1** | The action point **fires on the reported track boundary**. No lag guard, no compensating delay | P-U5-1 |
+| **BR-43.2** | Every skip attempt records the reported **track id and `progress_ms` before the `POST`, and the same pair after** | Q8, retained |
+| **BR-43.3** | A skip is **confirmed** by `progress_ms` **resetting** *and* a track-id change | Q8, validated |
+| **BR-43.4** | ⚠️ Allow a **~3 s grace** before judging a skip unconfirmed. A check at +1.5 s can precede the audio | P-U5-1 |
+| **BR-43.5** | An unconfirmed skip is **failed** — **surfaced, never retried** | FR-48, FR-40 |
+| **BR-43.6** | ⚠️ **No fixed timing offset may be assumed anywhere in U5** | P-U5-1 — see below |
+| **BR-43.7** | The transition regime is discriminated by **the queue**, never by `context_type` | P-U5-1 + R11 |
+| **BR-43.8** | ⚠️ An **absent track** in a now-playing read must not be treated as *playback stopped* for the purpose of firing a skip | P-U5-1 — see below |
+| **BR-43.9** | ⚠️ BR-36's one-attempt-per-play guard **stays**. The hazard being false does not license removing the loop guard | BR-36.4 |
 
-> ### ⚠️ BR-43.3 is `successor_lag_ms` wearing a different hat
+> ### ⚠️ BR-43.6 — the DJ has at least THREE transition behaviours and nothing predicts which
 >
-> `recordSuccessorLag` had **zero callers for its entire life** and `successor_lag_ms` is `null` on
-> all 662 rows, so the 2026-09-22 measurement had to reconstruct successor lag from retained trails
-> — the field designed to hold it was never wired. **A column that is structurally empty reads as
-> "this never happens."** If BR-43.2's fields are specified and not written, the later review will
-> find nothing and conclude the hazard is absent. *"We'll look at the data later"* silently becomes
-> *"there is no data."*
+> | type | n | tail (median) | audio lag |
+> |---|---|---|---|
+> | hard-cut | 3 | 8.0 s | +0.9 s |
+> | crossfade | 3 | 25.1 s | +2.0 s |
+> | **dj-talk** | 2 | 1.6 s | **−6.9 s** — the audio changes *before* the API names the next track |
+>
+> ⚠️ **`dj-talk`'s audio lag is NEGATIVE**, so even the *sign* of the offset varies. Nothing in the API
+> says which behaviour is coming. Any rule, threshold or guard that assumes a constant offset will be
+> wrong on at least one type — which is why BR-43.1 compensates for nothing rather than compensating
+> by an average.
+>
+> **This is R11's shape again**: the answer is *it depends*, and the field you would branch on does not
+> exist.
 
----
+> ### ✅ BR-43.7 — the discriminator already exists, and FR-36 already fetches it
+>
+> The mechanism (user's observation, 2026-09-27) is **pre-determined vs produced-live**, not
+> *algorithmic* — radio is algorithmic and behaves exactly like an album.
+>
+> ```
+> queue returns tracks  ->  pre-determined  ->  clean transitions, progress_ms trustworthy
+> queue is empty        ->  produced-live   ->  trimmed, pre-reported, progress_ms ahead
+> ```
+>
+> ⚠️ **`context.type` cannot do this** — the DJ and a radio station are both `type: playlist` with the
+> `37i9dQZF1E` prefix (R11, re-confirmed: DJ `…Ykqdzj48dyYq` vs radio `…4xunLN1DdaFF`). **The queue
+> can.** So BR-39.1's runtime queue probe is *also* the transition-regime probe, and U5 needs no new
+> field for it. BR-41.3 stands: `context_type` remains **evidence only**.
+
+> ### ⚠️ BR-43.8 — `200` with `item: null`, a new API fact
+>
+> During DJ commentary the Web API returns **HTTP 200 with `item: null`** — *not* a 204 — for
+> **6.5–7.2 s**, on 3 of 8 DJ transitions. Code that reads the item and infers *playback stopped* will
+> mis-handle it, and `PlayObserver` takes its play boundary from exactly that state.
+>
+> **For U5 the safe behaviour already follows from BR-42.5**: a queued attempt whose play has closed is
+> **discarded, and the discard recorded**. Erring toward not acting is correct here.
+>
+> ⚠️ **But there is an unresolved question this must not be confused with.** The live path parses the
+> MCP `getNowPlaying` **text**, not this endpoint, so the shape of a commentary gap there is *unknown*.
+> If it reads as *nothing playing*, a commentary gap would **close the play** and — since `classify`
+> returns `skipped` only on `track-change` — fall through to **`unknown`**, systematically. That would
+> mean a slice of the `unknown` population is DJ commentary rather than instrument downtime, which
+> reaches R2 and open item 8. **It is a hypothesis. It must be probed on the MCP surface and must not
+> be asserted from P-U5-1**, which never observed that surface.
+
+> ### ⚠️ Classifier v2: the FIX stands, the stated MECHANISM was backwards
+>
+> `CLAUDE.md` recorded *"in the DJ context the API stops reporting a track 18–41 s before it stops
+> playing."* **Reversed.** `B@first` settles it: radio and album name the incoming track at ~1 s of
+> progress, the DJ at up to **23.6 s**. So `progress_ms` is accurate in pre-determined contexts, the DJ
+> tails are **real edits**, and the DJ simply does not play the last ~18–50 s.
+>
+> ✅ **No re-derivation is needed.** `maxUnobservedTailMs = 55_000` thresholds the right quantity and
+> the 24 re-derived rows stay correct — the listener heard those tracks finish because, as the DJ
+> presented them, they did. Only the explanation changes. ⚠️ **Do not treat this as grounds to re-run
+> the classifier or the gate**; BR-11.7 is untouched by a change of explanation.
+
+### ⚠️ What P-U5-1 does NOT establish
+
+- **n is small**: 8 DJ / 3 radio / 4 album, one machine, one account, one evening. Enough to separate
+  ~2 s from ~25 s; **not** enough to characterise the distribution of DJ trim lengths.
+- **Trim length as a distribution** is unmeasured — observed 6.8–48.7 s implied, on 6 transitions.
+- **Autoplay was never tested.** R11 found it exposes a queue, so it *should* be pre-determined, but
+  that is inference, not measurement.
+
 
 ## Rules inherited unchanged, listed so they are not re-litigated
 

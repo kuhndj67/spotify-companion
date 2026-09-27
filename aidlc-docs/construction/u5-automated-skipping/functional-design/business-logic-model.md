@@ -55,19 +55,19 @@ How a decision becomes an action, and every place the system refuses to act.
    record reportedTrackId + progress_ms BEFORE            [BR-43.2]
                               │
                               ▼
-          ⚠️⚠️  POST /me/player/next  — NOT SPECIFIED  ⚠️⚠️
-                  see §4. Gated on probe P-U5-1
+              POST /me/player/next   ✅ fires on the reported boundary,
+                  NO lag guard, NO delay  [BR-43.1, probe P-U5-1]
                               │
                               ▼
    record reportedTrackId + progress_ms AFTER             [BR-43.2]
                               │
                               ▼
-   confirm? ⚠️ PROVISIONAL — progress_ms reset + track-id change   [BR-43.5]
+   confirm: progress_ms reset + track-id change, ~3s grace  [BR-43.3/43.4]
         │                                        │
      confirmed                             unconfirmed
         │                                        │
         ▼                                        ▼
-   update counters                    SURFACE AS FAILED — never retry  [BR-43.1]
+   update counters                    SURFACE AS FAILED — never retry  [BR-43.5]
         │
         ▼
    consecutive ≥ 3?  ──► RUNAWAY HALT, global, until acknowledged  [BR-35]
@@ -110,45 +110,55 @@ two of them defects, and a `firedAt` of `null` cannot tell them apart. This is U
 
 ---
 
-## 4. ⚠️ THE ACTION POINT IS NOT SPECIFIED — probe P-U5-1
+## 4. ✅ THE ACTION POINT — RESOLVED by probe P-U5-1 (2026-09-27)
 
-**Everything above and below this section is designable now. This is not.**
+**This section was deliberately unspecified until the probe ran.** It is now settled by measurement.
 
-### Established
+### ✅ The predicted hazard is FALSE
 
-In the AI DJ context the API **stops reporting a track 18–41 s before it stops playing** (classifier
-v2). `EvaluationCoordinator` takes its play boundary from `PlayObserver`, which consumes `tick` — the
-API's notion of the current track. **So the engine opens a decision for track B while track A is still
-audible.**
+| | AI DJ (n=8) | radio (n=3) | album (n=4) |
+|---|---|---|---|
+| **audio lag** behind the reported flip | **+0.9 to +2.2 s** | −0.3 to +0.5 s | −0.4 to −0.5 s |
 
-### Not established
+**A skip at the reported boundary costs at most ~2–3 s of the outgoing track**, so the action point
+fires on the reported boundary with **no lag guard and no compensating delay** (BR-43.1).
 
-⚠️ **Whether `POST /me/player/next` acts on the player's real state or on the same lagged state the
-read endpoints report.**
+### ⚠️ The hypothesis was backwards
 
-| If the lag is in… | Then… |
-|---|---|
-| Spotify's **reporting** | The skip fires against a player still on **A** and **truncates an unmatched track the listener was enjoying**, while B plays on unskipped — in the context used **50–70%** of the time |
-| Spotify's **state store** | The skip lands on **B**. FR-46 as designed is safe and needs no guard |
+The API never lagged. **The DJ stops *playing* a track 18–50 s before its nominal end and reports that
+accurately.** `B@first` — how far into the incoming track the API already is when it first names it —
+is the proof: ~1 s in radio and album, **up to 23.6 s in the DJ**. So `progress_ms` is accurate in
+pre-determined contexts and the DJ's tails are real edits.
 
-**Not inferable from anything this project has. Probe it.**
+✅ **Classifier v2's fix stands; its stated mechanism does not.** `outcomeClassifier` is still
+untouched by U5.
 
-### Why the confirmation is stuck on the same answer
+### ⚠️ No fixed offset may be assumed — the DJ has at least three behaviours
 
-The obvious check — *is a different track reported now?* — is **exactly the signal the DJ reports
-early**. It can return *confirmed* when nothing audible happened. ⚠️ **A confirmation guaranteed to
-pass is not a confirmation**: the `inc=releases` 200 and `measure-confound.mjs`'s zeros, a third time.
+| type | n | tail (median) | audio lag |
+|---|---|---|---|
+| hard-cut | 3 | 8.0 s | +0.9 s |
+| crossfade | 3 | 25.1 s | +2.0 s |
+| **dj-talk** | 2 | 1.6 s | **−6.9 s** — audio changes *before* the API names the next track |
 
-### ⚠️ Run the probe with the container DOWN
+Even the **sign** varies, and nothing in the API predicts which is coming. That is why BR-43.1
+compensates for nothing rather than compensating by an average.
 
-Each trial POSTs `next` 0–3 s into a track. `PlayObserver` closes that play on `track-change` at
-near-zero progress, and **both v2 conditions fail** — `unobservedTailMs` is nearly the whole duration
-against the 55 s cap, `observedPositionRatio` ~0.01 against the 0.75 rail — so `outcomeClassifier`
-records **`skipped`**, `skip_source = 'user'`.
+### ✅ The regime discriminator FR-36 already fetches
 
-**4–6 trials would inject 4–6 artefact skips into a corpus of 22** — up to **27% contamination of the
-entire evidence base** BR-40 depends on. The probe needs no container: it reads `spotify-config.json`
-and cannot race the MCP server, because token handling deliberately never writes back.
+```
+queue returns tracks  ->  pre-determined  ->  clean transitions, progress_ms trustworthy
+queue is empty        ->  produced-live   ->  trimmed, pre-reported, progress_ms ahead
+```
+
+⚠️ `context.type` **cannot** do this — the DJ and radio share the `37i9dQZF1E` prefix. The queue can.
+
+### ⚠️ `200` with `item: null`
+
+DJ commentary returns **HTTP 200 with no item** — not a 204 — for 6.5–7.2 s. For U5 the safe behaviour
+already follows from **BR-42.5**: a queued attempt whose play has closed is discarded and the discard
+recorded. ⚠️ Whether the **MCP live path** behaves the same way is **unknown and must be probed
+separately** — see BR-43.8.
 
 ---
 
@@ -241,7 +251,7 @@ its n, and the gate is the human one that already worked here — U4's dry-run r
 | 2 | Kill switch halts action immediately | BR-34.7 · action-point check |
 | 3 | Kill switch **persists across restart** | BR-34.1–34.5 · ⚠️ verified **through the container**, not on the host (BR-34.4) |
 | 4 | Rate limit and runaway halt enforced | BR-35 · pre-registered before arming |
-| 5 | A failed skip is surfaced, not retried | BR-43.1 · ⚠️ partly gated on P-U5-1 |
+| 5 | A failed skip is surfaced, not retried | BR-43.5 · ✅ P-U5-1 discharged; confirmation validated |
 | 6 | No skip without a matching armed rule | BR-33.2 · six refusal points |
 | 7 | Every action logged with rule, facts and verdict | FR-41 · U4's log plus `SkipAttempt` |
 

@@ -3,8 +3,10 @@
 **Stage**: CONSTRUCTION · Functional Design
 **Unit**: U5 — Automated Skipping (Phase 4, *Act*)
 **Written**: 2026-09-23 · **answers recorded 2026-09-26**
-**Status**: ✅ **All 9 questions answered.** The settled specification is §5.1. Next step is
-**probe P-U5-1** (§3), which needs the user present and listening — it gates FR-46 and FR-48
+**Status**: ✅ **COMPLETE.** All 9 questions answered (§5.1) and **probe P-U5-1 discharged 2026-09-27**
+— the predicted hazard is **FALSE**, FR-46 needs no lag guard, and BR-43 is written. Record:
+[`../u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`](../u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md).
+**Next stage: the Code Generation plan.**
 
 > **U5 is the only unit that can cause harm.** Every other unit, wrong, produces a bad number in a
 > report. This one, wrong, interrupts the music the user is listening to. The phases were
@@ -87,7 +89,15 @@ and it is **the field FR-36 most wants**. It is available from
 **This is the most important thing on this page. It is a hypothesis with a clear mechanism, and it
 must be probed before `POST /me/player/next` is designed, not after.**
 
-Classifier v2 established that **in the AI DJ context the API stops reporting a track 18–41 s
+⚠️ **RESOLVED 2026-09-27 — THE HAZARD BELOW IS FALSE, AND ITS PREMISE WAS BACKWARDS.** Probe P-U5-1
+found the audio follows the reported boundary within **~2 s**, so a skip there costs 2–3 s, not 18–41 s;
+and the API was never reporting early — **the DJ stops *playing* 18–50 s before nominal end and reports
+that accurately.** FR-46 needs no lag guard (BR-43). Record:
+[`../u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`](../u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md).
+**The section is kept in full because the probe protocol and the reasoning that motivated it are the
+record of how it was tested.**
+
+Classifier v2 established that ~~**in the AI DJ context the API stops reporting a track 18–41 s
 before it stops playing**. The listener hears track A finish; the API is already reporting track B.
 
 `EvaluationCoordinator` takes its play boundary from `PlayObserver`, which consumes `tick` — i.e.
@@ -220,8 +230,10 @@ not take effect.
 in the user's own words with a ⚙ note where a clarification changed something.
 
 - [x] Settle Q1–Q9 — answered 2026-09-26. **Authoritative reading: §5.1**
-- [ ] ▶ **Probe P-U5-1** — **THE NEXT STEP.** Resolve §3 before FR-46 **or FR-48** is designed.
-      ⚠️ Needs the user present and listening; cannot be run unattended
+- [x] ✅ **Probe P-U5-1 — DISCHARGED 2026-09-27.** The predicted hazard is **FALSE**: audio follows the
+      reported boundary within ~2 s, so a skip costs 2–3 s, not 18–41 s. ⚠️ **And the hypothesis was
+      backwards** — the DJ stops *playing* 18–50 s early and reports it accurately. Classifier v2's fix
+      stands, its stated mechanism does not
 - [ ] Get sign-off on the two **§5.2** amendments (FR-40's wording; R11's stale caveat)
 - [x] Write `business-rules.md` — **BR-33 … BR-43**, continuing from U4's BR-32.4
 - [x] Write `domain-entities.md` — `SkipAttempt`, `AutomationState`, `RunawayHalt`, `SafetyCounters`,

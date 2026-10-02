@@ -66,6 +66,9 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   'rules/DecisionLogRepository.ts': 'interface only',
   'musicbrainz/types.ts': 'type declarations only',
   'musicbrainz/LabelRepository.ts': 'interface only',
+  // U5. ⚠️ The IMPLEMENTATION is covered by skipAttemptRepository.test.ts; only the interface
+  // declaration is unreachable, and `playback/types.ts` IS executed (two safety constants).
+  'playback/SkipAttemptRepository.ts': 'interface only',
 
   // ⚰️ Retired 2026-09-22: a tombstone with no runtime code. It is kept, rather than deleted,
   // because its doc comment records the 2026-09-21 finding, why classifier v2 superseded it, and

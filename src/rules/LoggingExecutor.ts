@@ -1,45 +1,63 @@
 /**
- * The only `DecisionExecutor` in U4 (LC-15, BR-30.1/30.2). 🔌 IMPURE
+ * One of two `DecisionExecutor`s (LC-15, BR-30.1/30.2). 🔌 IMPURE
  *
- * ## ⚠️ This class is the phase boundary
+ * **It records a decision and never acts on one.** `SkipExecutor` is the other, added
+ * **alongside** this class in U5 and selected by configuration — this one was never grown into it.
  *
- * U3's containment guarantee was *"`git status src/` shows only `src/rules/`"*. U4 necessarily
- * changes the poll loop, `api.ts`, the schema and the UI, so that guarantee cannot survive this
- * unit. From here the boundary rests on two structural facts: **`src/playback/` does not
- * exist**, and **this constructor takes no playback collaborator**.
+ * ## ⚠️ The phase boundary MOVED in U5, and the old guarantee is gone
  *
- * ⚠️ **Not an unused one. Not an optional one. Not a null one.** An injected-but-uncalled
+ * This docstring used to say the boundary rested on *"`src/playback/` does not exist"*. **That
+ * directory now exists** — U5 necessarily ends that guard, as U3's *"`git status src/` shows only
+ * `src/rules/`"* ended at U4. Corrected 2026-10-02.
+ *
+ * The replacement is an **import-graph property** plus a **method count** (P-33), both asserted by
+ * structural tests rather than left to review:
+ *
+ * ```
+ * nothing in src/rules/  imports  src/playback/      <- the direction that is refused
+ * only SkipExecutor      imports  src/playback/
+ * the player client exposes EXACTLY ONE method: skipToNext()
+ * ```
+ *
+ * ⚠️ **The one-method rule is asserted on the client's exported shape, not via the orphan check**,
+ * which walks modules rather than methods — two dead methods lived inside a heavily-executed file
+ * for their entire lives and that check was satisfied throughout.
+ *
+ * ## ⚠️ What has NOT changed: this constructor takes no playback collaborator
+ *
+ * **Not an unused one. Not an optional one. Not a null one.** An injected-but-uncalled
  * `PlaybackController` is one line away from being called, and the boundary would then be a
- * runtime flag rather than a structural fact — something a reviewer has to *remember* instead
- * of something the type system refuses.
+ * runtime flag rather than a structural fact — something a reviewer has to *remember* instead of
+ * something the type system refuses. `LoggingExecutor.length === 1` still pins it.
  *
- * U5 adds `SkipExecutor` **alongside** this class. It does not grow this one into it.
+ * ⚠️ **The same argument is why the player client has one method**, and why `DecisionExecutor` has
+ * no `cancel`: an unused capability on a live device is indistinguishable from an intended one the
+ * day someone calls it.
  */
 
 import type { DecisionLogRepository } from './DecisionLogRepository.js';
 import { hashRule } from './ruleHash.js';
-import type { Decision, LoadedRuleSet, NewDecisionLogEntry } from './types.js';
+import type {
+  Decision,
+  DecisionExecutor,
+  ExecutionContext,
+  LoadedRuleSet,
+  NewDecisionLogEntry,
+} from './types.js';
 import { RULE_ENGINE_VERSION } from './types.js';
 
-export interface DecisionExecutor {
-  /**
-   * Act on a decision. ⚠️ In U4 the only available action is **recording it**.
-   *
-   * Returns the `evaluationId` so the caller can complete the `playId` link when the play
-   * closes — or mark it failed if the play row could not be written.
-   */
-  execute(context: ExecutionContext): string;
-}
-
-export interface ExecutionContext {
-  readonly decision: Decision;
-  readonly ruleSet: LoadedRuleSet;
-  readonly trackId: string;
-  readonly evaluationId: string;
-  readonly decidedAt: string;
-  /** ⚠️ Whether the enrichment wait TIMED OUT — not whether any field read null (FQ3). */
-  readonly partialData: boolean;
-}
+/**
+ * ⚠️ `DecisionExecutor` and `ExecutionContext` MOVED to `./types.js` in U5 (code-gen Q1).
+ *
+ * They were declared here while this was the only implementation. U5 adds `SkipExecutor`
+ * **alongside** it (BR-30), and leaving the interface here would have made the skipping executor
+ * import from the logging executor's module — an import edge that says the opposite of BR-30 to
+ * anyone reading the graph, including the structural test that enforces the phase boundary.
+ *
+ * Re-exported for one release so existing importers do not break. ⚠️ **New code imports from
+ * `./types.js`.**
+ */
+export type { DecisionExecutor, ExecutionContext } from './types.js';
 
 export class LoggingExecutor implements DecisionExecutor {
   readonly #log: DecisionLogRepository;

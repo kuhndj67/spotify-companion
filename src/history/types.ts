@@ -224,7 +224,37 @@ export interface PlayRecord {
    * evidence for a late-learned transition. `null` means not measured — never zero.
    */
   successorLagMs: number | null;
+  /**
+   * The playback context Spotify reported, e.g. `playlist` | `album` | `artist` | `collection`.
+   *
+   * ⚠️ **This column has existed since v1 and was NEVER POPULATED ON LIVE PLAYS** — only on
+   * backfilled rows (measured 2026-10-02: 86 `playlist`, 2 `artist`, and `null` on all 765 live plays).
+   * `recently-played` carries context; the MCP `getNowPlaying` the poll loop reads does **not**. So the
+   * field was available exactly where the outcome variable was not. **U5 populates it live** from
+   * `GET /me/player/currently-playing` (BR-41.1, CLAUDE.md open item 7).
+   *
+   * ⚠️ **EVIDENCE ONLY — never a rule input**, and that is a rule rather than a preference (BR-41.3,
+   * BR-41.5). `contextUri` **goes stale**: it kept naming an album through 33 minutes of autoplay by
+   * other artists. A rule over it would classify algorithmic placement as album playback, which is
+   * wrong in the direction that **hides** what R1 is about.
+   *
+   * ⚠️ **And this field cannot identify the AI DJ.** The DJ and a radio station are both
+   * `type: playlist`, sharing the `37i9dQZF1E` prefix. The discriminator is whether the **queue**
+   * exposes tracks (pre-determined) or not (produced-live) — which is why FR-36 asks the queue at
+   * runtime rather than branching on this value.
+   *
+   * ⚠️ Existing rows stay as they are. `null` is unknown and is never backfilled with a guess, and
+   * `recently-played` cannot supply it retroactively for a play it has aged out of.
+   */
   contextType: string | null;
+  /**
+   * The context URI, e.g. `spotify:playlist:37i9dQZF1EYkqdzj48dyYq`. **New in U5, migration 007.**
+   *
+   * ⚠️ Necessary but **not sufficient** to identify a context, and it **goes stale** — see
+   * `contextType`. Recorded as evidence so the DJ-vs-radio question stays *askable* later, not so a
+   * rule can branch on it.
+   */
+  contextUri: string | null;
   /**
    * U2 label enrichment. Every field is `null` until resolved, and **`null` here means one of
    * two different things**, which is why `labelUnknownReason` exists alongside `labelVerdict`:

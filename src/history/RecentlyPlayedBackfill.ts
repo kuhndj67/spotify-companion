@@ -36,7 +36,8 @@ interface RecentlyPlayedResponse {
       explicit?: boolean;
       external_ids?: { isrc?: string };
     };
-    context?: { type?: string } | null;
+    /** ⚠️ `uri` added U5: `recently-played` carries it, and it is the only retroactive source. */
+    context?: { type?: string; uri?: string } | null;
   }[];
 }
 
@@ -159,6 +160,7 @@ export class RecentlyPlayedBackfill {
         provenance: 'backfilled',
         skipSource: null,
         contextType: item.context?.type ?? null,
+        contextUri: item.context?.uri ?? null,
         classifierVersion: CLASSIFIER_VERSION,
       };
 

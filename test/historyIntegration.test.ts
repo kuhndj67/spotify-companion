@@ -54,6 +54,7 @@ function track(id: string, durationMs: number, overrides: Partial<PlaybackSample
     ageYears: 6,
     following: true,
     contextType: 'playlist',
+    contextUri: null,
     explicit: null,
     albumType: null,
     ...overrides,

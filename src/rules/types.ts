@@ -495,3 +495,68 @@ export const DECISION_LOG_CAP = 100_000;
 
 /** ⚠️ A bound, not a setting. `truncated` discloses when it fires (P-24). */
 export const BACK_TEST_MAX_PLAYS = 50_000;
+
+// ─── U5 ──────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Act on a decision. 🔌 Implemented by `LoggingExecutor` (records only) and, from U5,
+ * `SkipExecutor` (records, then enqueues an attempt).
+ *
+ * Returns the `evaluationId` so the caller can complete the `playId` link when the play closes —
+ * or mark it failed if the play row could not be written.
+ *
+ * ## ⚠️ `execute` is SYNCHRONOUS, and that is load-bearing (BR-42.1)
+ *
+ * `SkipExecutor` has to issue an HTTP `POST`, which is asynchronous, so making this
+ * `Promise<string>` is the obvious move. It was rejected three times over:
+ *
+ * 1. It would change `LoggingExecutor`'s signature to serve a collaborator it does not have —
+ *    which is what **BR-30** exists to prevent.
+ * 2. `EvaluationCoordinator` calls this **unawaited from a timer**. An unawaited promise in a
+ *    timer is how a swallowed rejection becomes a skip that silently never happened.
+ * 3. ⚠️ **It would put the safety check in the wrong place.** An awaited `execute` checks the kill
+ *    switch where the *decision* is taken; BR-33.5 requires it where the *action* fires, up to
+ *    `ENRICHMENT_WAIT_MS` later.
+ *
+ * So `SkipExecutor.execute` enqueues and returns, and a separate drain performs the `POST`.
+ *
+ * ## ⚠️ There is deliberately no `cancel`
+ *
+ * BR-37.5 lets a re-evaluation withdraw a pending skip. It is **not** implemented as a method
+ * here: that would widen this interface to serve one implementation and force `LoggingExecutor` to
+ * carry a no-op, which is BR-30's objection one level up from the constructor parameter it already
+ * forbids. Instead the **drain reads the latest decision for the play** and withdraws the attempt
+ * itself — a pull, not a push, which also keeps the dependency direction `playback → rules`.
+ * Settled 2026-10-02.
+ */
+export interface DecisionExecutor {
+  execute(context: ExecutionContext): string;
+}
+
+export interface ExecutionContext {
+  readonly decision: Decision;
+  readonly ruleSet: LoadedRuleSet;
+  readonly trackId: string;
+  readonly evaluationId: string;
+  readonly decidedAt: string;
+  /** ⚠️ Whether the enrichment wait TIMED OUT — not whether any field read null (FQ3). */
+  readonly partialData: boolean;
+  /**
+   * ⚠️ U5. Which pass produced this decision (BR-37.3).
+   *
+   * `initial` is the decision taken when enrichment settles or the wait caps out.
+   * `enrichment-arrived` is FR-34's second pass, which may resolve an `unknown` into a decision —
+   * and may **withdraw** a pending skip, but may **never** fire one an earlier pass declined
+   * (BR-37.6). The asymmetry is the point: the direction that errs toward *not acting* is safe.
+   */
+  readonly trigger: DecisionTrigger;
+}
+
+/**
+ * Which evaluation pass wrote a decision row (BR-37.3, migration 007).
+ *
+ * ⚠️ Existing rows are `initial` **by construction**, not by a judgement about them — U4 took
+ * exactly one decision per play, so the column's DEFAULT supplies the value and no `UPDATE`
+ * decides it retroactively.
+ */
+export type DecisionTrigger = 'initial' | 'enrichment-arrived';

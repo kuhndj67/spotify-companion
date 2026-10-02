@@ -49,6 +49,7 @@ export interface PlaybackSample {
   ageYears: number | null;
   following: boolean | null;
   contextType: string | null;
+  contextUri: string | null;
   /** U4, schema v5. See the note on `PlayRecord.explicit` — null is unknown, never `false`. */
   explicit: boolean | null;
   albumType: string | null;
@@ -236,6 +237,7 @@ export class PlayObserver {
       // `recordSuccessorLag`, which has no callers.
       successorLagMs: null,
       contextType: play.sample.contextType,
+      contextUri: play.sample.contextUri,
       classifierVersion: CLASSIFIER_VERSION,
     };
 

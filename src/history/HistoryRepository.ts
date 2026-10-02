@@ -159,5 +159,24 @@ export interface HistoryRepository {
    */
   firstPlayStartedAt(): string | null;
 
+  /**
+   * The most recent `limit` plays, oldest-first, reduced to *was this skipped by a rule*.
+   *
+   * ⚠️ **U5, for BR-35.1's consecutive-skip halt. It lives HERE and not on the skip-attempt store**,
+   * because the counter resets on any play **not** skipped by a rule (BR-35.9) — and `skip_attempt`
+   * has no row for such a play, so a query over that table alone counts "three rule skips ever"
+   * rather than "three in a row". LC-24 listed a `recentForConsecutive` method on the wrong
+   * repository; corrected 2026-10-02.
+   *
+   * ⚠️ **`play.skip_source` is the authoritative source**, and it exists for precisely this: US-13 was
+   * deliberately split across U1 and U5 so every play recorded before automation existed already
+   * carries the fact. An attempt is not a skip — a `refused` or `cancelled` attempt never touched the
+   * player — so the halt must count what the *play* records, not what was tried.
+   *
+   * ⚠️ **Oldest-first**, because `consecutiveRuleSkips` counts the trailing run and a reversed array
+   * silently returns a different number.
+   */
+  recentPlaysForCounting(limit: number): { readonly playId: number; readonly skippedByRule: boolean }[];
+
   close(): void;
 }

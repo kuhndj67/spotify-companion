@@ -78,6 +78,7 @@ interface PlayRow {
   provenance: string;
   skip_source: string | null;
   context_type: string | null;
+  context_uri: string | null;
   classifier_version: number;
   /** Schema v5. Null on a pre-v5 row is UNANSWERABLE, not `false` — decided by the watermark. */
   explicit: number | null;
@@ -123,6 +124,7 @@ function rowToRecord(row: PlayRow): PlayRecord {
     provenance: row.provenance as Provenance,
     skipSource: row.skip_source as SkipSource | null,
     contextType: row.context_type,
+    contextUri: row.context_uri,
     classifierVersion: row.classifier_version,
     explicit: fromDbBool(row.explicit),
     albumType: row.album_type,
@@ -645,6 +647,32 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
       | { first_at: string | null }
       | undefined;
     return row?.first_at ?? null;
+  }
+
+  /**
+   * ⚠️ U5, BR-35.1. See the interface for why this lives here and not on the skip-attempt store.
+   *
+   * ⚠️ **Ordered `started_at DESC` to take the most recent N, then REVERSED to oldest-first**, which
+   * is what `consecutiveRuleSkips` requires. Doing it in one `ASC` query would take the OLDEST N plays
+   * in the corpus — a counter answering about August while the halt is about now.
+   */
+  recentPlaysForCounting(limit: number): { playId: number; skippedByRule: boolean }[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT id, outcome, skip_source
+           FROM play
+          ORDER BY started_at DESC, id DESC
+          LIMIT ?`,
+      )
+      .all(limit) as unknown as { id: number; outcome: string; skip_source: string | null }[];
+    return rows
+      .map((r) => ({
+        playId: r.id,
+        // ⚠️ BOTH conditions. `skip_source` is null on a non-skip, but a reader should not have to
+        // know that: "outcome is skipped AND a rule did it" is the fact BR-35.3 names.
+        skippedByRule: r.outcome === 'skipped' && r.skip_source === 'rule',
+      }))
+      .reverse();
   }
 
   // ==========================================================================

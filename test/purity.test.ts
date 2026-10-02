@@ -67,6 +67,18 @@ const PURE_MODULES = [
   // U4's UI judgement. ⚠️ This is where a false green would come from, so it lives in src/
   // and is tested; `public/app.js` has no tests and is outside the orphan check.
   'ui/statusBar.ts',
+  // ─── U5 ──────────────────────────────────────────────────────────────────────────────────────
+  // The action-point vocabulary. No runtime behaviour beyond two pre-registered constants, and
+  // keeping it pure is what stops the safety limits acquiring a config read.
+  'playback/types.ts',
+  // ⚠️ DECIDES WHETHER A SKIP MAY FIRE. A Date.now() or a file read here would make a SAFETY
+  // decision depend on when it was asked, and PBT-40's sixteen-combination table would stop being
+  // enumerable — the live path cannot produce "automation on, rule disabled, halt set" on demand.
+  'playback/automationPredicate.ts',
+  // ⚠️ DECIDES WHETHER AUTOMATION HALTS. `now` is a parameter for the same reason playStats.ts
+  // takes one: a rolling window anchored on an ambient clock is untestable at exactly the boundary
+  // that goes wrong. A clock here would also make the halt un-reproducible after the fact.
+  'playback/safetyCounters.ts',
   // The line a person reads all day to judge their rules. A clock or a lookup here would make
   // the log disagree with the row it reports.
   'rules/decisionSummary.ts',

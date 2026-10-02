@@ -512,6 +512,158 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    description: 'U5 automated skipping: skip attempts, re-evaluation trigger, context uri',
+    up(db) {
+      db.exec(`
+        -- ============================================================================
+        -- ADDITIVE ONLY, AND THAT IS THE ROLLBACK GUARANTEE (BR-37.4)
+        --
+        -- \`migrate()\` skips every migration whose version is at or below current, so
+        -- U4's image against a v7 database finds nothing to apply, reports from:7 to:7
+        -- and runs normally -- the new table and columns simply go unread. That is the
+        -- recovery path if U5 misbehaves, and U5 is the only unit that can interrupt
+        -- the music.
+        --
+        -- ⚠️ The guarantee holds ONLY while migrations stay additive. One that REWRITES
+        -- or DROPS breaks it SILENTLY: the old image starts happily against data it can
+        -- no longer interpret. This is also why skip_attribution is nulled rather than
+        -- dropped -- do not tidy it.
+        -- ============================================================================
+
+        -- ----------------------------------------------------------------------------
+        -- decision_log.trigger -- which evaluation pass wrote the row (BR-37.3)
+        --
+        -- U4 took exactly ONE decision per play (BR-22.1). FR-34 requires a second pass
+        -- when slow enrichment lands, so rows now need to say which pass produced them.
+        --
+        -- ⚠️ THE 909 EXISTING ROWS ARE 'initial' BY CONSTRUCTION, and the DEFAULT is what
+        -- supplies that -- not an UPDATE. Probed 2026-10-02: ALTER TABLE ... ADD COLUMN
+        -- NOT NULL DEFAULT backfills existing rows in SQLite, leaving zero nulls. An
+        -- UPDATE would be a judgement ABOUT those rows; the default is a statement about
+        -- what the code that wrote them could possibly have meant.
+        --
+        -- ⚠️ \`trigger\` IS A SQLITE KEYWORD (CREATE TRIGGER), and using it as a column name
+        -- is the kind of thing that fails in one position and works in four others. Probed
+        -- 2026-10-02 rather than assumed: unquoted ADD COLUMN, SELECT, INSERT and WHERE all
+        -- work. No quoting is needed, and adding some would only hide the question.
+        --
+        -- ⚠️ NO UNIQUE CONSTRAINT IS ADDED HERE OR ANYWHERE BELOW (BR-22.1a, BR-37.2).
+        -- One-decision-per-play was scoped to U4 and enforced by a flag, never by the
+        -- schema, precisely so this migration could stay additive. A UNIQUE index on
+        -- (play_id, rule_id) is the obvious way to express the old rule and would make
+        -- rollback impossible.
+        -- ----------------------------------------------------------------------------
+        ALTER TABLE decision_log ADD COLUMN trigger TEXT NOT NULL DEFAULT 'initial';
+
+        -- ----------------------------------------------------------------------------
+        -- play.context_uri -- ONE column, not two (BR-41.1, corrected 2026-10-02)
+        --
+        -- ⚠️ context_type ALREADY EXISTS. It has been in the schema since v1 (see the
+        -- CREATE TABLE play above), is already read and written, and is already populated
+        -- on backfilled rows -- measured 2026-10-02: 86 'playlist', 2 'artist', and NULL on
+        -- all 765 live plays. Re-adding it would fail the ALTER, abort this migration inside
+        -- its own transaction, and leave the app running DISPLAY-ONLY (NFR-13) with the page
+        -- loading and nothing being recorded.
+        --
+        -- What U5 adds is POPULATING BOTH ON LIVE PLAYS. recently-played carries context;
+        -- the MCP getNowPlaying the poll loop reads does not (BR-41.2) -- so the field was
+        -- available exactly where the outcome variable was not.
+        --
+        -- ⚠️ EVIDENCE ONLY. No rule field is exposed over context in U5, and that is a rule
+        -- rather than a preference (BR-41.3/41.5): context_uri GOES STALE -- it kept naming
+        -- an album through 33 minutes of autoplay by other artists -- so a rule over it would
+        -- classify algorithmic placement as album playback, which is wrong in the direction
+        -- that HIDES what R1 is about.
+        --
+        -- Existing rows stay NULL. NULL is unknown and is never backfilled with a guess, and
+        -- recently-played cannot supply it for a play it has aged out of (a 50-play window).
+        -- ----------------------------------------------------------------------------
+        ALTER TABLE play ADD COLUMN context_uri TEXT;
+
+        -- ----------------------------------------------------------------------------
+        -- skip_attempt -- the action, as a record rather than a side effect
+        --
+        -- ⚠️ A TABLE, NOT COLUMNS ON play. A play may have an attempt that was REFUSED, and
+        -- that must be distinguishable from a play never attempted (BR-36.3). Columns on
+        -- play would force one row's worth of state into the play and lose the refusal.
+        --
+        -- ⚠️ EVERY COLUMN THAT CAN SAY "nothing happened" SAYS WHY. refused_reason is a
+        -- first-class column because fired_at IS NULL has several causes -- some correct
+        -- behaviour, some defects -- and cannot distinguish them. This is U4's play_link
+        -- lesson at higher stakes: "why is this absent" must never be inferred from the
+        -- absence itself.
+        --
+        -- ⚠️ NO retry column, and no attempt counter. Surface, do not retry (FR-48,
+        -- BR-36.4): one attempt is the budget per PLAY ROW, and a failed attempt does not
+        -- earn another. There is deliberately nothing here to increment.
+        -- ----------------------------------------------------------------------------
+        CREATE TABLE skip_attempt (
+          id                           INTEGER PRIMARY KEY AUTOINCREMENT,
+
+          -- The decision this acts on. Joins to decision_log(evaluation_id).
+          evaluation_id                TEXT    NOT NULL,
+
+          -- ⚠️ NOT NULL, unlike decision_log.play_id. An attempt without a play has
+          -- nothing to be one-per (BR-36.1), so the guard would be unenforceable.
+          --
+          -- ⚠️ And the guard is keyed on THE PLAY, never on track_id (BR-36.2). A recurring
+          -- track is a NEW play and stays fully skippable -- suppressing it would be the
+          -- same class of error as clamping completionRatio to 1.0: hygiene that destroys
+          -- signal. FR-40's original "never skip the same track twice in a session" was
+          -- WITHDRAWN for exactly this reason.
+          play_id                      INTEGER NOT NULL,
+
+          -- The track the RULE MATCHED -- not necessarily what was playing when the drain
+          -- ran. The difference is the evidence columns below.
+          track_id                     TEXT    NOT NULL,
+          rule_id                      TEXT    NOT NULL,
+
+          -- queued | cancelled | refused | fired | confirmed | unconfirmed
+          --
+          -- ⚠️ No CHECK constraint, and that is deliberate rather than an omission: SQLite
+          -- has no ALTER TABLE DROP CONSTRAINT, so a CHECK here would have to be widened by
+          -- rebuilding the table -- making a future migration NON-ADDITIVE and retiring the
+          -- rollback guarantee. Migration 006 recorded the same reasoning for skip_source.
+          -- The union is enforced in TypeScript, where it is also exhaustively switched.
+          state                        TEXT    NOT NULL,
+
+          enqueued_at                  TEXT    NOT NULL,
+
+          -- When the POST was issued. NULL while queued, or if it never fired.
+          fired_at                     TEXT,
+
+          -- ⚠️ WHY nothing happened. Never inferred from fired_at being NULL.
+          refused_reason               TEXT,
+
+          -- Evidence: what the API reported immediately before and after the POST (BR-43.2),
+          -- so the BR-43.3 confirmation is auditable after the fact rather than only live.
+          --
+          -- ⚠️ These exist because no fixed timing offset may be assumed (P-34). Probe
+          -- P-U5-1 found the AI DJ has at least three transition behaviours and that one of
+          -- them has a NEGATIVE audio lag -- so even the sign varies, and nothing in the API
+          -- predicts which is coming. Stored observations let the judgement be recomputed;
+          -- a stored verdict alone could not be.
+          reported_track_id_before     TEXT,
+          reported_progress_ms_before  INTEGER,
+          reported_track_id_after      TEXT,
+          reported_progress_ms_after   INTEGER,
+
+          FOREIGN KEY (play_id) REFERENCES play(id)
+        );
+
+        -- BR-36.1's one-attempt-per-play lookup, on every drain.
+        CREATE INDEX idx_skip_attempt_play ON skip_attempt(play_id);
+
+        -- BR-35.2's rolling-hour window, and the startup sweep for surviving 'queued' rows.
+        CREATE INDEX idx_skip_attempt_enqueued ON skip_attempt(enqueued_at);
+
+        -- Joining an attempt back to the decision that caused it (FR-41).
+        CREATE INDEX idx_skip_attempt_evaluation ON skip_attempt(evaluation_id);
+      `);
+    },
+  },
 ];
 
 /**

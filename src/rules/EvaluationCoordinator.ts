@@ -26,12 +26,11 @@
  */
 
 import type { DecisionSummaryInput } from './decisionSummary.js';
-import type { DecisionExecutor } from './LoggingExecutor.js';
 import type { LiveFactSource } from './liveFactSource.js';
 import { assembleFacts } from './trackFacts.js';
 import { decide } from './RuleEngine.js';
 import type { HistoryCounts } from '../history/types.js';
-import type { LoadedRule, Maybe } from './types.js';
+import type { DecisionExecutor, LoadedRule, Maybe } from './types.js';
 
 /** What the coordinator needs from each tick. A projection of the snapshot, not the snapshot. */
 export interface EvaluationSample {
@@ -232,6 +231,8 @@ export class EvaluationCoordinator {
         evaluationId: play.evaluationId,
         decidedAt,
         partialData,
+        // U5: the first pass. FR-34's second pass passes 'enrichment-arrived' (BR-37.3).
+        trigger: 'initial',
       });
 
       this.#decisions += 1;

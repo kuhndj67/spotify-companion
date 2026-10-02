@@ -45,6 +45,7 @@ function play(startedAt: string, overrides: Partial<NewPlayRecord> = {}): NewPla
     provenance: 'live',
     skipSource: null,
     contextType: null,
+    contextUri: null,
     classifierVersion: 1,
     evidence: {
       listenedMs: 0,

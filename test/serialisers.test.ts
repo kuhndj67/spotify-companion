@@ -41,6 +41,7 @@ function play(overrides: Partial<PlayRecord> = {}): PlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    contextUri: null,
     explicit: null,
     albumType: null,
     successorLagMs: null,

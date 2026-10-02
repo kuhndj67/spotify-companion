@@ -76,6 +76,7 @@ function livePlay(): NewPlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    contextUri: null,
     explicit: null,
     albumType: null,
     successorLagMs: null,

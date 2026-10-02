@@ -97,6 +97,7 @@ function play(over: Partial<NewPlayRecord> = {}): NewPlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: 'playlist',
+    contextUri: null,
     explicit: null,
     albumType: null,
     successorLagMs: null,

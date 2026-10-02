@@ -65,6 +65,7 @@ function row(overrides: Partial<PlayRecord> = {}): PlayRecord {
     provenance: 'live',
     skipSource: null,
     contextType: null,
+    contextUri: null,
     classifierVersion: 1,
     evidence: {
       listenedMs: 180_000,

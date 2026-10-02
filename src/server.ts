@@ -433,7 +433,12 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
     releaseDate: enrichmentData?.releaseDate ?? null,
     ageYears: enrichmentData?.ageYears ?? null,
     following: enrichmentData?.following ?? null,
+    // ⚠️ U5 Step 9 populates BOTH from GET /me/player/currently-playing. The MCP getNowPlaying this
+    // sample is built from returns no context at all (BR-41.2) — which is why context_type has been
+    // null on every live play since v1 while backfilled rows carry it. `null` is the honest value
+    // until that fetch exists; it is EVIDENCE ONLY and never a rule input (BR-41.3).
     contextType: null,
+    contextUri: null,
     // U4 / schema v5. `?? null` is the right coalesce here and `?? false` would be a defect:
     // enrichment that has not landed, and a `GET /tracks/{id}` that failed, both arrive as
     // absent — and neither is evidence that the track is clean (BR-31.3b).

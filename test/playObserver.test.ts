@@ -30,6 +30,7 @@ function sample(overrides: Partial<PlaybackSample> = {}): PlaybackSample {
     ageYears: 6,
     following: true,
     contextType: null,
+    contextUri: null,
     explicit: null,
     albumType: null,
     ...overrides,
@@ -176,6 +177,8 @@ describe('degraded operation (BR-3.8, BR-3.9)', () => {
         throw new Error('unused');
       },
       v5Watermark: () => null,
+      // U5, BR-35.1. Unused here: PlayObserver does not count rule skips.
+      recentPlaysForCounting: () => [],
       coverage: () => {
         throw new Error('unused');
       },

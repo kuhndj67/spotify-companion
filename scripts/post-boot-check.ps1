@@ -15,6 +15,28 @@
 
   Run with -Baseline BEFORE rebooting, then with no arguments afterwards.
 
+  ## !! SCOPE LIMIT, recorded 2026-10-01: this is a REBOOT test, and it misreads a RESUME
+
+  On 2026-09-30 a WSL update installed by Windows Update *during Modern Standby* destroyed the WSL
+  VM; recording was silently down ~13 hours. The host never rebooted -- only the VM died -- and
+  `restart: unless-stopped` recovered the container by itself once dockerd returned.
+
+  This script reported VERDICT: INCONCLUSIVE (exit 2) while EVERY substantive check passed, because
+  of one inference: "container started N seconds after boot -- too long to credit the chain; was it
+  started by hand?"
+
+  !! IT CANNOT DISTINGUISH "started by hand" FROM "restarted by the restart policy after the engine
+  came back" -- and the second is the chain WORKING. The boot-clock delta is meaningless when the
+  thing that restarted was the container engine rather than the host.
+
+  So after a Rancher Desktop or WSL upgrade, READ THE INDIVIDUAL [PASS] LINES, not the verdict.
+  A verdict that is wrong in a known case trains people to ignore it, which is worse than no verdict
+  -- the same reason `unverifiable` is not reported as a failure in verify-all-backups.mjs.
+
+  !! AND THIS SCRIPT CANNOT BE THE MONITOR FOR THAT FAILURE MODE. It is run by hand, after the fact.
+  Detecting "the container is not running" needs something OUTSIDE the container, on a timer. See
+  `audit.md` 2026-10-01 and metric M4 in the U5 NFR plan.
+
 .EXAMPLE
   powershell -File scripts/post-boot-check.ps1 -Baseline    # before the reboot
   powershell -File scripts/post-boot-check.ps1              # after logging back in

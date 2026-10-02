@@ -133,8 +133,8 @@ play*. See `requirements.md` §FR-40.
 
 | # | Rule | Source |
 |---|---|---|
-| **BR-36.1** | **At most one skip attempt per play row.** The second attempt against the same play is refused | FR-40 as amended, Q7 |
-| **BR-36.2** | ⚠️ The guard is keyed on the **play**, never on `track_id`. A recurring track is a **new play** and remains fully skippable | Q7 (user) |
+| **BR-36.1** | **At most one skip attempt per play.** The second attempt against the same play is refused. ⚠️ **Keyed on `evaluationId`, not on a play row id** — amended 2026-10-02: the play row does not exist while the play is open, so a `playId`-keyed guard is unenforceable at the action point | FR-40 as amended, Q7 |
+| **BR-36.2** | ⚠️ The guard is keyed on the **play** (via `evaluationId`), never on `track_id`. A recurring track is a **new play** with a new `evaluationId` and remains fully skippable | Q7 (user) |
 | **BR-36.3** | The refusal is **recorded**, not silent. A play whose skip was refused for this reason is distinguishable from one never attempted | FR-48 |
 | **BR-36.4** | The guard holds **regardless of whether the attempt succeeded**. One attempt is the budget; a failed attempt does not earn a retry | FR-48 — *surface, do not retry* |
 | **BR-36.5** | It survives a restart in the sense that matters: a play row is closed by then, so no attempt can be made against it at all | BR-36.1 |

@@ -30,13 +30,32 @@ import type { Maybe } from '../rules/types.js';
  */
 export interface SkipAttempt {
   readonly id: number;
-  /** The decision this attempt acts on. Joins to `DecisionLogEntry`. */
+  /**
+   * ⚠️ **THE ONE-ATTEMPT-PER-PLAY GUARD KEYS ON THIS** (BR-36.1), not on `playId`.
+   *
+   * `evaluationId` is created once per play in `PlayObserver`'s `onPlayStarted` and is shared by both
+   * decision passes (`initial` and `enrichment-arrived`). It is the per-play identifier that exists
+   * **while the play is open**, which is when a skip has to happen.
+   *
+   * Also joins to `DecisionLogEntry`, which uses the same key for the same reason.
+   */
   readonly evaluationId: string;
   /**
-   * ⚠️ **Not nullable, unlike `DecisionLogEntry.playId`.** An attempt without a play has nothing to
-   * be one-per (BR-36.1).
+   * ⚠️ **NULLABLE, and the Functional Design said the opposite — corrected 2026-10-02.**
+   *
+   * `domain-entities.md` §1 specified non-nullable, reasoning that *"an attempt without a play has
+   * nothing to be one-per"*. The reasoning is sound and the conclusion was **impossible**:
+   * `PlayObserver` writes the play row in `recordPlay`, which runs when the play **closes**. A skip
+   * must happen **while the play is still playing**, so at the action point there is no `playId`.
+   *
+   * ⚠️ **Non-nullable would have thrown a constraint violation on the first real skip** — in the one
+   * unit whose failures are audible. Found while writing the drain, before migration 007 had run.
+   *
+   * The guard keys on **`evaluationId`** instead (see below). This is backfilled when the play closes,
+   * exactly as `DecisionLogEntry.playId` already is. `null` means *the play had not been written yet*,
+   * never *there was no play*.
    */
-  readonly playId: number;
+  readonly playId: Maybe<number>;
   /** The track the **rule matched** — not necessarily the one playing when the drain runs. */
   readonly trackId: string;
   readonly ruleId: string;

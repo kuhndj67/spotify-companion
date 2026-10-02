@@ -201,6 +201,26 @@ describe('skip_attempt', () => {
     db.close();
   });
 
+  it('⭐ play_id is NULLABLE, because the play row does not exist yet when a skip fires', () => {
+    // domain-entities §1 specified NOT NULL, reasoning that "an attempt without a play has nothing to
+    // be one-per". The reasoning was sound and the conclusion impossible: PlayObserver writes the play
+    // row in recordPlay, which runs when the play CLOSES. A skip happens while the play is still
+    // playing, so NOT NULL would have thrown a constraint violation on the first real skip -- in the
+    // one unit whose failures are audible. Amended 2026-10-02, before 007 had ever run.
+    const db = atV6();
+    migrateTo7(db);
+    const info = db
+      .prepare(`SELECT name, "notnull" FROM pragma_table_info('skip_attempt')`)
+      .all() as { name: string; notnull: number }[];
+
+    const playId = info.find((c) => c.name === 'play_id');
+    assert.equal(playId?.notnull, 0, 'play_id must be nullable');
+
+    const evaluationId = info.find((c) => c.name === 'evaluation_id');
+    assert.equal(evaluationId?.notnull, 1, 'evaluation_id is the guard key and must be NOT NULL');
+    db.close();
+  });
+
   it('⚠️ has NO retry column and no attempt counter', () => {
     // FR-48 / BR-36.4: surface, do not retry. One attempt is the budget per play row, so there is
     // deliberately nothing here to increment. This must be true of the schema, not only of the code.
@@ -242,9 +262,14 @@ describe('skip_attempt', () => {
         .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='skip_attempt'`)
         .all() as { name: string }[]
     ).map((r) => r.name);
-    assert.ok(names.includes('idx_skip_attempt_play'), 'BR-36.1 lookup on every drain');
+    // ⚠️ BR-36.1's guard keys on evaluation_id, not play_id -- see the column comment in migration
+    // 007. Indexing only play_id would have left the hot path (every drain) unindexed.
+    assert.ok(
+      names.includes('idx_skip_attempt_evaluation_play'),
+      'BR-36.1 lookup on every drain, keyed on evaluation_id',
+    );
     assert.ok(names.includes('idx_skip_attempt_enqueued'), 'BR-35.2 rolling window, startup sweep');
-    assert.ok(names.includes('idx_skip_attempt_evaluation'), 'joining back to the decision (FR-41)');
+    assert.ok(names.includes('idx_skip_attempt_play'), 'the analysis join, once play_id is backfilled');
     db.close();
   });
 });

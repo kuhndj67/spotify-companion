@@ -42,7 +42,11 @@ function insertPlay(db: DatabaseSync, trackId: string, startedAt: string): numbe
   return row.id;
 }
 
-function attempt(playId: number, trackId: string, over: Partial<NewSkipAttempt> = {}): NewSkipAttempt {
+function attempt(
+  playId: number,
+  trackId: string,
+  over: Partial<NewSkipAttempt> = {},
+): NewSkipAttempt {
   return {
     evaluationId: `ev-${playId}`,
     playId,
@@ -132,34 +136,73 @@ describe('PBT-49 — a SkipAttempt round-trips by value', () => {
   });
 });
 
-describe('⭐ PBT-37 — the one-attempt guard keys on the PLAY, never the track', () => {
-  it('a second attempt on the SAME PLAY is detected', () => {
+describe('⭐ PBT-37 — the guard keys on evaluationId (the PLAY), never the track', () => {
+  it('a second attempt for the SAME evaluationId is detected', () => {
     const db = freshDb();
     const repo = new SqliteSkipAttemptRepository(db);
     const playId = insertPlay(db, 't1', '2026-10-02T09:00:00.000Z');
 
-    assert.equal(repo.attemptedForPlay(playId), false, 'nothing attempted yet');
-    repo.enqueue(attempt(playId, 't1'));
-    assert.equal(repo.attemptedForPlay(playId), true);
+    assert.equal(repo.attemptedForPlay('ev-1'), false, 'nothing attempted yet');
+    repo.enqueue(attempt(playId, 't1', { evaluationId: 'ev-1' }));
+    assert.equal(repo.attemptedForPlay('ev-1'), true);
     db.close();
   });
 
   it('⚠️ the SAME TRACK on a NEW PLAY is NOT blocked — a repeat listen stays skippable', () => {
-    // This is the half a track_id-keyed guard would fail, silently: the listener chose to hear the
-    // track again, and their rule would never fire for it.
+    // The half a track_id-keyed guard would fail, silently: the listener chose to hear the track
+    // again, and their rule would never fire for it.
     const db = freshDb();
     const repo = new SqliteSkipAttemptRepository(db);
     const first = insertPlay(db, 'same-track', '2026-10-02T09:00:00.000Z');
     const second = insertPlay(db, 'same-track', '2026-10-02T11:00:00.000Z');
 
-    repo.enqueue(attempt(first, 'same-track'));
+    repo.enqueue(attempt(first, 'same-track', { evaluationId: 'ev-first' }));
 
-    assert.equal(repo.attemptedForPlay(first), true);
+    assert.equal(repo.attemptedForPlay('ev-first'), true);
     assert.equal(
-      repo.attemptedForPlay(second),
+      repo.attemptedForPlay('ev-second'),
       false,
-      'a recurring track is a NEW play row and must remain fully skippable (BR-36.2)',
+      'a recurring track is a NEW play with a NEW evaluationId, and stays fully skippable (BR-36.2)',
     );
+    assert.ok(second > first);
+    db.close();
+  });
+
+  it('⚠️ WORKS WHILE playId IS STILL NULL — which is the normal case at the action point', () => {
+    // PlayObserver writes the play row at CLOSE, so during the play there is no playId. A
+    // playId-keyed guard would have been unenforceable exactly when it is needed, and NOT NULL on
+    // that column would have thrown on the first real skip.
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+
+    const id = repo.enqueue(attempt(0, 't1', { evaluationId: 'ev-open', playId: null }));
+    assert.equal(repo.get(id)?.playId, null);
+    assert.equal(repo.attemptedForPlay('ev-open'), true, 'the guard works with no play row at all');
+    db.close();
+  });
+
+  it('attachPlayId backfills once the play closes, and the guard is unaffected', () => {
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+    const id = repo.enqueue(attempt(0, 't1', { evaluationId: 'ev-open', playId: null }));
+    const playId = insertPlay(db, 't1', '2026-10-02T09:00:00.000Z');
+
+    repo.attachPlayId('ev-open', playId);
+
+    assert.equal(repo.get(id)?.playId, playId);
+    assert.equal(repo.attemptedForPlay('ev-open'), true, 'the guard never read this column');
+    db.close();
+  });
+
+  it('⚠️ attachPlayId does not overwrite a playId already set', () => {
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+    const first = insertPlay(db, 't1', '2026-10-02T09:00:00.000Z');
+    const second = insertPlay(db, 't2', '2026-10-02T10:00:00.000Z');
+    const id = repo.enqueue(attempt(first, 't1', { evaluationId: 'ev-x' }));
+
+    repo.attachPlayId('ev-x', second);
+    assert.equal(repo.get(id)?.playId, first, 'the first write wins; a re-link is not a correction');
     db.close();
   });
 
@@ -169,10 +212,10 @@ describe('⭐ PBT-37 — the one-attempt guard keys on the PLAY, never the track
     const repo = new SqliteSkipAttemptRepository(db);
     const playId = insertPlay(db, 't1', '2026-10-02T09:00:00.000Z');
 
-    const id = repo.enqueue(attempt(playId, 't1'));
+    const id = repo.enqueue(attempt(playId, 't1', { evaluationId: 'ev-u' }));
     repo.transition(id, 'unconfirmed', { firedAt: '2026-10-02T10:00:05.000Z' });
 
-    assert.equal(repo.attemptedForPlay(playId), true, 'an unconfirmed attempt still spent the budget');
+    assert.equal(repo.attemptedForPlay('ev-u'), true, 'an unconfirmed attempt still spent the budget');
     db.close();
   });
 
@@ -180,9 +223,9 @@ describe('⭐ PBT-37 — the one-attempt guard keys on the PLAY, never the track
     const db = freshDb();
     const repo = new SqliteSkipAttemptRepository(db);
     const playId = insertPlay(db, 't1', '2026-10-02T09:00:00.000Z');
-    const id = repo.enqueue(attempt(playId, 't1'));
+    const id = repo.enqueue(attempt(playId, 't1', { evaluationId: 'ev-r' }));
     repo.transition(id, 'refused', { refusedReason: 'automation-off' });
-    assert.equal(repo.attemptedForPlay(playId), true);
+    assert.equal(repo.attemptedForPlay('ev-r'), true);
     db.close();
   });
 });

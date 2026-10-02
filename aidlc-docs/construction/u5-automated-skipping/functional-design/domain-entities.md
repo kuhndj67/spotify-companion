@@ -23,8 +23,8 @@ a `Decision` into an **action that can be refused, queued, cancelled, audited an
 | Field | Type | Notes |
 |---|---|---|
 | `id` | integer | Surrogate key |
-| `evaluationId` | string | The decision this attempt acts on. Joins to `DecisionLogEntry` |
-| `playId` | number | ⚠️ **Not nullable, unlike `DecisionLogEntry.playId`.** An attempt without a play has nothing to be one-per (BR-36.1) |
+| `evaluationId` | string | ⚠️ **THE GUARD KEYS ON THIS** (BR-36.1), not on `playId`. Created once per play in `onPlayStarted`, shared by both decision passes, and available **while the play is open** |
+| `playId` | `Maybe<number>` | ⚠️ **AMENDED 2026-10-02 — nullable.** This said *non-nullable: an attempt without a play has nothing to be one-per*. The reasoning was sound and the conclusion **impossible** — see the note below |
 | `trackId` | string | The track the **rule matched** |
 | `ruleId` | string | The rule that caused it |
 | `state` | `SkipAttemptState` | See below. The whole entity is this field plus its evidence |
@@ -57,6 +57,25 @@ a `Decision` into an **action that can be refused, queued, cancelled, audited an
 | `already-attempted` | BR-36.1 — one attempt per play |
 | `play-closed` | BR-42.5 — the play ended while queued |
 | `rate-limited` | BR-35.2 |
+
+> ### ⚠️ AMENDED 2026-10-02: `playId` is nullable, and the guard keys on `evaluationId`
+>
+> This document specified `playId` **non-nullable**, reasoning that *"an attempt without a play has
+> nothing to be one-per (BR-36.1)"*. **The reasoning is sound and the conclusion was impossible.**
+>
+> `PlayObserver` writes the play row in `recordPlay`, which runs when the play **closes**, and only
+> then fires `onPlayRecorded`. **A skip must happen while the play is still playing**, so at the action
+> point there is no `playId` to record. `NOT NULL` would have thrown a constraint violation on the
+> first real skip — in the one unit whose failures are audible.
+>
+> ✅ **The guard keys on `evaluationId` instead**, which is created once per play in `onPlayStarted`,
+> is shared by both decision passes, and exists throughout the play. One attempt per `evaluationId` is
+> one attempt per play, exactly as BR-36.1 intends. `playId` is **backfilled** when the play closes,
+> exactly as `DecisionLogEntry.playId` already is, so the analysis join is unchanged.
+>
+> ⚠️ **Found while writing the drain (Step 6), before migration 007 had ever run** — so the schema was
+> amended rather than migrated twice. The user chose this resolution over writing the play row at play
+> start, which would have rewritten the write path of the one table that cannot be regenerated.
 
 > ### ⚠️ `refusedReason` is a first-class field for the same reason `playLink` was in U4
 >

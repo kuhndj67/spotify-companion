@@ -16,6 +16,7 @@ Plan: [`../../plans/u5-infrastructure-design-plan.md`](../../plans/u5-infrastruc
 |---|---|
 | `decision_log` | **+ `trigger` TEXT** — `initial` \| `enrichment-arrived` |
 | `play` | **+ `context_uri` TEXT** nullable — ⚠️ **ONE column, not two** |
+| `skip_attempt.play_id` | ⚠️ **NULLABLE** — amended 2026-10-02. The play row is written at close, so there is no `playId` when a skip fires. The guard keys on `evaluation_id` |
 | new table | **`skip_attempt`** — holds the `SkipAttempt` entity |
 
 ### ⚠️ CORRECTED 2026-10-02: `context_type` ALREADY EXISTS and migration 007 must not re-add it

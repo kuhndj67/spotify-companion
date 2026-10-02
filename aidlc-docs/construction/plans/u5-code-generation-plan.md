@@ -252,7 +252,12 @@ against a fake player client before `server.ts` ever constructs the real one.
       deliberate: whether it landed is *unknown*, and unknown counts as landed (P-30's rule applied
       to a safety limit). A halt that under-counts is a halt that does not fire
 - [x] ⚠️ `transition` writes state **and its evidence fields in one statement** (BR-43.2)
-- [x] ⚠️ `attemptedForPlay` keyed on **`playId`, never `trackId`** — **PBT-37** pins both directions
+- [x] ⚠️ `attemptedForPlay` keyed on **`evaluationId`, never `trackId`** — **PBT-37** pins both
+      directions, plus the case that forced the change: it works **while `playId` is still null**
+- [x] ⚠️ **`skip_attempt.play_id` is NULLABLE and the FD said otherwise.** `PlayObserver` writes the
+      play row at **close**, so there is no `playId` while the play is open — which is when a skip must
+      happen. `NOT NULL` would have thrown on the first real skip. Amended in migration 007 **before it
+      had ever run**; `playId` is backfilled via `attachPlayId`, as `decision_log` already does
 - [x] ⚠️ Normalise `undefined → null` before persisting — **PBT-49**
 
 ### Step 5 — `AutomationStateStore` and `spotifyPlayerClient` — ✅ DONE 2026-10-02

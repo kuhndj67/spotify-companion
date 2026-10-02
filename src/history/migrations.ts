@@ -602,18 +602,36 @@ export const MIGRATIONS: readonly Migration[] = [
         CREATE TABLE skip_attempt (
           id                           INTEGER PRIMARY KEY AUTOINCREMENT,
 
-          -- The decision this acts on. Joins to decision_log(evaluation_id).
-          evaluation_id                TEXT    NOT NULL,
-
-          -- ⚠️ NOT NULL, unlike decision_log.play_id. An attempt without a play has
-          -- nothing to be one-per (BR-36.1), so the guard would be unenforceable.
+          -- ⚠️ THE GUARD KEYS ON THIS, and that is a correction made 2026-10-02.
           --
-          -- ⚠️ And the guard is keyed on THE PLAY, never on track_id (BR-36.2). A recurring
+          -- evaluation_id is created once per play, in PlayObserver's onPlayStarted, and is
+          -- shared by both decision passes (initial and enrichment-arrived). It is the
+          -- per-play identifier that EXISTS WHILE THE PLAY IS OPEN -- which is when a skip
+          -- has to happen.
+          --
+          -- ⚠️ The guard is keyed on THE PLAY, never on track_id (BR-36.2). A recurring
           -- track is a NEW play and stays fully skippable -- suppressing it would be the
           -- same class of error as clamping completionRatio to 1.0: hygiene that destroys
           -- signal. FR-40's original "never skip the same track twice in a session" was
           -- WITHDRAWN for exactly this reason.
-          play_id                      INTEGER NOT NULL,
+          evaluation_id                TEXT    NOT NULL,
+
+          -- ⚠️ NULLABLE, and the Functional Design said the opposite.
+          --
+          -- domain-entities §1 specified NOT NULL, reasoning that "an attempt without a play
+          -- has nothing to be one-per". The reasoning is sound and the conclusion was
+          -- impossible: PlayObserver writes the play row at recordPlay, which runs when the
+          -- play CLOSES, and then fires onPlayRecorded. A skip must happen WHILE THE PLAY IS
+          -- STILL PLAYING, so at the action point there is no play_id to record.
+          --
+          -- NOT NULL here would have thrown a constraint violation on the first real skip --
+          -- in the one unit whose failures are audible. Found 2026-10-02 while writing the
+          -- drain; amended before this migration had ever run.
+          --
+          -- Backfilled when the play closes, exactly as decision_log.play_id already is,
+          -- so the join for later analysis is unchanged. NULL means "the play had not been
+          -- written yet", never "there was no play".
+          play_id                      INTEGER,
 
           -- The track the RULE MATCHED -- not necessarily what was playing when the drain
           -- ran. The difference is the evidence columns below.
@@ -653,14 +671,17 @@ export const MIGRATIONS: readonly Migration[] = [
           FOREIGN KEY (play_id) REFERENCES play(id)
         );
 
-        -- BR-36.1's one-attempt-per-play lookup, on every drain.
+        -- ⚠️ BR-36.1's one-attempt-per-play lookup runs on EVERY drain, and it keys on
+        -- evaluation_id rather than play_id -- see the column comment. Indexing play_id
+        -- instead would have left the hot query unindexed.
+        CREATE INDEX idx_skip_attempt_evaluation_play ON skip_attempt(evaluation_id);
+
+        -- For the analysis join once play_id has been backfilled.
         CREATE INDEX idx_skip_attempt_play ON skip_attempt(play_id);
 
         -- BR-35.2's rolling-hour window, and the startup sweep for surviving 'queued' rows.
         CREATE INDEX idx_skip_attempt_enqueued ON skip_attempt(enqueued_at);
 
-        -- Joining an attempt back to the decision that caused it (FR-41).
-        CREATE INDEX idx_skip_attempt_evaluation ON skip_attempt(evaluation_id);
       `);
     },
   },

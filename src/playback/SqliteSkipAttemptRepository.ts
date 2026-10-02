@@ -14,7 +14,7 @@ import type { NewSkipAttempt, RefusalReason, SkipAttempt, SkipAttemptState } fro
 interface AttemptRow {
   id: number;
   evaluation_id: string;
-  play_id: number;
+  play_id: number | null;
   track_id: string;
   rule_id: string;
   state: string;
@@ -54,6 +54,7 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
   readonly #queued: StatementSync;
   readonly #attempted: StatementSync;
   readonly #firedSince: StatementSync;
+  readonly #attachPlay: StatementSync;
   readonly #db: DatabaseSync;
 
   constructor(db: DatabaseSync) {
@@ -71,9 +72,15 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
 
     this.#queued = db.prepare(`SELECT * FROM skip_attempt WHERE state = 'queued' ORDER BY id`);
 
-    // ⚠️ play_id, never track_id (BR-36.2). Uses idx_skip_attempt_play; runs on every drain.
+    // ⚠️ evaluation_id — the per-play key that exists while the play is OPEN. Never play_id (which
+    // is null until the play closes) and never track_id (BR-36.2). Uses
+    // idx_skip_attempt_evaluation_play; runs on every drain.
     this.#attempted = db.prepare(
-      `SELECT COUNT(*) AS c FROM skip_attempt WHERE play_id = ?`,
+      `SELECT COUNT(*) AS c FROM skip_attempt WHERE evaluation_id = ?`,
+    );
+
+    this.#attachPlay = db.prepare(
+      `UPDATE skip_attempt SET play_id = ? WHERE evaluation_id = ? AND play_id IS NULL`,
     );
 
     // ⚠️ Filters on state, not merely on fired_at being non-null: a row could in principle carry a
@@ -139,9 +146,13 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     return (this.#queued.all() as unknown as AttemptRow[]).map(toAttempt);
   }
 
-  attemptedForPlay(playId: number): boolean {
-    const row = this.#attempted.get(playId) as unknown as { c: number };
+  attemptedForPlay(evaluationId: string): boolean {
+    const row = this.#attempted.get(evaluationId) as unknown as { c: number };
     return row.c > 0;
+  }
+
+  attachPlayId(evaluationId: string, playId: number): void {
+    this.#attachPlay.run(playId, evaluationId);
   }
 
   firedSinceMs(sinceIso: string): number[] {

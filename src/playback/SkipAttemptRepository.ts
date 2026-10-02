@@ -60,16 +60,32 @@ export interface SkipAttemptRepository {
   /**
    * Has any attempt already been made for this play?
    *
-   * ⚠️ **Keyed on the PLAY ROW, never on `track_id`** (BR-36.1/36.2). A recurring track is a new play
-   * and stays fully skippable. FR-40's original wording — *never skip the same track twice within one
-   * session* — was **withdrawn** because suppressing a repeat listen is the same class of error as
-   * clamping `completionRatio` to 1.0: hygiene that destroys signal. It also required a definition of
-   * "session" that this corpus has never modelled.
+   * ⚠️ **Keyed on `evaluationId`, which identifies the PLAY** — not on `playId`, and never on
+   * `trackId`.
+   *
+   * `playId` does not exist yet while the play is open (`PlayObserver` writes the row at close), so a
+   * `playId`-keyed guard is unenforceable at the action point. `evaluationId` is created once per play
+   * in `onPlayStarted` and is available throughout. Corrected 2026-10-02.
+   *
+   * ⚠️ **Never `trackId`** (BR-36.2). A recurring track is a new play and stays fully skippable.
+   * FR-40's original wording — *never skip the same track twice within one session* — was **withdrawn**
+   * because suppressing a repeat listen is the same class of error as clamping `completionRatio` to
+   * 1.0: hygiene that destroys signal. It also required a definition of "session" this corpus has
+   * never modelled.
    *
    * ⚠️ **True regardless of the attempt's outcome** (BR-36.4). One attempt is the budget; a failed
    * attempt does not earn a retry.
    */
-  attemptedForPlay(playId: number): boolean;
+  attemptedForPlay(evaluationId: string): boolean;
+
+  /**
+   * Backfill `playId` once the play row exists, from `PlayObserver`'s `onPlayRecorded`.
+   *
+   * ⚠️ **Convenience for later analysis, never load-bearing for the guard.** Exactly the role
+   * `DecisionLogRepository.attachPlayId` plays for the decision log — and if it never runs, the guard
+   * is unaffected because it does not read this column.
+   */
+  attachPlayId(evaluationId: string, playId: number): void;
 
   /**
    * Epoch-millisecond timestamps of attempts that **reached the player** since `sinceIso`, for

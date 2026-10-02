@@ -492,7 +492,9 @@ this way, one of them a security bypass.
 | **In-app analysis, dashboards, charts, statistical modelling** | User decision 2026-08-25 — mature tools exist. The app's obligation is export quality (§3.5), not analysis |
 | **HTTP data API / live dashboard integration** | User decision 2026-08-25 — needs a security architecture this project does not have. See §5.1 |
 | **Group-alias and comma-in-name artist resolution** | User decision 2026-09-23 — noted, not built. Affects the derived reporting DB only, no rule or gate input. See §5.1 **W-4** |
-| **Full user-data backup and restore** | User decision 2026-09-26 — deferred, not dismissed. See §5.1 **W-5**. ⚠️ A **minimal** `history.db` backup/restore is a **U5 prerequisite** for migration 007; W-5 is the full-inventory version, and it includes the `metabase-app-db` named volume that no tree-walking backup would find |
+| **Full user-data backup and restore** | User decision 2026-09-26 — deferred, not dismissed. See §5.1 **W-5**. ⚠️ A **minimal** `history.db` backup/restore is a **U5 prerequisite** for migration 007; W-5 is the full-inventory version, and it includes the `metabase-app-db` named volume that no tree-walking backup would find. ✅ The minimal half was **built and verified 2026-09-27/29** |
+| **Adaptive poll backoff when idle** | Measured 2026-09-30 while answering U5 NFR Q8: the 3 s poll is **98.4%** of the app's Spotify footprint and never stops — ~86,000 requests over the 2.5-day idle of 2026-09-29. See §5.1 **W-7**. ⚠️ Deferred because it changes the **recording instrument**, and it is **blocked on the U5 M1–M4 metrics** — without a counter there is no before-and-after |
+| **Systematic defect-class detection for an agent-authored codebase** | User question 2026-09-29, after three dead artefacts in eight days that the suite never saw. See §5.1 **W-6**, triggered at the **end of U5**. ⚠️ Two of the six recommendations were **not** deferred — CI entry-point execution and `knip` went into the U5 NFR Design plan (**Q9**, **P-36**) |
 
 ### 5.1 Wishlist — deferred, not rejected
 
@@ -801,7 +803,7 @@ same standing the project applies to anything unprobed.
 | `data/history.db` **+ `-wal` + `-shm`** | The play corpus. ⚠️ WAL checkpoint required first — see above |
 | `config/rules.json` | User-authored rules |
 | **`metabase-app-db`** | ⚠️ **A named Docker volume in a DIFFERENT compose project** (`reporting/compose.yaml`), holding the dashboards and questions built over the Metabase API. It is **not** a bind mount, so it does not appear anywhere in `data/` and would be missed by any backup that walks the project tree. Restoring it needs `docker run --rm -v metabase-app-db:/v …` tar work — a different mechanism from copying a file |
-| `config/automation-state.json` | **From U5** — the kill switch and runaway-halt latches. Does not exist yet |
+| `state/automation-state.json` | **From U5** — the kill switch and runaway-halt latches. Does not exist yet. ⚠️ **Path amended 2026-10-01** (was `config/`): it lives on a separate `./state:/state:rw` mount so `config/` stays read-only. ⚠️ **W-5 must NOT back this up** — restoring an old latch would silently re-arm automation, and a kill switch recoverable from an archive is not reliably off |
 
 **Derived — regenerable, so restore may skip it:** `data/reporting/reporting.db` (rebuilt in place),
 `data/snapshots/` (re-exportable from `history.db`), `data/artist-credits.json`.
@@ -839,6 +841,161 @@ restore path is the defect this item exists to fix** § decide the `secrets/` qu
 **Prerequisite**: none technically. ⚠️ The `secrets/` question should be settled before the first
 archive is written, because changing your mind afterwards means the earlier archives are already the
 thing you decided against.
+
+---
+
+#### W-6 — Defect-class detection for an agent-authored codebase
+
+**Raised by the user, 2026-09-29**, after three dead-or-broken artefacts surfaced in eight days
+without the test suite noticing any of them: *"So we seem to be getting a LOT of 'unforced errors'
+emerging from the codebase. Things that are dead or don't work as expected and are not being caught
+by our test suite. What is the best practice when working with a primarily agent coded app to review
+the code and detect problems with it, the pipeline, the test suite or other project tools and
+artifacts?"*
+
+**What it would enable**: catching the class of defect this project keeps finding *by accident*,
+before it is found by accident.
+
+### ⚠️ The evidence this was raised against — the suite has never caught one of these
+
+Every notable defect in the project record, with how it was actually found:
+
+| Defect | Found by |
+|---|---|
+| `skip_source` asserted rather than observed | the user noticing *"I never skip Ren"* |
+| `played_at` is the END, not the start — 41 duplicate rows | a human seeing one chart number move |
+| `RecentlyPlayedBackfill` untested while writing ⅓ of the corpus | the same observation |
+| WebSocket `403` — access policy re-implemented and diverged | running the container |
+| Three U2 `error`-vs-`unknown` defects | watching a real failure get *recorded* |
+| `recordSuccessorLag` / `updateSkipAttribution` dead their whole lives | a manual measurement that needed the field |
+| Ten backups with no restore path | reading the U5 plan |
+| `npm run reclassify` dead for a week | accident, while fixing the lock guard |
+| Six API traps · `fs.watch` · WAL-on-bind-mount · the blind lock guard | probes |
+
+⚠️ **Essentially none were caught by the 891 tests, and that is structural rather than a quality
+problem.** The suite does real regression work invisibly; this class is simply outside its reach,
+and **coverage actively conceals it** — `test/noOrphanModules.test.ts`'s own docstring records why
+(an untested file leaves the *denominator* rather than scoring zero).
+
+### The five categories, and why tests cannot see them
+
+| | Category | Why the suite is blind to it |
+|---|---|---|
+| **A** | Code nothing executes — dead files, methods, entry points | Untested code leaves the coverage denominator; the orphan check walks **modules, not methods**, and **`src/` only** |
+| **B** | Code executed only with inputs that cannot fail it | A check that has never seen bad input is indistinguishable from one that always passes — PBT-22 against always-zero counts |
+| **C** | Duplicated knowledge that drifts | Both copies pass their own tests. The WebSocket `403`, `bucketOf`, `USER_SKIP_RATIO_CEILING` |
+| **D** | Assertions recorded as observations | **The code does exactly what it says.** `skip_source`, `played_at`, *"loses over half the corpus"*, the lock guard's docstring |
+| **E** | Environment mismatches | Tests do not run in the container. SQLite locks not crossing the bind mount, `fs.watch`, `:ro`, Development Mode |
+
+### ⚠️ What is specifically amplified by agent authorship
+
+**1. Co-generated tests share the author's misconception.** When one pass writes both the
+implementation and its tests, the tests encode the same mental model — so if the model is wrong,
+both are wrong **and they agree**. This is exactly the WebSocket `403`: the tests exercised the
+policy function (correct) and nothing exercised the handler (which held a copy), and **all 411 tests
+passed**. A human writing tests a week later brings a fresh model; an agent writing them in the same
+breath does not.
+
+**2. Agents make things look finished, and a confident comment is the most dangerous artefact in the
+repo.** The lock guard shipped with a docstring arguing why it was *"a real test of the dangerous
+condition rather than a proxy for it"*. It was blind, and it **outlived the corruption incident it
+had failed to prevent**. `reclassify`'s header said it refuses to apply; it could not. ⚠️ A human
+writing that sentence is making a claim they feel accountable for; an agent is pattern-matching to
+what such a comment usually says — **and the comment then stops the next reader from checking.**
+
+**3. Agents re-implement rather than retrieve.** Three instances: the access policy copied into the
+upgrade handler, `bucketOf` re-implemented in `trackPlayStats`, `USER_SKIP_RATIO_CEILING` copied into
+`attribute-skips.mjs`.
+
+**4. Agents run the tests, not the app.** Which is why the table above is dominated by *running the
+system* and *probing* rather than by CI.
+
+### The deferred items — W-6 proper
+
+⚠️ **Two of the six recommendations were NOT deferred**: *execute every entry point in CI* and
+*`knip` for unused exports across `src/` and `scripts/`* went into the **U5 NFR Design plan** (Q9,
+P-36) on 2026-09-29, because they are ~an hour together and would have caught two of the last three
+findings. **W-6 is the remaining four.**
+
+| | Item | Targets | Note |
+|---|---|---|---|
+| **W-6.1** | **Mutation testing on the pure core** — `outcomeClassifier`, `predicate`/`ruleEngine`, `playStats`, `factReconstructor`, `statusBar`, `serialisers` | **B** | Measures *would my tests notice if the code were wrong* — the question coverage cannot ask. ⚠️ Direct evidence it is needed: PBT-22 passed trivially against always-zero counts, and that was caught **by hand**. ⚠️ Stryker has **no first-class `node:test` runner**; it would run through the command runner — slower, acceptable on pure modules. ⚠️ **Probe that claim before scheduling** — it is read from documentation, which is exactly what this project does not trust |
+| **W-6.2** | **Generate tests from the BR numbers, not from the code** — a session writes tests from `business-rules.md` **without reading `src/`** | **B, C, D** | ⭐ The strongest lever available, and nearly free: the artefact already exists as numbered, individually testable statements written *before* the code. Makes two things measurable — a BR with no test is the coverage gap that matters, and a test not traceable to a BR is probably testing what the code *does* rather than what it *should* |
+| **W-6.3** | **Negative control as a convention** — every guard, validator or classifier ships with a case proving it **rejects** | **B** | ⚠️ Independently invented twice already (PBT-22a; `restore-history.mjs --self-test` against the CORRUPT snapshot). Promoting it to a rule is recognising a pattern, not adding one |
+| **W-6.4** | **Environment-parity probes in the container** — any claim about locks, mounts, watchers or permissions is probed where the app runs | **E** | The API probe rule, applied to the runtime. ⚠️ The blind lock guard was reasoned about on the **host**. `scripts/post-boot-check.ps1` is the right instrument — **grow it** rather than writing new ad-hoc probes |
+
+**Explicitly rejected**: chasing a coverage percentage. It answers the wrong question, and this
+project has already been bitten by its denominator twice.
+
+**Review questions for an agent-authored diff** (cheap, and they catch most of the above):
+
+> *What did this make unreachable? What does it duplicate? What behavioural claim does a comment
+> make, and is it tested? Where does this behave differently in the container?*
+
+**Why it is deferred**: none of it blocks U5, and W-6.2 in particular wants a stable business-rules
+corpus to work from — U5's BR-33…BR-43 are written but the unit is not built, so tests generated now
+would be testing a **design** rather than an implementation. ⚠️ **Deferred, not dismissed**: the
+trigger is **the end of U5**, when Phase 4 closes and BR-01…BR-43 are all backed by shipped code.
+
+**Prerequisite**: none technically. ⚠️ W-6.2 must be done by a session that has **not** read the
+implementation. That is a process constraint rather than a technical one, and it is the entire point
+of the item — **it cannot be relaxed for convenience without becoming the co-generation problem it
+exists to break.**
+
+---
+
+#### W-7 — Adaptive poll backoff when nothing is playing
+
+**Raised 2026-09-30**, measuring the app's upstream footprint to answer the user's U5 NFR **Q8**
+addendum: *"Ideally the app has a 'light touch' on the vendor sites reflecting efficient design."*
+
+**What it would enable**: cutting roughly **98%** of the app's Spotify request volume without
+changing what it records.
+
+### The measurement that motivates it
+
+At `POLL_INTERVAL_MS: 3000`, steady state:
+
+| Upstream call | Rate/hr | Share |
+|---|---|---|
+| **MCP `getNowPlaying` poll** | **1,200** | **98.4%** |
+| `GET /tracks/{id}` — once per *distinct* track | ≤16 | 1.3% |
+| Token refresh · liked set · followed · `recently-played` | ~4 | 0.3% |
+
+✅ **Everything except the poll is already a light touch, and Development Mode is why.** The
+`/contains` family returning 403 forced *fetch the set once, cache it, resolve locally*, so follow and
+liked status cost **zero** per-track requests. The sandbox accidentally produced the efficient design.
+
+⚠️ **The poll never stops, and this was observed rather than projected.** On 2026-09-29 no play was
+recorded for **~2.5 days** while the container ran healthy — roughly **86,000 requests spent learning
+*"nothing is playing"* 86,000 times.** 28,800/day, continuously, music or not.
+
+⚠️ **This is the *efficiency* question and it is independent of Spotify's ceiling.** "Light touch" is
+requests per unit of information, not merely staying under a limit — and by that measure the idle poll
+is the entire problem.
+
+### Why it is deferred rather than done in U5
+
+⚠️ **It changes the behaviour of the recording instrument** — the one function whose output cannot be
+regenerated — and U5 is the unit that exists *because* phases are sequenced by risk containment.
+Shaving requests is not worth risking the corpus, and the analysis it needs is its own:
+
+- Backoff may apply **only when nothing is playing**. A longer interval *during* playback would thin
+  `PlayObserver`'s trail, and the observer's density is what FR-20's re-derivation depends on.
+- ⚠️ **Returning from idle costs precision on the first play**: `startedAt` would be late by up to the
+  backoff interval. **Classifier v2 is *probably* robust** — it thresholds `durationMs − maxProgressMs`
+  and a max-progress rail, both from Spotify's own `progress_ms` rather than from trail density, and
+  dedup keys on the **end**. ⚠️ **"Probably" is doing real work in that sentence. Probe it.**
+- ⚠️ It would lengthen the FR-34 blind spot — plays ending before `ENRICHMENT_WAIT_MS` log nothing,
+  currently 2.8% of plays.
+- ⚠️ A backoff that fails to *exit* is a silent recording outage. The 2026-09-29 scare showed how that
+  reads: a healthy container, a live snapshot timer, and no plays — **indistinguishable from "the user
+  did not listen"** without a positive liveness signal.
+
+**Prerequisite**: ⚠️ **The U5 M1–M4 metrics come first.** Without a request counter there is no
+before-and-after, so the change could not be shown to have worked — and without M4 (share of polls
+returning nothing) the waste it targets is not even visible. **Do not implement this before the
+metrics that measure it.**
 
 ---
 

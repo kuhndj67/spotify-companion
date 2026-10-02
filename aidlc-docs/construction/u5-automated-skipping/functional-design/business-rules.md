@@ -7,7 +7,8 @@ ended at **BR-32.4**.
 
 **Settled parameters** (design plan §5.1): dry-run is the arming gate, back-test advisory only ·
 pre-warm depth 3, asked at runtime · re-evaluation may cancel, never escalate · `hold` until
-`min(label resolved, 30 s, 50% of duration)` · kill switch in `config/`, fails closed · runaway halt
+`min(label resolved, 30 s, 50% of duration)` · kill switch in **`/state/`** (⚠️ amended 2026-10-01 from
+`config/` — see BR-34), fails closed · runaway halt
 at 3 consecutive / 10 per hour, global, acknowledged · one skip attempt **per play row** ·
 `context_type` recorded as evidence only · migration **007**, additive.
 
@@ -57,22 +58,38 @@ at 3 consecutive / 10 per hour, global, acknowledged · one skip attempt **per p
 
 | # | Rule | Source |
 |---|---|---|
-| **BR-34.1** | Persisted to **`config/automation-state.json`** | Q5 |
+| **BR-34.1** | Persisted to **`/state/automation-state.json`**. ⚠️ **AMENDED 2026-10-01** — was `config/automation-state.json` | Q5, amended by Infra Q1 |
 | **BR-34.2** | Written by **write-temp-then-rename**, never in place | Q5.3 |
-| **BR-34.3** | ⚠️ `config/` is mounted as a **directory**, and must stay so. A single-file mount binds an **inode**, and an atomic rename either fails or silently detaches the container's view from the host file | CLAUDE.md |
-| **BR-34.4** | ⚠️ The mount is currently **`:ro`** (`compose.yaml:202`). U5 is the **first unit that writes to `config/`**, so the mount must become `:rw`. Until it does, every save fails | measured 2026-09-26 |
+| **BR-34.3** | ⚠️ **`./state` must be a DIRECTORY mount.** A single-file mount binds an **inode**, and write-temp-then-rename *replaces* it, so the rename either fails or silently detaches the container's view from the host file | CLAUDE.md |
+| **BR-34.4** | ⚠️ **`./state:/state:rw` is a NEW mount and must exist before first run.** `config/` stays **`:ro`** — U5 writes nothing there. Writability is **probed at startup** (LC-29), never inferred from `compose.yaml` | Infra Q1 = C |
 | **BR-34.5** | **Fails closed.** Missing, unparseable, or partially-written state ⇒ automation **off**. A corrupt file must never be a path to *on* | Q5.4, FR-47 |
 | **BR-34.6** | Exposed as **a button on the Rules pop-up** and **an API route**. ⚠️ Not on the primary screen — it stays as clean as possible | Q5 (user) |
 | **BR-34.7** | "Immediately" means **no skip is issued after the switch is thrown** — a guarantee about the action point, not about the 3 s poll | Q5.2 |
 | **BR-34.8** | Throwing the switch **never cancels the decision log**. Evaluation and recording continue; only action stops | FR-41 |
 
-> ### ⚠️ BR-34.4 is a latent failure U3 and U4 could not have found
+> ### ⚠️ BR-34.1 and BR-34.4 were AMENDED 2026-10-01 by Infrastructure Design Q1
 >
-> CLAUDE.md already predicted it: *"U3 only reads, so the bug is invisible here and would surface
-> the first time the U4 rule editor saves."* U4 shipped a **read-only** panel, so it still has not
-> surfaced. **U5 is where it comes due**, and it will present as a kill switch that appears to work
-> in the UI and does not persist — the worst possible failure mode for this particular control.
-> Verify by writing through the container, not on the host.
+> **The FD put the state file in `config/` and required that mount to become `:rw`.** Infrastructure
+> Q1 found what that grants: **permission to overwrite `config/rules.json`**, the user's hand-authored
+> rule set — a permission **no U5 code would ever use**. BR-30 rejects the same shape one level down,
+> forbidding an injected-but-uncalled playback collaborator because an unused capability leaves one
+> line of code preventing its use.
+>
+> ⚠️ **And BR-20.8 would not have protected `rules.json`.** It reloads the last-known-good set when a
+> new file **fails to parse**; a file truncated to valid-but-empty JSON parses successfully and would be
+> accepted as a deliberate empty rule set.
+>
+> ✅ **Settled: a new `./state:/state:rw` mount, and `config/` stays `:ro`.** `data/` was also rejected
+> — once W-5's full-inventory backup exists, restoring a week-old backup would restore the week-old
+> latch and **silently re-arm automation**.
+>
+> ✅ **The planned AI-authored rules system strengthens this rather than weakening it**: a kill switch
+> stored in the same writable directory as the file an AI agent edits is one that agent can disable.
+>
+> ⚠️ **The latent-failure warning still stands, at the new location.** An unwritable `./state` presents
+> as *a kill switch that appears to work in the UI and does not persist* — the worst failure mode this
+> control could have. **Verify by writing through the container, never on the host**, where the write
+> succeeds and the bug is invisible.
 
 ---
 
@@ -236,7 +253,7 @@ ever** — 0 on all 88 samples, including at track boundaries.
 
 | # | Rule | Source |
 |---|---|---|
-| **BR-41.1** | Migration 007 records **`context_type`** and **`context_uri`** on live plays | Q9 |
+| **BR-41.1** | **`context_type`** and **`context_uri`** are recorded **on live plays**. ⚠️ **CORRECTED 2026-10-02**: `context_type` has existed since **v1** and is already populated on backfilled rows (86 `playlist`, 2 `artist`; `null` on all 765 live plays), so **migration 007 adds only `context_uri`**. The *recording* is new; one of the two columns is not | Q9, corrected by Step 1 |
 | **BR-41.2** | Source is `GET /me/player/currently-playing`. The MCP `getNowPlaying` returns no context field | Q9, open item 7 |
 | **BR-41.3** | **Evidence only.** No rule field is exposed over context in U5 | Q9 |
 | **BR-41.4** | ⚠️ `context_uri` **goes stale** — it named an album through 33 minutes of autoplay by other artists. It is necessary but **not sufficient** to identify a context | R11 |

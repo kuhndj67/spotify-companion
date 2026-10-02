@@ -4,12 +4,56 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED 2026-09-27. Next: Code Generation plan.**
+- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED 2026-09-27. BACKUP + VERIFIED RESTORE BUILT 2026-09-27. Next: U5 NFR Design plan → Infrastructure Design → Code Generation.**
   ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — U5's single entry point.
   ✅ The FD is `construction/u5-automated-skipping/functional-design/`: `business-rules.md`
   (**BR-33…BR-43**), `domain-entities.md`, `business-logic-model.md`, `frontend-components.md`.
   The settled answers are [`construction/plans/u5-functional-design-plan.md`](construction/plans/u5-functional-design-plan.md) §5.1.
-  `src/` untouched, no migration, container healthy and recording.
+  `src/` untouched, no migration, container healthy and recording. **Corpus: 850 plays, 900 decision
+  rows** (2026-09-27; this said 662/664 until then).
+
+  ⚠️ **STAGE SEQUENCE CORRECTED 2026-09-27.** Every U5 document said *"next: the Code Generation
+  plan"*, which **skips two stages** that U1–U4 each ran — and those are where **LC-\*/P-\*/PBT-\***
+  numbers are allocated, which the code-generation plan then references as inputs. U5 also has real
+  infrastructure content (`config/` `:ro` → `:rw`, migration 007). **User chose the full sequence**
+  (2026-09-27): NFR Design → Infrastructure Design → Code Generation.
+
+  ✅ **The migration-007 prerequisite is BUILT AND DISCHARGED** (plan §4):
+  `scripts/backup-history.mjs`, `restore-history.mjs`, `verify-all-backups.mjs` —
+  `npm run db:backup` / `db:restore` / `db:verify-backups`. Round trip rehearsed on a scratch copy:
+  850 plays → damaged to 0 → restored to 850, `integrity_check: ok`.
+
+  ✅ **THE BACKUP IS TAKEN AND VERIFIED (2026-09-29)** —
+  `data/backup-before-migration-007-20260929T172027Z`, schema v6, **all eight checks pass**, 850 plays /
+  900 decision rows. Container down for it, back up and healthy afterwards, corpus identical either side.
+  **Migration 007 is no longer blocked.** Sweep: **1 fully verified · 10 intact but unverifiable ·
+  1 CORRUPT.**
+
+  ✅ **The blind guard is FIXED (2026-09-29)** — `reclassify-unobserved-tails.mjs` now delegates to
+  `assertNobodyElseHoldsIt` (`docker ps` + the lock probe, failing closed), **imported rather than
+  re-implemented**. Verified to refuse with the container up.
+
+  ⚠️ **AND `npm run reclassify` HAD BEEN DEAD SINCE `f864e4e` (2026-09-22)** — classifier v2 removed
+  `ATTRIBUTION_VERSION`/`attributeSkip` from `src/` and left the script importing them, so the **FR-20
+  re-derivation tool could not start at all**. Seven days; **891 tests stayed green**, because
+  `noOrphanModules` walks `src/` and `scripts/` is outside every guard. **Third instance of that shape in
+  eight days.** Repaired by removing the attribution half. ✅ **762 of 762 live plays re-derive identical
+  under v2 — 0 changes**, so the deadness cost nothing.
+
+  ⚠️ **TWO RECORDED CLAIMS WERE MEASURED WRONG.** ① *"copying the `.db` alone loses over half the
+  corpus"* is **false** — a `.db`-only copy held **824 of 850** plays. WAL size tracks **page churn**,
+  not row count. The correction makes the hazard **worse**: 3% lost, newest rows only,
+  `integrity_check: ok`. ② ⚠️ **A LIVE SAFETY DEFECT** — **SQLite's locks do not cross the Rancher
+  Desktop bind mount**, so `reclassify-unobserved-tails.mjs`'s exclusive-lock guard **cannot see the
+  container** and returns green exactly when the danger is present. This **mechanically explains the
+  U4 corruption incident**. `docker compose down` is the only real protection. **Not yet fixed in that
+  script** — left for a decision. See `audit.md` 2026-09-27 (later).
+
+  ⚠️ **0 of 11 existing backups are fully verified; 1 is CORRUPT.** `CORRUPT-snapshot-20260921-201444`
+  reports a plausible 586 plays and **fails `integrity_check`** — it is the **load-bearing negative
+  control** for `npm run db:restore -- --self-test` and **must not be tidied away**. Conversely a
+  backup with one play deleted returns `integrity_check: ok`: **integrity sees damage, the manifest
+  sees incompleteness, and neither sees the other's failure.**
 
   ✅ **PROBE P-U5-1: THE PREDICTED HAZARD IS FALSE.** Audio follows the reported track boundary within
   **~2 s** in the AI DJ and essentially simultaneously in radio and album, so a skip at that boundary
@@ -1070,11 +1114,78 @@ mode enforces PBT-02, PBT-03, PBT-07, PBT-08 and PBT-09 as blocking; the rest ar
       (insufficient data) and **DISCHARGED 2026-09-10 by the confirmatory run: R1 NOT SUPPORTED**
       (p = 0.888, 95% CI [−7.7%, +8.9%]). BR-11.7's single evaluation is **spent**. Runner:
       `scripts/hypothesis-gate.mjs`
-- [ ] NFR Requirements
-- [ ] NFR Design
-- [ ] Infrastructure Design
-- [ ] Code Generation
-- [ ] Build and Test
+- [ ] NFR Requirements — **U5: SKIPPED**, as for U1–U4 (the 27 NFRs in `requirements.md` §4 stand)
+- [x] NFR Design — **U5: ALL NINE QUESTIONS ANSWERED 2026-09-30**, every one as recommended.
+      Authoritative reading: [`construction/plans/u5-nfr-design-plan.md`](construction/plans/u5-nfr-design-plan.md)
+      **§5.1**. ⚠️ **Q8 carried a new requirement — §5.2**: metrics proving a "light touch" on
+      Spotify/MusicBrainz. Measuring it found the **3 s poll is 98.4% of the app's Spotify footprint**
+      (1,200/hr of 1,220) and that **nothing counts requests at all** — `webApiClient.ts:125` throws the
+      `Retry-After` away in a message string. ⚠️ **So "what is a reasonable rate" is unanswerable
+      today**: MusicBrainz publishes 1 req/s (complied with, and already probed *tighter* than the
+      published floor), **Spotify publishes no number at all**. Adds metrics **M1–M4** and pattern
+      **P-37**. ⚠️ Idle backoff deferred as **W-7** — it changes the *recording instrument*, and is
+      **blocked on M1–M4**. ⚠️ The deliverables (`logical-components.md`, `nfr-design-patterns.md`)
+      ✅ **are WRITTEN 2026-10-01**: `construction/u5-automated-skipping/nfr-design/` —
+      **P-27…P-37** and **LC-23…LC-31** with **PBT-34…PBT-50**.
+      ⚠️ **P-30 AMENDS NFR-17 rather than satisfying it** — its `Retry-After` clause is declined for
+      the skip path, because waiting 30 s then posting `next` is *"skip whatever is playing in 30
+      seconds"*. **An NFR quietly not met is a defect; one explicitly amended with a reason is a
+      decision**, and it is recorded in the coverage table so the next reader does not "fix" it.
+      ⚠️ **PBT-34a is a positive control and not garnish**: a `drain` that posted nothing, ever, would
+      satisfy all six refusal properties perfectly. ⚠️ **PBT-41 is the only property that can catch
+      the P-27 defect** — checking the predicate at decision time instead of drain time is correct in
+      every ordinary test and diverges only when automation is switched off *during* the 10 s
+      enrichment wait, which is exactly what FR-38 is about.
+      ⚠️ **This stage was nearly skipped**: every U5 document said *"next: the Code Generation plan"*,
+      and four documents agreeing was one observation rather than four, because each had copied the
+      next. The two questions that justified running it: **Q3**, a genuine conflict between **NFR-17's
+      retry and BR-43.5's never-retry**, resolved by *did the request reach the device?*; and **Q5**,
+      where the obvious "don't change state if you couldn't persist it" means **the user presses stop
+      and the system keeps going**.
+- [x] Infrastructure Design — **U5 COMPLETE 2026-10-01.** All six questions answered as recommended
+      (Q1 **C** · Q2–Q6 **A**); deliverable at
+      `construction/u5-automated-skipping/infrastructure-design/infrastructure-design.md`.
+      **Migration 007** is additive only — the by-image rollback guarantee depends on it, and
+      `skip_attribution` stays nulled-not-dropped for the same reason.
+      ✅ **Q1 = C: a NEW `./state:/state:rw` mount, and `config/` STAYS `:ro`.** This overturned NFR
+      Q5's `config/automation-state.json`, because `:rw` there would grant the app permission to
+      overwrite the user's hand-authored `rules.json` — which no U5 code would use, and which BR-20.8
+      would not protect (it reloads on a **parse failure**; a file truncated to valid-but-empty JSON
+      parses fine). ⚠️ **`data/` was rejected because of restore**: once W-5's full-inventory backup
+      exists, restoring a week-old backup would restore the week-old automation latch and **silently
+      re-arm automation**.
+      ✅ **The planned AI-authored rules system does not change this and strengthens it**: a kill switch
+      in the same writable directory as the file an AI agent edits is a kill switch that agent can
+      disable. The future `config/` → `:rw` change remains a one-word edit in the unit that adds rule
+      editing.
+      ✅ **Q4 = A: the BR-35 thresholds are CONSTANTS IN SOURCE, not env values** — an explicit
+      exception to this project's habit, because `compose.yaml` already holds three operational numbers.
+      ⚠️ The halt is reachable in normal use: the busiest hour held **27 plays**, so 10/hour trips on
+      any rule matching **>37%** of tracks. If it were an env value the easy fix would be to raise it,
+      after which it never fires. Precedents: the hypothesis gate's `pre-registration.md`, and
+      `MAX_PREDICATE_DEPTH` (*"Only the PATH is configurable. The bounds are not."*).
+      ✅ **Q5 = A: automation state survives a restart** — ⚠️ **so once armed, a reboot resumes skipping
+      unattended.** FR-47's *"off by default"* means fresh install, not fresh boot. FC-U5-1's indicator
+      is what makes that visible without a click.
+      ✅ **Q3 = A: rollback is verified LIVE, not read from the code** — the skip line proves *007 is
+      skipped*, not *U4's code runs correctly against an unread table and three unread columns*.
+      ⚠️ **Still open**: the two `compose.yaml` comment corrections, the live rollback check, and the
+      BR-35 pre-registration
+- [ ] Code Generation — **U5: PLAN WRITTEN 2026-10-01, 2 scoping questions awaiting answers.**
+      [`construction/plans/u5-code-generation-plan.md`](construction/plans/u5-code-generation-plan.md).
+      13 steps, pure-first ordering, and the app's behaviour is unchanged until Step 9.
+      ⚠️ **Q1**: `DecisionExecutor` is declared inside `LoggingExecutor.ts`, so `SkipExecutor` would
+      import the interface from the other implementation — contradicting BR-30 in the import graph and
+      muddying the P-33 structural test. Recommend moving it to `src/rules/types.ts`.
+      ⚠️ **Q2**: confirms `SKIP_EXECUTOR_ENABLED` (constructed at startup) and `globalAutomationEnabled`
+      (checked at the action point) are **not** redundant — collapsing them breaks FR-38, and the env
+      flag is what lets U5 ship **inert** for the dry-run review.
+      ⚠️ **The action point is written in Step 6, before anything can reach it**, and tested against a
+      fake player client. ⚠️ **Step 12 carries the P-33 structural tests** — `src/rules/` imports nothing
+      from `src/playback/`, and `spotifyPlayerClient`'s exported surface is **exactly one method**,
+      asserted on the shape because the orphan check walks modules rather than methods
+- [ ] Build and Test — **U5 pending.** ⚠️ Exit criterion 3 (kill switch persists across restart) is
+      the one most likely to **pass on the host and fail in the container**
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations (placeholder)

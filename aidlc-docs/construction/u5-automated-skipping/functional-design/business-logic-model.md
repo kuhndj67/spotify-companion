@@ -265,9 +265,15 @@ its n, and the gate is the human one that already worked here — U4's dry-run r
 - **`docker compose down` before anything that writes `history.db`.** A maintenance script is a
   writer. This corrupted the index during U4, reported `integrity_check: ok` at the time, and
   surfaced later as a just-written value reading `null`. ⚠️ `VACUUM INTO` does **not** repair it.
-- **Back up `data/` before migration 007** — and ⚠️ **a file copy is not a backup**: `history.db-wal`
-  is currently **larger** than `history.db`, so copying the `.db` alone loses over half the corpus.
-  Checkpoint the WAL first.
+- **Back up `data/` before migration 007** — ✅ `npm run db:backup -- --label before-migration-007`,
+  then `npm run db:restore -- <dir> --verify-only` (2026-09-27; round trip rehearsed).
+  ⚠️ **A file copy is still not a backup, but the "over half the corpus" figure was wrong**: measured
+  2026-09-27, a `.db`-only copy held **824 of 850 plays**. WAL size tracks page churn, not row count.
+  ⚠️ **3% lost, newest rows only, `integrity_check: ok`** — subtler than the old claim, not milder.
+- ⚠️ **SQLite's locks do NOT cross the Rancher Desktop bind mount**, so the exclusive-lock guard in
+  `reclassify-unobserved-tails.mjs` **cannot see the container** and passes exactly when the danger is
+  present (probed 2026-09-27). `docker compose down` is the only real protection; the new scripts
+  check `docker ps` and fail closed.
 - **`PlayObserver` must consume `tick`, never `change`.** `change` is signature-suppressed and the
   signature excludes progress.
 - **Never clamp `completionRatio` to 1.0.** It measures listened time; replaying legitimately exceeds

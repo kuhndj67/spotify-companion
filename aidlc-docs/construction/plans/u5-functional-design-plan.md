@@ -6,7 +6,9 @@
 **Status**: ✅ **COMPLETE.** All 9 questions answered (§5.1) and **probe P-U5-1 discharged 2026-09-27**
 — the predicted hazard is **FALSE**, FR-46 needs no lag guard, and BR-43 is written. Record:
 [`../u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md`](../u5-automated-skipping/probes/p-u5-1-transition-behaviour-2026-09-27.md).
-**Next stage: the Code Generation plan.**
+~~**Next stage: the Code Generation plan.**~~ ⚠️ **Corrected 2026-09-27 — that skipped two
+stages.** **Next: [the NFR Design plan](u5-nfr-design-plan.md)**, then Infrastructure Design, then
+Code Generation.
 
 > **U5 is the only unit that can cause harm.** Every other unit, wrong, produces a bad number in a
 > report. This one, wrong, interrupts the music the user is listening to. The phases were
@@ -243,14 +245,26 @@ in the user's own words with a ⚙ note where a clarification changed something.
       acknowledgement)
 - [x] Specify the **skip-attempt evidence fields** (Q8b) — BR-43.2
 - [ ] Pre-register the Q6 safety thresholds **before** any rule is armed
-- [ ] **Minimal `history.db` backup + RESTORE, before migration 007.** ⚠️ `data/` already holds ten
-      ad-hoc backups in five naming conventions written by three scripts, **and not one of them has a
-      restore path** — every script writes a backup, none reads one back. Must checkpoint the WAL
-      first (`history.db-wal` is currently **larger** than `history.db`, so a naive copy loses over
-      half the corpus) and refuse to run while the container is up. ⚠️ **Verify the restore** — an
-      unverified restore path is the defect this item exists to fix. Full-inventory version is
-      backlog **W-5**, which includes the `metabase-app-db` named volume that no tree-walking backup
-      would find, and an undecided `secrets/` security question
+- [x] ✅ **Minimal `history.db` backup + VERIFIED RESTORE — BUILT 2026-09-27.**
+      `scripts/backup-history.mjs`, `scripts/restore-history.mjs`, `scripts/verify-all-backups.mjs`
+      (`npm run db:backup` / `db:restore` / `db:verify-backups`). Checkpoints the WAL, refuses while
+      the container is up, writes a manifest, and **verifies the restore** — the defect this item
+      existed to fix. Round trip rehearsed on a scratch copy: 850 plays → damaged to 0 → restored to
+      850, `integrity_check: ok`.
+      - ✅ **THE BACKUP IS TAKEN AND VERIFIED (2026-09-29)**:
+        `data/backup-before-migration-007-20260929T172027Z` — schema v6, **all eight checks pass**,
+        850 plays / 900 decision rows. Container down for it, back up and healthy afterwards, corpus
+        identical before and after. **Migration 007 is no longer blocked on this.**
+      - ⚠️ **The "loses over half the corpus" figure was FALSE** — measured: a `.db`-only copy held
+        **824 of 850** plays. WAL size tracks page churn, not row count. The corrected reading is
+        worse: 3% lost, newest rows only, `integrity_check: ok`.
+      - ⚠️ **A NEW DEFECT WAS FOUND IN AN EXISTING GUARD.** SQLite's locks do **not** cross the
+        Rancher Desktop bind mount, so `reclassify-unobserved-tails.mjs`'s exclusive-lock guard
+        **cannot see the container** and passes exactly when the danger is present. This mechanically
+        explains the U4 corruption incident. The new scripts check `docker ps` and fail closed.
+      - ⚠️ **0 of 11 pre-existing backups are fully verified; 1 is CORRUPT.** Full-inventory version
+        stays backlog **W-5** (the `metabase-app-db` named volume, plus an undecided `secrets/`
+        security question)
 - [ ] Define the live-verification protocol discharging Phase 4's seven exit criteria
 
 ---

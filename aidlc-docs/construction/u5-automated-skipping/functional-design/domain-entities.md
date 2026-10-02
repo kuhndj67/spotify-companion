@@ -44,8 +44,8 @@ a `Decision` into an **action that can be refused, queued, cancelled, audited an
 | `cancelled` | A re-evaluation withdrew it before it fired (BR-37.5) |
 | `refused` | The action point declined it. `refusedReason` says why |
 | `fired` | The `POST` was issued |
-| `confirmed` | ⚠️ **Provisional** — the check is BR-43.5, pending P-U5-1 |
-| `unconfirmed` | Fired, and the confirmation did not hold. **Treated as failed and surfaced, never retried** (BR-43.1) |
+| `confirmed` | ✅ `progress_ms` reset **+** a track-id change, with a **~3 s grace** (BR-43.3/43.4, validated by P-U5-1) |
+| `unconfirmed` | Fired, and the confirmation did not hold. **Treated as failed and surfaced, never retried** (BR-43.5) |
 
 ### `RefusalReason`
 
@@ -66,12 +66,21 @@ a `Decision` into an **action that can be refused, queued, cancelled, audited an
 > them defects. A `firedAt` of `null` cannot distinguish *the user had automation off* from *the
 > queue drained too late*. **`null` means unknown and is never `false` or `0`.**
 
-> ### ⚠️ `confirmed` is a state this document cannot yet define
+> ### ✅ `confirmed` IS now defined — P-U5-1 settled it, 2026-09-27
 >
-> BR-43.5 is provisional. In the AI DJ context the reported track changes 18–41 s before the audible
-> one, so the obvious confirmation can return *confirmed* when nothing audible happened. **The state
-> exists in the model; the predicate that enters it does not.** Do not implement `confirmed` from
-> BR-43.5 and treat the question as closed — P-U5-1 decides it.
+> This section used to say the predicate could not be written, on the grounds that *"the reported
+> track changes 18–41 s before the audible one"*, so the obvious check could pass when nothing
+> audible happened. ⚠️ **Both halves of that were wrong.** The predicted hazard is **false** — audio
+> follows the reported boundary within **~2 s** — and the mechanism was **backwards**: the API never
+> lagged, **the DJ stops *playing* 18–50 s early and reports it accurately** (`B@first`: ~1 s in
+> radio/album, up to **23.6 s** in the DJ).
+>
+> So the predicate is **`progress_ms` reset AND a track-id change**, with a **~3 s grace** — a check
+> at +1.5 s can precede the audio (BR-43.3/43.4).
+>
+> ⚠️ **What has NOT become safe is assuming a fixed offset.** The DJ has at least three transition
+> behaviours and `dj-talk`'s audio lag is **negative** (−6.9 s), so even the *sign* varies and nothing
+> in the API predicts which is coming (BR-43.6). The grace is a tolerance, never a compensation.
 
 ---
 
@@ -91,21 +100,26 @@ and clearing them are different acts.
 
 | | |
 |---|---|
-| Location | `config/automation-state.json` |
+| Location | **`/state/automation-state.json`** ⚠️ **amended 2026-10-01** — was `config/` |
 | Write | Write-temp-then-rename, **atomic** |
-| ⚠️ Mount | `config/` must be a **directory** mount, and must become **`:rw`** — it is `:ro` today (`compose.yaml:202`) |
+| ⚠️ Mount | **`./state:/state:rw`**, a **directory** mount, new in U5. `config/` stays **`:ro`** |
 | Read failure | ⚠️ **Fails closed.** Missing, unparseable or partial ⇒ automation **off** |
 
-> ### ⚠️ This is the first unit that writes to `config/`, and two latent traps meet here
+> ### ⚠️ AMENDED 2026-10-01: this unit writes to a NEW `./state` mount, not to `config/`
+>
+> This section used to say U5 was the first unit that writes to `config/` and that the mount must
+> become `:rw`. **Infrastructure Design Q1 reversed that**, because `:rw` on `config/` grants
+> permission to overwrite the user's hand-authored `rules.json` — which no U5 code would use.
 >
 > **A single-file bind mount binds an inode.** Write-temp-then-rename *replaces* the inode, so through
 > a single-file mount the rename either fails or silently detaches the container's view from the host
-> file. `config/` is mounted as a directory for exactly this reason — keep it that way.
+> file. ⚠️ **`./state` must therefore be a DIRECTORY mount**, for the same reason `config/` and `data/`
+> are.
 >
-> **And the mount is read-only today.** CLAUDE.md predicted this would surface *"the first time the
-> U4 rule editor saves"*; U4 shipped a read-only panel, so it did not. ⚠️ It will present as a kill
-> switch that works in the UI and does not persist — **the worst failure mode this particular control
-> could have.** Verify by writing through the container, never on the host.
+> ⚠️ **The latent failure moved with the file rather than disappearing.** An unwritable `./state`
+> presents as a kill switch that works in the UI and does not persist — **the worst failure mode this
+> control could have.** `probeWritable` (LC-29) tests it at startup, and verification must write
+> **through the container**, never on the host.
 
 ---
 
@@ -171,12 +185,17 @@ The by-image rollback guarantee depends on it (BR-37.4).
 ⚠️ **No uniqueness constraint may be added** on `playId`, `(playId, ruleId)` or `evaluationId`-per-play
 (BR-22.1a, BR-37.2). U4 deliberately created none so that this migration could stay additive.
 
-### `play` — two new columns
+### `play` — ONE new column
 
 | Column | Type | Notes |
 |---|---|---|
-| `context_type` | text | Nullable. **Evidence only** (BR-41.3) |
 | `context_uri` | text | Nullable. ⚠️ **Goes stale** — necessary, not sufficient (BR-41.4) |
+
+⚠️ **CORRECTED 2026-10-02: `context_type` is NOT new.** It has existed since the **v1** schema and is
+already populated on backfilled rows (86 `playlist`, 2 `artist`; `null` on all 765 live plays). What U5
+adds is **populating it on live plays** — the MCP `getNowPlaying` returns no context, so the field was
+available exactly where the outcome variable was not. Re-adding the column would fail the `ALTER` and
+abort migration 007.
 
 ⚠️ **All 577 existing live plays stay `null`.** `null` is *unknown* and is never backfilled with a
 guess — and `recently-played` cannot supply it retroactively for a play it has aged out of.
@@ -189,9 +208,19 @@ Holds `SkipAttempt` (§1). ⚠️ **Not a column on `play`**: a play may have an
 
 > ### ⚠️ Back up `data/` before running this — and a file copy is not a backup
 >
-> `history.db-wal` is **currently 4.1 MB against a 3.3 MB `history.db`**. Copying the `.db` alone
-> captures **less than half the corpus**, and the copy opens cleanly and looks plausible. Checkpoint
-> the WAL first, as `reclassify-unobserved-tails.mjs` does deliberately.
+> ✅ **The tooling now exists** (2026-09-27): `npm run db:backup -- --label before-migration-007`,
+> then `npm run db:restore -- <dir> --verify-only`. Round trip rehearsed end to end.
+>
+> ⚠️ **The "less than half the corpus" figure was WRONG and is corrected.** The WAL really can be
+> larger than the `.db` (3673 KB vs 3396 KB, re-measured 2026-09-27), but the inference was false: a
+> `.db`-only copy held **824 of 850 plays**. WAL size tracks **page churn**, not row count.
+> ⚠️ **The corrected reading is worse** — 3% lost, confined to the *newest* rows, reporting
+> `integrity_check: ok`. Checkpoint first still stands; only the reason changes.
+>
+> ⚠️ **And for this migration specifically, `integrity_check` alone will not tell you the backup is
+> complete.** A backup with one play deleted returns `ok`. The manifest's per-table counts are what
+> catch that, which is why `backup-history.mjs` introspects `sqlite_master` rather than listing
+> tables — **it has to be able to count `skip_attempt`, a table it was written before.**
 >
 > ⚠️ **`docker compose down` first.** A maintenance script is a writer. Doing this during U4 corrupted
 > the index, reported `integrity_check: ok` at the time, and surfaced later as a just-written value

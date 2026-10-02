@@ -1,11 +1,158 @@
-# U5 Handoff — read this before starting Functional Design
+# U5 Handoff — U5's single entry point
 
-**Written 2026-09-22** at the U4/U5 boundary. **Updated 2026-09-26**; this is the single entry
+**Written 2026-09-22** at the U4/U5 boundary. **Updated 2026-09-30**; this is the single entry
 point for U5.
 
 ---
 
-## ▶ CURRENT STATE AND NEXT STEP (2026-09-26)
+## ▶ CURRENT STATE AND NEXT STEP (2026-09-30)
+
+✅ **Functional Design is COMPLETE and probe P-U5-1 is DISCHARGED.** Details in the blocks below.
+
+⚠️ **THE STAGE SEQUENCE IN THIS FILE WAS WRONG, and so was every other U5 document.** They all ended
+*"Next: the Code Generation plan"*, which **skips two stages**. U1–U4 each ran **NFR Design** and
+**Infrastructure Design** in between, and those are where **LC-\***, **P-\*** and **PBT-\*** numbers
+are allocated — numbers the code-generation plan then references as inputs. **User chose the full
+sequence, 2026-09-27.**
+
+> **NFR Design → Infrastructure Design → Code Generation.**
+
+▶ **NFR DESIGN IS COMPLETE (2026-10-01).** All nine questions in
+[`../plans/u5-nfr-design-plan.md`](../plans/u5-nfr-design-plan.md) are settled, every one as
+recommended — authoritative reading is its **§5.1**. ✅ **The deliverables are written**:
+`nfr-design/nfr-design-patterns.md` (**P-27…P-37**) and `nfr-design/logical-components.md`
+(**LC-23…LC-31**, **PBT-34…PBT-50**).
+
+⚠️ **Three things in there that will be got wrong if skimmed:**
+1. **P-30 AMENDS NFR-17.** Its `Retry-After` clause is declined for the skip path — waiting 30 s then
+   posting `next` is *"skip whatever is playing in 30 seconds"*. It needs a **new `RefusalReason`,
+   `upstream-rate-limited`**, distinct from BR-35.2's own hourly cap.
+2. **PBT-34a is a positive control.** A `drain` that posted nothing, ever, satisfies all six refusal
+   properties perfectly. One property must prove the action *fires*.
+3. **PBT-41 is the only thing that can catch the P-27 defect** — the predicate must be re-read at
+   **drain** time. Checking it at decision time is correct in every ordinary test.
+
+✅ **INFRASTRUCTURE DESIGN IS COMPLETE (2026-10-01).** All six questions answered as recommended;
+deliverable at `infrastructure-design/infrastructure-design.md`. Plan:
+[`../plans/u5-infrastructure-design-plan.md`](../plans/u5-infrastructure-design-plan.md).
+
+✅ **Q1 = C, and it OVERTURNED an earlier settled answer.** NFR Q5 had settled
+`config/automation-state.json`. Infrastructure Q1 found that `./config:/config:rw` would grant the app
+permission to overwrite the user's hand-authored `rules.json` — a permission no U5 code would use.
+**So: a new `./state:/state:rw` mount, and `config/` stays `:ro`.**
+⚠️ **BR-20.8 would NOT protect `rules.json`**: it reloads the last-known-good set when a new file
+**fails to parse**, and a file truncated to valid-but-empty JSON parses fine.
+⚠️ **`data/` was rejected because of restore** — once W-5's full-inventory backup exists, restoring a
+week-old backup restores the week-old latch and **silently re-arms automation**.
+✅ **The planned AI-authored rules system strengthens C rather than weakening it**: a kill switch in
+the same writable directory as the file an AI agent edits is one that agent can disable.
+
+⚠️ **Q4 = A: the BR-35 thresholds are constants in SOURCE, not env values.** `compose.yaml` already
+holds `POLL_INTERVAL_MS`, `RULES_POLL_INTERVAL_MS` and `ENRICHMENT_WAIT_MS`, so an exception must be
+stated or someone follows the habit. The halt is reachable in normal use — the busiest hour held
+**27 plays**, so 10/hour trips on any rule matching **>37%** of tracks — and if the number were in
+`compose.yaml` the easy response to a halt would be to raise it, after which it never fires again.
+
+⚠️ **Q5 = A, with the consequence stated: once armed, a reboot resumes skipping** on the autostart
+chain with nobody watching. FR-47's *"off by default"* means fresh install, not fresh boot.
+
+✅ **ALL THREE DESIGN STAGES ARE COMPLETE.** Functional, NFR and Infrastructure — every question
+answered as recommended.
+
+▶ **Next: [the Code Generation plan](../plans/u5-code-generation-plan.md) — WRITTEN 2026-10-01,
+2 scoping questions awaiting answers.** It is the first U5 stage that will touch `src/`.
+
+⚠️ **Q1 is a structural wart worth fixing first.** `DecisionExecutor` is declared **inside**
+`src/rules/LoggingExecutor.ts`, so `SkipExecutor` would have to import the interface from the other
+implementation's module — which says the opposite of BR-30 (*added alongside, never grown out of*) to
+anyone reading the import graph, including the P-33 structural test. Recommendation: move the interface
+to `src/rules/types.ts`. A pure type move, no behaviour change.
+
+⚠️ **Q2 confirms that TWO off switches is deliberate, not redundant.** `SKIP_EXECUTOR_ENABLED` decides
+whether `SkipExecutor` is **constructed** (deployment-time, needs a restart); `globalAutomationEnabled`
+decides whether a queued attempt **fires** (runtime, checked at the action point). Collapsing them
+breaks FR-38, because a restart-requiring control cannot satisfy *"no skip is issued after the switch is
+thrown"*. Keeping the env flag is also what lets U5 ship **inert** for the dry-run review.
+
+⚠️ **Three items are open that are NOT code and NOT design** — do not let code generation close them
+by implication:
+1. The two `compose.yaml` comment corrections.
+2. **The live rollback check**: U4's image against a **v7 copy**, expecting `from: 7, to: 7`.
+3. **The BR-35 pre-registration**, written before any rule is armed.
+
+⚠️ **Q8 carried a new requirement — §5.2.** Metrics proving a "light touch" on the vendor APIs.
+Measuring it found the **3 s poll is 98.4% of the app's Spotify footprint** and that **nothing counts
+requests at all**, so *"what is a reasonable rate"* is **unanswerable today** — Spotify publishes no
+number, and the one place a 429 is seen throws the `Retry-After` away in a message string. Adds
+**M1–M4** and **P-37**; idle backoff deferred as **W-7**, which is **blocked on M1–M4**.
+
+⚠️ **Q9 was added 2026-09-29** and is not a U5 design question like the others: it closes the
+`scripts/` blind spot that has now cost **three findings in eight days**. The wider diagnosis is
+backlog **W-6** (`requirements.md` §5.1), triggered at the end of U5.
+
+⚠️ **Four documents agreed with each other, and that agreement was the problem, not the evidence.**
+Each had copied the next. **Consensus across documents that share an author is one observation, not
+four** — the same shape as this file's own R11 staleness, corrected 2026-09-26.
+
+### ✅ The migration-007 prerequisite is BUILT (2026-09-27)
+
+`npm run db:backup -- --label x` · `npm run db:restore -- <dir> --verify-only` ·
+`npm run db:verify-backups` · `npm run db:restore -- --self-test`. **The restore half never existed
+before.** Round trip rehearsed on a scratch copy: 850 plays → damaged to 0 → restored to 850,
+`integrity_check: ok`.
+
+✅ **THE BACKUP IS TAKEN AND VERIFIED (2026-09-29)** —
+`data/backup-before-migration-007-20260929T172027Z`, schema v6, **all eight checks pass**, 850 plays /
+900 decision rows. **Migration 007 is no longer blocked on it.**
+
+⚠️ **TWO RECORDED CLAIMS WERE MEASURED WRONG.**
+1. *"Copying the `.db` alone loses over half the corpus"* is **false** — a `.db`-only copy held
+   **824 of 850** plays. WAL size tracks **page churn**, not row count. ⚠️ The correction makes the
+   hazard **worse**: 3% lost, newest rows only, `integrity_check: ok`.
+2. ⚠️ **A SAFETY DEFECT — now FIXED (2026-09-29).** **SQLite's locks do not cross the Rancher
+   Desktop bind mount**, so `reclassify-unobserved-tails.mjs`'s exclusive-lock guard **could not see
+   the container** and returned green exactly when the danger was present. **This mechanically
+   explains the U4 corruption incident.** ✅ It now delegates to `assertNobodyElseHoldsIt`
+   (`docker ps` + the lock probe, failing closed), **imported rather than re-implemented**, and is
+   verified to refuse with the container up. ⚠️ `docker compose down` is still the only *real*
+   protection — the guard is a backstop, not a licence.
+
+### ⚠️ THIRD DEAD-TOOL FINDING: `npm run reclassify` was DEAD for a week
+
+Found while testing that guard fix. Commit **`f864e4e`** (classifier v2, 2026-09-22) retired
+`skip_attribution` and removed `ATTRIBUTION_VERSION`/`attributeSkip` from `src/`, **leaving the script
+importing both** — so the **FR-20 re-derivation tool could not start at all**. Seven days, and **891
+tests stayed green**.
+
+⚠️ **`scripts/` is wholly untested and outside every guard**: `noOrphanModules` walks `src/`, and
+coverage cannot see a file no test imports. **Third instance of that shape in eight days** —
+`recordSuccessorLag` (dead method in a live file), ten backups with no restore path, now a dead entry
+point. **This bears on U5 directly**: the replacement phase guard for `src/playback/` is a *structural
+test*, and if it lives where the orphan check cannot reach it, it is the same defect again. See
+**P-36** in the NFR plan.
+
+✅ Repaired by **removing** the attribution half, not restoring the dead imports — `domain-entities.md`
+§6: *"Do not reintroduce it, and do not read it."* ✅ **762 of 762 live plays re-derive identical under
+v2 — 0 changes**, so the deadness cost nothing and `--apply` would have been a no-op.
+
+⚠️ **`data/CORRUPT-snapshot-20260921-201444` is now LOAD-BEARING and must not be tidied away.** It is
+the negative control for `--self-test`: it reports a plausible 586 plays and **fails
+`integrity_check`**. Conversely, a backup with one play deleted returns `integrity_check: ok` —
+**integrity sees damage, the manifest sees incompleteness, and neither sees the other's failure.**
+
+### Current numbers — 2026-09-30
+
+**891 tests · typecheck clean · schema v6 · 850 plays · 900 decision rows · 31 user skips**
+(`src/` untouched, `src/playback/` still absent). ⚠️ The FD plan's §2 figures are from **2026-09-23 at
+664 plays**; `../plans/u5-nfr-design-plan.md` §2 supersedes them.
+
+⚠️ **The evidence base grew 22 → 31 skips, and Q1 is UNCHANGED by that.** 31 has the same character as
+22: it catches a rule that is wildly wrong and cannot distinguish a good rule from a mediocre one.
+**Do not reopen Q1's "no numeric back-test threshold" on the strength of the growth.**
+
+---
+
+## The state as of 2026-09-26, kept because the detail below is still current
 
 ✅ **All 9 design questions are ANSWERED** (2026-09-26). The settled specification is
 [**§5.1 of the design plan**](../../plans/u5-functional-design-plan.md) — read that, not the raw
@@ -64,7 +211,9 @@ P-U5-1**.
 
 Record:
 [`probes/p-u5-1-transition-behaviour-2026-09-27.md`](probes/p-u5-1-transition-behaviour-2026-09-27.md).
-**Next: the Code Generation plan.**
+~~**Next: the Code Generation plan.**~~ ⚠️ **Corrected 2026-09-27 — that skipped two stages.**
+**Next: [the NFR Design plan](../plans/u5-nfr-design-plan.md)**, then Infrastructure Design, then Code
+Generation. See the top block.
 
 ### The original protocol, kept for the history — §3 of the plan
 

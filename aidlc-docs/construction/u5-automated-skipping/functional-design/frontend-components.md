@@ -53,7 +53,7 @@ goal** — no added prose, one more dot in a row that already has several.
 | `hold` | A rule is holding, pending enrichment | BR-38 |
 | `passed-partial` | Decided on **partial data** | BR-38.4, BR-22.4 |
 | `passed` | Decided on complete facts | BR-22.5 |
-| `failed` | ⚠️ A skip was attempted and **not confirmed** | BR-43.1 |
+| `failed` | ⚠️ A skip was attempted and **not confirmed** | BR-43.3/43.5 |
 | `halted` | ⚠️ **Runaway halt in force** — added; not in the user's list, and it must be visible | BR-35.4 |
 
 ### ⚠️ Colour cannot be the only channel, and that is already decided
@@ -104,7 +104,7 @@ clean as possible)."*
 | | |
 |---|---|
 | Surface | A button **on the Rules pop-up**, plus an API route (BR-34.6) |
-| State shown | Current `globalAutomationEnabled`, read from `config/automation-state.json` |
+| State shown | Current `globalAutomationEnabled`, read from **`/state/automation-state.json`** (⚠️ amended 2026-10-01 from `config/` — see BR-34.1) |
 | Effect | Persisted atomically; checked at the **action point** (BR-33.5, BR-34.7) |
 | ⚠️ Not on | The primary screen. It is a control, not a status |
 
@@ -159,13 +159,17 @@ for.
 
 ---
 
-## 5. ⚠️ Deferred with the probe
+## 5. ✅ No longer deferred — P-U5-1 discharged 2026-09-27
 
-`failed` in FC-U5-1 depends on **BR-43.5**, which is provisional pending probe **P-U5-1**. In the AI
-DJ context the reported track changes 18–41 s before the audible one, so the obvious confirmation can
-return *confirmed* when nothing audible happened.
+`failed` in FC-U5-1 depends on **BR-43.5**, which this section recorded as provisional. **It is now
+settled.** The confirmation is `progress_ms` reset **+** a track-id change with a **~3 s grace**
+(BR-43.3/43.4), and the hazard this section warned about — *"the reported track changes 18–41 s before
+the audible one"* — is **false**: audio follows the reported boundary within ~2 s. ⚠️ **The mechanism
+was also backwards**: the DJ stops *playing* early and reports it accurately.
 
-**The state belongs in the model now** — a user must be able to see a failed skip. ⚠️ **But do not
-implement its predicate from BR-43.5 and treat the question as closed.** An indicator that renders
-`passed` because the confirmation is guaranteed to succeed is worse than no indicator: it is a green
-light asserting something nobody checked.
+⚠️ **The warning that still applies, restated so it is not lost with the correction:** an indicator
+that renders `passed` because the confirmation is guaranteed to succeed is worse than no indicator —
+it is a green light asserting something nobody checked. The ~3 s grace is what keeps `failed`
+reachable rather than decorative, so **there must be a test that drives FC-U5-1 into `failed`**. A
+state that no test can enter is the `recordSuccessorLag` trap in UI form: a live module, a dead
+branch, and a coverage figure that looks fine.

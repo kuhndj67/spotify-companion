@@ -5006,3 +5006,830 @@ it *should* be pre-determined, but that is inference.
 
 **The Code Generation plan.** The FD is complete: `business-rules.md` (BR-33…BR-43),
 `domain-entities.md`, `business-logic-model.md`, `frontend-components.md`.
+
+---
+
+## 2026-09-27 (later) — The backup/restore pair is built, and TWO recorded claims were measured wrong
+
+**Stage**: CONSTRUCTION — U5, migration-007 prerequisite (design plan §4)
+**Decision**: user approved the full stage sequence (NFR → Infrastructure → Code Generation), the
+minimal backup scope, and correcting the documents.
+
+### ✅ Built: `backup-history.mjs`, `restore-history.mjs`, `verify-all-backups.mjs`
+
+`npm run db:backup -- --label x` · `npm run db:restore -- <dir> --verify-only` ·
+`npm run db:verify-backups`. **The restore half has never existed before** — `data/` held ten backups
+written by three scripts and nothing ever read one back.
+
+**Round trip rehearsed end to end** on a scratch copy of the live database: 850 plays → damaged to 0 →
+restored to 850, `integrity_check: ok`, with the damaged version preserved first. That discharges the
+plan's *"⚠️ Verify the restore — an unverified restore path is the defect this item exists to fix."*
+
+### ⚠️ CLAIM 1 CORRECTED: "copying the `.db` alone loses over half the corpus" is FALSE
+
+The WAL really can be larger than the `.db` — **3673 KB vs 3396 KB**, re-measured. But the inference
+drawn from that size comparison was wrong. Measured on the live database:
+
+| | plays | decision rows | `integrity_check` |
+|---|---|---|---|
+| live (read-only, authoritative) | **850** | **900** | — |
+| `.db`-only copy | 824 | 825 | **`ok`** |
+| `.db` + `-wal` | 850 | 900 | `ok` |
+
+**3.1% lost, not >50%.** WAL size tracks **page churn**, not row count. Confirmed against the one
+pre-existing backup with a 4 MB WAL: 139 of 145 plays survive a `.db`-only copy.
+
+⚠️ **The correction makes the hazard worse, not milder.** A 50% loss announces itself. A 3% loss
+confined to the *newest* rows, reporting `integrity_check: ok`, does not. **"Checkpoint the WAL first"
+stands; only the stated reason changes** — same shape as classifier v2, where the fix stood and the
+mechanism was backwards.
+
+⚠️ **This is the denominator-trap family again**: a *plausible inference from file sizes*, recorded in
+CLAUDE.md as though it were a measurement, and repeated into four other documents. It is the
+project's own rule pointing at its own notes — **a recorded quantity decays as silently as a recorded
+negative, because nothing ever re-measures it.**
+
+### ⚠️ CLAIM 2 CORRECTED, and this one is a live SAFETY DEFECT: the lock guard is BLIND
+
+`reclassify-unobserved-tails.mjs` says *"This script refuses to apply if it can see the app holding
+the database."* **It cannot see it.** Probed 2026-09-27: with `spotify-now-playing` **up, healthy and
+actively recording**, a host process **successfully acquired `BEGIN EXCLUSIVE`** on
+`data/history.db`. The app holds its connection for its whole process lifetime
+(`SqliteHistoryRepository.ts:192`), so this is not a race — **SQLite's locks do not cross the
+Rancher Desktop bind mount** between the Windows host and the Linux VM.
+
+⚠️ **This mechanically explains the U4 corruption incident (audit 2026-09-21).** The guard passed, so
+two writers hit one file. It is not a weak guard, it is one that **returns green exactly when the
+danger is present** — the same family as *"a guard computed the same way as the thing it guards is not
+a guard"*, here **a guard that cannot observe the condition it guards**. Worse than no guard.
+
+⚠️ **Found by accident**: the new backup script ran while the container was up and *succeeded*. It
+checkpointed the live WAL. Nothing was lost — 850 plays and `integrity_check: ok` before and after —
+but that is luck. **`docker compose down` is the only real protection, and the script-level guard that
+appeared to back it up did not.**
+
+✅ The new scripts check **`docker ps`** and **fail closed**: if `docker` cannot be reached the answer
+is *unknown*, and unknown refuses (`--i-have-stopped-the-container` is the deliberate override). The
+lock probe is **kept alongside** it, because neither check sees the other's writer — `docker ps` cannot
+see `npm start`, and the lock cannot see the container. It is incomplete, not useless.
+
+⚠️ **NOT YET FIXED: `reclassify-unobserved-tails.mjs` still carries the blind guard and the false
+docstring.** Left for a decision rather than patched silently, because it is a tool that has been run
+in anger.
+
+### What verification means, established by two complementary negative controls
+
+| | `integrity_check` | manifest counts |
+|---|---|---|
+| `CORRUPT-snapshot-20260921-201444` — damaged b-tree | ✖ **fails** | plausible: 586 plays, 126 decisions |
+| a backup with one play deleted | ✅ **`ok`** | ✖ fails: 849 ≠ 850, max(id) 890 ≠ 891 |
+
+⚠️ **Integrity sees damage; the manifest sees incompleteness; neither sees the other's failure.** So
+verification is both. Row counts alone would have passed the corrupt file; integrity alone would have
+passed a database missing a play.
+
+✅ **The verifier is itself verified.** `--self-test` runs it against the CORRUPT snapshot and **fails
+if it passes** — a checker that has only seen good input is indistinguishable from one that returns ok
+unconditionally, which this project has already been bitten by (PBT-22 passing trivially against
+counts that were always zero). The CORRUPT directory is therefore **load-bearing and must not be
+tidied away**; the script errors out if it is missing.
+
+⚠️ **A third verdict was needed, and its absence was a real bug in the first version.** It printed
+*"could not be checked against a manifest"* for a backup whose manifest **was present and
+disagreed** — found by the tamper rehearsal. Now `corrupt` / `mismatch` / `unverifiable` are distinct,
+and `mismatch` is flagged as **more** serious than a missing manifest: the file is internally
+consistent, so nothing else will ever complain about it.
+
+### ⚠️ First sweep: 0 of 11 existing backups are fully verified, and 1 is CORRUPT
+
+Ten are intact-but-unknown — none carried a manifest, so their *completeness* cannot be checked.
+`unverifiable` is deliberately **not** reported as a failure: calling it one would train the reader to
+ignore the output, and then the single real corrupt file goes unnoticed. `null` is unknown, and
+unknown is never `false`.
+
+### Stale statements found and fixed in the same pass
+
+⚠️ Three places still said BR-43.5 was *provisional pending P-U5-1* and repeated the **backwards**
+mechanism (*"the reported track changes 18–41 s before the audible one"*) — `domain-entities.md` §1
+twice and `frontend-components.md` §5 — while `business-rules.md` had already recorded the probe as
+discharged. Two BR cross-references pointed at BR-43.1 where BR-43.5 was meant.
+
+**This is exactly the §5.2 lesson being obeyed rather than re-learned**: a correction pass that fixes
+only the statement it went looking for leaves the document wrong *and freshly reviewed*.
+
+### Corpus note
+
+**850 plays, 900 decision rows** as of 2026-09-27 — CLAUDE.md and `aidlc-state.md` still said 662/664.
+
+### Next
+
+**The U5 NFR Design plan**, then Infrastructure Design, then Code Generation. ⚠️ The
+`before-migration-007` backup itself still has to be **taken with the container down**.
+
+---
+
+## 2026-09-29 — The before-migration-007 backup is taken and verified; the blind guard is fixed; and `npm run reclassify` had been DEAD for a week
+
+**Stage**: CONSTRUCTION — U5, closing the two items left open on 2026-09-27.
+
+### ✅ The `before-migration-007` backup exists and is VERIFIED
+
+`data/backup-before-migration-007-20260929T172027Z` — schema **v6**, `integrity_check: ok`, **850
+plays · 900 decision rows · 49,582 observations**, and **all eight verification checks pass** (manifest,
+sha256, integrity, schema match, every table count, every max id).
+
+Taken with `docker compose down`, restored-verified while the original was still present, container back
+up and healthy: UI `200`, `mcp: connected`, `integrity_check: ok`, **850 plays / 900 decisions /
+maxPlayId 891 before and after**. Sweep now reads **1 fully verified · 10 intact but unverifiable ·
+1 CORRUPT**.
+
+⚠️ **Cost: zero unrecorded listening**, because nothing was playing. Checked first rather than assumed
+— see the recording scare below.
+
+### ✅ The blind guard in `reclassify-unobserved-tails.mjs` is FIXED
+
+It now delegates to `assertNobodyElseHoldsIt`, which checks **`docker ps`** *and* keeps the lock probe
+for a host writer, and **fails closed** on an unreachable `docker`. **Verified against the exact case
+the old guard passed**: with the container up, `npm run reclassify -- --apply` now exits **2** with a
+refusal naming the container.
+
+⚠️ **Imported, not re-implemented.** *One admission rule, invoked twice, never written twice* — this
+project has already shipped a divergence of that shape, where the WebSocket upgrade handler
+re-implemented the local-access policy, the copies drifted, and every page load returned `200` while
+every handshake returned `403` with all 411 tests passing.
+
+The false docstring — *"refuses to apply if it can see the app holding the database"* — is replaced with
+the correction **and the history of both wrong versions**, because both looked right.
+
+> ⚠️ **The general lesson: a recorded reassurance decays exactly like a recorded negative, because
+> nothing ever re-tests it.** This one survived a corruption incident that it had failed to prevent.
+> Open item 3a already recorded the mirror-image case (*our own notes said the API doesn't return X, and
+> it does*). **Both are the same defect: a claim written once and never re-probed.**
+
+### ⚠️ THIRD DEAD-TOOL FINDING: `npm run reclassify` has been BROKEN SINCE 2026-09-22
+
+Found while testing the guard fix — the script **could not start at all**:
+
+```
+SyntaxError: The requested module '../src/history/types.js'
+             does not provide an export named 'ATTRIBUTION_VERSION'
+```
+
+⚠️ **Proven pre-existing, not caused by the guard edit**: stashing the edit and re-running reproduces it
+on `HEAD`. Commit **`f864e4e`** (classifier v2) retired `skip_attribution`, removed
+`ATTRIBUTION_VERSION` and `attributeSkip` from `src/`, and **left the script importing both**.
+
+⚠️ **This is the FR-20 re-derivation tool** — the instrument for *"store observations; derive
+judgements"*, the one that re-derived the 24 rows classifier v2 corrected, and a documented command in
+`CLAUDE.md`. It was **dead for seven days and nothing noticed.**
+
+**Why nothing noticed, stated as the pattern rather than the instance:**
+
+| | |
+|---|---|
+| `test/noOrphanModules.test.ts` | walks **`src/`** only — `scripts/` is outside it entirely |
+| Coverage | cannot see a file no test imports; an untested file is missing from the **denominator** |
+| The retirement commit | changed `src/` and its tests, and **891 tests stayed green** |
+
+⚠️ **`scripts/` is wholly untested and outside every guard**, and it now holds 19 files including the
+hypothesis-gate runner, the `played_at` repair, the probes and the new backup/restore pair. **This is
+the third instance of the same shape in eight days**: `recordSuccessorLag` (a dead method inside a live
+file), the ten backups with no restore path, and now a dead entry point. Each was invisible for the same
+reason — **the guards watch `src/` and the tools live somewhere else.**
+
+**Repaired** by removing the attribution half rather than restoring the dead imports, per
+`domain-entities.md` §6: *"Do not reintroduce it, and do not read it: classifier v2 subsumes it, and the
+two rules could contradict each other."* The script no longer reads **or writes** `skip_attribution` /
+`attribution_version`; those columns stay nulled-not-dropped for by-image rollback.
+
+✅ **And the repaired script reports the corpus is stable**: **762 live plays, 762 re-derived identical,
+0 changes** under classifier v2. So the week of deadness cost nothing — but that is the *outcome*, not a
+defence. ⚠️ It also means `--apply` would have been a no-op, so the guard fix was verified on a run that
+could not have damaged anything either way. **The guard was not proven by risking the corpus.**
+
+### ⚠️ A recording scare, resolved: nothing was wrong
+
+No play or decision had been written since **2026-09-27T02:46Z** — ~2.5 days — while the container
+reported `Up 2 days (healthy)`. The `.db` and `-wal` mtimes had also not moved.
+
+**Recording was fine.** `/api/diagnostics`: `MCP getNowPlaying → "Connected — nothing currently
+playing"`, `Database → schema v6`, `Listening history → 850 plays · 0 gaps`, and the **snapshot
+scheduler had run at 2026-09-29T15:07:54Z**, proving the background timers were alive. The user simply
+had not played music.
+
+⚠️ **Two false signals to distrust next time.** ① **Bind-mount mtimes are not a liveness signal** — the
+last play (`02:46Z`) is *later* than the `-wal` mtime (`02:31Z`), which is impossible if mtimes were
+faithful. ② **"No new rows" is indistinguishable from "no listening"** without asking the app what it
+can see. The discriminator is a *positive* check that the timers are alive — the snapshot timestamp —
+not the absence of data. **Absent data reading as a fault is this project's own trap inverted.**
+
+### Verified after all of it
+
+**891 tests · typecheck clean · schema v6 · 850 plays · 900 decision rows · `integrity_check: ok` ·
+`src/` untouched · `src/playback/` still absent.**
+
+### Next
+
+**The U5 NFR Design plan's 8 questions** — [`../plans/u5-nfr-design-plan.md`](../plans/u5-nfr-design-plan.md).
+⚠️ **Candidate P-32 (*a guard must be able to observe the condition it guards*) has now earned a second
+citation**, and a candidate joins it: ⭐ **a tool outside `src/` is outside every guard** — three
+instances in eight days.
+
+---
+
+## 2026-09-29 (later) — W-6 opened: the suite has never caught an "unforced error", and that is structural
+
+**Stage**: INCEPTION amendment (`requirements.md` §5.1) + CONSTRUCTION (U5 NFR Design plan).
+**Raised by the user** after three dead-or-broken artefacts surfaced in eight days without the test
+suite noticing: *"What is the best practice when working with a primarily agent coded app to review
+the code and detect problems with it, the pipeline, the test suite or other project tools and
+artifacts?"*
+
+⚠️ **`requirements.md` is a stage-gated inception deliverable and was amended on the user's explicit
+instruction**, not unilaterally — the same handling as the FR-40 and R11 amendments of 2026-09-26.
+
+### The finding that motivates it
+
+Going through the project's own defect record and asking *what found this*: **essentially none were
+caught by the 891 tests.** They were found by the user noticing a wrong number, by running the
+container, by watching a real failure get recorded, by probes — and twice **by accident**.
+
+⚠️ **This is not a quality problem with the suite.** It does real regression work invisibly. The class
+is outside its reach, and **coverage actively conceals it**: `noOrphanModules.test.ts`'s own docstring
+already records why — an untested file leaves the **denominator** rather than scoring zero.
+
+Five categories, in `requirements.md` §5.1 W-6. The one worth repeating here is **D — assertions
+recorded as observations** — because **tests can never catch it: the code does exactly what it says.**
+`skip_source`, `played_at`, *"loses over half the corpus"*, and the lock guard's docstring are all
+this, and all four were written confidently.
+
+### ⚠️ What is specifically amplified by agent authorship
+
+1. ⭐ **Co-generated tests share the author's misconception.** One pass writing both code and tests
+   encodes the same mental model twice, so when the model is wrong **both are wrong and they agree**.
+   The WebSocket `403` is the exact case: the tests exercised the policy function (correct), nothing
+   exercised the handler (which held a copy), and **all 411 tests passed**.
+2. ⚠️ **A confident comment is the most dangerous artefact in an agent codebase** — more dangerous
+   than the code, because it stops the next reader from checking. The lock guard shipped with a
+   docstring arguing why it was *"a real test of the dangerous condition rather than a proxy for it"*,
+   and it **outlived the corruption incident it had failed to prevent**.
+3. **Agents re-implement rather than retrieve** — three instances (the access policy, `bucketOf`,
+   `USER_SKIP_RATIO_CEILING`).
+4. **Agents run the tests, not the app** — which is why the found-by column is dominated by *running
+   the system*.
+
+### The split: two guards into U5, four analyses into the backlog
+
+**Into the U5 NFR Design plan as Q9**, because they are cheap, they are guardrails, and **they would
+have caught two of the last three findings**:
+
+- **Execute every entry point in CI.** ⚠️ `node --check` is **not** sufficient — the reclassify
+  breakage was a missing *named export*, a link-time failure, so the module must actually be
+  evaluated. ⚠️ And evaluating is only safe for scripts that guard `main()`;
+  `reclassify-unobserved-tails.mjs` does **not**, so the convention must be *invoke the safe mode*,
+  never *import the file*.
+- **`knip` over `src/` AND `scripts/`** — the method-level half `noOrphanModules` structurally cannot
+  do, since it walks **modules, not methods**.
+
+**Deferred as W-6**, triggered at the **end of U5**: mutation testing on the pure core (**W-6.1**),
+⭐ **BR-derived tests written without reading `src/`** (**W-6.2**), the negative-control convention
+(**W-6.3**), and container-parity probes (**W-6.4**).
+
+⚠️ **W-6.2 is the strongest lever and it is nearly free**, because `business-rules.md` already exists
+as numbered, individually testable statements written *before* the code. It is deferred only because
+it wants BR-33…BR-43 backed by **shipped** code — generated today it would test a design.
+⚠️ **Its process constraint cannot be relaxed**: the session writing those tests must not have read
+the implementation, or it becomes the co-generation problem it exists to break.
+
+**Explicitly rejected**: chasing a coverage percentage. Wrong question, and this project has been
+bitten by its denominator twice.
+
+⚠️ **One claim in W-6.1 is documentation-derived and is flagged as such**: that Stryker has no
+first-class `node:test` runner and would need the command runner. **Probe it before scheduling** —
+recording an unverified claim inside the item that exists to catch unverified claims would be its own
+punchline.
+
+### Next
+
+**Nine questions** now await answers in
+[`../plans/u5-nfr-design-plan.md`](../plans/u5-nfr-design-plan.md).
+
+---
+
+## 2026-09-30 — U5 NFR Design answered (9 of 9, all as recommended), and Q8's addendum found the real footprint
+
+**Stage**: CONSTRUCTION — NFR Design, U5. Authoritative reading:
+[`../plans/u5-nfr-design-plan.md`](../plans/u5-nfr-design-plan.md) **§5.1**.
+
+All nine settled by the user **as recommended**. The ones worth recording beyond the table:
+
+- **Q3 = B** resolves a genuine conflict between **NFR-17** (*retry 429 with `Retry-After`*) and
+  **BR-43.5** (*never retry a skip*). The distinction that resolves it: **did the request reach the
+  device?** 401 provably did not, so re-issuing *completes* the first attempt; a 429 did not either,
+  but honouring a 30 s `Retry-After` would mean *"skip whatever is playing in 30 seconds"*.
+  ⚠️ **Needs a new `RefusalReason`, `upstream-rate-limited`**, distinct from BR-35.2's own hourly
+  limit — conflating them would make the runaway halt's evidence unreadable.
+- **Q5 = C** keeps the kill switch **asymmetric**: a write failure never blocks *disarming*, always
+  blocks *arming*. ⚠️ The symmetric "don't change state if you couldn't persist it" is ordinary
+  transactional hygiene and, applied to a kill switch, means **the user pressed stop and the system
+  kept going.** Same asymmetry as BR-37.5/37.6.
+- **Q4 = A and A** gives the playback client **exactly one method**. An unused `pause` on a live
+  device is indistinguishable from an intended one the day someone calls it — BR-30's argument,
+  applied to a method rather than a constructor parameter.
+
+### ⚠️ Q8 carried a new requirement, and the two halves turned out to be one item
+
+The user added: *"metrics that let the dev (during live debug) check that the app is not abusing the
+external api's… Ideally the app has a 'light touch'… I'd also like a little thought/research put into
+'can we determine what a reasonable app bandwidth/hit rate to external sites should be'."*
+
+**The research cannot be done yet, because nothing counts the requests.**
+`webApiClient.ts:125` throws on a 429 with the `Retry-After` **inside a message string** and records
+nothing, so the app cannot say whether it has ever been rate-limited. ⚠️ **Zero 429s in the container
+log proves nothing** — the container had been recreated 30 minutes earlier for the backup.
+**The metric is the prerequisite for the research, not a parallel task.**
+
+### The measured footprint — and the poll is 98.4% of it
+
+| Upstream call | Rate/hr | Share |
+|---|---|---|
+| **MCP `getNowPlaying` poll** @ 3 s | **1,200** | **98.4%** |
+| `GET /tracks/{id}` — once per *distinct* track | ≤16 | 1.3% |
+| Token refresh · liked set (663÷50, 6-hourly) · followed · `recently-played` | ~4 | 0.3% |
+| **Spotify total** | **≈1,220/hr · ≈29,300/day** | |
+
+✅ **Everything except the poll is already a light touch, and Development Mode is why.** The
+`/contains` family returning 403 forced *fetch the set once, cache it, resolve locally*, so follow and
+liked status cost **zero** per-track requests and enrichment is **one** call per distinct track.
+⚠️ **The sandbox restriction accidentally produced the efficient design** — worth noting, because the
+restriction is recorded in this project only as a cost.
+
+⚠️ **The poll never stops, and that was observed rather than projected**: the 2026-09-29 scare showed
+**~2.5 days with no play recorded** while the container ran healthy — roughly **86,000 requests spent
+learning *"nothing is playing"* 86,000 times.**
+
+### What is knowable about a "reasonable" rate
+
+| Vendor | Published limit? | Position |
+|---|---|---|
+| **MusicBrainz** | ✅ 1 req/sec sustained with an identifying `User-Agent` | Compliant (NFR-14/15), **and already probed tighter than the published floor** — at 1200 ms spacing 6 of 19 tracks still took a 503 |
+| **Spotify** | ❌ **No numeric limit published** — documented only as a rolling 30-second window, differing by app mode | The app sits at **10 requests per 30-second window**. ⚠️ Whether that is 10% or 90% of the ceiling is **not derivable from documentation** |
+
+⚠️ **So the honest answer is: for MusicBrainz yes, and we already have it; for Spotify no — not from
+documents.** The only evidence that can ever exist is observed 429s and their `Retry-After` values,
+which is exactly what is not recorded. ⚠️ **And a clean counter would bound nothing except "below the
+limit"** — the same logic as the gate's CI ruling out ±8pp *and nothing smaller*. **Do not let zero
+429s be read as headroom.** ⚠️ And do not resolve this by reading Spotify's docs harder: six wrong
+conclusions have come from those docs, every one caught by a probe.
+
+### The work it creates
+
+**In U5**: metrics **M1** (per-upstream rate in a rolling 30 s window *and* per hour — an hourly mean
+hides a burst), **M2** (429/503 **counted and persisted** with the last `Retry-After`), **M3**
+(requests per play — the efficiency ratio), **M4** (share of polls returning nothing playing).
+⚠️ **M2 must count, never just log** — a failure written down and never aggregated is the
+`successor_lag_ms` shape, where a structurally empty field reads as *this never happens*. New pattern
+**P-37: a limit you cannot see is a limit you cannot respect.**
+
+**Deferred as W-7** — *adaptive poll backoff when idle*, the change that would cut ~98% of the
+footprint. ⚠️ **Deliberately not in U5**: it alters the **recording instrument**, the one output that
+cannot be regenerated, and U5 exists because phases are sequenced by risk containment. Its own
+analysis is needed — backoff only while *nothing is playing* (a longer interval during playback thins
+`PlayObserver`'s trail); a late `startedAt` on the first play after idle, where **classifier v2 is
+*probably* robust** because it thresholds `durationMs − maxProgressMs` from Spotify's own
+`progress_ms` rather than trail density, ⚠️ **and "probably" must be probed**; a longer FR-34 blind
+spot; and ⚠️ **a backoff that fails to exit is a silent recording outage that looks exactly like "the
+user did not listen"** — which the 2026-09-29 scare demonstrated.
+
+⚠️ **W-7 is blocked on the U5 metrics**, not merely sequenced after them: without a counter there is no
+before-and-after, and without M4 the waste it targets is not even visible.
+
+### Next
+
+**The U5 Infrastructure Design plan**, then Code Generation. ⚠️ Infrastructure owns the `config/`
+**`:ro` → `:rw`** change and **migration 007**; the backup it needs is **taken and verified**.
+
+---
+
+## 2026-10-01 — ⚠️ CORRECTION: the "bind-mount mtimes are not a liveness signal" finding of 2026-09-29 is FALSE
+
+**Raised by the user**, querying a claim of mine that recording had *"stopped around 09:04 today"*:
+**"Hmm 9:04 AM?"** — at 22:05 local. The query was right, and chasing it found that **the underlying
+finding recorded in this log on 2026-09-29 is wrong.**
+
+### ✅ mtimes over the bind mount ARE faithful, and the proof was sitting in `data/snapshots/`
+
+`history-snapshot-2026-09-29T15-07-54-884.csv` carries **UTC in its filename** and **local in its
+mtime**: `2026-09-29 11:07:55 -0400` = **15:07:55Z**. Match to the second.
+
+⚠️ **So the offset is self-evident from a single `ls` of that directory**, and it is **UTC-4 (EDT)** —
+not the UTC-3 I had inferred from one coincidence on 2026-09-27 and then never checked.
+
+### What the withdrawn claim said, and why it was wrong
+
+> ⚠️ ~~**Bind-mount mtimes are not a liveness signal** — the last play (`02:46Z`) is *later* than the
+> `-wal` mtime (`02:31Z`), which is impossible if mtimes were faithful.~~ **WITHDRAWN.**
+
+Recomputed at UTC-4: that `-wal` mtime was **Sep 26 23:31 EDT = 2026-09-27T03:31Z**, which is **45
+minutes AFTER** the 02:46Z play, exactly as a trail being appended as the track finished would be.
+**Nothing was impossible. The comparison was across two timezones, and the direction came out
+backwards.**
+
+⚠️ **Claim ② of that entry stands and is the one that mattered**: *"no new rows" is indistinguishable
+from "no listening"* without a positive check that the timers are alive.
+
+### ⚠️ And then I used the invalidated signal anyway, today
+
+Reading `-wal` mtime `09:04` I reported *"recording stopped around 09:04 today"*. At UTC-4 that is
+**13:04:19Z**, which is **11 minutes AFTER** the newest play started (`2026-09-30T12:53:44Z`) — again
+perfectly coherent, and again a local mtime compared against a UTC timestamp.
+
+⚠️ **`09:04` is the last time there was anything TO write, not the last heartbeat.** Three plays were
+recorded 08:47–08:53 EDT and then listening stopped; the container could have polled for hours
+afterwards writing nothing. ⚠️ **The files cannot date the container's stop**, and with dockerd down
+its logs are unreachable, so **when it stopped is unknown** — stated as unknown rather than estimated.
+
+### The shape of the error, which is this project's own and is why it is worth a whole entry
+
+1. An offset was **inferred from a single coincidence** and never measured.
+2. It was used to **invalidate a reliable instrument** — and the invalidation was written into the
+   append-only log as a *finding*, with a confident mechanism (*"impossible if mtimes were faithful"*).
+3. The now-distrusted instrument was then **read anyway**, two days later, and produced a second wrong
+   conclusion about whether the recording instrument was alive.
+
+⚠️ **This is the plausible-inference-recorded-as-measurement trap, committed in the log that exists to
+catch it** — the same family as *"loses over half the corpus"* and the lock guard's docstring, and the
+third time in this session that a confident claim of mine needed measuring rather than reasoning.
+⚠️ **It is also W-6 category D exactly**: an assertion recorded as an observation, which no test can
+ever catch because nothing executes it.
+
+✅ **The usable instrument, recorded so it is not re-derived**: `data/snapshots/` filenames are UTC and
+their mtimes are local, so **one `ls --time-style=full-iso data/snapshots/` establishes the offset and
+proves mtimes are trustworthy.** Do that before reasoning about any file time.
+
+### State at the time of writing
+
+**853 plays · 909 decision rows · `integrity_check: ok`** — three new plays this morning, newest
+`2026-09-30T12:53:44Z`, held in a 478 KB uncheckpointed WAL. ⚠️ **Nothing lost.** The container is
+**down** because the Docker daemon is unreachable (Rancher Desktop's processes are alive, its backend
+is not); `restart: unless-stopped` should recover it when dockerd returns.
+
+---
+
+## 2026-10-01 — Recording was silently down ~13 hours: a WSL update during Modern Standby destroyed the VM
+
+**Not a project defect.** Recorded because it falsifies a claim in `CLAUDE.md`, and because of how it
+was found.
+
+### Root cause, from the Windows event log
+
+| Time (EDT) | Event |
+|---|---|
+| **11:32:16** | Machine enters Modern Standby. WSL VM suspended — this is why `k3s.log`, `docker.log` and the guestagent log all stop here. ⚠️ **Suspension, not death** |
+| **13:06:39** | `Installation Started: MicrosoftCorporationII.WindowsSubsystemForLinux`, and the **`Windows Subsystem for Linux` service start type set to `disabled`** |
+| **13:10:40** | **`WSL Service` start type set to `disabled`** |
+| **14:11:41** | Hyper-V vmswitch: NIC **disconnected from port** |
+| **14:42:40** | Hyper-V vmswitch: **port deleted** — the VM is gone |
+| 15:39 / 16:42 | Resume |
+| **16:50:11** | Rancher's `host-switch.exe` and `Ubuntu-24.04 socket proxy` exit **status 1**; Rancher relaunches, then stops logging |
+
+**Windows Update installed a WSL update (now 2.7.14.0) while the machine was in Modern Standby, and
+the WSL VM was torn down with it.** `dockerd` stops mid-sentence in a 10-second warning loop — no
+SIGTERM, no shutdown message. That is a VM kill, not a daemon exit.
+
+⚠️ **Modern Standby alone is NOT the cause, and checking that mattered.** The machine enters standby
+dozens of times a week and recording survived nearly all of it — including a **5 h 07 m** standby the
+same morning (03:22→08:29), after which it recorded normally. **Duration is not the discriminator
+either.** What distinguishes this one is that a **WSL version update landed inside it**.
+
+> ⚠️ **I nearly asserted "Modern Standby killed it" from a single clean coincidence** — the standby
+> beginning at 11:32:16 against logs stopping at 11:32:38. That is the same error as the timezone
+> finding corrected hours earlier in this same log. **The standby history is what refuted it**, and it
+> cost one query. **Check the base rate before believing a coincidence.**
+
+### Why the UI hung while Rancher's own diagnostics was clean
+
+The Containers and Volumes panes query the container engine over a socket with no daemon behind it, so
+they wait forever. ⚠️ **Rancher's diagnostics has no "is the engine answering" probe**, so a dead
+backend is invisible to it. **This is the project's own `localGuard` lesson in someone else's
+product**: a clean report on one surface says nothing about a surface nobody checked.
+
+### Recovery, and what it proves
+
+`rdctl shutdown` + `wsl --shutdown` + relaunch. ✅ **`restart: unless-stopped` worked**: the container
+revived **by itself** once dockerd returned — it was not started by hand.
+
+✅ **Zero data loss.** 853 plays · 909 decision rows · max play id 894 · `integrity_check: ok` ·
+0 recording gaps — identical either side, with this morning's three plays (892–894) intact. They were
+in a 478 KB uncheckpointed WAL throughout, which is a committed log and was never at risk.
+⚠️ **Note the WAL did not "fold in" on restart** — it is 585 KB and growing, and `history.db`'s mtime
+is still the 2026-09-29 backup checkpoint. That is normal WAL operation, not a pending problem.
+
+### ⚠️ `CLAUDE.md`'s "the autostart chain is PROVEN" is TRUE BUT NARROWER THAN IT READS
+
+The 2026-09-05 reboot test is sound and is not withdrawn. But it proved **reboot** — and this failure
+was **resume plus a host-component update**, which is far more common and had never been exercised.
+
+⚠️ **`post-boot-check.ps1` returned `INCONCLUSIVE` (exit 2) today, and every substantive check passed**:
+dockerd up, container healthy, no startup errors, schema v6 through the bind mount, UI `200`, WebSocket
+`101`, cross-site Origin `403` on **both** surfaces, `integrity_check: ok`. The verdict came only from
+its autostart heuristic — *"container started 614,154s after boot — too long to credit the chain; was
+it started by hand?"*
+
+⚠️ **Its one weak inference is exactly today's case.** The host never rebooted; only the VM died. The
+script cannot distinguish *"started by hand"* from *"restarted by the restart policy after the engine
+returned"* — and the second is what happened, which is the chain **working**. It is a reboot test being
+asked a resume question. **Not a bug; a scope limit that should be stated rather than read as a
+failure.**
+
+### ⚠️ The detection gap is the real finding
+
+Recording stopped for ~13 hours and **nothing noticed**. It surfaced only because the user queried a
+timestamp in a status line — *"Hmm 9:04 AM?"*. `restart: unless-stopped` cannot help when dockerd
+itself never returns, and the app cannot report its own absence.
+
+⚠️ **And "no new rows" is indistinguishable from "the user did not listen"** — the one surviving claim
+from the withdrawn 2026-09-29 entry, now demonstrated twice: once as a false alarm (09-29, nothing
+wrong) and once as a real outage (09-30). **Absence of data is not a signal in either direction.**
+
+✅ **The discriminator has to be a positive liveness heartbeat**, and the instrument for it is already
+specified: **M4** (share of polls returning nothing playing) distinguishes *polling and hearing
+silence* from *not polling*. ⚠️ **So M1–M4 are now load-bearing for two separate items** — W-7's
+before-and-after, and outage detection. They were costed as diagnostics; they are infrastructure.
+
+**Candidate backlog item, not opened without a decision**: external monitoring of recording liveness.
+⚠️ It cannot live in the container, because the failure mode is *the container is not running*.
+
+---
+
+## 2026-10-01 — U5 NFR Design COMPLETE: P-27…P-37, LC-23…LC-31, PBT-34…PBT-50
+
+**Stage**: CONSTRUCTION — NFR Design, U5. Deliverables:
+`construction/u5-automated-skipping/nfr-design/{nfr-design-patterns.md,logical-components.md}`.
+Written from the plan's §5.1 (nine answers, all as recommended) and §5.2 (Q8's addendum).
+
+### The one NFR this unit AMENDS rather than satisfies
+
+⚠️ **P-30 declines NFR-17's `Retry-After` clause for the skip path**, and that is a decision rather
+than a gap. NFR-17 says *handle 429 with `Retry-After`*; BR-43.5 says *never retry a skip*. The
+discriminator neither rule contains: **did the request reach the device?**
+
+| Failure | Reached it? | Therefore |
+|---|---|---|
+| 401 | **No** — edge | re-issue once; it *completes* the first attempt |
+| 429 | **No** — edge | ⚠️ **refuse without waiting** — honouring 30 s means *"skip whatever is playing in 30 seconds"* |
+| 5xx / network / unconfirmed | ⚠️ **Unknown** | failed, surfaced, never retried |
+
+⚠️ **Unknown landing counts as landed** — `null` is unknown and unknown is not `false`, the project's
+rule applied to an action rather than a field. ⚠️ **Needs a new `RefusalReason`,
+`upstream-rate-limited`**, distinct from BR-35.2's own hourly cap: conflating them makes the runaway
+halt's evidence unreadable, and the halt's only job is to say what tripped it.
+
+> ⚠️ **Recorded prominently in the coverage table, `CLAUDE.md` and the HANDOFF** because the next
+> person to read NFR-17 will otherwise see a contradiction and "fix" it. **An NFR quietly not met is a
+> defect; an NFR explicitly amended with a reason is a decision.**
+
+### The two properties that earn their place, and why the other sixteen would pass without them
+
+⚠️ **PBT-34a — the positive control.** Six properties (PBT-34…39) prove the six refusal points fire.
+**A `drain` that posted nothing, ever, satisfies all six perfectly.** One property must prove the
+action *fires*, or the suite is green on a system that cannot skip. This is the third time this
+project has needed the same lesson: PBT-22 passed trivially against counts that were always zero, and
+`restore-history.mjs` needed `--self-test` against a known-corrupt file.
+
+⚠️ **PBT-41 — the only thing that can catch the P-27 defect.** The safety predicate must be re-read
+**at drain time**. Checking it when the decision was taken produces **correct behaviour in every
+ordinary test**, because the two states agree whenever nothing changed in between. It diverges only
+when automation is switched off *during* the 10 s enrichment wait — which is exactly the case FR-38
+exists for, and exactly the case no hands-on session reproduces on purpose. **Same shape as PBT-22:
+a defect with no observable failure mode under normal use.**
+
+### What replaces U4's phase guard
+
+U4's was **`src/playback/` does not exist**. U5 ends it, so **P-33** makes the boundary two structural
+properties: a single import path (`src/rules/` → `DecisionExecutor` → `SkipExecutor` → `src/playback/`
+→ the write client), and **the client exposing exactly one method, `skipToNext()`**.
+
+⚠️ **A general `PlayerClient` is how a skip-only unit acquires the ability to pause the user's music.**
+BR-30 already makes this argument about a constructor parameter — *"an injected-but-uncalled one
+reduces the boundary to one line of restraint"* — and it applies unchanged to a method.
+⚠️ **Asserted on the client's exported shape, NOT via the orphan check**, which walks modules and let
+two dead methods live inside a heavily-executed file for their entire lives. **A second method would
+be invisible to it** — P-33 and P-36 meeting.
+
+### Patterns that came from defects rather than from design
+
+⚠️ **P-32** (*a guard must be able to observe the condition it guards*) and **P-36** (*a tool outside
+`src/` is outside every guard*) are the two most likely to be dropped as obvious, and both were earned
+this week: the blind lock guard that **outlived the corruption incident it failed to prevent**, and
+three dead-tool findings in eight days. **P-37** (*a limit you cannot see is a limit you cannot
+respect*) joins them from Q8's addendum.
+
+⚠️ **P-32 is applied to three U5 guards concretely**, not just stated: the action-point predicate must
+re-read state, the loop guard must key on the **play row** and never `track_id`, and the phase guard
+must observe the **import graph and exported shape** rather than the file tree.
+
+### LC-28 outgrew its brief
+
+The M1–M4 metrics were costed under Q8 as *diagnostics*. **M4 — share of polls returning nothing
+playing — is the positive liveness signal** that distinguishes *polling and hearing silence* from *not
+polling*, which is precisely what the 2026-09-30 outage lacked while recording was down ~13 hours.
+**So M1–M4 are load-bearing for W-7's before-and-after AND for outage detection.** ⚠️ It makes the
+state *visible*; it does not *alert* — a monitor cannot live in the container when the failure mode is
+*the container is not running*.
+
+### Verified
+
+**891 tests · typecheck clean · `src/` untouched · `src/playback/` still absent.** Documentation-only,
+as every U5 stage has been so far. The phase boundary is intact at the end of NFR Design.
+
+### Next
+
+**The U5 Infrastructure Design plan.** ⚠️ It owns the `config/` **`:ro` → `:rw`** change — a
+security-posture change to a deliberately read-only mount — and **migration 007**, additive only. The
+`before-migration-007` backup is **taken and verified**.
+
+---
+
+## 2026-10-01 — U5 Infrastructure Design COMPLETE, and Q1 overturned a settled FD answer
+
+**Stage**: CONSTRUCTION — Infrastructure Design, U5. Deliverable:
+`construction/u5-automated-skipping/infrastructure-design/infrastructure-design.md`.
+All six questions answered as recommended: Q1 **C** · Q2 **A** · Q3 **A** · Q4 **A** · Q5 **A** ·
+Q6 **A**.
+
+### ✅ Q1 = C — a new `./state:/state:rw` mount, and `config/` STAYS `:ro`
+
+⚠️ **This reverses NFR Q5**, which had settled `config/automation-state.json`. Q5 stands on everything
+it considered; **it did not consider what `:rw` on `config/` grants** — permission to overwrite
+`config/rules.json`, the user's hand-authored rule set, which U3 and U4 deliberately protected.
+**No U5 code would ever use that permission**, and BR-30 rejects the same shape one level down: it
+forbids an injected-but-uncalled playback collaborator because an unused capability leaves one line of
+code preventing its use.
+
+⚠️ **BR-20.8 would not have protected `rules.json`, and that is worth knowing independently of this
+decision.** Its last-known-good path reloads the previous rule set when a new file **fails to parse**.
+A file truncated to valid-but-empty JSON **parses successfully**, so it would be accepted as a
+deliberate empty rule set rather than rejected.
+
+⚠️ **`data/` was rejected because of RESTORE, not because of tidiness.** Today `backup-history.mjs`
+copies only `history.db*`. But **W-5** is specified as a *full-inventory* backup of `data/`. Once that
+exists, restoring a week-old backup would also restore the week-old automation latch — **so if
+automation was armed then and has since been turned off, the restore turns it back on and nothing says
+so.** `requirements.md` W-5 now records that the state file must **not** be backed up: a kill switch
+recoverable from an archive is not reliably off.
+
+### ✅ The user's AI-rules question, answered: it strengthens C rather than weakening it
+
+The user asked whether the planned move to an AI-authored rule system — after which `rules.json` will
+eventually need to be writable by *some* app — changes the recommendation. **It does not:**
+
+1. The future change stays a one-word edit (`./config:/config:ro` → `:rw`) in the unit that adds rule
+   editing. C declines to pre-pay for it; it does not obstruct it.
+2. The two files want different permissions even once both are writable — one is a machine-written
+   safety latch, the other is authored intent, changed rarely and costly to lose.
+3. "Eventually" is an unbounded window, and BR-30's argument applies throughout it.
+4. ⚠️ **The strongest reason, and it is specific to that plan: a kill switch stored in the same
+   writable directory as the file an AI agent edits is a kill switch that agent can disable** — by a bug
+   or a bad generation pass. **That argument gets stronger as the rule author becomes less predictable.**
+
+⚠️ And if the rule system becomes a *separate app*, separate mounts express it cleanly: this app holds
+`state:rw` + `config:ro`, the rules app holds `config:rw`. Under option A this app would hold a write
+permission it never exercises while a different process does the writing.
+
+### FD documents AMENDED as a consequence
+
+Q1 = C made four FD statements wrong, and they were corrected rather than left to be discovered:
+
+| Document | Was | Now |
+|---|---|---|
+| `business-rules.md` BR-34.1 | `config/automation-state.json` | **`/state/automation-state.json`** |
+| `business-rules.md` BR-34.3/34.4 | *"`config/` … must become `:rw`"* | **`./state:/state:rw` is new; `config/` stays `:ro`** |
+| `business-rules.md` header summary | *"kill switch in `config/`"* | **`/state/`** |
+| `domain-entities.md` §2 | *"the first unit that writes to `config/`"* | **writes to `./state`; `config/` untouched** |
+| `frontend-components.md` §2 | read from `config/…` | read from **`/state/…`** |
+| `nfr-design/logical-components.md` LC-29 | `config/…` | **`/state/…`** |
+| `requirements.md` W-5 inventory | `config/automation-state.json` | **`state/…`, and must NOT be backed up** |
+
+⚠️ **The latent-failure warning moved with the file rather than disappearing.** An unwritable `./state`
+still presents as *a kill switch that works in the UI and does not persist* — the worst failure mode
+this control could have. `probeWritable` (LC-29) tests it at startup, and verification must write
+**through the container**, never on the host.
+
+### ⚠️ The `compose.yaml` comment is now right in outcome and wrong in reasoning
+
+It says `:rw` arrives *"in the unit that adds **RULE EDITING**, and not before."* Under Q1 = C that
+**conclusion is correct** — U5 writes nothing to `config/`. **But the reasoning implies rule editing is
+the only thing that could make the directory writable**, which is what sent this plan looking for a
+`:rw` change in the first place.
+
+⚠️ **That comment has now been wrong twice in different ways**: it named the wrong **unit** in
+2026-09-21 (*"becomes `:rw` at U4"*, and U4 had no editor), and the wrong **reason** now. The rule to
+state instead is narrower and does not decay: **`config/` holds user-authored intent and the app never
+writes it; app-written state lives in `./state`.** Correction to apply at code generation.
+
+### Q2–Q6, briefly
+
+- **Q2 = A**: migration 007 runs automatically at startup. Running it by hand against a stopped
+  container was rejected — during U4 a maintenance script wrote to `history.db` alongside the container
+  and corrupted an index, and the guard meant to catch that **could not see the container** until
+  2026-09-29. The app at startup is the one writer we can be certain is alone.
+- **Q3 = A**: rollback is **verified live**, not read from the code. ⚠️ The skip line proves *007 is
+  skipped*; it does not prove *U4's code runs correctly against an unread table and three unread
+  columns*. Separate claims, and the rollback guarantee is the second. Run it against a **copy**.
+- **Q4 = A**: `MAX_CONSECUTIVE_RULE_SKIPS = 3` and `MAX_RULE_SKIPS_PER_HOUR = 10` are **constants in
+  source**, not env values — an explicit exception to this project's habit, since `compose.yaml` already
+  holds three operational numbers. ⚠️ The halt is reachable in normal use: the busiest hour held
+  **27 plays**, so 10/hour trips on any rule matching **>37%** of tracks. If the number were a one-line
+  edit, the easy response to a halt would be to raise it, after which it never fires again.
+- **Q5 = A**: automation state survives a restart. ⚠️ **So once armed, a reboot resumes skipping**,
+  unattended, on the autostart chain. FR-47's *"off by default"* means fresh install, not fresh boot.
+  Requiring re-arming was rejected because the app runs unattended and the machine sleeps dozens of
+  times a week — automation would be off most of the time **without saying so**.
+- **Q6 = A**: M1–M4 on `/api/diagnostics` only. **No new route, no new WebSocket surface.** A second
+  route would duplicate the local-access check, which is what caused the WebSocket `403`.
+
+### Still open, and none of it is design work
+
+1. The two `compose.yaml` comment corrections, at code generation.
+2. ⚠️ **The live rollback check** — U4's image against a v7 copy, expecting `from: 7, to: 7`.
+3. ⚠️ **The BR-35 pre-registration**, which must be written before any rule is armed.
+
+### Verified
+
+**891 tests · typecheck clean · `src/` untouched · `src/playback/` still absent.** Documentation-only,
+as every U5 stage has been. **Next: the Code Generation plan.**
+
+---
+
+## 2026-10-01 — U5 Code Generation plan written; all three design stages complete
+
+**Stage**: CONSTRUCTION — Code Generation, U5.
+[`../plans/u5-code-generation-plan.md`](../plans/u5-code-generation-plan.md) — 13 steps,
+2 scoping questions open. **`src/` is still untouched.**
+
+### Two scoping questions, both found by reading the code rather than the designs
+
+**Q1 — `DecisionExecutor` is declared inside `src/rules/LoggingExecutor.ts:24`.** So `SkipExecutor`
+would have to import the interface from the *other implementation's* module.
+
+⚠️ **That is not merely untidy; it contradicts BR-30 in the import graph.** BR-30 says `SkipExecutor` is
+*added alongside, never grown out of* `LoggingExecutor`, and an import edge between them says the
+opposite to any reader — including the **P-33 structural test**, which has to distinguish *imports the
+interface* from *imports the other implementation*. Recommendation: move the interface and
+`ExecutionContext` to `src/rules/types.ts`, a pure type move with no behavioural risk, so the test can
+be stated as *nothing in `src/rules/` imports `src/playback/`* without an exception clause.
+⚠️ **Declaring a second copy in `src/playback/` was explicitly rejected** — two declarations of one
+contract drift, which is the WebSocket `403` defect exactly.
+
+**Q2 — confirming that two off switches is deliberate.** `SKIP_EXECUTOR_ENABLED` decides whether
+`SkipExecutor` is **constructed** (deployment-time, restart required, checked once at startup);
+`globalAutomationEnabled` decides whether a queued attempt **fires** (runtime, checked at the action
+point, every attempt).
+
+⚠️ **They read as redundant and are not**, and the risk is a later session "simplifying" by deleting
+one. Collapsing them **breaks FR-38**: a restart-requiring control cannot satisfy *"no skip is issued
+after the switch is thrown."* ⚠️ **And dropping the env flag loses the ability to deploy U5 inert** —
+which is how BR-40.1's dry-run review happens with the action path never constructed at all.
+
+### Ordering: the action point is written before anything can reach it
+
+Pure → storage → **action point (Step 6)** → wiring (Step 9) → UI. `skipDrain` is fully tested against a
+fake player client before `server.ts` ever constructs the real one, and **the app's behaviour is
+unchanged until Step 9**.
+
+### The phase guard U4 relied on retires, and two structural tests replace it
+
+U4's guard was *`src/playback/` does not exist*. Step 12 asserts instead: nothing in `src/rules/` imports
+`src/playback/` · only `SkipExecutor` imports `src/playback/` · **`spotifyPlayerClient`'s exported
+surface is exactly one method** · `LoggingExecutor.length === 1` still passes.
+
+⚠️ **The one-method rule is asserted on the client's exported shape, not via the orphan check**, because
+`noOrphanModules.test.ts` walks **modules, not methods** — `recordSuccessorLag` and
+`updateSkipAttribution` had zero callers for their entire lives inside a heavily-executed file and the
+check was satisfied throughout. **A second method would be invisible to it.**
+
+### Three items that code generation must not close by implication
+
+1. The two `compose.yaml` comment corrections — the `:rw` **reason**, and the inode hazard moving to
+   `./state`.
+2. ⚠️ **The live rollback check**: U4's image against a **v7 copy**, expecting `from: 7, to: 7`. Reading
+   the skip line proves *007 is skipped*, not *U4's code runs correctly against an unread table and
+   three unread columns*.
+3. ⚠️ **The BR-35 pre-registration**, written before any rule is armed — carried on the FD plan's
+   checklist since 2026-09-26.
+
+### What CI still cannot close
+
+1. **The dry-run review** that arms the first rule — BR-40.1's actual gate.
+2. **The first real skip, heard by the user**, confirming it costs 2–3 s rather than 18–41 s.
+3. **`probeWritable` against the real `/state` mount**, verified through the container — on the host the
+   write succeeds and the bug is invisible.
+
+⚠️ **Three separate U2 defects all passed the full suite** and were found only by running the system and
+watching a real failure get *recorded*. **U5's equivalent failure is audible.**
+
+### Verified
+
+**891 tests · typecheck clean · `src/` untouched · `src/playback/` still absent.** Every U5 stage so far
+has been documentation-only, and the phase boundary is intact going into code generation.

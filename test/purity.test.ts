@@ -83,6 +83,11 @@ const PURE_MODULES = [
   // takes one: a rolling window anchored on an ambient clock is untestable at exactly the boundary
   // that goes wrong. A clock here would also make the halt un-reproducible after the fact.
   'playback/safetyCounters.ts',
+  // ⚠️ M1–M4's aggregation. It holds mutable records, which is not the same as being impure: every
+  // window is a function of `(records, nowMs)` and `nowMs` is a PARAMETER. PBT-50 asserts that the
+  // answer moves when the parameter moves; this is what stops a `Date.now()` being added inside, which
+  // would make the metric that proves this app is well-behaved untestable at a window boundary.
+  'playback/upstreamMetrics.ts',
   // The line a person reads all day to judge their rules. A clock or a lookup here would make
   // the log disagree with the row it reports.
   'rules/decisionSummary.ts',

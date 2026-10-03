@@ -74,6 +74,26 @@ describe('PBT-40 — the full BR-33.2 truth table', () => {
     }
   });
 
+  /**
+   * **PBT-36, second half — BR-33.3: a rule cannot opt out of a global dry-run.**
+   *
+   * ⚠️ There is no rule-set-level `dryRun` field, so *global dry-run* means
+   * `globalAutomationEnabled: false`: the whole system logging and acting on nothing. The question is
+   * whether a rule declaring `dryRun: false` can make itself live anyway.
+   *
+   * ⚠️ It is covered by the 16-row table above, as four of its rows — but only implicitly, and an
+   * obligation that is satisfied by a row nobody has labelled is one that survives a refactor of the
+   * table by accident. Asserted directly: `dryRun` can only ever ADD restriction.
+   */
+  it('⭐ a rule declaring dryRun:false cannot opt out of automation being off', () => {
+    for (const halted of [true, false]) {
+      for (const ruleEnabled of [true, false]) {
+        const v = live(state(false, halted), rule(ruleEnabled, false));
+        assert.equal(v.live, false, `halted=${halted} enabled=${ruleEnabled}`);
+      }
+    }
+  });
+
   it('exactly one combination is live', () => {
     const liveCount = cases.filter(
       (c) => live(state(c.automation, c.halted), rule(c.ruleEnabled, c.dryRun)).live,

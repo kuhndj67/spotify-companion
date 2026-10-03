@@ -50,7 +50,11 @@ import type { DecisionExecutor, ExecutionContext } from './types.js';
  * Re-exported for one release so existing importers do not break. ⚠️ **New code imports from
  * `./types.js`.**
  */
-export type { DecisionExecutor, ExecutionContext } from './types.js';
+/*
+ * ⚠️ These were re-exported from here after the U5 move, and **nothing imported them from this path** —
+ * `SkipExecutor`, `decisionRows` and the tests all take them from `./types.js`. Removed 2026-10-03 (found
+ * by `knip`). The docstring above still records where they went, which is the part that was load-bearing.
+ */
 
 export class LoggingExecutor implements DecisionExecutor {
   readonly #log: DecisionLogRepository;

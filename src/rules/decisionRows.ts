@@ -100,4 +100,9 @@ export function buildDecisionRows(
 }
 
 /** Re-exported so callers do not have to reach into `types.js` for one union. */
-export type { DecisionTrigger };
+/*
+ * ⚠️ A `export type { DecisionTrigger }` re-export sat here for compatibility after the U5 move and
+ * **nothing ever imported it** — every caller takes it from `./types.js` directly. Removed 2026-10-03
+ * (found by `knip`). A compatibility shim with no consumer is just a second place the name can be
+ * reached from, which is how two copies of a type start.
+ */

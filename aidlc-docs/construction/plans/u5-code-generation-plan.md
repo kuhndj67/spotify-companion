@@ -430,24 +430,50 @@ against a fake player client before `server.ts` ever constructs the real one.
 > found by a human using the page, and the container still runs the **U4 image**, so none of this UI is
 > reachable yet. **The click-through belongs to step 13**, against the real `/state` mount.
 
-### Step 12 — Tests, purity, orphans, and the CI guards
+### Step 12 — Tests, purity, orphans, and the CI guards — ✅ DONE 2026-10-03
 
 > ⚠️ **P-33's structural tests MOVED TO STEP 10** (`test/playbackBoundary.test.ts`), because step 10 is
 > the step that spends U4's boundary — leaving the replacement two steps downstream would have left the
 > guarantee unenforced across the very commits that break it. What remains here is purity, orphans and
 > the CI guards from NFR Q9.
-- [ ] **PBT-34 … PBT-50**, including **PBT-34a** and **PBT-41**
-- [ ] Extend `test/purity.test.ts` to `automationPredicate`, `safetyCounters`, `armingProjection`,
-      `statusBar`'s new derivation, and `upstreamMetrics`' pure aggregation
-- [ ] ⚠️ Generators build the child arbitrary **once** — never recurse per branch
-- [ ] `noOrphanModules.test.ts`: every new module executed, or an `ALLOWED_ORPHANS` entry **with a
-      reason**
-- [ ] **Structural tests**: nothing in `src/rules/` imports `src/playback/` · only `SkipExecutor`
-      imports `src/playback/` · `spotifyPlayerClient`'s exported surface is **exactly one method** ·
-      `LoggingExecutor.length === 1`
-- [ ] ⚠️ **Q9 from the NFR plan**: CI runs **each script's safe mode** (not `node --check`, not by
-      importing), and **`knip`** over `src/` *and* `scripts/`, ignore list seeded **with a reason per
-      entry**
+- [x] **PBT-34 … PBT-50**, including **PBT-34a** and **PBT-41** — all seventeen behaviourally covered
+- [x] ⚠️ **PBT-35, PBT-36 and PBT-38 were covered and NAMED BY NOTHING.** The behaviour was right
+      (`skipDrain.test.ts`'s refusal table and `automationPredicate.test.ts`'s sixteen-row enumeration);
+      the traceability was absent, and **an obligation nobody can locate is one nobody re-checks**.
+      Labels added, and PBT-36's second half (*a rule cannot opt out of a global dry-run*) asserted
+      directly rather than left implicit in four rows of a table
+- [x] ⚠️ **`test/propertyObligations.test.ts`** — reads the obligations table and fails if a declared
+      PBT is named by no test. ⚠️ **It excludes ITSELF from the search**, because its own docstring names
+      PBT-35/36/38 while explaining why they needed labels — without that, deleting the real labels would
+      leave the check green, satisfied by its own prose. The exclusion is itself asserted
+- [x] ⚠️ It also states what it does **not** prove: that a reference is *honest*. A `PBT-41` comment
+      over an empty test would satisfy it
+- [x] Extend `test/purity.test.ts` — `automationPredicate`, `safetyCounters` and `statusBar` were
+      already listed; **`upstreamMetrics` was NOT and now is.** It holds mutable records, which is not
+      impurity: every window is a function of `(records, nowMs)` and `nowMs` is a parameter. Without the
+      entry, nothing stopped a `Date.now()` being added inside the one metric meant to prove this app is
+      well-behaved. ⚠️ `armingProjection` does not exist — the panel derivation became
+      **`ui/automationPanel.ts`** (step 11), which is listed
+- [x] ⚠️ Generators build the child arbitrary once — no new recursive generators were added
+- [x] `noOrphanModules.test.ts`: every new module executed. `diagnostics.ts`'s `ALLOWED_ORPHANS` reason
+      now also records **why U5's steps were extracted** rather than inlined into that gap
+- [x] **Structural tests** — delivered in step 10 as `test/playbackBoundary.test.ts`
+- [x] ⚠️ **Q9 (i): `npm run smoke`** — `scripts/smoke-entry-points.mjs` invokes each script's safe
+      mode. ⚠️ **A non-zero exit is NOT a failure**: `backup-history.mjs` correctly refuses while the
+      container is up, and a check demanding exit 0 would pressure someone into weakening that guard. The
+      discriminator is *did the module LOAD* — `SyntaxError`, `ERR_MODULE_NOT_FOUND`,
+      `does not provide an export named`, which is exactly the reclassify breakage
+- [x] ⚠️ **The first draft of that runner shipped the defect it exists to catch.** It passed
+      `--dry-run` to `backup-history.mjs`, **which has no such flag** — silently ignored, and clean only
+      because the container happened to be up. With the container down it would have written a backup
+      every run. It also ran three genuine writers. **Fixed**: writers are skipped with a reason, and
+      every flag is now checked against the target script's source, with a `--self-test` proving that
+      guard can fail
+- [x] ⚠️ **Q9 (ii): `npm run knip`**, over `src/` *and* `scripts/`, config in **`knip.jsonc`** so each
+      ignore entry carries a reason. One entry: `skipAttribution.ts`, the deliberate tombstone
+- [x] ⚠️ **knip found four dead exports and one undeclared dependency on its first run**, and none was
+      noise — see the audit entry. `ajv` is now a declared devDependency
+- [x] **`npm run verify`** = typecheck + test + smoke + knip. **1228 tests, all four stages green**
 
 ### Step 13 — Deployment and documentation
 - [ ] `compose.yaml`: `+ ./state:/state:rw` · `AUTOMATION_STATE_PATH` · `SKIP_EXECUTOR_ENABLED` ·

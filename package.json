@@ -18,6 +18,9 @@
     "test:watch": "node --import tsx --test --watch test/*.test.ts",
     "test:coverage": "node --import tsx --test --experimental-test-coverage test/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "smoke": "node scripts/smoke-entry-points.mjs",
+    "knip": "knip",
+    "verify": "npm run typecheck && npm test && npm run smoke && npm run knip",
     "check:rules-schema": "node --import tsx scripts/check-rules-schema.mjs",
     "reporting:build": "node --import tsx scripts/build-reporting-db.mjs",
     "reclassify": "node --import tsx scripts/reclassify-unobserved-tails.mjs",
@@ -42,7 +45,9 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
     "@types/ws": "^8.5.13",
+    "ajv": "^8.20.0",
     "fast-check": "^4.9.0",
+    "knip": "^6.39.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0"
   }

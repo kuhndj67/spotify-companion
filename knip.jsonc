@@ -1,0 +1,31 @@
+// Unused files, exports and dependencies, over `src/` AND `scripts/` (NFR Q9 (ii)).
+//
+// ⚠️ This is the METHOD-LEVEL half that `test/noOrphanModules.test.ts` structurally cannot do: that test
+// walks MODULES, and `recordSuccessorLag` / `updateSkipAttribution` had zero callers for their entire
+// lives inside a heavily-executed file. It is also the only check that sees `scripts/` at all.
+//
+// ⚠️ JSONC rather than JSON so each ignore entry can carry a REASON. An ignore entry is a decision, not
+// a formality -- the same discipline as `ALLOWED_ORPHANS`.
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+
+  // ⚠️ `src/server.ts` is deliberately ABSENT. It is reached from nothing -- importing it starts the
+  // process -- so listing it as an entry point would be redundant with `project` below while implying
+  // something imports it. The tests are the real entry points for `src/`.
+  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js"],
+
+  "project": ["src/**/*.ts", "scripts/**/*.mjs", "test/**/*.ts"],
+
+  "ignore": [
+    // A TOMBSTONE, kept on purpose. `skip_attribution` was retired by classifier v2 (2026-09-22) and
+    // the column was NULLED RATHER THAN DROPPED, because dropping it breaks by-image rollback. This
+    // file carries the history of that rule so nobody re-derives it. ⚠️ Do not "clean it up", and do
+    // not import it -- `domain-entities.md` §6 says do not read it either.
+    "src/history/skipAttribution.ts"
+  ],
+
+  // Exports consumed only inside their own file are not reported. ⚠️ They are still a smell -- an
+  // export with no external consumer should usually just be a `const` -- and four were removed on
+  // 2026-10-03 because of this tool. This setting stops the report drowning in the harmless ones.
+  "ignoreExportsUsedInFile": true
+}

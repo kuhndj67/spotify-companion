@@ -64,13 +64,18 @@ export type PlayBucket =
   | 'inconclusive'
   | 'not-observed';
 
-/** The four display buckets, in stack order: real observations first, absence last. */
-export const PLAY_BUCKETS: readonly PlayBucket[] = [
-  'completed',
-  'skipped',
-  'inconclusive',
-  'not-observed',
-];
+/*
+ * ⚠️ **`PLAY_BUCKETS` was REMOVED 2026-10-03 (found by `knip`), and it should not come back.**
+ *
+ * It declared *"the four display buckets, in stack order"* and **nothing imported it, ever.** The order
+ * it claimed to own actually lives in `public/app.js` as `DRAWN_SERIES` — which carries a label and a
+ * fill per bucket, and which deliberately **omits `not-observed` from the plot** while still counting it
+ * everywhere else. So this constant was not merely dead: it read as the source of truth for a stack order
+ * that a different file decides, and the two could have disagreed silently.
+ *
+ * ⚠️ The `PlayBucket` **type** is still used and is unaffected. If a server-side list is ever wanted,
+ * remember that *drawn* and *counted* are different sets — that asymmetry is the 2026-09-06 fix.
+ */
 
 /**
  * Which bucket a play falls in. Provenance decides first — it is the stronger fact.

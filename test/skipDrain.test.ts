@@ -230,6 +230,22 @@ describe('PBT-34…39 — the refusal points, each recording its own reason', ()
     ],
   ];
 
+  /**
+   * ⚠️ **This table discharges PBT-35, PBT-36 and PBT-38 as well as PBT-34**, and the labels are
+   * written down because an obligation nobody can find is an obligation nobody re-checks:
+   *
+   * | Row | Obligation |
+   * |---|---|
+   * | `automation off` | **PBT-34** — BR-33.1 |
+   * | `runaway halted` | **PBT-35** — and the *separate latch* half is in `automationRoutes.test.ts` |
+   * | `rule in dry-run` | **PBT-36** — and *a rule cannot opt out of a global dry-run* is the 16-row table in `automationPredicate.test.ts` |
+   * | `nothing playing`, `a DIFFERENT play is now current` | **PBT-38** — BR-42.5 |
+   *
+   * ⚠️ **Each row asserts the refusal is RECORDED, not merely that nothing posted.** PBT-38 says *the
+   * discard is recorded*, and a drain that silently dropped an attempt would pass a
+   * `posts() === 0` assertion perfectly — while leaving the row `queued` for ever, which is the state
+   * the startup sweep exists to clean up and which nothing would ever explain.
+   */
   for (const [name, over, reason] of cases) {
     it(`${name} → refused: ${reason}, and NOTHING is posted`, async () => {
       const h = harness(over);

@@ -198,4 +198,8 @@ function toAttempt(row: AttemptRow): SkipAttempt {
 }
 
 /** Exported for the test that pins which states count toward the rolling window. */
-export const STATES_THAT_REACHED_THE_PLAYER = REACHED_THE_PLAYER;
+/*
+ * ⚠️ A `STATES_THAT_REACHED_THE_PLAYER` alias was exported here and imported by nothing. Removed
+ * 2026-10-03 (found by `knip`). `REACHED_THE_PLAYER` above is the one definition; if a test ever needs
+ * it, export THAT rather than adding a second name for it.
+ */

@@ -6088,3 +6088,132 @@ confirm it renders.
 
 **The click-through belongs to step 13**, against the real `/state` mount — and ⚠️ **it must be verified
 THROUGH THE CONTAINER**, because on the host the write succeeds and the bug is invisible.
+
+## 2026-10-03 — U5 step 12: the two CI guards, and the smoke test that shipped the defect it exists to catch
+
+**1228 tests · typecheck clean · `npm run smoke` green · `npm run knip` clean · schema still v6.**
+`npm run verify` = typecheck + test + smoke + knip, and all four stages pass.
+
+### 🔧 The smoke runner's FIRST DRAFT contained the exact failure mode it was built to prevent
+
+`scripts/smoke-entry-points.mjs` exists because **`scripts/` is outside every guard** —
+`noOrphanModules.test.ts` walks `src/` only, and `npm run reclassify` was dead for a week while 891 tests
+stayed green. Its job is to invoke each script's safe mode and fail if one cannot start.
+
+⚠️ **The first draft invoked `backup-history.mjs --label smoke-test-dry-run --dry-run`. That script has
+no `--dry-run` flag.** The argument was silently ignored. The run came back green **only because the
+container was up and the `docker ps` guard refused** — with the container down, a CI check would have
+written a real backup directory on every run.
+
+⚠️ **And it ran three genuine writers**, because *"safe mode"* was assumed rather than checked:
+
+| Script | What it actually did |
+|---|---|
+| `build-reporting-db.mjs` | rebuilt `data/reporting/reporting.db` |
+| `resolve-artist-credits.mjs` | rewrote `data/artist-credits.json`, and would have made a live `GET /tracks/{id}` per uncached track |
+| `metabase-setup.mjs` | POSTed `/api/database` and a schema sync to the running Metabase |
+
+**Verified afterwards: `history.db` and its WAL were NOT touched** (mtimes still 2026-10-02 20:50 and
+21:11), and **zero upstream requests were spent** — because the credit cache happened to be warm.
+⚠️ **That is luck, not design.** Cold, the same run would have spent hundreds of Spotify requests.
+
+**Fixed two ways.** Writers are **skipped with a reason**, not invoked and hoped about. And every flag in
+the table is now checked against the target script's own source before the script runs — with a
+`--self-test` that proves the guard rejects an unknown flag, because *a guard that never fires is
+decorative* and this project has already shipped two of those.
+
+> ⚠️ **The lesson is not "check your flags".** It is that the NFR plan's warning was **literal** and I
+> read it as a caution: *"`--apply` paths stay out of CI — several of these are writers, and CI is not a
+> place to discover that."* I built the thing that discovers it in CI. **An unrecognised flag is the worst
+> kind of argument, because the run comes back green** — same family as the `inc=releases` 200 and the
+> lock probe that could not see the container.
+
+### ⚠️ A non-zero exit is NOT a failure, and that is the design
+
+`backup-history.mjs` exits 2 while the container is up; `measure-confound.mjs` exits 2 against a
+post-retirement database; three probes exit 1. **Every one of those is a guard working.** A smoke test
+demanding exit 0 would either fail on a healthy machine or pressure someone into weakening a guard. So
+the discriminator is **did the module LOAD** — `SyntaxError`, `ERR_MODULE_NOT_FOUND`,
+`does not provide an export named`, `ReferenceError`. The third of those is the reclassify breakage
+exactly, and ⚠️ **`node --check` would not have caught it**: a missing named export is a *link-time*
+failure, not a parse error.
+
+⚠️ **`backup-history.mjs` is skipped and its load check is NOT lost**, because
+`restore-history.mjs --self-test` and `reclassify-unobserved-tails.mjs` both import
+`assertNobodyElseHoldsIt` from it, so its module body is evaluated either way.
+
+### knip found four dead exports and one undeclared dependency on its FIRST RUN, and none was noise
+
+The NFR plan predicted *"expect a first run to be noisy, and expect some of that noise to be real."* It
+was not noisy — five findings, all real:
+
+| Finding | Verdict |
+|---|---|
+| `PLAY_BUCKETS` (`playStats.ts`) | ⚠️ **Worse than dead.** Removed — see below |
+| `STATES_THAT_REACHED_THE_PLAYER` | An alias of `REACHED_THE_PLAYER`, exported in step 5, imported by nothing. Removed |
+| `export type { DecisionTrigger }` (`decisionRows.ts`) | A compatibility shim from the U5 move with no consumer. Removed |
+| `export type { DecisionExecutor, ExecutionContext }` (`LoggingExecutor.ts`) | The same shim; every caller takes them from `./types.js`. Removed |
+| `ajv/dist/2020.js` in `check-rules-schema.mjs` | **Undeclared dependency.** Now a devDependency |
+
+⚠️ **`PLAY_BUCKETS` is the one worth understanding.** It declared *"the four display buckets, in stack
+order"* and **nothing had ever imported it.** The order it claimed to own actually lives in
+`public/app.js` as `DRAWN_SERIES`, which carries a label and a fill per bucket and **deliberately omits
+`not-observed` from the plot** while still counting it everywhere else. So it was not merely dead: it read
+as the source of truth for a stack order a different file decides, and **the two could have diverged
+silently.** The same shape as the message precedence pinned in step 11 — except this copy had no consumer
+at all, which is why nobody noticed. The `PlayBucket` *type* is unaffected.
+
+⚠️ **The `ajv` finding is the reclassify class.** `npm run check:rules-schema` imported a package the
+project never declared, working only by hoisting from `@modelcontextprotocol/sdk`. ✅ **The script already
+failed closed** — *"Refusing to skip: a check that quietly does nothing is worse than one that is
+absent"*, exit 2 — so it was never going to pass by not running. But it would have stopped working the
+moment the SDK changed its tree. Declared now.
+
+⚠️ **knip introduced no vulnerabilities.** `npm audit` reports 4 (1 high, 3 moderate) and **all of them
+are pre-existing**, from `@modelcontextprotocol/sdk` (`fast-uri`, `hono`, `ip-address`) and `express`
+(`qs`). Worth stating precisely, because the audit output appears immediately after the install and reads
+as though the install caused it. Both new dev dependencies are pruned from the image —
+`npm prune --omit=dev` in the Dockerfile.
+
+### 🔧 PBT-35, PBT-36 and PBT-38 were covered and named by nothing
+
+All seventeen U5 obligations were behaviourally discharged. **Three were labelled nowhere**: PBT-35 and
+PBT-38 by rows of `skipDrain.test.ts`'s refusal table, PBT-36 by four rows of
+`automationPredicate.test.ts`'s sixteen-combination enumeration.
+
+**The behaviour was right; the traceability was absent** — and an obligation satisfied by a row nobody has
+labelled is one that survives a refactor of the table **by accident**. Labels added. PBT-36's second half
+(BR-33.3, *a rule cannot opt out of a global dry-run*) is now asserted directly rather than left implicit.
+
+✅ **`test/propertyObligations.test.ts`** reads the obligations table from `logical-components.md` and fails
+if a declared PBT is named by no test. It also checks the range **PBT-34 … PBT-50** has no gaps, so a row
+cannot be deleted instead of discharged.
+
+⚠️ **IT EXCLUDES ITSELF FROM THE SEARCH, and that is load-bearing.** Its own docstring names PBT-35,
+PBT-36 and PBT-38 while explaining why they needed labels — so without the exclusion, **deleting those
+labels from the real tests would leave the check green, satisfied by its own prose.** A check whose input
+includes its own output reports success exactly when it is useless: the same family as *a guard computed
+the same way as the thing it guards is not a guard*, and as the lock probe. The exclusion is itself
+asserted, twice.
+
+⚠️ **And it states what it does NOT prove**: that a reference is *honest*. A `PBT-41` comment above a test
+that asserts nothing would satisfy it. That limit is written in the file rather than left for someone to
+discover.
+
+### `upstreamMetrics` was missing from `PURE_MODULES`
+
+Added. ⚠️ It holds mutable records, which is **not** impurity: every window is a function of
+`(records, nowMs)` and `nowMs` is a **parameter**. PBT-50 asserts the answer moves when the parameter
+moves; `purity.test.ts` is what stops a `Date.now()` being added inside — **in the one metric whose job is
+to prove this app is a good citizen of the vendor APIs.** ⚠️ The plan also named `armingProjection`, which
+does not exist: that derivation became `ui/automationPanel.ts` in step 11, and is listed.
+
+### Still open, unchanged
+
+The two `compose.yaml` comment corrections · the **live rollback check** (U4's image against a v7 copy,
+expecting `from: 7, to: 7`) · the **BR-35 pre-registration**, in writing before any rule is armed · and
+the **click-through of step 11's UI**, which must be done through the container.
+
+⚠️ **W-6 is NOT closed by this.** These two are *guards*, not the analysis: mutation testing,
+BR-derived tests, the negative-control convention and container-parity probes remain W-6, and W-6.2 wants
+BR-33…BR-43 backed by shipped code, which is the end of this unit.

@@ -389,6 +389,32 @@ describe('POST /api/automation', () => {
   });
 });
 
+/**
+ * **PBT-35, second half — BR-33.4/BR-35.5: the halt is a SEPARATE LATCH from the kill switch.**
+ *
+ * ⚠️ Two fields, never collapsed into one. *The user turned automation off* and *the system halted
+ * itself* are different facts, and clearing them are different acts — so neither operation may clear the
+ * other as a side effect. The two tests below are the two directions of that.
+ */
+describe('⭐ PBT-35 — the halt and the switch are two latches, not one', () => {
+  it('disarming does NOT clear the halt', async () => {
+    const c = control({ globalAutomationEnabled: true, runawayHalt: HALT, schemaVersion: 1 });
+    await withServer({ automation: c.api }, async (base) => {
+      await post(base, '/api/automation', { enabled: false });
+      assert.deepEqual(c.current().runawayHalt, HALT, 'a halt is not cleared by a switch');
+    });
+  });
+
+  it('acknowledging does NOT arm automation', async () => {
+    const c = control({ ...OFF, runawayHalt: HALT });
+    await withServer({ automation: c.api }, async (base) => {
+      await post(base, '/api/automation/acknowledge-halt', { reArm: false });
+      assert.equal(c.current().runawayHalt, null);
+      assert.equal(c.current().globalAutomationEnabled, false, 'reviewed is not resume');
+    });
+  });
+});
+
 describe('POST /api/automation/acknowledge-halt', () => {
   it('clears the halt and leaves automation OFF when reArm is false', async () => {
     const c = control({ ...OFF, runawayHalt: HALT });

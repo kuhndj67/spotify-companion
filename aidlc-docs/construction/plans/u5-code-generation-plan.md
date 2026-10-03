@@ -349,13 +349,22 @@ against a fake player client before `server.ts` ever constructs the real one.
 - [x] `hold` completes FR-33: `min(label resolved, 30 000 ms, 50% of duration)` — **PBT-48**.
       ⚠️ `applyOnUnknown` keeps **no `default:` clause**
 
-### Step 9 — The two columns' write path, and `upstreamMetrics` (LC-28)
-- [ ] `currently-playing` → `PlaybackSample` → `NewPlayRecord` → `recordPlay` INSERT → `PlayRecord`
-- [ ] `RecentlyPlayedBackfill` populates both — probed present on `recently-played`
-- [ ] ⚠️ **`src/export/serialisers.ts` including CSV headers** — the one nothing fails without
-- [ ] M1 (rolling 30 s **and** per hour) · **M2 counts and persists 429/503 with `Retry-After`** ·
+### Step 9 — The context write path and `upstreamMetrics` — ✅ DONE 2026-10-02
+- [x] ⚠️ **New module `playbackContext.ts`, and it fetches ONCE PER TRACK, never per tick.** The
+      poll is already **98.4%** of this app's Spotify footprint, so a per-tick context fetch would
+      **double** it — to collect a value that cannot change within one play. ~16 req/hr instead of
+      1,200. An in-flight guard stops a slow upstream turning one call per track into one per tick
+- [x] ⚠️ **A context failure records `null` and does NOT poison the cache** — the next tick may
+      retry. Marking the track fetched on failure would record `unknown` for a whole play on one
+      transient error (NFR-18)
+- [x] ⚠️ **The fetch reports itself to `upstreamMetrics`** — a new upstream call that was not
+      counted would be exactly the blind spot M1–M4 exist to remove
+- [x] Wiring it into `server.ts` is **Step 10**; the module and its tests are here
+- [x] `RecentlyPlayedBackfill` populates both — probed present on `recently-played`
+- [x] ⚠️ **`src/export/serialisers.ts` including CSV headers** — the one nothing fails without
+- [x] M1 (rolling 30 s **and** per hour) · **M2 counts and persists 429/503 with `Retry-After`** ·
       M3 requests-per-play · M4 share of polls returning nothing playing
-- [ ] ⚠️ **M2 must count, not log.** `webApiClient.ts:125` currently throws the `Retry-After` away
+- [x] ⚠️ **M2 must count, not log.** `webApiClient.ts:125` currently throws the `Retry-After` away
       inside a message string — **PBT-50**
 
 ### Step 10 — `api.ts`, `server.ts`, `diagnostics.ts`

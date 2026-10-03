@@ -40,6 +40,16 @@ export const CSV_COLUMNS = [
   'provenance',
   'skip_source',
   'context_type',
+  // -- U5, schema v7 ----------------------------------------------------------
+  // ⚠️ Exports as the literal token `unknown` when absent (BR-6.3), and here that matters more
+  // than usual: context_type was NULL on every live play until U5 and populated only on
+  // backfilled rows, so a blank cell would read as "played from nowhere" on exactly the rows
+  // where the field was simply never collected.
+  //
+  // ⚠️ EVIDENCE ONLY (BR-41.3). The uri GOES STALE -- it named an album through 33 minutes of
+  // autoplay by other artists -- so an analysis grouping by it will understate algorithmic
+  // placement. That is why no rule field is exposed over it.
+  'context_uri',
   'classifier_version',
   // -- U4, schema v5 ----------------------------------------------------------
   // ⚠️ These two export as the literal token `unknown` when absent, like every other
@@ -154,6 +164,7 @@ export function toCsvRow(play: PlayRecord): string {
     play.provenance,
     play.skipSource,
     play.contextType,
+    play.contextUri,
     play.classifierVersion,
     play.explicit,
     play.albumType,
@@ -210,6 +221,7 @@ export function toJsonObject(play: PlayRecord): Record<string, unknown> {
     provenance: play.provenance,
     skip_source: renderMaybe(play.skipSource),
     context_type: renderMaybe(play.contextType),
+    context_uri: renderMaybe(play.contextUri),
     classifier_version: play.classifierVersion,
     explicit: renderMaybe(play.explicit),
     album_type: renderMaybe(play.albumType),

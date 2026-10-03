@@ -38,6 +38,7 @@ interface DecisionRow {
   engine_version: number;
   rule_set_version: number;
   rule_set_content_hash: string;
+  trigger: string;
 }
 
 /**
@@ -98,6 +99,9 @@ function rowToEntry(row: DecisionRow): DecisionLogEntry {
     engineVersion: row.engine_version,
     ruleSetVersion: row.rule_set_version,
     ruleSetContentHash: row.rule_set_content_hash,
+    // U5. Cast rather than validated, for the reason the state column records: no CHECK
+    // constraint, because widening one would make a future migration non-additive.
+    trigger: row.trigger as DecisionLogEntry['trigger'],
   };
 }
 
@@ -117,8 +121,9 @@ export class SqliteDecisionLogRepository implements DecisionLogRepository {
          evaluation_id, decided_at, play_id, play_link, track_id,
          rule_id, rule_name, rule_hash, verdict, matched,
          fields_seen, unknown_fields, rested_on_unknown, partial_data,
-         dry_run, executed, error, engine_version, rule_set_version, rule_set_content_hash
-       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         dry_run, executed, error, engine_version, rule_set_version, rule_set_content_hash,
+         trigger
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     );
 
     this.#db.exec('BEGIN');
@@ -145,6 +150,16 @@ export class SqliteDecisionLogRepository implements DecisionLogRepository {
           e.engineVersion,
           e.ruleSetVersion,
           e.ruleSetContentHash,
+          // U5, migration 007 (BR-37.3).
+          //
+          // ⚠️ Adding this to the column list WITHOUT adding it here failed loudly -- NOT NULL
+          // constraint failed -- rather than silently defaulting. Probed 2026-10-02: a column's
+          // DEFAULT applies when the column is OMITTED from the INSERT, and does NOT rescue an
+          // explicitly bound null. That is the good outcome, and worth knowing because the reverse
+          // assumption is the natural one: if DEFAULT had covered an explicit null, every
+          // re-evaluation would have been recorded as 'initial' and FR-34's second decision would have
+          // been indistinguishable from the first, with no test failing.
+          e.trigger,
         );
       }
       this.#db.exec('COMMIT');

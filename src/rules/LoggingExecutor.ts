@@ -35,16 +35,9 @@
  * day someone calls it.
  */
 
+import { buildDecisionRows } from './decisionRows.js';
 import type { DecisionLogRepository } from './DecisionLogRepository.js';
-import { hashRule } from './ruleHash.js';
-import type {
-  Decision,
-  DecisionExecutor,
-  ExecutionContext,
-  LoadedRuleSet,
-  NewDecisionLogEntry,
-} from './types.js';
-import { RULE_ENGINE_VERSION } from './types.js';
+import type { DecisionExecutor, ExecutionContext } from './types.js';
 
 /**
  * ⚠️ `DecisionExecutor` and `ExecutionContext` MOVED to `./types.js` in U5 (code-gen Q1).
@@ -67,54 +60,20 @@ export class LoggingExecutor implements DecisionExecutor {
     this.#log = log;
   }
 
+  /**
+   * ⚠️ **`dryRun` is `true`, and that is accurate rather than a leftover.** If this executor is the
+   * one wired, no action is possible at all, so every decision it records genuinely is a dry run.
+   *
+   * `SkipExecutor` passes BR-33.2's computed value instead, because it is the one holding an
+   * `AutomationStateStore` to ask. Computing it here would mean giving this class that collaborator —
+   * which is exactly what BR-30.2 exists to prevent.
+   *
+   * ⚠️ **The row building moved to `decisionRows.ts` and is NOT duplicated.** Both executors write
+   * identical rows, and a second copy of forty lines carrying three deliberate subtleties is how the
+   * WebSocket `403` happened.
+   */
   execute(context: ExecutionContext): string {
-    const { decision, ruleSet, trackId, evaluationId, decidedAt, partialData } = context;
-
-    // `RuleOutcome` carries only the rule's ID, so the name and hash come from the set that
-    // was in force at the moment of the decision — never from the file as it reads later.
-    const byId = new Map(ruleSet.rules.map((loaded) => [loaded.rule.id, loaded.rule]));
-
-    // One row per rule EVALUATED, matched or not (BR-23.1). A matched-only log cannot answer
-    // "why did my rule not fire?", which is the question the log exists for.
-    const entries: NewDecisionLogEntry[] = decision.outcomes.map((outcome) => {
-      const rule = byId.get(outcome.ruleId);
-      return {
-        evaluationId,
-        decidedAt,
-        // Nullable and stays nullable: the play row does not exist yet (BR-24.1).
-        playId: null,
-        playLink: 'pending' as const,
-        trackId,
-        ruleId: outcome.ruleId,
-        // Denormalised, so a rename or a deletion does not orphan this row's history.
-        // ⚠️ A rule absent from the set cannot happen — the outcomes came FROM it — but the
-        // fallbacks say so plainly rather than crashing the poll loop over a logging concern.
-        ruleName: rule?.name ?? outcome.ruleId,
-        ruleHash: rule === undefined ? 'unknown' : hashRule(rule),
-        verdict: outcome.verdict,
-        matched: decision.matchedRuleIds.includes(outcome.ruleId),
-        fieldsSeen: outcome.fieldsSeen,
-        unknownFields: decision.unknownFields,
-        // ⚠️ Copied verbatim, never accumulated (BR-23.5). Under Kleene logic a predicate can
-        // contain an unknown and still resolve decisively — `false AND unknown` is `false`,
-        // because the data answered it. A flag raised during the walk implements the option
-        // that was offered and rejected.
-        restedOnUnknown: outcome.restedOnUnknown,
-        partialData,
-        // ⚠️ Constants in U4, and they are columns rather than assumptions so that U5 changes
-        // behaviour instead of changing the schema (BR-23.8, BR-25.3).
-        dryRun: true,
-        executed: false,
-        error: null,
-        engineVersion: RULE_ENGINE_VERSION,
-        ruleSetVersion: ruleSet.version,
-        // ⚠️ The version counter resets on restart, so on a permanent table it identifies
-        // nothing. The hash is what makes this row attributable months later (BR-23.7a).
-        ruleSetContentHash: ruleSet.contentHash,
-      };
-    });
-
-    this.#log.record(entries);
-    return evaluationId;
+    this.#log.record(buildDecisionRows(context, true));
+    return context.evaluationId;
   }
 }

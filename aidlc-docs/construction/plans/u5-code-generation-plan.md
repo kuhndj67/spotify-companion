@@ -306,13 +306,27 @@ against a fake player client before `server.ts` ever constructs the real one.
 - [x] ⭐ **PBT-34a — the positive control.** A drain that posts nothing satisfies all six refusal
       properties perfectly
 
-### Step 7 — `SkipExecutor` (LC-25) and `LoggingExecutor`'s one change
-- [ ] `SkipExecutor.execute` is **synchronous**, writes decision rows, enqueues, schedules a drain,
+### Step 7 — `SkipExecutor` and `LoggingExecutor`'s one change — ✅ DONE 2026-10-02
+- [x] `SkipExecutor.execute` is **synchronous**, writes decision rows, enqueues, schedules a drain,
       returns the `evaluationId` (BR-42.1/42.2)
-- [ ] **One drain function, two entry points** — the schedule and the 3 s tick backstop. ⚠️ Never two
+- [x] **One drain function, two entry points** — the schedule and the 3 s tick backstop. ⚠️ Never two
       drains
-- [ ] `LoggingExecutor.ts:88`'s `dryRun: true` becomes BR-33.2's computed value
-- [ ] ⚠️ **`LoggingExecutor` gains NO constructor parameter** (BR-30.2) and
+- [x] ⚠️ **`LoggingExecutor`'s `dryRun: true` STAYS `true`, and the plan's instruction was wrong.**
+      It said the constant *"becomes BR-33.2's computed value"* — but computing it needs the
+      `AutomationStateStore`, and **BR-30.2 forbids giving `LoggingExecutor` that collaborator.**
+      `true` is also *accurate* rather than a leftover: if `LoggingExecutor` is the selected
+      executor, no action is possible at all. The row builder takes `dryRun` as a **parameter**;
+      `LoggingExecutor` passes `true`, `SkipExecutor` passes the computed value
+- [x] ⚠️ **Row building extracted to `rules/decisionRows.ts` (pure), not duplicated.** Both
+      executors write identical rows, and a second copy of forty lines carrying three deliberate
+      subtleties is how the WebSocket `403` happened. Having `SkipExecutor` call `LoggingExecutor`
+      was also rejected: that import edge says the opposite of BR-30. `LoggingExecutor` dropped
+      from 120 lines to 79
+- [x] ⚠️ **`DecisionLogEntry.trigger` and the INSERT were MISSING** — migration 007 added the
+      column but nothing wrote it, so Step 8's re-evaluation could not have recorded which pass it
+      was. Added here, with the bind value; probed that a column DEFAULT does **not** rescue an
+      explicitly bound null, so the omission failed loudly instead of silently recording `initial`
+- [x] ⚠️ **`LoggingExecutor` gains NO constructor parameter** (BR-30.2) and
       `LoggingExecutor.length === 1` still passes
 
 ### Step 8 — `EvaluationCoordinator`: FR-34 re-evaluation (BR-37)

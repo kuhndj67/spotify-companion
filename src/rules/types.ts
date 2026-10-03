@@ -358,8 +358,21 @@ export interface DecisionLogEntry {
   /** Copied from the `Decision` verbatim, never accumulated (BR-23.5). */
   readonly restedOnUnknown: boolean;
   readonly partialData: boolean;
-  /** Always `true` in U4 (BR-23.8, BR-25.3). */
+  /**
+   * Whether this decision may act.
+   *
+   * ⚠️ Always `true` in U4, and still always `true` whenever `LoggingExecutor` is the selected
+   * executor — which is accurate rather than a leftover: if it is running, no action is possible.
+   * `SkipExecutor` writes BR-33.2's computed value instead.
+   */
   readonly dryRun: boolean;
+  /**
+   * ⚠️ U5, migration 007. Which evaluation pass wrote this row (BR-37.3).
+   *
+   * Without it, FR-34's second decision for a play is indistinguishable from the first — and BR-22.1a
+   * deliberately created no uniqueness constraint that would have made the duplicate visible.
+   */
+  readonly trigger: DecisionTrigger;
   /** Always `false` in U4. */
   readonly executed: boolean;
   /** Always `null` in U4. */

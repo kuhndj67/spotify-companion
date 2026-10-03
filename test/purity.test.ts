@@ -82,6 +82,10 @@ const PURE_MODULES = [
   // The line a person reads all day to judge their rules. A clock or a lookup here would make
   // the log disagree with the row it reports.
   'rules/decisionSummary.ts',
+  // U5. Builds decision-log rows for BOTH executors. A clock or a state read here would make the
+  // two disagree about the same decision, and `dryRun` is deliberately a PARAMETER so that the
+  // automation state never has to reach this far down (BR-30.2).
+  'rules/decisionRows.ts',
   // Calendar bucketing for reports and charts. A system-zone read here would misdate half the
   // corpus by a day (measured: 327 of 662) while every test still passed — so every function
   // takes its zone as an argument and there is no default.

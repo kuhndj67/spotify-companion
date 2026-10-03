@@ -67,6 +67,7 @@ function entry(overrides: Partial<NewDecisionLogEntry> = {}): NewDecisionLogEntr
     engineVersion: RULE_ENGINE_VERSION,
     ruleSetVersion: 1,
     ruleSetContentHash: 'set-hash-1',
+    trigger: 'initial',
     ...overrides,
   };
 }

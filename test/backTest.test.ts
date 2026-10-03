@@ -271,6 +271,7 @@ describe('the execution trace (BR-32)', () => {
       engineVersion: 1,
       ruleSetVersion: 2,
       ruleSetContentHash: 'set-hash',
+      trigger: 'initial',
       ...overrides,
     };
   }

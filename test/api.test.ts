@@ -540,6 +540,7 @@ function decisionRow(overrides: Partial<DecisionLogEntry> = {}): DecisionLogEntr
     engineVersion: 1,
     ruleSetVersion: 6,
     ruleSetContentHash: 'set-hash-6',
+    trigger: 'initial',
     ...overrides,
   };
 }

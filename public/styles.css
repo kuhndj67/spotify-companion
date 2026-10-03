@@ -843,6 +843,20 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+/*
+ * The track title on a decision-trace header. Sits between the date and the enrichment status.
+ *
+ * ⚠️ Allowed to shrink and ellipsise rather than wrap: the header is a one-line summary, and a long
+ * title pushing the enrichment status onto a second line would make the log much harder to scan.
+ */
+.decision-track {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .decision-head {
   display: flex;
   flex-wrap: wrap;

@@ -81,8 +81,17 @@ describe('SqliteDecisionLogRepository — round trip', () => {
     const [read] = repo.list({ limit: 10 });
 
     assert.ok(read);
-    const { id: _id, ...withoutId } = read;
-    assert.deepEqual(withoutId, written);
+    /*
+     * ⚠️ `title` is excluded alongside `id`, and is ASSERTED SEPARATELY rather than quietly dropped.
+     *
+     * It is not a stored field: `decision_log` has no title column, and the repository looks it up from
+     * `play` at read time — which is why `NewDecisionLogEntry` omits it. Removing it from this
+     * comparison without saying anything would weaken the one test whose job is *every stored field
+     * round-trips*, by making it silently tolerant of any future derived field too.
+     */
+    const { id: _id, title, ...stored } = read;
+    assert.deepEqual(stored, written, 'every STORED field round-trips by value');
+    assert.equal(title, null, 'and `title` is derived: no play row was inserted here, so it is unknown');
   });
 
   it('writes one row per rule evaluated, sharing an evaluationId', () => {
@@ -293,5 +302,108 @@ describe('pruneToCap (BR-29)', () => {
 
     const plays = db.prepare('SELECT COUNT(*) AS n FROM play').get() as { n: number };
     assert.equal(plays.n, 1);
+  });
+});
+
+describe('the track title on a read row (decision log UI)', () => {
+  /**
+   * ⚠️ `decision_log` has NO title column. The title is looked up from `play` at read time, which is
+   * why `NewDecisionLogEntry` omits it — nothing writes one.
+   *
+   * ## ⭐ The two cases that matter
+   *
+   *   1. **Keyed on `track_id`, not `play_id`.** `play_id` is `null` while the play is still OPEN
+   *      (BR-24.1: the decision precedes the play row), and this log is read live — so the
+   *      currently-playing track is exactly the row a reader is most likely looking at. Keying on
+   *      `play_id` would leave that one blank.
+   *   2. **`null` renders as a FACT, not a blank.** No play row for this track yet means it is the
+   *      first time the track has been heard.
+   */
+
+  it('⭐ resolves the title from the play row for the same track', () => {
+    const db = freshDb();
+    const repo = new SqliteDecisionLogRepository(db);
+    insertPlay(db);
+    repo.record([entry({ trackId: 'abcdefghijklmnopqrstuv' })]);
+
+    assert.equal(repo.list({ limit: 10 })[0]?.title, 't');
+    db.close();
+  });
+
+  it('⭐ ⚠️ resolves it even when play_id is NULL, which is the live case', () => {
+    // A decision taken while the play is still open has no play_id. That is the row on screen when
+    // someone opens the log during a track, so it is the one that must not be blank.
+    const db = freshDb();
+    const repo = new SqliteDecisionLogRepository(db);
+    insertPlay(db);
+    repo.record([entry({ trackId: 'abcdefghijklmnopqrstuv', playId: null, playLink: 'pending' })]);
+
+    const row = repo.list({ limit: 10 })[0];
+    assert.equal(row?.playId, null, 'no play link at all');
+    assert.equal(row?.title, 't', 'and still a title');
+    db.close();
+  });
+
+  it('⭐ ⚠️ is NULL when no play row carries that track id — never an empty string', () => {
+    // `''` would render as a title that happens to be blank. `null` is unknown, and the UI says what
+    // it means: "first play of this track".
+    const db = freshDb();
+    const repo = new SqliteDecisionLogRepository(db);
+    repo.record([entry({ trackId: 'never-played-before' })]);
+
+    assert.equal(repo.list({ limit: 10 })[0]?.title, null);
+    db.close();
+  });
+
+  it('⚠️ takes the MOST RECENT play, so a retitled track shows its current title', () => {
+    const db = freshDb();
+    const repo = new SqliteDecisionLogRepository(db);
+    insertPlay(db);
+    db.prepare(
+      `INSERT INTO play (track_id, title, artist_name, album_name, started_at, ended_at,
+                         outcome, close_reason, provenance, classifier_version,
+                         ev_listened_ms, ev_duration_ms, ev_completion_ratio, ev_max_progress_ms,
+                         ev_max_gap_ms, ev_observation_count, ev_saw_pause, ev_rewound,
+                         ev_ended_with_idle)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run('abcdefghijklmnopqrstuv', 'Remastered Title', 'a', 'al', '2026-09-25T10:00:00.000Z',
+          '2026-09-25T10:03:00.000Z', 'completed', 'track-change', 'live', 1,
+          0, 0, 0, 0, 0, 1, 0, 0, 0);
+
+    repo.record([entry({ trackId: 'abcdefghijklmnopqrstuv' })]);
+    assert.equal(repo.list({ limit: 10 })[0]?.title, 'Remastered Title');
+    db.close();
+  });
+
+  it('⭐ ⚠️ the subquery does not break ?trackId= filtering', () => {
+    // The `where` clauses name their columns UNQUOTED -- `track_id = ?`. `play` also has a `track_id`,
+    // so a JOIN would have made that ambiguous and the filter would have quietly stopped meaning what
+    // it says. A correlated subquery leaves it untouched. This is the test that would catch a JOIN.
+    const db = freshDb();
+    const repo = new SqliteDecisionLogRepository(db);
+    insertPlay(db);
+    repo.record([
+      entry({ evaluationId: 'ev-a', trackId: 'abcdefghijklmnopqrstuv' }),
+      entry({ evaluationId: 'ev-b', trackId: 'some-other-track' }),
+    ]);
+
+    const filtered = repo.list({ limit: 10, trackId: 'abcdefghijklmnopqrstuv' });
+    assert.equal(filtered.length, 1, 'the filter still selects on decision_log.track_id');
+    assert.equal(filtered[0]?.evaluationId, 'ev-a');
+    assert.equal(filtered[0]?.title, 't');
+    db.close();
+  });
+
+  it('⚠️ and does not break date filtering either', () => {
+    // `play` has `started_at`; `decision_log` has `decided_at`. Different names, so this one could not
+    // collide -- asserted anyway, because the next column added to `play` might not be so lucky.
+    const db = freshDb();
+    const repo = new SqliteDecisionLogRepository(db);
+    insertPlay(db);
+    repo.record([entry({ decidedAt: '2026-09-20T10:00:00.000Z' })]);
+
+    assert.equal(repo.list({ limit: 10, from: '2026-09-21T00:00:00.000Z' }).length, 0);
+    assert.equal(repo.list({ limit: 10, from: '2026-09-19T00:00:00.000Z' }).length, 1);
+    db.close();
   });
 });

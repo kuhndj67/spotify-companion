@@ -1453,6 +1453,27 @@ async function loadDecisions() {
       when.textContent = formatDay(trace.decidedAt);
       head.append(when);
 
+      // The track, between the date and the enrichment status.
+      //
+      // ⚠️ Derived server-side: `decision_log` has no title column, so the repository looks it up
+      // from the most recent `play` row for this `track_id`. Keyed on track_id rather than play_id
+      // because play_id is null while the play is still OPEN -- which is the row a reader of a LIVE
+      // log is most likely looking at.
+      //
+      // ⚠️ `null` is not a missing field and must not render blank: no play row carries this
+      // track_id yet, which means this is the FIRST time the track has been heard. Same family as
+      // the `Label detail` dash -- an empty state that does not explain itself gets read as broken.
+      const track = document.createElement('span');
+      track.className = 'decision-track';
+      if (trace.title) {
+        track.textContent = trace.title;
+      } else {
+        track.classList.add('muted');
+        track.textContent = 'first play of this track';
+        track.title = `No completed play recorded for ${trace.trackId} yet, so there is no title to show.`;
+      }
+      head.append(track);
+
       // ⚠️ `partialData` means THE WAIT TIMED OUT, not "a field read null" (FQ3). It is the
       // measurement that says whether ENRICHMENT_WAIT_MS is right, so it is on screen.
       const trigger = document.createElement('span');

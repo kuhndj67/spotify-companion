@@ -529,6 +529,7 @@ function loadedRuleSet(overrides: Partial<LoadedRuleSet> = {}): LoadedRuleSet {
 function decisionRow(overrides: Partial<DecisionLogEntry> = {}): DecisionLogEntry {
   return {
     id: 1,
+    title: 'A Track',
     evaluationId: 'ev-1',
     decidedAt: '2026-09-20T10:00:00.000Z',
     playId: null,

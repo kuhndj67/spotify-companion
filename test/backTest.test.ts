@@ -251,6 +251,7 @@ describe('the execution trace (BR-32)', () => {
   function row(overrides: Partial<DecisionLogEntry> = {}): DecisionLogEntry {
     return {
       id: 1,
+      title: 'A Track',
       evaluationId: 'ev-1',
       decidedAt: '2026-09-20T10:00:00.000Z',
       playId: null,

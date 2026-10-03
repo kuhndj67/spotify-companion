@@ -386,10 +386,27 @@ export interface DecisionLogEntry {
   readonly ruleSetVersion: number;
   /** ⚠️ What actually attributes this row to a rule set across restarts (BR-23.7a). */
   readonly ruleSetContentHash: string;
+  /**
+   * The track's title, for display. ⚠️ **DERIVED AT READ TIME, never stored** — see
+   * `NewDecisionLogEntry` below, which excludes it.
+   *
+   * ⚠️ `null` is reachable and must stay so. The lookup is on `track_id` against the most recent
+   * `play` row, and a track being evaluated for the **first time** has no play row yet — the decision
+   * precedes it by design (BR-24.1). So `null` means *this is the first time this track has been
+   * heard*, which is a fact worth showing rather than a blank.
+   */
+  readonly title: Maybe<string>;
 }
 
-/** A row before it has an id — what the executor hands the log. */
-export type NewDecisionLogEntry = Omit<DecisionLogEntry, 'id'>;
+/**
+ * A row before it has an id — what the executor hands the log.
+ *
+ * ⚠️ **`title` is excluded as well as `id`.** The title is not a property of a decision: it is looked
+ * up from `play` when the log is READ, so `decision_log` has no `title` column and nothing writes one.
+ * Leaving it in this type would force every caller to supply a value the schema cannot hold — and the
+ * obvious ways to satisfy that are `trackId` or `''`, either of which would then be shown as a title.
+ */
+export type NewDecisionLogEntry = Omit<DecisionLogEntry, 'id' | 'title'>;
 
 /** Half-open `[from, to)`, so adjacent ranges partition history without double-counting. */
 export interface DateRange {

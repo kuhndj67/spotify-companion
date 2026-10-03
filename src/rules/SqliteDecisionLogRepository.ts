@@ -17,6 +17,11 @@ import type {
 } from './types.js';
 
 interface DecisionRow {
+  /**
+   * ⚠️ NOT a column on `decision_log`. It comes from the correlated subquery in `list`, and is `null`
+   * when no `play` row carries this `track_id` yet.
+   */
+  track_title: string | null;
   id: number;
   evaluation_id: string;
   decided_at: string;
@@ -102,6 +107,9 @@ function rowToEntry(row: DecisionRow): DecisionLogEntry {
     // U5. Cast rather than validated, for the reason the state column records: no CHECK
     // constraint, because widening one would make a future migration non-additive.
     trigger: row.trigger as DecisionLogEntry['trigger'],
+    // ⚠️ `?? null`, never `?? ''`. An empty string renders as a title that happens to be blank;
+    // `null` is *unknown*, and the UI says what it means.
+    title: row.track_title ?? null,
   };
 }
 
@@ -227,8 +235,30 @@ export class SqliteDecisionLogRepository implements DecisionLogRepository {
     }
 
     const clause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+    /*
+     * ⚠️ **A correlated SUBQUERY, not a JOIN**, and that is not a style preference.
+     *
+     * Every `where` clause above names its column **unqualified** — `track_id = ?`, `decided_at >= ?`.
+     * `play` also has `track_id` and `started_at`, so a JOIN would make those ambiguous: SQLite would
+     * either error or resolve them against the wrong table, and `?trackId=` filtering would quietly
+     * stop meaning what it says. A subquery leaves every filter untouched.
+     *
+     * ⚠️ **Keyed on `track_id`, NOT on `play_id`** — the less obvious of the two. `play_id` is `null`
+     * while the play is still OPEN (BR-24.1: the decision precedes the play row), and this log is read
+     * live, so the currently-playing track is exactly the row a reader is most likely looking at.
+     * Keying on `play_id` would leave that one blank.
+     *
+     * Uses `idx_play_track`, which has existed since schema v1.
+     */
     const rows = this.#db
-      .prepare(`SELECT * FROM decision_log ${clause} ORDER BY id DESC LIMIT ?`)
+      .prepare(
+        `SELECT decision_log.*,
+                (SELECT p.title FROM play p
+                  WHERE p.track_id = decision_log.track_id
+                  ORDER BY p.started_at DESC LIMIT 1) AS track_title
+           FROM decision_log ${clause} ORDER BY id DESC LIMIT ?`,
+      )
       .all(...args, filter.limit) as unknown as DecisionRow[];
 
     return rows.map(rowToEntry);

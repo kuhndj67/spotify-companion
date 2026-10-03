@@ -21,7 +21,7 @@
  * produces the verdict, one function returning both, never a parallel `explain`.
  */
 
-import type { DecisionLogEntry } from './types.js';
+import type { DecisionLogEntry, Maybe } from './types.js';
 
 export interface TracedField {
   readonly name: string;
@@ -43,6 +43,11 @@ export interface TracedRule {
 export interface DecisionTrace {
   readonly evaluationId: string;
   readonly trackId: string;
+  /**
+   * The track's title, for the trace header. ⚠️ `null` when no play row carries this `track_id` yet,
+   * which means **the first time this track has been heard** — not a missing field.
+   */
+  readonly title: Maybe<string>;
   readonly decidedAt: string;
   /** How the decision came to be taken — BR-32.2's trigger timeline. */
   readonly trigger: TriggerSummary;
@@ -107,6 +112,9 @@ export function buildTrace(rows: readonly DecisionLogEntry[]): DecisionTrace | n
   return {
     evaluationId: first.evaluationId,
     trackId: first.trackId,
+    // ⚠️ Taken from the FIRST row, like every other per-evaluation field here. Every row in a group
+    // shares one `evaluation_id`, so they describe one play and one track.
+    title: first.title,
     decidedAt: first.decidedAt,
     trigger: summariseTrigger(first.partialData),
     ruleSetVersion: first.ruleSetVersion,

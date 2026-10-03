@@ -273,14 +273,34 @@ export class EvaluationCoordinator {
    * play is open** — `playId` is written when the play closes. That is the same fact that made
    * `skip_attempt.play_id` nullable.
    */
-  get inProgress(): { trackId: string; evaluationId: string; decided: boolean } | null {
-    return this.#current === null
-      ? null
-      : {
-          trackId: this.#current.trackId,
-          evaluationId: this.#current.evaluationId,
-          decided: this.#current.decided,
-        };
+  get inProgress(): {
+    trackId: string;
+    evaluationId: string;
+    decided: boolean;
+    decidedOnPartialData: boolean;
+    holding: boolean;
+  } | null {
+    const play = this.#current;
+    if (play === null) return null;
+    return {
+      trackId: play.trackId,
+      evaluationId: play.evaluationId,
+      decided: play.decided,
+      decidedOnPartialData: play.decidedOnPartialData,
+      /**
+       * ⚠️ **FC-U5-1's `hold`, and it is NOT the same as `!decided`.**
+       *
+       * An undecided play is either *waiting for enrichment to settle* (`ENRICHMENT_WAIT_MS`, every
+       * play, always) or *holding for a fact a rule asked to wait for* (FR-33/BR-38.2, only when a
+       * loaded rule declares `onUnknown: 'hold'`). The indicator distinguishes them, because the
+       * second is the feature working and the first is just the first few seconds of every track.
+       *
+       * ⚠️ Derived from the SAME `#holdDeadlineMs` the decision path uses, never from a second copy
+       * of the "does any rule hold?" question — a UI that disagreed with the engine about whether a
+       * hold was in force would be worse than no indicator.
+       */
+      holding: !play.decided && this.#holdDeadlineMs(play) !== null,
+    };
   }
 
   #decide(

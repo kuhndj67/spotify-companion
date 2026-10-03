@@ -49,6 +49,7 @@ import type { DecisionFilter, LoadedRuleSet } from './rules/types.js';
 import type { ReadResult as AutomationReadResult } from './playback/AutomationStateStore.js';
 import type { SkipAttemptRepository } from './playback/SkipAttemptRepository.js';
 import type { AutomationState, WriteOutcome } from './playback/types.js';
+import { haltPanel, switchView } from './ui/automationPanel.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
 import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { LABEL_CLASSIFIER_VERSION } from './musicbrainz/LabelEnrichmentService.js';
@@ -538,13 +539,85 @@ export function createApi(deps: ApiDeps): Router {
   // -- U5: automated skipping ------------------------------------------------
 
   /**
+   * The body all three automation routes return.
+   *
+   * ## ⚠️ One shape from one builder, because the UI must not learn two of them
+   *
+   * `GET`, `POST` and the acknowledgement all answer the same question — *what is true now?* — so they
+   * return the same body. A `POST` that replied with a narrower shape would make the client either
+   * re-GET (a race) or merge two shapes (a second copy of the rendering rules).
+   *
+   * ## ⚠️ The derived VIEW is computed here, in `src/`, and never in `public/app.js`
+   *
+   * `app.js` has no tests, is outside the orphan check, and cannot import from `src/` — there is no
+   * bundler. So *"the judgement lives in a tested module"* means **the server derives it and ships it**,
+   * exactly as the status-bar indicators already arrive pre-derived on the WebSocket snapshot.
+   *
+   * ⚠️ **The raw facts are returned ALONGSIDE the view, not instead of it.** `enabled`, `halt`,
+   * `source` and `writable` are what a script or a probe wants; `view` and `haltPanel` are what a button
+   * needs. Dropping the facts would make the route untestable except through its own prose.
+   */
+  function automationPayload(
+    automation: AutomationControl,
+    lastWriteError: string | null,
+  ): Record<string, unknown> {
+    const read = automation.read();
+    const queued = deps.skipAttempts?.queued() ?? [];
+    const nowMs = Date.parse(deps.now());
+    const oldest = queued
+      .map((a) => Date.parse(a.enqueuedAt))
+      .filter((ms) => Number.isFinite(ms))
+      .reduce<number | null>((min, ms) => (min === null || ms < min ? ms : min), null);
+
+    const writable = automation.probeWritable();
+    const facts = {
+      enabled: read.state.globalAutomationEnabled,
+      halt: read.state.runawayHalt,
+      source: read.source,
+      detail: read.detail ?? null,
+      writable,
+      executorEnabled: deps.skipExecutorEnabled,
+      queue: {
+        depth: queued.length,
+        // ⚠️ `null` with an empty queue, never 0: "nothing waiting" and "something waiting for no time
+        // at all" are different facts, and the standing rule is that `null` is unknown.
+        oldestQueuedAgeMs: oldest === null ? null : Math.max(0, nowMs - oldest),
+      },
+      lastAttempt: deps.skipAttempts?.latest() ?? null,
+    };
+
+    return {
+      ...facts,
+      /**
+       * ⚠️ **Its own field, NOT `detail`.** `detail` already means *why the state file could not be
+       * read*; a failed write is a different fact, and reusing one key for both would make the UI
+       * report a parse problem as a save problem (or hide one behind the other).
+       */
+      writeError: lastWriteError,
+      view: switchView({
+        enabled: facts.enabled,
+        halt: read.state.runawayHalt,
+        source: read.source,
+        writable,
+        executorEnabled: deps.skipExecutorEnabled,
+        lastWriteError,
+      }),
+      haltPanel: haltPanel(read.state.runawayHalt),
+    };
+  }
+
+  /**
    * Everything the automation indicator and the kill switch need, in one read.
    *
-   * ## ⚠️ This route reports FACTS, and computes no state name
+   * ## ⚠️ FACTS *and* a derived view — and both are computed in `src/`, never in `app.js`
    *
-   * FC-U5-1's seven states are derived in `statusBar.ts`, which is pure and tested. Deriving them here
-   * would put the judgement in an untestable place and give the client a second opinion to disagree
-   * with — and a UI that renders a state the server named cannot be driven into that state by a test.
+   * `public/app.js` has no tests, is outside the orphan check, and **cannot import from `src/`** — there
+   * is no bundler. So *"the judgement lives in a tested module"* means the server derives it and ships
+   * it, which is already how the status-bar indicators arrive on the WebSocket snapshot.
+   *
+   * ⚠️ So this route returns `view` (`switchView`) and `haltPanel` alongside the raw fields. **It still
+   * does not name FC-U5-1's seven states**: that indicator is derived by `automationIndicator` and
+   * travels on the snapshot, because it belongs to the status bar rather than to this panel.
    *
    * ⚠️ **`source` is part of the answer, not debug detail.** `absent` and `unreadable` both read as
    * *off*, and they are different facts: the first is a fresh install behaving correctly, the second is
@@ -556,29 +629,9 @@ export function createApi(deps: ApiDeps): Router {
       return;
     }
 
-    const read = deps.automation.read();
-    const queued = deps.skipAttempts?.queued() ?? [];
-    const nowMs = Date.parse(deps.now());
-    const oldest = queued
-      .map((a) => Date.parse(a.enqueuedAt))
-      .filter((ms) => Number.isFinite(ms))
-      .reduce<number | null>((min, ms) => (min === null || ms < min ? ms : min), null);
-
-    res.json({
-      enabled: read.state.globalAutomationEnabled,
-      halt: read.state.runawayHalt,
-      source: read.source,
-      detail: read.detail ?? null,
-      writable: deps.automation.probeWritable(),
-      executorEnabled: deps.skipExecutorEnabled,
-      queue: {
-        depth: queued.length,
-        // ⚠️ `null` with an empty queue, never 0: "nothing waiting" and "something waiting for no time
-        // at all" are different facts, and the standing rule is that `null` is unknown.
-        oldestQueuedAgeMs: oldest === null ? null : Math.max(0, nowMs - oldest),
-      },
-      lastAttempt: deps.skipAttempts?.latest() ?? null,
-    });
+    // ⚠️ No write has been attempted on a GET, so `lastWriteError` is null. That is not the same as
+    // *the file is writable* — `view.warning` reports both, from different fields.
+    res.json(automationPayload(deps.automation, null));
   });
 
   /**
@@ -624,17 +677,12 @@ export function createApi(deps: ApiDeps): Router {
     }
 
     const outcome = deps.automation.write({ ...before.state, globalAutomationEnabled: enabled });
-    const after = deps.automation.read();
 
-    // 200 only when the write landed. ⚠️ A 503 whose body still carries the state read back from disk:
+    // 200 only when the write landed. ⚠️ A 503 whose body still carries the state READ BACK FROM DISK:
     // the request failed and the UI must still render the truth, which is the PREVIOUS value.
     res.status(outcome.ok ? 200 : 503).json({
-      enabled: after.state.globalAutomationEnabled,
-      halt: after.state.runawayHalt,
-      source: after.source,
-      writable: deps.automation.probeWritable(),
+      ...automationPayload(deps.automation, outcome.ok ? null : outcome.reason),
       error: outcome.ok ? undefined : 'Could not persist the automation state.',
-      detail: outcome.ok ? undefined : outcome.reason,
     });
   });
 
@@ -687,15 +735,14 @@ export function createApi(deps: ApiDeps): Router {
       runawayHalt: null,
       globalAutomationEnabled: reArm,
     });
-    const after = deps.automation.read();
+    const payload = automationPayload(deps.automation, outcome.ok ? null : outcome.reason);
 
     res.status(outcome.ok ? 200 : 503).json({
-      enabled: after.state.globalAutomationEnabled,
-      halt: after.state.runawayHalt,
-      source: after.source,
-      acknowledged: after.state.runawayHalt === null,
+      ...payload,
+      // ⚠️ Read back from disk, never set to `true` because the write was requested. A failed write
+      // that still reported `acknowledged` would clear a safety latch in the UI only.
+      acknowledged: payload['halt'] === null,
       error: outcome.ok ? undefined : 'Could not persist the acknowledgement.',
-      detail: outcome.ok ? undefined : outcome.reason,
     });
   });
 

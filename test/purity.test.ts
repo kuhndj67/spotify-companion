@@ -67,6 +67,10 @@ const PURE_MODULES = [
   // U4's UI judgement. ⚠️ This is where a false green would come from, so it lives in src/
   // and is tested; `public/app.js` has no tests and is outside the orphan check.
   'ui/statusBar.ts',
+  // U5's UI judgement, and the reason is SPECIFIC rather than general: the documented worst case
+  // for a kill switch is one that "works in the UI and does not persist". Nothing in here reads
+  // client state — every function takes what the server read back from disk.
+  'ui/automationPanel.ts',
   // ─── U5 ──────────────────────────────────────────────────────────────────────────────────────
   // The action-point vocabulary. No runtime behaviour beyond two pre-registered constants, and
   // keeping it pure is what stops the safety limits acquiring a config read.

@@ -393,17 +393,42 @@ against a fake player client before `server.ts` ever constructs the real one.
       guard — so on a fast transition it would attach the **closing play's id to the next play's
       attempt**. Fixed by **removing the copy**, not by adding the term; pinned structurally
 
-### Step 11 — UI (FC-U5-1, FC-U5-2, FC-U5-3)
-- [ ] **`src/ui/statusBar.ts` ⚙️ tested** — `automationIndicator`, seven states, **a glyph per state**
-- [ ] ⚠️ **`IndicatorLevel` widens; no `default:` clause is added to silence the compiler**
-- [ ] ⚠️ **`Rules v#` is NOT recoloured** — its four levels stay bound to rules-file load health
-- [ ] Kill switch + halt acknowledgement on the **Rules pop-up**, not the primary screen
-- [ ] ⚠️ The button reflects **what was read back from disk**, never optimistic client state
-- [ ] ⚠️ **Two buttons for the halt**: *"I have reviewed this"* and *"turn automation back on"* are
-      different statements (BR-35.5)
-- [ ] `public/app.js` gets DOM wiring only — **no judgement**
-- [ ] ⚠️ **A test must drive FC-U5-1 into `failed`.** A state no test can enter is the
-      `recordSuccessorLag` trap in UI form
+### Step 11 — UI (FC-U5-1, FC-U5-2, FC-U5-3) — ✅ DONE 2026-10-02
+- [x] **`src/ui/statusBar.ts` ⚙️ tested** — `automationIndicator`, seven states, **a glyph per state**,
+      pinned by a test asserting 7 distinct levels AND 7 distinct glyphs
+- [x] ⚠️ **`IndicatorLevel` widened by five members; no `default:` clause added.** The compiler named
+      every site that had to change, which is the pattern working — five `statusBar({…})` literals in
+      `statusBar.test.ts` had to gain `automation`
+- [x] ⚠️ **A second test pins that no glyph is an EMOJI.** An emoji renders at a different size and
+      baseline from the geometric shapes, so a state change would visibly shift the whole bar — and
+      colour fonts vary by platform
+- [x] ⚠️ **`Rules v#` is NOT recoloured** — untouched; the U5 dot is appended and is omitted entirely
+      when `automation` is `null`, rather than drawn as `unknown`
+- [x] Kill switch + halt acknowledgement on the **Rules pop-up**, FIRST section, not the primary screen
+- [x] ⚠️ The button reflects **what was read back from disk** — a structural test asserts `app.js`
+      keeps no local `automationEnabled` and never toggles the rendered state without a round trip
+- [x] ⚠️ **Two buttons for the halt** (BR-35.5), and `haltPanel` returns two distinct labels, asserted
+- [x] `public/app.js` gets DOM wiring only
+- [x] ⚠️ **`src/ui/automationPanel.ts` ⚙️ tested** — added because `app.js` **cannot import from
+      `src/`** (no bundler), so *"the judgement lives in a tested module"* can only mean **the server
+      derives it and ships it**. `/api/automation` now returns `view` and `haltPanel` beside the facts,
+      exactly as the status-bar indicators already arrive on the WebSocket snapshot
+- [x] ⚠️ **`test/statusBarPrecedence.test.ts`** — the message precedence is the ONE status-bar
+      judgement that exists twice, because the Connection dot is client-side and so `app.js` has to
+      assemble the array itself. The test reads **both files** and fails if the orderings disagree
+- [x] ⚠️ **A test drives FC-U5-1 into `failed`** — and into all six others
+- [x] ⚠️ **Defect found and fixed**: `switchView`'s *machinery not built* branch hard-coded
+      `warning: null`, so a failed save vanished behind the greyed control. `explanation` and `warning`
+      are separate channels; pinned
+- [x] ⚠️ **Defect found and fixed**: `decorate()` called `statusIndicators()` **twice** per tick.
+      Harmless while every input was an in-memory counter — and no longer, because the automation
+      indicator reads the state file and queries `skip_attempt`. The two calls could also have
+      **disagreed**, giving a payload whose dot and whose message came from different reads
+
+> ⚠️ **NOT verified by clicking, and the FD says that is where this component's defects live.** Both
+> real defects ever found in `app.js` — the liked-refresh race and *"every axis tick says Aug"* — were
+> found by a human using the page, and the container still runs the **U4 image**, so none of this UI is
+> reachable yet. **The click-through belongs to step 13**, against the real `/state` mount.
 
 ### Step 12 — Tests, purity, orphans, and the CI guards
 

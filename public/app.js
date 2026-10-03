@@ -1220,6 +1220,9 @@ function refreshStats(trackId, artistId, artistName) {
 
 const CONNECTION_GLYPH = { ok: '●', warn: '◐', fail: '✕', unknown: '○' };
 
+/** Levels that produce the one status message, most serious first. ⚠️ Mirrors `statusBar.ts`. */
+const MESSAGE_LEVELS = ['fail', 'halted'];
+
 let connectionState = null;
 let lastServerStatus = null;
 let openDetail = null;
@@ -1256,6 +1259,9 @@ function renderStatusBar() {
     server?.rules ?? { level: 'unknown', label: 'Rules', detail: 'No status yet.' },
     connectionIndicatorView(),
     server?.spotify ?? { level: 'unknown', label: 'Spotify', detail: 'No snapshot yet.' },
+    // FC-U5-1 (U5). ⚠️ Omitted entirely when the server does not send it, rather than drawn as
+    // `unknown`: a deployment without U5 has no automation to be unknown about.
+    ...(server?.automation ? [server.automation] : []),
   ];
 
   dots.replaceChildren();
@@ -1296,7 +1302,19 @@ function renderStatusBar() {
 
   // ⚠️ One message, not a list. A bar showing three problems at once reads as broken rather
   // than informative, and the most serious one is what needs acting on.
-  const worst = indicators.find((i) => i.level === 'fail');
+  //
+  // ⚠️ MESSAGE_LEVELS IS A SECOND COPY of the precedence in `statusBar.ts`, and it exists only
+  // because the Connection dot is client-side, so this file has to assemble the array itself.
+  // `test/statusBarPrecedence.test.ts` reads both files and fails if the two lists disagree --
+  // because one admission rule implemented twice, with the copies diverging, is exactly how the
+  // WebSocket 403 happened.
+  //
+  // ⚠️ `fail` outranks `halted` regardless of position: a halt is the system working as designed and
+  // clears only on a deliberate acknowledgement, so it can stand for days. Accepting either in one
+  // pass would let it permanently occupy the single message slot and hide every later fault.
+  const worst = MESSAGE_LEVELS.map((level) => indicators.find((i) => i.level === level)).find(
+    (i) => i !== undefined,
+  );
   if (message) {
     message.hidden = worst === undefined;
     message.textContent = worst === undefined ? '' : worst.detail;
@@ -1501,6 +1519,171 @@ async function loadDecisions() {
   }
 }
 
+// -- FC-U5-2 / FC-U5-3: the kill switch and the halt acknowledgement ---------
+//
+// ⚠️ DOM WIRING ONLY, and here that is not a style preference but the defence against the
+// documented worst case for this control: *a kill switch that works in the UI and does not persist*.
+// Every label, every `disabled`, every warning below is computed by `src/ui/automationPanel.ts`,
+// which is pure and tested, and arrives on the response as `view` and `haltPanel`.
+//
+// ⚠️ **Nothing here keeps optimistic state.** After any write, the panel re-renders from the
+// RESPONSE BODY, which the server read back from disk. There is no local `enabled` variable to get
+// out of step with the file -- which is what would make the button flip while a restart silently
+// re-armed automation.
+
+/** The last payload, so a failed write can re-render without a second request. */
+let lastAutomation = null;
+
+async function loadAutomation() {
+  const section = el('automation-section');
+  const body = el('automation-body');
+  if (!section || !body) return;
+
+  try {
+    const response = await fetch('/api/automation');
+    if (response.status === 503) {
+      // U5 is not deployed. ⚠️ Hide the section rather than showing an empty one: an empty state that
+      // does not explain itself gets read as broken, and this one has nothing to explain.
+      section.hidden = true;
+      return;
+    }
+    lastAutomation = await response.json();
+  } catch (error) {
+    section.hidden = false;
+    body.replaceChildren(muted(`Could not read the automation state: ${error.message}`));
+    return;
+  }
+
+  section.hidden = false;
+  renderAutomation();
+}
+
+function renderAutomation() {
+  const body = el('automation-body');
+  const data = lastAutomation;
+  if (!body || !data) return;
+
+  const view = data.view;
+  const children = [];
+
+  const row = document.createElement('div');
+  row.className = 'automation-row';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'automation-switch';
+  button.dataset.testid = 'automation-switch';
+  // ⚠️ Every one of these comes from the server's derived view. None is decided here.
+  button.textContent = view.label;
+  button.disabled = view.disabled;
+  button.dataset.on = String(view.on);
+  button.setAttribute('aria-pressed', String(view.on));
+  if (view.nextEnabled !== null) {
+    button.addEventListener('click', () => void setAutomation(view.nextEnabled));
+  }
+  row.append(button);
+
+  const explanation = document.createElement('span');
+  explanation.className = 'muted';
+  explanation.textContent = view.explanation;
+  row.append(explanation);
+
+  children.push(row);
+
+  if (view.warning) {
+    const warning = document.createElement('p');
+    warning.className = 'automation-warning';
+    warning.dataset.testid = 'automation-warning';
+    warning.textContent = view.warning;
+    children.push(warning);
+  }
+
+  // FC-U5-3. ⚠️ Absent when nothing is halted, rather than an empty box.
+  if (data.haltPanel) children.push(haltPanelView(data.haltPanel));
+
+  body.replaceChildren(...children);
+}
+
+function haltPanelView(panel) {
+  const box = document.createElement('div');
+  box.className = 'automation-halt';
+  box.dataset.testid = 'automation-halt';
+
+  const heading = document.createElement('h4');
+  heading.textContent = panel.heading;
+
+  const detail = document.createElement('p');
+  detail.textContent = panel.detail;
+
+  // ⚠️ The attempt ids, or the note saying they are missing. `attemptsNote` carries both cases, and
+  // an empty list is a DEFECT REPORT rather than an empty state -- BR-35.8 requires this surface to
+  // say which rule-skips counted.
+  const attempts = document.createElement('p');
+  attempts.className = 'muted';
+  attempts.textContent = panel.attemptsNote;
+
+  // ⚠️ TWO buttons, never one (BR-35.5). "I have reviewed this" and "turn automation back on" are
+  // different statements; collapsing them would make the system's halt indistinguishable from the
+  // user's own choice. Neither is marked as the default.
+  const actions = document.createElement('div');
+  actions.className = 'automation-halt-actions';
+
+  const acknowledge = document.createElement('button');
+  acknowledge.type = 'button';
+  acknowledge.className = 'automation-switch';
+  acknowledge.dataset.testid = 'automation-acknowledge';
+  acknowledge.textContent = panel.acknowledgeLabel;
+  acknowledge.addEventListener('click', () => void acknowledgeHalt(false));
+
+  const reArm = document.createElement('button');
+  reArm.type = 'button';
+  reArm.className = 'automation-switch';
+  reArm.dataset.testid = 'automation-rearm';
+  reArm.textContent = panel.reArmLabel;
+  reArm.addEventListener('click', () => void acknowledgeHalt(true));
+
+  actions.append(acknowledge, reArm);
+  box.append(heading, detail, attempts, actions);
+  return box;
+}
+
+/**
+ * ⚠️ Re-renders from the RESPONSE, on success and on failure alike.
+ *
+ * A 503 still carries the full payload, with the state read back from disk and `writeError` set. So
+ * the failure path and the success path are the same path -- which is why there is no branch here
+ * that could leave the button saying something the file does not.
+ */
+async function setAutomation(enabled) {
+  await postAutomation('/api/automation', { enabled });
+}
+
+async function acknowledgeHalt(reArm) {
+  await postAutomation('/api/automation/acknowledge-halt', { reArm });
+}
+
+async function postAutomation(path, payload) {
+  const body = el('automation-body');
+  try {
+    const response = await fetch(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    // ⚠️ A 409 (arming while halted, or acknowledging nothing) carries the real state but no `view`,
+    // so re-read rather than render a partial body.
+    if (data.view) {
+      lastAutomation = data;
+      renderAutomation();
+    } else {
+      await loadAutomation();
+    }
+  } catch (error) {
+    if (body) body.append(muted(`The change could not be sent: ${error.message}`));
+  }
+}
+
 function wireRulesDialog() {
   const dialog = el('rules');
   const open = el('rules-open');
@@ -1511,6 +1694,7 @@ function wireRulesDialog() {
 
   open.addEventListener('click', () => {
     dialog.showModal();
+    void loadAutomation();
     void loadRules();
     void loadDecisions();
   });

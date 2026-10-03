@@ -239,6 +239,20 @@
         <button id="rules-close" class="ghost" type="button">Close</button>
       </header>
 
+      <!--
+        FC-U5-2 / FC-U5-3. The kill switch and the halt acknowledgement.
+
+        ⚠️ ON THE RULES POP-UP, not the primary screen (user decision, Q5): it is a CONTROL, not a
+        status. The primary screen still answers "is this armed?" through FC-U5-1's compact dot.
+
+        ⚠️ FIRST in the dialog, above the rule set. A halt is the one thing in here that needs acting
+        on, and a user who has to scroll to find it may not.
+      -->
+      <section class="diag-section" id="automation-section" hidden>
+        <h3>Automated skipping</h3>
+        <div id="automation-body"><p class="muted">Loading&hellip;</p></div>
+      </section>
+
       <!-- FC-2. Read-only: rule editing is out of scope until U5. -->
       <section class="diag-section">
         <h3>

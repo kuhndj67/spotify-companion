@@ -261,15 +261,42 @@ describe('GET /api/automation', () => {
     );
   });
 
-  it('does not compute a state name — the UI derives FC-U5-1 from these facts', async () => {
-    // Deriving the seven states here would put the judgement in an untestable place and give the
-    // client a second opinion to disagree with. `statusBar.ts` is pure and owns it.
+  it('does not name FC-U5-1 state — that indicator travels on the snapshot, not here', async () => {
+    // The seven-state indicator belongs to the status bar and is derived by `automationIndicator`.
+    // This route carries the PANEL's view instead, so the two surfaces cannot disagree about which
+    // module owns which judgement.
     await withServer({ automation: control().api }, async (base) => {
       const body: Body = await (await fetch(`${base}/api/automation`)).json();
-      assert.equal(body.state, undefined);
       assert.equal(body.level, undefined);
       assert.equal(body.indicator, undefined);
     });
+  });
+
+  it('⭐ carries the DERIVED button view, because app.js cannot import from src/', async () => {
+    // `app.js` has no tests and no bundler. If it derived the button state itself, the documented worst
+    // case -- a kill switch that works in the UI and does not persist -- would live in the one file
+    // nothing can test.
+    await withServer({ automation: control().api, skipExecutorEnabled: true }, async (base) => {
+      const body: Body = await (await fetch(`${base}/api/automation`)).json();
+      assert.match(body.view.label, /Turn automation on/);
+      assert.equal(body.view.disabled, false);
+      assert.equal(body.view.on, false);
+      assert.ok(body.view.explanation.length > 0);
+      assert.equal(body.haltPanel, null, 'no halt, no panel');
+    });
+  });
+
+  it('⭐ carries the halt PANEL when halted, naming what tripped it', async () => {
+    await withServer(
+      { automation: control({ ...OFF, runawayHalt: HALT }).api, skipExecutorEnabled: true },
+      async (base) => {
+        const body: Body = await (await fetch(`${base}/api/automation`)).json();
+        assert.match(body.haltPanel.detail, /3 rule-skips in a row/);
+        assert.deepEqual(body.haltPanel.attemptIds, [11, 12, 13]);
+        // BR-35.5 -- two statements, two buttons.
+        assert.notEqual(body.haltPanel.acknowledgeLabel, body.haltPanel.reArmLabel);
+      },
+    );
   });
 });
 
@@ -303,7 +330,10 @@ describe('POST /api/automation', () => {
       const body: Body = await response.json();
       assert.equal(body.enabled, false, 'the PREVIOUS value, read back from disk');
       assert.equal(body.writable, false);
-      assert.match(body.detail, /read-only/);
+      // ⚠️ `writeError`, NOT `detail` — `detail` already means "why the state file could not be read",
+      // and one key for both facts would report a parse problem as a save problem.
+      assert.match(body.writeError, /read-only/);
+      assert.match(body.view.warning, /read-only/, 'and the button says so too');
       assert.equal(c.current().globalAutomationEnabled, false);
     });
   });

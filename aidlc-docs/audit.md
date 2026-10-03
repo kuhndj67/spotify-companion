@@ -5970,3 +5970,121 @@ in writing before any rule is armed.
 
 ⚠️ **`probeWritable` has still never run against the real `/state` mount.** On the host the write
 succeeds, so the bug this probe exists to catch is invisible until it is run **through the container**.
+
+## 2026-10-02 — U5 step 11: the UI, and the discovery that "put the judgement in `src/`" has a harder meaning than it reads
+
+**1219 tests · typecheck clean · schema still v6 · container still on the U4 image.**
+
+FC-U5-1, FC-U5-2 and FC-U5-3 are built. `IndicatorLevel` widened by five members, and **the compiler
+named every site that had to change** — five `statusBar({…})` literals in `statusBar.test.ts` — which is
+the no-`default:` pattern doing exactly its job. No `default:` was added.
+
+### ⚠️ `public/app.js` CANNOT IMPORT FROM `src/`, and that changes what the FD's rule can mean
+
+The FD says the judgement goes in a tested module and the DOM wiring goes in `app.js`. For FC-U5-1 that
+was already satisfied by accident: indicators are derived server-side and **arrive pre-derived on the
+WebSocket snapshot**.
+
+⚠️ **FC-U5-2 has no snapshot.** The kill switch is driven by `GET /api/automation`, and `app.js` is a
+browser script served statically with **no bundler** — so there is no import to make. The choice was:
+
+1. derive the button's label / `disabled` / warning **in `app.js`** — putting *"a kill switch that works in
+   the UI and does not persist"*, the documented worst case for this exact control, in the one file
+   nothing can test; or
+2. derive it in `src/ui/automationPanel.ts` and **have the route ship it**.
+
+**Option 2.** `/api/automation` now returns `view` and `haltPanel` *alongside* the raw facts. ⚠️ **The
+facts are kept, not replaced** — `enabled`, `halt`, `source`, `writable` are what a script or a probe
+wants, and dropping them would leave the route testable only through its own prose.
+
+⚠️ **An earlier comment in `api.ts` claimed this route "computes no state name" — amended, because it now
+computes the panel's view.** What stays true is narrower and worth stating precisely: **FC-U5-1's seven
+states are still named only by `automationIndicator`**, and travel on the snapshot, because that
+indicator belongs to the status bar rather than to this panel.
+
+### ⚠️ One judgement genuinely exists twice, and it is now pinned
+
+`app.js` assembles the indicator array itself, because the **Connection** dot's input is the browser's own
+socket state and no server can know it. So the *message precedence* — which indicator owns the single
+message slot — exists in both files. It already did, for `fail`.
+
+`test/statusBarPrecedence.test.ts` reads **both files** and fails if the orderings disagree. ⚠️ **This is
+the WebSocket `403` shape pre-empted**: one admission rule written twice, with `TRUST_PUBLISHED_PORT`
+added to one copy only, and **all 411 tests passing** because they exercised the policy function and
+nothing exercised the copy. `attachPlayId` repeated the shape in step 10, found by reading.
+
+### `fail` outranks `halted`, and the reason is duration
+
+Two passes, not one. A halt **clears only on a deliberate acknowledgement**, so it can stand for days — a
+single pass accepting either level would let it permanently occupy the one message slot and hide every
+later fault, including a Recording failure, which is the only one that loses something unrecreatable.
+⚠️ And the automation dot sits **last**, so position alone would not have saved it.
+
+### The seven states, and the two distinctions that would have been collapsed
+
+| State | Level | Glyph | What it would have been wrongly merged with |
+|---|---|---|---|
+| idle | `idle` | `·` | ⚠️ `ok` — which would claim a decision was made |
+| disabled | `disabled` | `⊘` | `warn` — but this is the FR-47 default, not a fault |
+| hold | `hold` | `…` | `warn` — holding is the feature working |
+| passed-partial | `passed-partial` | `◎` | ⚠️ **`ok` — which would hide that a fact never arrived** |
+| passed | `ok` | `●` | — |
+| failed | `fail` | `✕` | — |
+| halted | `halted` | `‼` | ⚠️ **`fail` — *the system protected you* is not *something is broken*** |
+
+⚠️ **`passed-partial` is why the glyphs are load-bearing rather than decorative.** The user's palette put
+*Green-passed* beside *Yellowgreen-passed-with-missing-info* — **the hardest pair in it to tell apart**,
+and the pair where being wrong means believing a decision rested on facts that never arrived. `●` against
+`◎` carries it with no colour at all.
+
+⚠️ **A second test asserts no glyph is an emoji.** An emoji renders at a different size and baseline from
+the geometric shapes, so the whole row would visibly jump on a state change, and colour fonts vary by
+platform. `halted` gets a **background badge** instead of a louder hue, because it sits next to `fail` in
+the palette and hue alone would make two states that demand *different actions* nearly interchangeable.
+
+⚠️ **Sustained motion on `fail` and `halted` only.** The FD recommends against flashing as a general state
+channel — accessibility hazard on an always-on display, cannot encode seven states, and any motion reads
+as *something is wrong* regardless of which state is moving. These are the two where demanding attention
+is the point, and `prefers-reduced-motion` still removes it.
+
+### `disabled` has THREE causes and three different details
+
+The machinery is not built · the switch is off · every rule is dry-run or disabled. A test asserts the
+three details are **distinct strings**. ⚠️ **A rule set of ten dry-run rules looks busy in `Rules v#` and
+can skip nothing**, and the honest word for that is *off* — `idle` would wrongly suggest armed and
+waiting.
+
+⚠️ And *off* does **not** mean *doing nothing*: rules are still evaluated and logged, which is the whole of
+U4. The label says so.
+
+### 🔧 Two defects found while building this
+
+**1. `switchView`'s *machinery not built* branch hard-coded `warning: null`.** So a **failed save vanished
+behind the greyed control** — the user presses a button, the write fails, and the only channel that would
+have said so was suppressed. ⚠️ `explanation` and `warning` are **separate channels**: the first says why
+the button is dead, the second says something went wrong, and the user had just caused the second. Caught
+by a route test, pinned by a panel test.
+
+**2. `decorate()` called `statusIndicators()` TWICE per tick.** Pre-existing and harmless while every
+input was an in-memory counter. ⚠️ **No longer**: from U5 the automation indicator **reads the state file
+and queries `skip_attempt`**, so the second call doubled both on every 3-second tick. ⚠️ **And the two
+calls could have DISAGREED**, since the file can change between them — a payload whose dot and whose
+message came from different reads of the same question. Same family as the duplicated `attachPlayId`: a
+second invocation of something that was supposed to happen once.
+
+### Why the state file is re-read on every tick, deliberately
+
+One small file read every 3 s, against the **1,200 Spotify requests/hour** the poll already spends. The
+alternative is a dot that lags the switch — and *an indicator reading cached state* is the documented
+worst case one layer up. The drain re-reads at the action point for the same reason.
+
+### ⚠️ NOT VERIFIED BY CLICKING, and that is where this component's defects live
+
+**Both** real defects ever found in `app.js` — the liked-refresh race and *"every axis tick says Aug"* —
+were found by a human **using the page**, not by a test. The container still runs the **U4 image**, so
+none of this UI is reachable. The structural tests pin the contract (`app.js` keeps no optimistic state,
+takes label/`disabled`/warning from the server, names none of the seven states itself); they cannot
+confirm it renders.
+
+**The click-through belongs to step 13**, against the real `/state` mount — and ⚠️ **it must be verified
+THROUGH THE CONTAINER**, because on the host the write succeeds and the bug is invisible.

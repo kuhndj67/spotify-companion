@@ -31,11 +31,13 @@ import { formatDecisionSummary } from './rules/decisionSummary.js';
 import { SqliteDecisionLogRepository } from './rules/SqliteDecisionLogRepository.js';
 import { DECISION_LOG_CAP } from './rules/types.js';
 import {
+  automationIndicator,
   recordingIndicator,
   rulesIndicator,
   spotifyIndicator,
   type Indicator,
 } from './ui/statusBar.js';
+import type { AutomationIndicatorState } from './ui/statusBar.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
@@ -985,7 +987,14 @@ function decorate(
     ...snapshot,
     ...(label === undefined ? {} : { label }),
     ...(liked === undefined ? {} : { liked }),
-    status: statusIndicators(snapshot),
+    // ⚠️ The `status` computed ABOVE, not a second call. This called `statusIndicators(snapshot)`
+    // twice -- harmless while every input was an in-memory counter, and no longer: from U5 the
+    // automation indicator READS THE STATE FILE and queries `skip_attempt`, so a second call doubled
+    // both on every tick. Fixed 2026-10-02.
+    //
+    // ⚠️ It would also have been possible for the two copies to DISAGREE, since the file can change
+    // between them -- a payload whose dot and whose message came from different reads.
+    status,
   };
 }
 
@@ -1017,6 +1026,13 @@ interface StatusIndicators {
   recording: Indicator;
   rules: Indicator;
   spotify: Indicator;
+  /**
+   * FC-U5-1. ⚠️ **A SECOND dot, never a recolouring of `Rules v#`** — that one already maps all four
+   * original levels to rules-FILE load health, where red *names the version still in force*.
+   * Recolouring it would make red mean either *your rules file is broken* or *a rule matched and the
+   * skip failed*, and the user would not know whether to open their rules file or their decision log.
+   */
+  automation: Indicator;
 }
 
 function statusIndicators(snapshot: Snapshot): StatusIndicators {
@@ -1046,6 +1062,60 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
       hasSnapshot: true,
       snapshotError: 'error' in snapshot ? String(snapshot.error) : null,
     }),
+    automation: automationIndicator(automationIndicatorState()),
+  };
+}
+
+/**
+ * FC-U5-1's facts, gathered fresh on every tick.
+ *
+ * ## ⚠️ The state file is RE-READ here, not cached
+ *
+ * One small file read every 3 s, against the 1,200 Spotify requests/hour the poll already spends — so
+ * the cost is nothing and the alternative is a dot that lags the switch. **The documented worst case for
+ * this control is a kill switch that appears to change and does not persist**; an indicator reading
+ * cached client-side state would be the same defect one layer up. The drain re-reads at every action
+ * point for the same reason.
+ *
+ * ## ⚠️ `liveRules` counts what could ACT, not what is loaded
+ *
+ * Active **and** enabled **and** not dry-run (BR-33.2). Ten dry-run rules look busy in `Rules v#` and
+ * can skip nothing, and the honest word for that is *off* — which is why this feeds `disabled` rather
+ * than `idle`.
+ */
+function automationIndicatorState(): AutomationIndicatorState {
+  const read = automationState.read();
+  const set = ruleWatcher?.current() ?? null;
+  const liveRules =
+    set === null
+      ? 0
+      : set.rules.filter(
+          (loaded) =>
+            loaded.status.state === 'active' && loaded.rule.enabled && loaded.rule.dryRun !== true,
+        ).length;
+
+  const play = coordinator?.inProgress ?? null;
+  const latest = skipAttempts?.latest() ?? null;
+
+  return {
+    // ⚠️ `null` only when the rules engine never started — with no repository there is no decision
+    // log, no evaluation and no automation, so *unknown* is the honest answer rather than *off*.
+    automationEnabled: coordinator === null ? null : read.state.globalAutomationEnabled,
+    executorConstructed: SKIP_EXECUTOR_ENABLED,
+    halt: read.state.runawayHalt,
+    liveRules,
+    evaluation:
+      play === null
+        ? null
+        : {
+            decided: play.decided,
+            decidedOnPartialData: play.decidedOnPartialData,
+            holding: play.holding,
+          },
+    // ⚠️ The LATEST attempt only, so a later confirmed skip clears the red light. Deliberately not
+    // sticky like `recording.gaps`: a dropped play is a permanent hole in the corpus, while an
+    // unconfirmed skip is a question about the device that the next skip re-asks.
+    lastAttemptUnconfirmed: latest?.state === 'unconfirmed',
   };
 }
 

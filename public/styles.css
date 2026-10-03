@@ -732,7 +732,40 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 /* ⚠️ Grey, never green: an indicator that has not heard from its subsystem is UNKNOWN. */
 .status-dot[data-level='unknown'] .glyph { color: #9ca3af; }
 
+/*
+ * FC-U5-1's five additional levels (U5). The palette follows the user's proposal:
+ * White-idle, Grey-disabled, Yellow-hold, Yellowgreen-passed-with-missing-info, Green-passed, Red-failed.
+ *
+ * ⚠️ `passed-partial` is the whole reason the glyphs differ. Green (#4ade80) against yellowgreen
+ * (#a3e635) is the hardest pair in this palette to tell apart, and it is the pair where being wrong
+ * means believing a decision rested on facts that never arrived. `●` against `◎` carries it with no
+ * colour at all.
+ */
+.status-dot[data-level='idle'] .glyph { color: #e5e7eb; }
+.status-dot[data-level='hold'] .glyph { color: #fbbf24; }
+.status-dot[data-level='passed-partial'] .glyph { color: #a3e635; }
+/*
+ * ⚠️ DIMMER than `unknown` (#9ca3af), and the difference matters: `disabled` is a deliberate off,
+ * `unknown` is no answer at all. Both are grey because neither is an error, and the glyphs (⊘ against
+ * ○) are what actually separates them.
+ */
+.status-dot[data-level='disabled'] .glyph { color: #6b7280; }
+
 .status-dot[data-level='fail'] .text { color: #ffb4a8; font-weight: 600; }
+
+/*
+ * ⚠️ `halted` is given a BADGE, not just a hue.
+ *
+ * It sits next to `fail` in the palette, and hue alone would make the two nearly interchangeable — but
+ * they demand different actions: investigate a failed skip, versus acknowledge a latch. So this one
+ * carries four channels: glyph (‼), weight, colour, and a background the others do not have.
+ */
+.status-dot[data-level='halted'] .glyph { color: #fca5a5; }
+.status-dot[data-level='halted'] {
+  background: rgba(248, 113, 113, 0.18);
+  border-radius: 6px;
+}
+.status-dot[data-level='halted'] .text { color: #ffb4a8; font-weight: 700; }
 
 .status-detail {
   flex-basis: 100%;
@@ -742,7 +775,14 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 
 /* No pulsing dots for anyone who asked not to have them. */
 @media (prefers-reduced-motion: no-preference) {
-  .status-dot[data-level='fail'] .glyph { animation: statusPulse 2s ease-in-out infinite; }
+  /*
+   * ⚠️ Sustained motion on `fail` and `halted` ONLY, and those are the two states where demanding
+   * attention is the point. The FD recommends against flashing as a general state channel — it is an
+   * accessibility hazard on a display left visible for hours, it cannot encode seven states, and on an
+   * always-on screen any motion reads as "something is wrong" regardless of which state is moving.
+   */
+  .status-dot[data-level='fail'] .glyph,
+  .status-dot[data-level='halted'] .glyph { animation: statusPulse 2s ease-in-out infinite; }
 }
 
 @keyframes statusPulse {
@@ -840,3 +880,78 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 
 /* ⚠️ An unknown renders as the word, in its own colour — never as an empty cell. */
 .field-row .unknown { color: #fcd34d; font-style: italic; }
+
+/* -- FC-U5-2 / FC-U5-3: the kill switch and the halt acknowledgement ------- */
+
+.automation-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* 44px minimum tap target, like the status dots. */
+.automation-switch {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #e2e8f0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.automation-switch:hover:not(:disabled),
+.automation-switch:focus-visible:not(:disabled) {
+  background: #334155;
+}
+
+/* ⚠️ ARMED is the state worth seeing at a glance: this app can change what is playing. */
+.automation-switch[data-on='true'] {
+  border-color: #4ade80;
+  color: #bbf7d0;
+}
+
+.automation-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/*
+ * ⚠️ A warning is NOT a state, and is never the only thing on screen. It appears beside the button
+ * rather than replacing it, because the most useful case is "the switch still shows what is on disk
+ * AND the save failed".
+ */
+.automation-warning {
+  margin: 0.4rem 0 0;
+  padding: 0.5rem 0.6rem;
+  border-left: 3px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fde68a;
+}
+
+.automation-halt {
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border-radius: 4px;
+}
+
+.automation-halt h4 {
+  margin: 0 0 0.35rem;
+  color: #ffb4a8;
+}
+
+.automation-halt p { margin: 0 0 0.5rem; }
+
+/* ⚠️ TWO buttons, never one: "I have reviewed this" and "turn automation back on" are different
+   statements (BR-35.5), and a single button would make the system's halt indistinguishable from the
+   user's own choice. They are deliberately not styled as a primary/secondary pair — neither is the
+   default action. */
+.automation-halt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

@@ -264,14 +264,22 @@ describe('enabled and status are two independent facts (BR-18.2, BR-18.3)', () =
     assert.equal(d.disabledRules[0]!.reason, 'unknown-field');
   });
 
-  it("a 'hold' rule is disabled by the validator and never reaches evaluation", () => {
+  it("✅ a 'hold' rule now REACHES evaluation — FR-33 completed in U5", () => {
+    // From U3 until 2026-10-02 this asserted the opposite: the validator disabled it with
+    // `unsupported-on-unknown`, because hold needs a deadline and a re-evaluation trigger that a pure
+    // synchronous module cannot have. Both now exist in EvaluationCoordinator, so the rule is
+    // evaluated like any other.
+    //
+    // ⚠️ `decide` itself is unchanged. A `hold` rule's verdict is still whatever the predicate says;
+    // what `hold` governs is WHEN the decision is taken, which is the coordinator's business and not
+    // the engine's. That separation is why FR-33 could complete without touching the pure core.
     const r = validateRuleSet([mk({ onUnknown: 'hold' })]);
     assert.ok(r.ok);
     if (r.ok) {
+      assert.equal(r.value[0]!.status.state, 'active', 'no longer disabled by the validator');
       const d = decide(r.value, facts());
-      assert.equal(d.outcomes.length, 0);
-      assert.equal(d.disabledRules[0]!.reason, 'unsupported-on-unknown');
-      assert.equal(d.action, 'none');
+      assert.equal(d.outcomes.length, 1, 'it is evaluated');
+      assert.equal(d.disabledRules.length, 0);
     }
   });
 });

@@ -225,6 +225,54 @@ describe('⭐ the one-attempt budget is spent HERE', () => {
   });
 });
 
+describe('⭐ BR-37.6 — a re-evaluation may CANCEL, and may NEVER create', () => {
+  it('an enrichment-arrived pass records its rows and enqueues NOTHING', () => {
+    // The permissive direction is the dangerous one: a rule that declined a track on incomplete facts
+    // and then matched it once the label arrived would skip a track the first pass had already
+    // cleared -- acting on a judgement the listener never saw being made.
+    const h = harness();
+    h.executor.execute({ ...context(['r1']), trigger: 'enrichment-arrived' });
+
+    assert.equal(h.recorded.length, 1, 'the decision IS recorded');
+    assert.equal(h.attempts.queued().length, 0, 'and no attempt is created');
+    assert.equal(h.drains(), 0, 'and no drain is scheduled');
+    h.db.close();
+  });
+
+  it('⚠️ not even when the re-evaluation is the FIRST thing to match', () => {
+    // This is the escalation BR-37.6 forbids, stated as the case it actually guards.
+    const h = harness();
+    h.executor.execute(context([]));                                    // first pass: declined
+    h.executor.execute({ ...context(['r1']), trigger: 'enrichment-arrived' }); // now matches
+
+    assert.equal(h.recorded.length, 2, 'both passes are in the log');
+    assert.equal(h.attempts.queued().length, 0, 'but nothing may act');
+    h.db.close();
+  });
+
+  it('a re-evaluation after a MATCH leaves the existing attempt alone', () => {
+    // Cancellation is the drain's job -- it reads the latest decision for the evaluationId and
+    // withdraws the attempt itself (a pull, not a push). The executor must not touch it.
+    const h = harness();
+    h.executor.execute(context(['r1']));
+    assert.equal(h.attempts.queued().length, 1);
+
+    h.executor.execute({ ...context([]), trigger: 'enrichment-arrived' });
+    assert.equal(h.attempts.queued().length, 1, 'still queued; the drain decides its fate');
+    assert.equal(h.attempts.get(2), null, 'and no second attempt row is written');
+    h.db.close();
+  });
+
+  it('⚠️ an INITIAL pass taken late still acts — that is what makes `hold` useful', () => {
+    // A held play was never decided, so its decision arrives as `initial` even when it is taken
+    // 30 seconds in. If held decisions were tagged `enrichment-arrived`, FR-33 would be inert.
+    const h = harness();
+    h.executor.execute({ ...context(['r1']), trigger: 'initial' });
+    assert.equal(h.attempts.queued().length, 1);
+    h.db.close();
+  });
+});
+
 describe('⚠️ rule selection, stated rather than inferred', () => {
   it('takes the first matched rule in RULE-SET order', () => {
     // One attempt per play means one rule acts, and precedence is out of scope for U5 (Q-B). Set

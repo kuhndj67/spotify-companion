@@ -71,9 +71,11 @@ describe('rulesDiagnostics', () => {
           predicate: { kind: 'compare', field: 'track.title', op: 'eq', value: 'x' },
         },
         {
-          // `hold` is stored and disabled with a reason until U5 (FR-33 is partial).
-          id: 'held', name: 'held', enabled: true, action: 'skip', onUnknown: 'hold',
-          predicate: { kind: 'compare', field: 'track.title', op: 'eq', value: 'x' },
+          // ⚠️ Was `onUnknown: 'hold'` until 2026-10-02, when FR-33 completed and that began loading
+          // ACTIVE. The fixture needs a rule that is genuinely disabled, so it now uses an unknown
+          // field -- the DisabledReason migration 004 made real.
+          id: 'held', name: 'held', enabled: true, action: 'skip', onUnknown: 'no-match',
+          predicate: { kind: 'compare', field: 'artist.labelVerdict', op: 'eq', value: 'major' },
         },
       ],
     });

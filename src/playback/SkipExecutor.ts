@@ -81,6 +81,25 @@ export class SkipExecutor implements DecisionExecutor {
 
     if (matched === null) return evaluationId;
 
+    // ⚠️ BR-37.6 — A RE-EVALUATION MAY CANCEL, AND MAY NEVER CREATE.
+    //
+    // FR-34's second pass records its rows (above) and stops here. The asymmetry is the point: the
+    // direction that errs toward *not acting* is the safe one.
+    //
+    // Enforced by the trigger rather than by comparing verdicts, because the two cases this must
+    // separate are already distinguishable by it:
+    //
+    //   - the first pass MATCHED  -> an attempt exists, and `already-attempted` below would refuse a
+    //                               second one anyway. Cancellation is the drain's job: it reads the
+    //                               latest decision for this evaluationId and withdraws the attempt.
+    //   - the first pass DECLINED -> no attempt exists, and this must NOT create one. A newly-matching
+    //                               re-evaluation is exactly the escalation BR-37.6 forbids.
+    //
+    // ⚠️ A HELD play is neither of those: it was never decided, so its decision arrives with
+    // trigger `initial` even when it is taken late. That is what makes FR-33's hold useful rather than
+    // inert — see EvaluationCoordinator.
+    if (context.trigger === 'enrichment-arrived') return evaluationId;
+
     // ── the attempt ─────────────────────────────────────────────────────────────────────────────
     //
     // ⚠️ An attempt row is written whether or not it will fire, so that every matched decision has a

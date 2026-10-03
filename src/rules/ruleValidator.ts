@@ -137,16 +137,18 @@ function semanticStatus(rule: Rule): RuleStatus {
     };
   }
 
-  // `hold` needs a deadline and a re-evaluation trigger, neither of which exists in a pure
-  // synchronous module. Stored rather than refused, so rules written now begin working when U5
-  // lands without being re-authored (BR-18.6).
-  if (rule.onUnknown === 'hold') {
-    return {
-      state: 'disabled',
-      reason: 'unsupported-on-unknown',
-      detail: "onUnknown: 'hold' is not available until automated skipping (U5) is built",
-    };
-  }
+  // ✅ FR-33 IS COMPLETE AS OF U5, and `hold` now loads ENABLED.
+  //
+  // This used to return `disabled: unsupported-on-unknown`, because hold needs a deadline and a
+  // re-evaluation trigger and neither exists in a pure synchronous module. It was stored rather than
+  // refused precisely so rules written then would start working now without being re-authored
+  // (BR-18.6, BR-38.1) -- and that is what has happened: no rule file needs editing.
+  //
+  // ⚠️ `DisabledReason`'s `unsupported-on-unknown` member is KEPT. Nothing produces it today, but
+  // removing it would delete the vocabulary for "stored and disabled with a reason", which is the
+  // pattern that made this transition free. `rulesDiagnostics` can still render historical rows.
+  //
+  // The deadline is EvaluationCoordinator's: min(label resolved, 30s, 50% of duration) -- BR-38.2.
 
   const stack: Predicate[] = [rule.predicate];
   while (stack.length > 0) {

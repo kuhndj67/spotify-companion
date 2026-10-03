@@ -329,13 +329,24 @@ against a fake player client before `server.ts` ever constructs the real one.
 - [x] ⚠️ **`LoggingExecutor` gains NO constructor parameter** (BR-30.2) and
       `LoggingExecutor.length === 1` still passes
 
-### Step 8 — `EvaluationCoordinator`: FR-34 re-evaluation (BR-37)
-- [ ] A second decision per play, `trigger = 'enrichment-arrived'`, writing **new** rows (BR-37.8)
-- [ ] ⚠️ May **cancel** a queued attempt; may **never create** one (BR-37.5/37.6) — **PBT-42**
-- [ ] `execute` call stays **synchronous and unawaited** (BR-42.1)
-- [ ] ⚠️ **No `FactCache`.** If one is ever added it may cache point-in-time history counts and
+### Step 8 — FR-34 re-evaluation and FR-33's `hold` — ✅ DONE 2026-10-02
+- [x] A second decision per play, `trigger = 'enrichment-arrived'`, writing **new** rows (BR-37.8)
+- [x] ⚠️ May **cancel** a queued attempt; may **never create** one (BR-37.5/37.6) — **PBT-42**,
+      enforced in **ONE place**: `SkipExecutor` returns early on `trigger === 'enrichment-arrived'`.
+      Keyed on the trigger rather than by comparing verdicts, because the trigger already separates
+      the two cases — a first pass that MATCHED leaves an attempt the drain can cancel, and a first
+      pass that DECLINED leaves none, which is the escalation BR-37.6 forbids
+- [x] ⭐ **A HELD play's decision is `initial`, not `enrichment-arrived`** — and that distinction is
+      what makes FR-33 useful rather than inert. A held play was never decided, so there is nothing
+      to re-evaluate; if its late decision were tagged `enrichment-arrived`, BR-37.6 would forbid a
+      holding rule from ever acting
+- [x] ⚠️ **At most ONE re-evaluation per play**, and only when the first pass used partial data.
+      Without the flag the coordinator would write a decision group every 3 s for the rest of the
+      track, which BR-22.1a's deliberate absence of a uniqueness constraint would not have surfaced
+- [x] `execute` call stays **synchronous and unawaited** (BR-42.1)
+- [x] ⚠️ **No `FactCache`.** If one is ever added it may cache point-in-time history counts and
       **never the enrichment fields** — the point of re-evaluating is that the facts changed
-- [ ] `hold` completes FR-33: `min(label resolved, 30 000 ms, 50% of duration)` — **PBT-48**.
+- [x] `hold` completes FR-33: `min(label resolved, 30 000 ms, 50% of duration)` — **PBT-48**.
       ⚠️ `applyOnUnknown` keeps **no `default:` clause**
 
 ### Step 9 — The two columns' write path, and `upstreamMetrics` (LC-28)

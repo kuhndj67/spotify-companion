@@ -158,18 +158,32 @@ describe('semantic failures disable ONE rule and never reject the set', () => {
     }
   });
 
-  it("onUnknown 'hold' → unsupported-on-unknown, stored not refused", () => {
-    // FQ3 = C. The rule loads so it begins working when U5 lands, without being re-authored.
+  it("✅ onUnknown 'hold' loads ACTIVE as of U5 — FR-33 is complete", () => {
+    // This test asserted `disabled: unsupported-on-unknown` from U3 until 2026-10-02. The rule was
+    // stored rather than refused precisely so it would start working when U5 landed WITHOUT being
+    // re-authored (FQ3 = C, BR-18.6, BR-38.1) -- and that is what this change demonstrates: no rule
+    // file needed editing, only the validator.
+    //
+    // ⚠️ The deadline it was waiting for is EvaluationCoordinator's hold window,
+    // min(label resolved, 30s, 50% of duration) -- BR-38.2.
     const r = validateRuleSet([ruleWith(titleIs('x'), { onUnknown: 'hold' })]);
     assert.ok(ok(r));
     if (r.ok) {
       assert.equal(r.value.length, 1, 'the rule must be present, not dropped');
-      assert.equal(r.value[0]!.status.state, 'disabled');
-      if (r.value[0]!.status.state === 'disabled') {
-        assert.equal(r.value[0]!.status.reason, 'unsupported-on-unknown');
-        assert.ok(r.value[0]!.status.detail.includes('U5'));
-      }
+      assert.equal(
+        r.value[0]!.status.state,
+        'active',
+        "FR-33 is complete: 'hold' is supported and the rule must now load enabled",
+      );
     }
+  });
+
+  it("⚠️ 'unsupported-on-unknown' is retained as a DisabledReason even though nothing emits it", () => {
+    // Nothing produces this reason today. It is kept because removing it would delete the vocabulary
+    // for "stored and disabled with a reason" -- the pattern that made FR-33's completion free -- and
+    // because rulesDiagnostics can still be asked to render a historical row carrying it.
+    const reason: import('../src/rules/types.js').DisabledReason = 'unsupported-on-unknown';
+    assert.equal(reason, 'unsupported-on-unknown');
   });
 
   it('a valid rule alongside a disabled one stays active', () => {

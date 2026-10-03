@@ -493,14 +493,18 @@ function loadedRuleSet(overrides: Partial<LoadedRuleSet> = {}): LoadedRuleSet {
         predicate: { kind: 'compare', field: 'label.classification', op: 'eq', value: 'major' },
       },
       {
-        // FR-33 is partial until U5: `hold` is stored and DISABLED with a reason, so a rule
-        // written now begins working when U5 lands instead of being re-authored.
+        // ⚠️ This rule used `onUnknown: 'hold'` to be DISABLED until 2026-10-02, when FR-33 completed
+        // and `hold` began loading ACTIVE. The test below needs a genuinely disabled rule, so the
+        // cause changed to an unknown field — the DisabledReason migration 004 made real.
+        //
+        // ✅ That FR-33 landed without any rule file changing is the point of BR-18.6: `hold` was
+        // stored-and-disabled rather than refused precisely so this would be free.
         id: 'held',
         name: 'Held rule',
         enabled: true,
         action: 'skip',
-        onUnknown: 'hold',
-        predicate: { kind: 'compare', field: 'track.explicit', op: 'eq', value: true },
+        onUnknown: 'no-match',
+        predicate: { kind: 'compare', field: 'artist.labelVerdict', op: 'eq', value: 'major' },
       },
     ],
   });
@@ -611,8 +615,9 @@ describe('GET /api/rules', () => {
 
   /**
    * ⚠️ A disabled rule must say WHY, in words. A rule that silently does nothing is
-   * indistinguishable from a rule that does not match — and `hold` is disabled by design
-   * until U5, which is exactly the case someone would otherwise read as broken.
+   * indistinguishable from a rule that does not match — which is exactly the case someone would
+   * otherwise read as broken. ⚠️ The fixture's disabling cause changed when FR-33 completed; the
+   * property under test did not.
    */
   it('reports each rule status, including the reason a rule is disabled', async () => {
     const body = (await (await fetch(`${base}/api/rules`)).json()) as Body;

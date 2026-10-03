@@ -30,9 +30,23 @@ import type { LiveFactSource } from './liveFactSource.js';
 import { assembleFacts } from './trackFacts.js';
 import { decide } from './RuleEngine.js';
 import type { HistoryCounts } from '../history/types.js';
-import type { DecisionExecutor, LoadedRule, Maybe } from './types.js';
+import type { DecisionExecutor, DecisionTrigger, LoadedRule, Maybe } from './types.js';
 
 /** What the coordinator needs from each tick. A projection of the snapshot, not the snapshot. */
+/**
+ * ⚠️ BR-38.2's absolute hold bound, and **deliberately NOT `ENRICHMENT_WAIT_MS`** (BR-38.5).
+ *
+ * That constant is 10 s and is measured-correct for U4's purpose — the longest observed enrichment
+ * settle was 9.0 s. A LABEL is a different wait: it sits behind a 1 req/sec MusicBrainz queue whose
+ * bounded retry has been seen to take a `503` at 1200 ms spacing. Reusing 10 s here would make `hold`
+ * behave exactly like `no-match`, because the rule would always time out before the thing it was
+ * waiting for arrived.
+ *
+ * ⚠️ A constant, not a setting. The hold window is a correctness bound on FR-33, not an operational
+ * cadence — the same reasoning as `MAX_PREDICATE_DEPTH` and the BR-35 safety limits.
+ */
+export const HOLD_MAX_MS = 30_000;
+
 export interface EvaluationSample {
   readonly trackId: string;
   readonly title: string;
@@ -88,6 +102,19 @@ interface CurrentPlay {
   readonly startedAtMs: number;
   readonly evaluationId: string;
   decided: boolean;
+  /**
+   * ⚠️ U5, BR-37. At most ONE re-evaluation per play.
+   *
+   * FR-34 asks for a second decision when slow enrichment lands. Without this flag the coordinator
+   * would re-evaluate on every subsequent tick, writing a decision group every 3 seconds for the rest
+   * of the track — and BR-22.1a deliberately created no uniqueness constraint that would have made
+   * that visible in the schema.
+   */
+  reEvaluated: boolean;
+  /** Whether the initial decision was taken on incomplete facts. Only then is a second pass useful. */
+  decidedOnPartialData: boolean;
+  /** Track length at the moment of the decision, for BR-38.2's 50%-of-duration bound. */
+  durationMs: number;
 }
 
 export class EvaluationCoordinator {
@@ -118,6 +145,10 @@ export class EvaluationCoordinator {
       startedAtMs: atMs,
       evaluationId: this.#deps.newEvaluationId(),
       decided: false,
+      reEvaluated: false,
+      decidedOnPartialData: false,
+      // Replaced by the real duration on the first tick that carries one.
+      durationMs: 0,
     };
   }
 
@@ -152,9 +183,11 @@ export class EvaluationCoordinator {
    */
   onTick(sample: EvaluationSample | null, atMs: number): void {
     const play = this.#current;
-    if (play === null || play.decided) return;
+    if (play === null) return;
     // A tick for some other track is stale. The observer, not this class, decides boundaries.
     if (sample === null || sample.trackId !== play.trackId) return;
+
+    play.durationMs = sample.durationMs;
 
     const settled = this.#deps.liveFacts.isSettled({
       trackId: sample.trackId,
@@ -163,17 +196,70 @@ export class EvaluationCoordinator {
       primaryArtistId: sample.artistId,
     });
 
-    if (settled) {
-      this.#decide(play, sample, atMs, false);
+    // ── FR-34: the SECOND pass, after a decision ───────────────────────────────────────────────
+    if (play.decided) {
+      // ⚠️ Only worth doing if the first pass ran out of patience. A decision taken on SETTLED facts
+      // has nothing left to learn, so re-evaluating it would write a second identical decision group
+      // and burn a `historyCountsBefore` query for no information.
+      if (play.reEvaluated || !play.decidedOnPartialData || !settled) return;
+      play.reEvaluated = true;
+      this.#decide(play, sample, atMs, false, 'enrichment-arrived');
       return;
     }
 
-    if (atMs - play.startedAtMs >= this.#deps.enrichmentWaitMs) {
+    if (settled) {
+      this.#decide(play, sample, atMs, false, 'initial');
+      return;
+    }
+
+    // ── FR-33: the hold (BR-38.2) ──────────────────────────────────────────────────────────────
+    //
+    // ⚠️ A holding rule waits LONGER than `ENRICHMENT_WAIT_MS`, and BR-38.5 says so explicitly: that
+    // constant is measured-correct for U4's purpose (max observed settle 9.0 s), but a label behind a
+    // 1 req/sec MusicBrainz queue can take far longer. Reusing it would make `hold` indistinguishable
+    // from `no-match` -- the rule would always time out before the label it was waiting for arrived.
+    const elapsed = atMs - play.startedAtMs;
+    const deadline = this.#holdDeadlineMs(play);
+
+    if (deadline !== null) {
+      if (elapsed < deadline) return; // still holding
+      // ⚠️ The hold expired. BR-38.4: take the FR-35 partial-data path, which is what makes a held
+      // rule decide rather than hang for the rest of the track.
+      this.#decide(play, sample, atMs, true, 'initial');
+      return;
+    }
+
+    if (elapsed >= this.#deps.enrichmentWaitMs) {
       // ⚠️ The cap fired. `partialData` means THE WAIT TIMED OUT (FQ3) — not that some field
       // read null, which is an ordinary unknown and is recorded per field in `fieldsSeen`.
-      this.#decide(play, sample, atMs, true);
+      this.#decide(play, sample, atMs, true, 'initial');
     }
     // else: wait for the next tick.
+  }
+
+  /**
+   * How long this play may hold, or `null` when no loaded rule asks to hold.
+   *
+   * **BR-38.2: `min(label resolved, 30 000 ms, 50% of track duration)`.** The *label resolved* term is
+   * handled by the caller — `settled` short-circuits ahead of this — so what remains is the lesser of
+   * the two bounds.
+   *
+   * ⚠️ **The duration term is a SECOND, INDEPENDENT bound, not a re-expression of the first**
+   * (BR-38.3). On a 40-second track, 50% is 20 s and the cap never applies; on a seven-minute one, 30 s
+   * applies long before half. Taking only the millisecond figure would hold a short track past its own
+   * end, which BR-38.7 forbids: holding past the point the track has finished is pointless.
+   *
+   * ⚠️ A duration of 0 means no tick has carried one yet, so the duration bound is not yet knowable
+   * and only the absolute cap applies. Treating 0 as "half of nothing" would decide instantly.
+   */
+  #holdDeadlineMs(play: CurrentPlay): number | null {
+    const anyHolds = this.#deps
+      .ruleSet()
+      .rules.some((loaded) => loaded.status.state === 'active' && loaded.rule.onUnknown === 'hold');
+    if (!anyHolds) return null;
+
+    const halfDuration = play.durationMs > 0 ? play.durationMs / 2 : Number.POSITIVE_INFINITY;
+    return Math.min(HOLD_MAX_MS, halfDuration);
   }
 
   /** In-progress state for diagnostics. Never used to make a decision. */
@@ -183,10 +269,17 @@ export class EvaluationCoordinator {
       : { trackId: this.#current.trackId, decided: this.#current.decided };
   }
 
-  #decide(play: CurrentPlay, sample: EvaluationSample, atMs: number, partialData: boolean): void {
+  #decide(
+    play: CurrentPlay,
+    sample: EvaluationSample,
+    atMs: number,
+    partialData: boolean,
+    trigger: DecisionTrigger,
+  ): void {
     // Marked decided BEFORE the work, so a throw cannot produce a second attempt on the next
     // tick and two decision groups for one play.
     play.decided = true;
+    if (trigger === 'initial') play.decidedOnPartialData = partialData;
 
     this.#safely(() => {
       const decidedAt = new Date(atMs).toISOString();
@@ -231,8 +324,11 @@ export class EvaluationCoordinator {
         evaluationId: play.evaluationId,
         decidedAt,
         partialData,
-        // U5: the first pass. FR-34's second pass passes 'enrichment-arrived' (BR-37.3).
-        trigger: 'initial',
+        // ⚠️ U5, BR-37.3. A HELD play's decision is `initial` even when it is taken late: it was
+        // never decided before, so there is nothing to re-evaluate. Only a decision taken on partial
+        // data and later revisited is `enrichment-arrived` — and BR-37.6 means that pass may CANCEL a
+        // pending skip and may never create one, which `SkipExecutor` enforces.
+        trigger,
       });
 
       this.#decisions += 1;

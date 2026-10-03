@@ -172,6 +172,18 @@ export class SqliteDecisionLogRepository implements DecisionLogRepository {
       .run(evaluationId);
   }
 
+  latestForEvaluationAndRule(evaluationId: string, ruleId: string): DecisionLogEntry | null {
+    const row = this.#db
+      .prepare(
+        `SELECT * FROM decision_log
+          WHERE evaluation_id = ? AND rule_id = ?
+          ORDER BY id DESC
+          LIMIT 1`,
+      )
+      .get(evaluationId, ruleId) as unknown as DecisionRow | undefined;
+    return row === undefined ? null : rowToEntry(row);
+  }
+
   list(filter: DecisionFilter): DecisionLogEntry[] {
     const where: string[] = [];
     const args: (string | number)[] = [];

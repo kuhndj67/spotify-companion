@@ -88,8 +88,13 @@ export interface SkipAttemptRepository {
   attachPlayId(evaluationId: string, playId: number): void;
 
   /**
-   * Epoch-millisecond timestamps of attempts that **reached the player** since `sinceIso`, for
-   * BR-35.2's rolling window.
+   * Attempts that **reached the player** since `sinceIso`, for BR-35.2's rolling window.
+   *
+   * ⚠️ **Returns ids alongside timestamps, and the ids are load-bearing.** BR-35.8 requires the
+   * acknowledgement surface to say *which rule-skips counted*, so `RunawayHalt.attemptIds` must name
+   * real rows. An earlier draft returned timestamps only and synthesised the ids from array indices —
+   * which would have produced a halt record pointing at attempts that do not exist, in the one place
+   * the user is asked to review evidence before clearing a safety latch.
    *
    * ⚠️ **`fired`, `confirmed` and `unconfirmed` all count; `queued`, `cancelled` and `refused` do
    * not.** The first three issued a `POST`; the last three did not.
@@ -98,7 +103,7 @@ export interface SkipAttemptRepository {
    * counts as landed — the same rule P-30 applies to transport failures, and the restrictive
    * direction for a safety limit. A halt that under-counts is a halt that does not fire.
    */
-  firedSinceMs(sinceIso: string): number[];
+  firedSince(sinceIso: string): readonly { readonly id: number; readonly firedAtMs: number }[];
 
   /** One attempt by id, for the UI and for tests. `null` when absent. */
   get(id: number): SkipAttempt | null;

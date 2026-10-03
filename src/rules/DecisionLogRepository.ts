@@ -36,6 +36,27 @@ export interface DecisionLogRepository {
 
   list(filter: DecisionFilter): DecisionLogEntry[];
 
+  /**
+   * The **most recent** decision for one play and one rule, or `null` if there is none.
+   *
+   * ⚠️ **U5. This is how BR-37.5's "a re-evaluation may cancel a pending skip" is implemented**, and
+   * the shape matters: nothing calls a `cancel` method. The drain **pulls** the latest decision at the
+   * action point and withdraws the attempt itself.
+   *
+   * A push would have required either widening `DecisionExecutor` with a `cancel` that
+   * `LoggingExecutor` implements as a no-op — BR-30's objection, one level up from the constructor
+   * parameter it already forbids — or letting `src/rules/` reach into `src/playback/`, which is the
+   * import direction the phase boundary refuses (P-33).
+   *
+   * ⚠️ **Keyed on `evaluationId`, not `playId`.** Both passes for a play share the `evaluationId`
+   * (created once in `onPlayStarted`), and `playId` is still null while the play is open — which is
+   * when this is asked.
+   *
+   * ⚠️ **"Most recent" is by row id, not by `decidedAt`.** Two passes can share a timestamp at this
+   * resolution, and id order is the order they were written.
+   */
+  latestForEvaluationAndRule(evaluationId: string, ruleId: string): DecisionLogEntry | null;
+
   countSince(sinceIso: string): number;
 
   /** Total rows. Drives the retention check and the diagnostics report. */

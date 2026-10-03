@@ -302,7 +302,7 @@ describe('queued() — the startup sweep', () => {
   });
 });
 
-describe('firedSinceMs — BR-35.2s rolling window input', () => {
+describe('firedSince — BR-35.2s rolling window input, WITH ids', () => {
   it('⚠️ counts fired, confirmed and unconfirmed; NOT queued, cancelled or refused', () => {
     const db = freshDb();
     const repo = new SqliteSkipAttemptRepository(db);
@@ -323,7 +323,7 @@ describe('firedSinceMs — BR-35.2s rolling window input', () => {
     repo.transition(ids[4]!, 'refused', { refusedReason: 'play-closed', firedAt: at(4) });
     // ids[5] stays queued.
 
-    const fired = repo.firedSinceMs('2026-10-02T09:00:00.000Z');
+    const fired = repo.firedSince('2026-10-02T09:00:00.000Z');
     assert.equal(
       fired.length,
       3,
@@ -339,8 +339,8 @@ describe('firedSinceMs — BR-35.2s rolling window input', () => {
     const id = repo.enqueue(attempt(playId, 't1'));
     repo.transition(id, 'fired', { firedAt: '2026-10-02T10:00:00.000Z' });
 
-    assert.equal(repo.firedSinceMs('2026-10-02T10:00:00.000Z').length, 0, 'exclusive cutoff');
-    assert.equal(repo.firedSinceMs('2026-10-02T09:59:59.000Z').length, 1);
+    assert.equal(repo.firedSince('2026-10-02T10:00:00.000Z').length, 0, 'exclusive cutoff');
+    assert.equal(repo.firedSince('2026-10-02T09:59:59.000Z').length, 1);
     db.close();
   });
 
@@ -351,8 +351,32 @@ describe('firedSinceMs — BR-35.2s rolling window input', () => {
     const id = repo.enqueue(attempt(playId, 't1'));
     repo.transition(id, 'fired', { firedAt: '2026-10-02T10:00:00.000Z' });
 
-    const [ms] = repo.firedSinceMs('2026-10-02T00:00:00.000Z');
-    assert.equal(ms, Date.parse('2026-10-02T10:00:00.000Z'));
+    const [first] = repo.firedSince('2026-10-02T00:00:00.000Z');
+    assert.equal(first?.firedAtMs, Date.parse('2026-10-02T10:00:00.000Z'));
+    db.close();
+  });
+
+  it('⭐ returns REAL attempt ids, because the halt record names them', () => {
+    // BR-35.8 requires the acknowledgement surface to say which rule-skips counted. An earlier draft
+    // returned timestamps only and the drain synthesised ids from array indices -- which would have
+    // pointed the user at attempts that do not exist, in the one place they are asked to review
+    // evidence before clearing a safety latch.
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+    const ids: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const playId = insertPlay(db, `t${i}`, `2026-10-02T09:0${i}:00.000Z`);
+      const id = repo.enqueue(attempt(playId, `t${i}`, { evaluationId: `ev-${i}` }));
+      repo.transition(id, 'fired', { firedAt: `2026-10-02T10:0${i}:00.000Z` });
+      ids.push(id);
+    }
+
+    const fired = repo.firedSince('2026-10-02T00:00:00.000Z');
+    assert.deepEqual(
+      fired.map((f) => f.id),
+      ids,
+      'the ids must be the rows that actually fired',
+    );
     db.close();
   });
 });

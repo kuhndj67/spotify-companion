@@ -86,7 +86,7 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     // ⚠️ Filters on state, not merely on fired_at being non-null: a row could in principle carry a
     // timestamp from an earlier transition, and the question here is "did this reach the player".
     this.#firedSince = db.prepare(
-      `SELECT fired_at FROM skip_attempt
+      `SELECT id, fired_at FROM skip_attempt
         WHERE fired_at IS NOT NULL
           AND fired_at > ?
           AND state IN ('fired', 'confirmed', 'unconfirmed')
@@ -155,9 +155,9 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     this.#attachPlay.run(playId, evaluationId);
   }
 
-  firedSinceMs(sinceIso: string): number[] {
-    const rows = this.#firedSince.all(sinceIso) as unknown as { fired_at: string }[];
-    return rows.map((r) => Date.parse(r.fired_at));
+  firedSince(sinceIso: string): readonly { id: number; firedAtMs: number }[] {
+    const rows = this.#firedSince.all(sinceIso) as unknown as { id: number; fired_at: string }[];
+    return rows.map((r) => ({ id: r.id, firedAtMs: Date.parse(r.fired_at) }));
   }
 
   get(id: number): SkipAttempt | null {

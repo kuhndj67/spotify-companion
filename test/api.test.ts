@@ -552,6 +552,8 @@ function stubLog(rows: DecisionLogEntry[]): DecisionLogRepository {
     list: () => rows,
     countSince: () => rows.length,
     count: () => rows.length,
+    // U5. Unused here: only the drain pulls the latest decision, for BR-37.5 cancellation.
+    latestForEvaluationAndRule: () => null,
     pruneToCap: () => 0,
   };
 }

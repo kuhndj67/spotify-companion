@@ -282,18 +282,28 @@ against a fake player client before `server.ts` ever constructs the real one.
       *refusal* rather than a *failure* because it is benign and provable — the listener pressed
       stop. In the failed bucket it would read as a defect every time
 
-### Step 6 — `skipDrain` 🔌 — **THE ACTION POINT** (LC-26)
-- [ ] The six refusals **in order**, each recorded with its reason (P-28)
-- [ ] ⚠️ **Re-read `AutomationState` from disk at drain time** — not a value captured at decision
+### Step 6 — `skipDrain` 🔌 — **THE ACTION POINT** — ✅ DONE 2026-10-02
+- [x] The refusals **in order**, each recorded with its reason (P-28)
+- [x] ⚠️ **`already-attempted` is NOT checked here — it moved to ENQUEUE** (Step 7). The row being
+      drained is itself an attempt for this play, so a drain-time check would have refused every
+      attempt as a duplicate of itself. The budget is spent when the row is created
+- [x] ⚠️ **The queue is the `skip_attempt` table, not an in-memory array** — a deviation from
+      P-29's wording, with the risk it named covered **twice**: the startup sweep closes surviving
+      `queued` rows, *and* the play-open check refuses them anyway because `currentPlay()` reports a
+      different `evaluationId` after a restart. One source of truth beats two that can disagree
+- [x] ⚠️ **Re-entrancy guard** — `drain` is called from the enqueue path AND the 3 s tick, so
+      without it two overlapping runs could both claim the same attempt and both `POST`: a
+      **double skip**. Pinned by a concurrent-drain test
+- [x] ⚠️ **Re-read `AutomationState` from disk at drain time** — not a value captured at decision
       time. **PBT-41 is the only property that can catch this**
-- [ ] Evidence before and after the `POST` (BR-43.2)
-- [ ] Confirmation: `progress_ms` reset **AND** track-id change, **~3 s grace** (BR-43.3/43.4)
-- [ ] ⚠️ **P-30 transport handling**: 401 → one refresh-and-reissue · 429 → **refuse without waiting**,
+- [x] Evidence before and after the `POST` (BR-43.2)
+- [x] Confirmation: `progress_ms` reset **AND** track-id change, **~3 s grace** (BR-43.3/43.4)
+- [x] ⚠️ **P-30 transport handling**: 401 → one refresh-and-reissue · 429 → **refuse without waiting**,
       `upstream-rate-limited` · 5xx / network / unconfirmed → failed, surfaced, **never retried**
-- [ ] ⚠️ **`drain` never throws.** Rejections are caught and written to the attempt row
-- [ ] ⚠️ **No fixed timing offset anywhere** (P-34) — `dj-talk`'s audio lag is **negative**
-- [ ] **PBT-34 … PBT-39**, **PBT-41**, **PBT-43**, **PBT-44**
-- [ ] ⭐ **PBT-34a — the positive control.** A drain that posts nothing satisfies all six refusal
+- [x] ⚠️ **`drain` never throws.** Rejections are caught and written to the attempt row
+- [x] ⚠️ **No fixed timing offset anywhere** (P-34) — `dj-talk`'s audio lag is **negative**
+- [x] **PBT-34 … PBT-39**, **PBT-41**, **PBT-43**, **PBT-44**
+- [x] ⭐ **PBT-34a — the positive control.** A drain that posts nothing satisfies all six refusal
       properties perfectly
 
 ### Step 7 — `SkipExecutor` (LC-25) and `LoggingExecutor`'s one change

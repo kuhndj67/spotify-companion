@@ -59,6 +59,8 @@ function spyLog(): { repo: DecisionLogRepository; rows: NewDecisionLogEntry[]; l
       list: () => [],
       countSince: () => 0,
       count: () => rows.length,
+      // U5. Unused here: only the drain pulls the latest decision, for BR-37.5 cancellation.
+      latestForEvaluationAndRule: () => null,
       pruneToCap: () => 0,
     },
   };

@@ -1,0 +1,11 @@
+This directory holds `automation-state.json`: U5's kill switch (FR-47) and its runaway latch (BR-35).
+
+It is mounted into the container as `/state:rw` and is the first directory this app is allowed to write
+other than `data/`. The state file itself is gitignored -- it is machine-local runtime state, and a
+committed `globalAutomationEnabled: true` would arm automation on any checkout.
+
+This placeholder is tracked so the directory exists before the first `compose up`. Docker would create
+it otherwise; on a Linux host that creation is owned by root, which would leave the app -- running as
+`node` -- unable to write its own kill switch. Measured on Rancher Desktop / Windows 2026-09-11, the
+bind mount synthesises `rwxrwxrwx root:root` and the problem does not arise here. Keeping the directory
+tracked costs nothing and removes the host-dependence.

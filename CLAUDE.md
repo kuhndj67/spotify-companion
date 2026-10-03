@@ -80,9 +80,61 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-09-27) — U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED.
+## ▶ Current state (2026-10-03) — U5 IS BUILT AND DEPLOYED, AND IT IS **INERT**
 
 **Read [`aidlc-docs/construction/u5-automated-skipping/HANDOFF.md`](aidlc-docs/construction/u5-automated-skipping/HANDOFF.md) before anything else** — U5's single entry point; the current state is its top block.
+
+✅ **All 13 code-generation steps are done. Migration 007 ran. Schema v7. The container is live on the
+new image.** 1228 tests · typecheck clean · `npm run smoke` green · `npm run knip` clean · **885 plays**
+· `integrity_check: ok`. **`npm run verify`** runs all four.
+
+⚠️ **NOTHING CAN SKIP A TRACK RIGHT NOW, and that is the delivered state, not an oversight.**
+`SKIP_EXECUTOR_ENABLED: "false"` means `SkipExecutor` is **never constructed** — no player client, no
+drain, no attempt rows — while the rules engine keeps evaluating and logging exactly as in U4. This is
+**BR-40.1's arming gate**: U5 ships inert so the dry-run log can be reviewed *before* anything acts.
+
+⚠️ **TWO OFF SWITCHES, and they are not redundant.** `SKIP_EXECUTOR_ENABLED` answers *is the machinery
+built?* (this file + a restart, checked once at startup); `globalAutomationEnabled` answers *may a built
+attempt fire?* (one UI click, re-read at **every action point**). Collapsing them breaks FR-38 — a
+control needing a restart cannot satisfy *no skip is issued after the switch is thrown*.
+
+▶ **NEXT: THE DRY-RUN REVIEW. It is not code.** Two of the three non-CI exit criteria are now closed:
+
+- ✅ **`probeWritable` against the real `/state` mount, through the container** — `/api/diagnostics`
+  reports `writable` as the `node` user, and the kill switch was written and read back **both ways**
+  with host and container seeing identical content. ⚠️ **So the write-temp-then-rename survived the bind
+  mount** — the inode hazard U3 and U4 could only describe, verified live. A single-file mount would
+  have broken on the first kill-switch change.
+- ⚠️ **OPEN: the dry-run review that arms the first rule** (BR-40.1). User judgement.
+- ⚠️ **OPEN: the first real skip, heard by the user**, confirming it costs 2–3 s rather than 18–41 s.
+
+⚠️ **The BR-35 thresholds are PRE-REGISTERED** —
+[`safety-thresholds/pre-registration.md`](aidlc-docs/construction/u5-automated-skipping/safety-thresholds/pre-registration.md),
+its own commit, written while `skip_attempt` held 0 rows. It fixes **3 consecutive / 10 per rolling
+hour** and what would count as evidence either is wrong. ⚠️ **Expect `3 consecutive` to trip first, not
+`10/hour`**: the broadest armed rule matches **145 of 885 plays (16.4%)** against the ~37% needed to
+trip the hourly limit at peak — but 16.4% says nothing about **adjacency**, and three consecutive
+major-label tracks is an ordinary run inside an album.
+
+⚠️ **A draft of that document said 40%, from `76 / 192`.** Stale gate figures *and* the wrong
+denominator — a rule is evaluated against **every** play, and with `onUnknown: 'no-match'` the 482
+plays whose label never resolved cannot match, so they belong in the denominator. **It nearly went into
+a pre-registration**, the one document whose value is that it was not fitted afterwards.
+
+✅ **ROLLBACK IS VERIFIED LIVE.** U4's image is tagged **`spotify-now-playing:u4-rollback`**. Against a
+**v7 copy** it reports `{from: 7, to: 7, applied: []}`, every U4 read path works, and ⚠️ **a U4 INSERT
+into a v7 `decision_log` succeeds with `trigger` defaulting to `'initial'`** — the clause that would
+have broken had that column been `NOT NULL` with no default. `integrity_check: ok` after that write.
+⚠️ **Reading the skip line alone would have proved only that 007 is skipped**, not that U4's code runs
+against an unread table and three unread columns.
+
+⚠️ **The UI was click-tested through the container** (Chrome, `localhost:3010`): five status dots with
+automation last, `Automation off / disabled / ⊘` and an aria-label carrying the level; the Rules pop-up's
+*Automated skipping* section renders the **disabled** button with the server-derived explanation naming
+`SKIP_EXECUTOR_ENABLED`; **no console errors or warnings.** WebSocket handshake **101** local and
+**403** cross-site Origin — the U4 blind spot still guarded both ways.
+
+### Earlier state (2026-09-27) — U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED.
 ✅ **All 9 Functional Design questions are answered.** The authoritative reading is
 [**`u5-functional-design-plan.md` §5.1**](aidlc-docs/construction/plans/u5-functional-design-plan.md) — not the raw answers in §5.
 ✅ **Probe P-U5-1 is DISCHARGED (2026-09-27), and BR-43 is written.** Record:
@@ -834,6 +886,13 @@ slow"*, not *"the generator is wrong"*. Build the child arbitrary **once** and r
 folding punctuation turns `["hip hop","rapcore"]` into `"hiphoprapcore"`, where a match crosses a
 boundary that exists in the data but not in the string. Both read as working rules.
 
+**✅ THE INODE HAZARD IS NOW VERIFIED LIVE, not merely described — 2026-10-03.** U5's
+`AutomationStateStore.write` does write-temp-then-rename into `/state`, and after a kill-switch change
+the **host and the container see identical file content**. So the directory mount is what makes that
+rename work, and a single-file mount would have detached the container's view on the **first** change.
+U3 and U4 could only warn about this; U5 is the first unit that would have hit it. The warning below is
+unchanged and is now evidence rather than inference.
+
 **A single-file bind mount binds an INODE.** `./config:/config:ro` mounts the directory for this
 reason: write-temp-then-rename, the safe way to save a config file, *replaces* the inode, and
 through a single-file mount that rename either fails or silently detaches the container's view
@@ -894,8 +953,20 @@ docker compose down           # stop it before running on the host
 docker logs -f spotify-now-playing
 
 npm start          # host deployment — port 3000. See the warning below before using it
-npm test           # 891 tests (2026-09-27)
+npm test           # 1228 tests (2026-10-03)
 npm run typecheck  # covers src AND test
+
+# ⚠️ RUN THIS, not `npm test` alone. A green suite has never been sufficient here.
+npm run verify     # typecheck + test + smoke + knip
+
+# Q9's two guards, added 2026-10-03 because `scripts/` is outside every other one.
+#
+# ⚠️ `smoke` invokes each script's SAFE MODE and fails only if a module cannot LOAD. A non-zero
+# exit is NOT a failure -- backup-history.mjs correctly refuses while the container is up. Writers
+# are skipped with a reason; every flag is checked against the target script's source, because a
+# draft of this runner passed `--dry-run` to a script that has no such flag.
+npm run smoke
+npm run knip       # dead files/exports/deps over src/ AND scripts/. Config: knip.jsonc
 npm run auth       # host-side OAuth, once
 
 node scripts/hypothesis-gate.mjs   # the Phase 2 gate (BR-11). Read-only; writes nothing
@@ -940,6 +1011,17 @@ pre-registration is that it cannot be adjusted once results are visible.
 > `docker compose down` first.
 
 Data lives in `data/` (gitignored): `history.db` plus `snapshots/`.
+
+**U5's kill switch lives in `state/automation-state.json`**, on its own `./state:/state:rw` mount.
+⚠️ **NOT under `data/`, and the reason is RESTORE**: once W-5's full-inventory backup exists, restoring
+a week-old backup would restore the week-old latch, and a kill switch a database restore can silently
+re-arm is not a kill switch. ⚠️ **NOT under `config/`** either — that stays `:ro` so no route can
+overwrite the hand-authored `rules.json`, and BR-20.8 would not protect it (it reloads on a *parse
+failure*, and a file truncated to valid-but-empty JSON parses fine).
+
+⚠️ **The directory is tracked (`state/.gitkeep`) while its contents are gitignored**, unlike `data/`.
+A committed `globalAutomationEnabled: true` would arm automation on any checkout — the one default in
+this project that must not travel.
 
 > ⚠️ **`data/` holds the only artefact here that cannot be regenerated.** Code comes back from git,
 > labels from MusicBrainz, enrichment from Spotify — months of play records come back from nowhere.

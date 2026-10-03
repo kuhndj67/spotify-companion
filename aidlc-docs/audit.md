@@ -6217,3 +6217,150 @@ the **click-through of step 11's UI**, which must be done through the container.
 ⚠️ **W-6 is NOT closed by this.** These two are *guards*, not the analysis: mutation testing,
 BR-derived tests, the negative-control convention and container-parity probes remain W-6, and W-6.2 wants
 BR-33…BR-43 backed by shipped code, which is the end of this unit.
+
+## 2026-10-03 — U5 step 13: DEPLOYED, schema v7, and shipped INERT on purpose
+
+**1228 tests · typecheck clean · `npm run smoke` green · `npm run knip` clean · schema **v7** ·
+`integrity_check: ok` · **885 plays** · 987 decision rows · **0 skip attempts**.**
+
+`migrated 7:` appears in the startup log **exactly once**. The container is live on the new image.
+
+⚠️ **NOTHING CAN SKIP A TRACK, and that is the delivered state.** `SKIP_EXECUTOR_ENABLED: "false"`
+means `SkipExecutor` is **never constructed** — no player client, no drain, no attempt rows — while the
+rules engine evaluates and logs exactly as in U4. **This is BR-40.1's arming gate**, not an oversight:
+U5 ships inert so the dry-run log can be reviewed before anything acts.
+
+### Order of operations, recorded because it is the part that cannot be redone
+
+1. `compose.yaml`: `+ ./state:/state:rw`, two env values, **both comment corrections**.
+2. `docker compose down` — the container holds `history.db` open and **SQLite's locks do not cross the
+   bind mount**, so this is the only real protection.
+3. **Backup + verify**, before any schema change: `backup-before-migration-007-deploy-20261003T135418Z`,
+   schema v6, 879 plays, **all eight checks pass**.
+4. **Tag U4's image** `spotify-now-playing:u4-rollback` — ⚠️ *before* the rebuild overwrote `:0.1.0`.
+   Without this, the rollback check would have had nothing to roll back to.
+5. `docker compose build` — exit code checked **directly**, not through a pipe.
+6. **Rollback verified on a throwaway v7 copy**, before the real database was touched.
+7. `docker compose up -d` → migration 007 → verification.
+
+### ⚠️ ROLLBACK IS VERIFIED BY A WRITE, not by reading the skip line
+
+The plan's warning was specific: *"Reading the skip line proves 007 is skipped, not that U4's code runs
+correctly against an unread table and three unread columns."*
+
+Against a v7 copy, U4's image:
+
+- reports `{from: 7, to: 7, applied: []}` — 007 skipped, nothing downgraded
+- reads everything: `listPlays`, `getTrail`, `decisionLog.list`, `count`, `coverage`, `trackPlayStats`
+- ⚠️ **INSERTs into a v7 `decision_log` successfully**, and `trigger` **defaults to `'initial'`**
+- `integrity_check: ok` after that write
+
+⚠️ **That default is the whole clause.** U4's INSERT names 20 columns and omits `trigger`; had migration
+007 added it `NOT NULL` with no default, **rollback would have been impossible to use** — the old image
+would start, read fine, and fail on the first decision it tried to record. Which is the worst shape: a
+rollback that appears to work.
+
+### ⚠️ THE INODE HAZARD IS NOW EVIDENCE, after two units of being inference
+
+`compose.yaml` has warned since U3 that *a single-file bind mount binds an INODE*, and that
+write-temp-then-rename **replaces** the inode. U3 and U4 only ever read their config, so the warning
+could not be tested.
+
+**`AutomationStateStore.write` is the first code in this project that does that rename into a mount.**
+After flipping the kill switch, the **host and the container see identical file content** — so the
+directory mount is what makes it work, and a single-file mount would have detached the container's view
+on the **first** kill-switch change. ✅ Measured, not reasoned.
+
+### The third non-CI exit criterion is CLOSED
+
+*"`probeWritable` against the real `/state` mount, verified through the container — on the host the
+write succeeds and the bug is invisible."*
+
+- `/api/diagnostics` reports **`/state/automation-state.json · writable`**, probed by the app **as its
+  own `node` user**. ⚠️ A `docker exec` check ran as **root** and was therefore meaningless; the app's
+  own probe is the authoritative one.
+- The switch was written and read back **in both directions** — `false → true → false` — each response
+  carrying the value **read back from disk**, with `source` moving `absent → file`.
+- ⚠️ **Safe to exercise with automation still unarmable**: `SKIP_EXECUTOR_ENABLED` is false, so no
+  executor exists and no skip could fire whatever the switch momentarily said. Automation ends **off**.
+
+**Still open, and neither is a test:** the dry-run review that arms the first rule (BR-40.1), and the
+first real skip heard by the user confirming it costs 2–3 s rather than 18–41 s.
+
+### The UI was click-tested through the container, which is where its defects live
+
+Both real defects ever found in `app.js` — the liked-refresh race and *"every axis tick says Aug"* —
+were found by a human **using the page**. Driven in Chrome against `localhost:3010`:
+
+- **Five status dots**, automation last: `Automation off` / `disabled` / `⊘`, and the **level is in the
+  aria-label**, so the glyph is not the only non-colour channel.
+- The Rules pop-up's **Automated skipping** section is first, above the rule set, with the **disabled**
+  button, the server-derived label *Automation unavailable*, and the explanation naming
+  `SKIP_EXECUTOR_ENABLED` and the restart. No warning, no halt panel — both correct.
+- ⚠️ **No console errors or warnings.**
+- Route guards live: acknowledge-with-nothing-halted **409**, `enabled: "true"` **400**, `reArm`
+  omitted **400**. WebSocket **101** local / **403** cross-site `Origin` — the U4 blind spot still
+  guarded both ways.
+
+### 🔧 The `:rw` comment was right in OUTCOME and wrong in REASON — corrected, second time
+
+`compose.yaml` said `:rw` arrives *"in the unit that adds RULE EDITING"*. Under Q1 = C the conclusion
+holds — U5 writes nothing to `config/` — but the framing implies **rule editing is the only thing that
+could make the directory writable**, and U5 adds app-written state while that mount stays `:ro`. So the
+sentence would have invited the wrong change.
+
+The rule now stated, which does not depend on which unit comes next:
+
+> **`./config` holds user-authored intent and the app never writes it. App-written state lives in
+> `./state`.**
+
+⚠️ That comment had already been corrected once (2026-09-21) for naming the wrong *unit*. **Leaving the
+wrong reason is how it goes stale a third time** — a recorded justification decays exactly like a
+recorded negative, because nothing re-tests it.
+
+### ⚠️ A WRONG DENOMINATOR NEARLY WENT INTO THE PRE-REGISTRATION
+
+The BR-35 pre-registration is committed (`fc3240b`) **in its own commit**, ahead of anything that could
+arm automation — the same discipline as the hypothesis gate's, committed at `fd09ad7` five days and 240
+plays before the comparison it governed. It fixes **3 consecutive / 10 per rolling hour** and **what
+would count as evidence that either is wrong**, written while `skip_attempt` held 0 rows.
+
+⚠️ **A draft of its §2 said the broadest armed rule matches 40% of plays, from `76 / 192`.** Both halves
+were wrong: the **stale** gate figures (2026-09-10, 427 plays), and the **wrong denominator**. A rule is
+evaluated against *every* play, and with `onUnknown: 'no-match'` the **482** plays whose label never
+resolved **cannot match** — so they belong in the denominator.
+
+**Re-measured on the live v7 database: 145 of 885 = 16.4%**, against the ~37% needed to trip the hourly
+limit at a 27-play peak hour. ⚠️ **That changes which limit to expect:**
+
+- **`10/hour` is NOT expected to trip** on the currently-armed rules — roughly half the trip point.
+- **`3 consecutive` IS the one to expect first.** 16.4% overall says nothing about **adjacency**, and
+  three consecutive major-label tracks is an ordinary run inside an album. BR-35.9 resets only on a play
+  **not** skipped by a rule.
+
+> ⚠️ **This is the project's own denominator warning, inside the one document whose entire value is that
+> it was not fitted afterwards.** *"Before reporting any rate, ask what is in the denominator and whether
+> every row in it could have been a success."* Recorded in the document rather than quietly corrected —
+> and the correction is what makes §3.1 name its denominator explicitly.
+
+### What is now true that was not
+
+| | |
+|---|---|
+| **FR-33 `hold`** | ✅ **complete.** PARTIAL since U3 — a rule declaring `onUnknown: 'hold'` was stored and *disabled with a reason*. It now holds, bounded by `min(label resolved, 30 000 ms, 50% of duration)` |
+| **`context_type` / `context_uri`** | ✅ populated on the **live** path for the first time, once per track. Previously NULL on every live play since v1 while backfilled rows carried it — *available exactly where the outcome variable was not* |
+| **M1–M4** | ✅ live on `/api/diagnostics`. ⚠️ Before this, `webApiClient` threw the `Retry-After` away inside a message string, so the app could not say whether it had **ever** been rate-limited |
+| **`skip_source`** | Still `user` \| `rule`, untouched since migration 006 — and now something can actually write `'rule'` |
+
+### Still open after this step
+
+1. **The dry-run review** that arms the first rule — the next step, and it is user judgement.
+2. **The first real skip, heard.**
+3. **W-6** — mutation testing, BR-derived tests, the negative-control convention, container-parity
+   probes. ⚠️ `smoke` and `knip` are *guards*, not that analysis. W-6.2 wants BR-33…BR-43 backed by
+   shipped code, which is only now true.
+4. **W-5** — the full-inventory backup including the `metabase-app-db` **named Docker volume** that no
+   tree-walking backup would find. ⚠️ And when it lands, `./state` must stay **outside** it, or a
+   history restore re-arms automation.
+5. **W-7** — idle poll backoff. Blocked on M1–M4, which now exist, so this is unblocked for the first
+   time. ⚠️ It changes the **recording instrument**, which is why it was deliberately not in U5.

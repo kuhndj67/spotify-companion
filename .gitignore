@@ -38,6 +38,22 @@ data/
 config/*
 !config/rules.example.json
 
+# U5's kill switch and runaway latch (`state/automation-state.json`).
+#
+# Machine-local RUNTIME state, not configuration. ⚠️ A committed `globalAutomationEnabled: true`
+# would arm automation on any checkout -- which is the opposite of FR-47's "off by default", and
+# the one default in this project that must not travel.
+#
+# ⚠️ The DIRECTORY is tracked (via .gitkeep) while its contents are not, unlike `data/` where the
+# whole directory is ignored. The mount needs to exist before the first `compose up`, and on a
+# Linux host a directory Docker creates is owned by root -- leaving the app, which drops to
+# `node`, unable to write its own kill switch.
+#
+# ⚠️ NOT under `data/`: restoring a week-old history backup would otherwise restore the week-old
+# latch, and a kill switch a database restore can re-arm is not a kill switch.
+state/*
+!state/.gitkeep
+
 *.log
 npm-debug.log*
 .DS_Store

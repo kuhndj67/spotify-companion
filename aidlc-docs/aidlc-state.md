@@ -4,7 +4,20 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U5 FUNCTIONAL DESIGN COMPLETE. PROBE P-U5-1 DISCHARGED 2026-09-27. BACKUP + VERIFIED RESTORE BUILT 2026-09-27. Next: U5 NFR Design plan → Infrastructure Design → Code Generation.**
+- **Current Stage**: CONSTRUCTION — **U5 IS BUILT AND DEPLOYED, AND IT IS INERT (2026-10-03). All 13 code-generation steps done, migration 007 ran, schema v7, container live on the new image. `SKIP_EXECUTOR_ENABLED` is `false`, so `SkipExecutor` is never constructed and nothing can skip a track. Next: THE DRY-RUN REVIEW — user judgement, not code.**
+  ⚠️ **Two of the three non-CI exit criteria are now closed.** `probeWritable` is verified against the
+  real `/state` mount **through the container**, and the kill switch was written and read back in both
+  directions with host and container seeing identical content — so the write-temp-then-rename survived
+  the bind mount. **Still open: the dry-run review that arms the first rule, and the first real skip
+  heard by the user.** Neither is a test.
+  ⚠️ **The BR-35 thresholds are PRE-REGISTERED** (`construction/u5-automated-skipping/safety-thresholds/pre-registration.md`),
+  committed in its own commit while `skip_attempt` held 0 rows. Read it before arming anything.
+  ⚠️ **Rollback is verified LIVE**: U4's image (tagged `spotify-now-playing:u4-rollback`) reports
+  `{from: 7, to: 7, applied: []}` against a v7 copy, and **a U4 INSERT into a v7 `decision_log`
+  succeeds** with `trigger` defaulting to `'initial'`. Reading the skip line alone would have proved
+  only that 007 is skipped.
+  1228 tests · typecheck clean · `npm run smoke` green · `npm run knip` clean · **885 plays** ·
+  `integrity_check: ok`. `npm run verify` runs all four.
   ▶ **READ [`construction/u5-automated-skipping/HANDOFF.md`](construction/u5-automated-skipping/HANDOFF.md) FIRST** — U5's single entry point.
   ✅ The FD is `construction/u5-automated-skipping/functional-design/`: `business-rules.md`
   (**BR-33…BR-43**), `domain-entities.md`, `business-logic-model.md`, `frontend-components.md`.

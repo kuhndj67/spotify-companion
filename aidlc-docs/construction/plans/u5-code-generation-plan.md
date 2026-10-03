@@ -475,16 +475,35 @@ against a fake player client before `server.ts` ever constructs the real one.
       noise — see the audit entry. `ajv` is now a declared devDependency
 - [x] **`npm run verify`** = typecheck + test + smoke + knip. **1228 tests, all four stages green**
 
-### Step 13 — Deployment and documentation
-- [ ] `compose.yaml`: `+ ./state:/state:rw` · `AUTOMATION_STATE_PATH` · `SKIP_EXECUTOR_ENABLED` ·
-      **two comment corrections** (the `:rw` *reason*, and the inode hazard moving to `./state`)
-- [ ] ⚠️ `npm run db:restore -- data/backup-before-migration-007-20260929T172027Z --verify-only`
-- [ ] `docker compose down` → build **checking the exit code directly** → `up -d` → `migrated 7:`
+### Step 13 — Deployment and documentation — ✅ DONE 2026-10-03
+- [x] `compose.yaml`: `+ ./state:/state:rw` · `AUTOMATION_STATE_PATH` · `SKIP_EXECUTOR_ENABLED` ·
+      **both comment corrections**. Plus `state/.gitkeep` and a `.gitignore` rule — the directory is
+      tracked while its contents are not, because a committed `globalAutomationEnabled: true` would arm
+      automation on any checkout
+- [x] ⚠️ A **fresh** backup was taken and verified rather than relying on the 2026-09-29 one:
+      `backup-before-migration-007-deploy-20261003T135418Z`, schema v6, 879 plays, **all eight checks**
+- [x] `docker compose down` → build, **exit code checked directly** → `up -d` → `migrated 7:`
       **exactly once**
-- [ ] ⚠️ **Verify rollback live** (Infra Q3): U4's image against a **v7 copy**, expecting
-      `from: 7, to: 7`
-- [ ] ⚠️ **Pre-register the BR-35 thresholds in writing** — before any rule is armed
-- [ ] `aidlc-state.md`, `audit.md`, code summary, build-and-test doc
+- [x] ⚠️ **U4's image was TAGGED `spotify-now-playing:u4-rollback` BEFORE the rebuild.** Without that
+      step the rollback check would have had nothing to roll back to — the build overwrites `:0.1.0`
+- [x] ⚠️ **Rollback verified LIVE on a throwaway v7 copy, before the real database was touched** — and
+      **by a WRITE**, not by reading the skip line. U4's image reports `{from: 7, to: 7, applied: []}`,
+      reads everything, and **INSERTs into a v7 `decision_log` with `trigger` defaulting to
+      `'initial'`**. ⚠️ That default is the whole clause: `NOT NULL` without it would have made rollback
+      *appear* to work and fail on the first decision recorded
+- [x] ⚠️ **BR-35 thresholds pre-registered** (`fc3240b`), in its own commit ahead of anything that
+      could arm. ⚠️ A draft said 40% from `76 / 192` — stale figures **and** the wrong denominator;
+      re-measured at **16.4%**, which changes the expected halt from `10/hour` to `3 consecutive`
+- [x] ⚠️ **Third non-CI exit criterion CLOSED**: `/state` writability probed by the app as `node`
+      through the container, and the switch written and read back both ways with **host and container
+      seeing identical content** — so write-temp-then-rename survived the bind mount
+- [x] ⚠️ **UI click-tested in a real browser through the container.** Five dots, automation last, level
+      in the aria-label; the pop-up's disabled button with the server-derived explanation; **no console
+      errors**. WebSocket **101** local / **403** cross-site
+- [x] `aidlc-state.md`, `CLAUDE.md`, `HANDOFF.md`, `audit.md`, `u5-build-and-test-summary.md`
+
+> ⚠️ **Shipped INERT.** `SKIP_EXECUTOR_ENABLED: "false"` — `SkipExecutor` is never constructed.
+> **The next step is the dry-run review, and it is not code.**
 
 ---
 

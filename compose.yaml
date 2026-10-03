@@ -130,6 +130,39 @@ services:
       # raised from the environment will be raised at the moment it first refuses
       # something, which is the moment it is doing its job.
 
+      # -- U5: automated skipping ----------------------------------------------
+      #
+      # ⚠️ **THE DEPLOYMENT-TIME POSTURE, NOT THE KILL SWITCH.** These answer different questions
+      # and are deliberately not redundant:
+      #
+      #   SKIP_EXECUTOR_ENABLED  is the skip machinery BUILT at all?   this file + a restart
+      #   globalAutomationEnabled  may a built attempt FIRE?           one UI click, re-read at
+      #                                                                every action point
+      #
+      # ⚠️ Collapsing them would break FR-38: a control that needs a restart cannot satisfy
+      # "no skip is issued after the switch is thrown". And dropping this one would lose the
+      # ability to deploy U5 **inert** for the dry-run review, which is BR-40.1's actual arming
+      # gate.
+      #
+      # With this unset, NOTHING is constructed: no player client, no drain, no attempt rows.
+      # The rules engine keeps evaluating and logging exactly as it did in U4.
+      SKIP_EXECUTOR_ENABLED: "false"
+
+      # Where the kill switch and the runaway latch live. See the ./state mount below.
+      #
+      # ⚠️ NOT under /config, and NOT under /data. Both were considered and rejected -- the
+      # reasons are on the mount, because that is where someone would go to change it.
+      AUTOMATION_STATE_PATH: /state/automation-state.json
+
+      # ⚠️ The BR-35 safety thresholds -- 3 consecutive rule-skips, 10 per rolling hour -- are
+      # NOT here, and that needs saying because every other cadence in this file IS.
+      #
+      # They are PRE-REGISTERED CONSTANTS, like the hypothesis gate's thresholds and unlike
+      # POLL_INTERVAL_MS. The limit is reachable by a legitimate rule: the busiest rolling hour
+      # in the corpus holds 27 plays, so 10/hour trips on anything matching more than ~37% at
+      # peak. ⚠️ The moment it is an env var, the obvious response to a halt is to raise it --
+      # and the guard becomes decorative. Change them by amending the pre-registration.
+
       # NOTE: request spacing (1 req/sec, NFR-15) and the retry policy are NOT
       # settings. There is no legitimate value other than one per second, so a knob
       # here would exist only to violate the policy -- most likely while debugging,
@@ -179,8 +212,26 @@ services:
       # editor needs to write". U4 HAS NO EDITOR -- it is read-only observability, and its
       # reload button re-READS the file. Left as written, that sentence was an instruction a
       # later session would follow without re-deriving, granting a write capability a whole
-      # unit before anything used it. It becomes :rw in the unit that adds RULE EDITING, and
-      # not before.
+      # unit before anything used it.
+      #
+      # ⚠️ CORRECTED AGAIN 2026-10-03, and the OUTCOME was right while the REASON was wrong.
+      # It said :rw arrives "in the unit that adds RULE EDITING", which implies rule editing is
+      # the only thing that could make this directory writable. U5 adds app-written state and
+      # this mount STAYS :ro -- so that framing would have invited the wrong change.
+      #
+      # The rule to apply instead, which does not depend on which unit comes next:
+      #
+      #     ./config holds USER-AUTHORED INTENT and the app never writes it.
+      #     App-written state lives in ./state.
+      #
+      # ⚠️ :rw here would grant this app permission to overwrite the hand-authored rules.json --
+      # a permission no U5 code would use, and one BR-20.8 does NOT protect: that path reloads
+      # the last-known-good set when a new file FAILS TO PARSE, and a file truncated to
+      # valid-but-empty JSON parses fine.
+      #
+      # ⚠️ And this gets stronger, not weaker, when the planned AI-authored rules system lands:
+      # a kill switch stored in the same writable directory as the file an AI agent edits is a
+      # kill switch that agent can disable.
       #
       # NOT under ./data on purpose. That directory holds history.db, the one artefact here
       # that cannot be regenerated. Rules are user-authored text that costs retyping.
@@ -200,5 +251,34 @@ services:
       # cite the root-ownership reason as if it had been seen here. An untested justification
       # repeated confidently is how a wrong reason outlives the decision it justified.
       - ./config:/config:ro
+
+      # -- U5: the kill switch and the runaway latch -----------------------------
+      #
+      # ⚠️ THE FIRST DIRECTORY THIS APP IS ALLOWED TO WRITE, other than ./data.
+      #
+      # It holds `automation-state.json`: `globalAutomationEnabled` (FR-47) and `runawayHalt`
+      # (BR-35). Two separate latches -- the user turning automation off and the system halting
+      # itself are different facts, and clearing them are different acts.
+      #
+      # The DIRECTORY is mounted, not the file, for the reason given on ./config above and on
+      # ./data before it: a single-file bind mount binds an INODE, and the safe way to write a
+      # config file is write-temp-then-rename, which REPLACES the inode. ⚠️ Here that hazard is
+      # LIVE rather than theoretical -- `AutomationStateStore.write` does exactly that rename, so
+      # a single-file mount would detach the container's view on the first kill-switch change.
+      # U3 and U4 could only describe this bug; U5 would hit it.
+      #
+      # ⚠️ WHY NOT ./config: that would grant write access to the user's hand-authored rules.json.
+      # See the long note on that mount.
+      #
+      # ⚠️ WHY NOT ./data, which is already :rw -- and this is the less obvious half. It is about
+      # RESTORE. Once W-5's full-inventory backup exists, restoring a week-old backup would
+      # restore the week-old LATCH along with the plays, and a kill switch that a database
+      # restore can silently re-arm is not a kill switch. Keeping it on its own mount means a
+      # history restore cannot change whether this app is allowed to touch playback.
+      #
+      # ⚠️ `probeWritable` checks this mount AT STARTUP and reports on /api/diagnostics, because
+      # the answer has to be known BEFORE the user reaches for the switch. Verify it THROUGH THE
+      # CONTAINER: on the host the write succeeds and the bug is invisible.
+      - ./state:/state:rw
 
     restart: unless-stopped

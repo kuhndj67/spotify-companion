@@ -5833,3 +5833,140 @@ watching a real failure get *recorded*. **U5's equivalent failure is audible.**
 
 **891 tests · typecheck clean · `src/` untouched · `src/playback/` still absent.** Every U5 stage so far
 has been documentation-only, and the phase boundary is intact going into code generation.
+
+## 2026-10-02 — U5 step 10: WIRED. The phase boundary is now a test, not a repository fact
+
+**1162 tests · typecheck clean · schema still v6 · 878 plays · container up 47 h, healthy and recording.**
+
+`src/playback/` is now reachable from the running process. U3's containment guarantee was *"`git status
+src/` shows only `src/rules/`"* and U4's was *"`src/playback/` does not exist"*. **Both are spent.** What
+replaces them is `test/playbackBoundary.test.ts`, which asserts over the source text:
+
+- nothing under `src/rules/` **imports** `src/playback/` (P-33),
+- `SpotifyPlayerClient.prototype` exposes **exactly `skipToNext`**, and the module names no other
+  `/me/player/*` endpoint,
+- `new SkipDrain(` appears **once**, with both entry points calling that one drain,
+- `sweepOrphaned()` precedes `new SkipExecutor(` in file order (P-29's ordering *is* the guarantee).
+
+⚠️ **The import check strips comments first, and that is load-bearing.** `LoggingExecutor.ts` and
+`DecisionLogRepository.ts` both *discuss* `src/playback/` at length, explaining the very rule the test
+enforces. A naive `includes('playback/')` fails on them — and the natural "fix" is to delete the
+sentences rather than the import. There is a second test asserting that those files still mention it,
+so the first cannot pass by the two trees simply never meeting.
+
+### 🔧 A defect found in review, not by a test: `attachPlayId` had TWO call sites
+
+The first draft called `skipAttempts.attachPlayId` from `PlayObserver`'s `onPlayRecorded` hook, reading
+the evaluation id from `coordinator.inProgress`. ⚠️ **`EvaluationCoordinator.onPlayRecorded` guards with
+`play.trackId === trackId && play.decided` — and the hook-side copy had no such check.** `onPlayRecorded`
+fires when a play **closes**, by which point `#current` may already be the next track, so on a fast
+transition it would have attached the **closing play's `play_id` to the NEXT play's attempt row**.
+
+**Fixed by removing the second copy, not by adding the missing term**: both links now travel through the
+`attachPlayId` callback the coordinator already gates, so there is one rule and one call site. P-33 is
+unaffected — the coordinator only knows it was handed a function.
+
+⚠️ **This is the WebSocket `403` shape for the fourth time in this project**: one admission rule
+implemented twice, with the second copy missing a term. It would have passed the suite, and the damage
+is a *plausible* wrong join rather than a crash. The pin is now structural (`one rule, one call site`),
+because the thing being prevented is a future edit.
+
+⚠️ **It was also not load-bearing, and that nearly hid it.** The one-attempt guard keys on
+`evaluationId` and never reads `play_id`. A mis-attached id costs a convenient join and nothing else —
+which is exactly why nobody would have noticed, and why `successor_lag_ms` sat `null` on 662 rows.
+
+### `automationDiagnosticSteps` was EXTRACTED so its branches are reachable from a test
+
+`diagnostics.ts` is in `ALLOWED_ORPHANS` — it reaches for the MCP client, the Web API and the
+credentials file, so no test loads it. Inlining U5's five steps would have put **the halt banner, the
+unwritable-`/state` fault and the stale-queue threshold** inside that untested region: live, reachable
+code covered by nothing. The new function takes **plain data only** — no clients, no clock, no
+filesystem — and `automationDiagnostics.test.ts` drives every branch, including the `fail` ones.
+
+⚠️ **A state no test can enter is the `recordSuccessorLag` trap**, and the same instruction already
+stands for FC-U5-1's `failed` state in step 11.
+
+What the steps assert, and why each distinction exists:
+
+| Condition | Status | Why not the other thing |
+|---|---|---|
+| `globalAutomationEnabled: false` | **ok** | FR-47's default. A red cross trains the reader to ignore red crosses on the page where the harmful unit reports itself |
+| a standing `runawayHalt` | **fail** | It clears only on explicit acknowledgement, so green would hide the one thing the user must act on |
+| `/state` unwritable, executor built | **fail** | The switch would appear to change in the UI and not persist |
+| `/state` unwritable, executor **not** built | **skip** | Harmless if nothing can write it; a cross for an unused mount devalues the real one above |
+| queue depth > 0, oldest < 60 s | **ok** | ⚠️ Depth is **not** the signal — a depth of 1 is the normal second between decision and `POST` |
+| oldest queued > 60 s | **fail** | The drain runs from the 3 s tick too, so 60 s is ~20 missed ticks: it is not running |
+| last attempt `refused` | **ok** | Most refusals **are** the system working — `automation-off`, `already-attempted`, `no-active-device` |
+
+⚠️ **`QUEUE_STALE_MS = 60_000` is arbitrary and is documented as such.** It is a liveness heuristic for a
+human reading a page; nothing measured depends on it. **Contrast `maxUnobservedTailMs`, which must not be
+tuned.** Recording the difference is the point — a project that has one pre-registered constant and one
+adjustable one needs to say which is which at each site.
+
+### The control surface: three routes, and the first WRITE this app has ever exposed
+
+`GET /api/automation` · `POST /api/automation` · `POST /api/automation/acknowledge-halt`, all in
+`api.ts` with collaborators injected, including `now`. Every other route in this app reads, and the one
+apparent exception — `POST /api/rules/reload` — re-*reads*. Decisions worth recording:
+
+- ⚠️ **Every response is READ BACK FROM DISK, never echoed from the request.** A failed write returns
+  **503 carrying the previous value**. An optimistic echo would draw the switch as *on* over a read-only
+  `/state` — the one case where the user most needs to know it did not take.
+- ⚠️ **Arming while halted is `409`, and writes nothing.** A latch cleared as a side effect of flipping a
+  switch is not an acknowledgement (BR-35.6).
+- ⚠️ **Disarming while halted still succeeds**, and leaves the halt standing. Turning automation off must
+  work in every state the app can reach; disarming is not acknowledging.
+- ⚠️ **`reArm` has no default.** *"I have reviewed this"* and *"turn automation back on"* are different
+  statements (BR-35.5), so a missing field is `400` rather than a guess.
+- ⚠️ **Acknowledging when nothing is halted is `409`, not an idempotent success.** Otherwise
+  `{reArm: true}` is a second path to `globalAutomationEnabled: true` that skips the check the other
+  route makes. The body carries the real state so the UI re-renders rather than showing an unexplainable
+  error.
+- ⚠️ **`enabled` must be a boolean.** `'false'`, `0` and `null` are all coercible, on the surface that
+  decides whether this app touches playback.
+- **The route computes no state name.** FC-U5-1's seven states are derived in `statusBar.ts`, which is
+  pure and tested. A server-named state cannot be driven into that state by a test, and gives the client
+  a second opinion to disagree with.
+
+**M1–M4 ride on `/api/diagnostics`** alongside `steps`, for the same reason `coverage` does: *1,216
+Spotify requests in the last hour* is neither a tick nor a cross, and Spotify publishes no limit to
+compare it against. **No metrics route and no new WebSocket surface** (Infrastructure Q6).
+
+### Two off switches, still not redundant
+
+| | answers | changing it | checked |
+|---|---|---|---|
+| `SKIP_EXECUTOR_ENABLED` | *is the skip machinery built at all?* | `compose.yaml` + restart | once, at startup |
+| `globalAutomationEnabled` | *may a built attempt fire?* | one UI click | every attempt, at the action point |
+
+With the first unset, **nothing is constructed**: no player client, no drain, no attempt rows. That is
+how U5 ships **inert** for the dry-run review, which is BR-40.1's actual arming gate. `GET
+/api/automation` reports both, so the UI can say *the machinery is not built* instead of drawing a switch
+that would do nothing if thrown.
+
+### `context_type` and `context_uri` are populated on the live path for the first time
+
+Fetched **once per track** from `GET /me/player/currently-playing` — ~16 requests/hour against the
+poll's 1,200. ⚠️ `null` on a track's first tick, because the fetch has not returned; the play row is not
+written until the play **closes**, by which time the value has arrived. **Evidence only, never a rule
+input** (BR-41.3/41.5).
+
+### M4 is recorded on EVERY tick, including the ones that find nothing
+
+An early return on *nothing playing* would delete the signal the metric exists to produce. ⚠️ **"No new
+play rows" cannot distinguish *polling and hearing silence* from *not polling at all*** — and the
+2026-09-30 outage ran ~13 hours unnoticed for exactly that reason. A high idle share with a non-zero
+total says the instrument is alive; a total of **zero** says it is down.
+
+### Verified, and what is NOT
+
+**1162 tests · typecheck clean.** `skip_attempt` does **not** exist in `data/history.db`, the live
+schema is still **v6**, and the container is running the **old image** — so none of this code is
+executing against the corpus yet. Migration 007 runs at step 13, after the verified backup.
+
+**Still open, unchanged by this step:** the two `compose.yaml` comment corrections · the **live rollback
+check** (U4's image against a v7 copy, expecting `from: 7, to: 7`) · the **BR-35 pre-registration**,
+in writing before any rule is armed.
+
+⚠️ **`probeWritable` has still never run against the real `/state` mount.** On the host the write
+succeeds, so the bug this probe exists to catch is invisible until it is run **through the container**.

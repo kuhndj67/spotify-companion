@@ -51,6 +51,11 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   // Reached only from server.ts. Its report shape is asserted through the /api/diagnostics route
   // (api.test.ts), but the sweep itself — which hits MCP, the Web API and MusicBrainz — is not
   // exercised. Known gap.
+  //
+  // ⚠️ U5's steps were EXTRACTED rather than inlined for exactly this reason:
+  // `automationDiagnosticSteps` takes plain data, so the halt banner, the unwritable-`/state` fault
+  // and the stale-queue threshold are covered by automationDiagnostics.test.ts. Anything added to
+  // the sweep itself lands back in this gap — prefer extracting it.
   'diagnostics.ts': 'only server.ts constructs it; the sweep itself is untested',
 
   // Reached only from server.ts. A timer that writes export snapshots to disk.

@@ -94,6 +94,11 @@ function serve(overrides: Partial<ApiDeps> = {}) {
     decisionLog: null,
     backTest: null,
     reloadRules: null,
+    // U5. Null by default for the same reason as the U4 deps: the degraded path is the one most of
+    // these tests exercise, and a route that throws instead of answering 503 is the defect.
+    automation: null,
+    skipExecutorEnabled: false,
+    skipAttempts: null,
     now: () => NOW,
     reportTimeZone: 'America/New_York',
     ...overrides,

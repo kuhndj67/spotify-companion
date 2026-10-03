@@ -107,4 +107,15 @@ export interface SkipAttemptRepository {
 
   /** One attempt by id, for the UI and for tests. `null` when absent. */
   get(id: number): SkipAttempt | null;
+
+  /**
+   * The most recently enqueued attempt, whatever became of it. `null` when there has never been one.
+   *
+   * ⚠️ **For diagnostics, and it must return the attempt in ANY state** — including `refused`. A
+   * "last attempt" that showed only the ones that fired would answer *when did automation last act*
+   * while appearing to answer *is automation working*, and those diverge in exactly the case worth
+   * seeing: a rule matching repeatedly and being refused every time, which looks identical to no
+   * matches at all.
+   */
+  latest(): SkipAttempt | null;
 }

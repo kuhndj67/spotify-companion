@@ -10,12 +10,21 @@ import { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
 import { runDiagnostics } from './diagnostics.js';
+import type { AutomationDiagnosticsInput } from './diagnostics.js';
 import { localGuard, decideAccess } from './localGuard.js';
 import { createApi, type DisplayLiked } from './api.js';
 import { BackTestService } from './rules/BackTestService.js';
 import { EvaluationCoordinator } from './rules/EvaluationCoordinator.js';
 import { LiveFactSource } from './rules/liveFactSource.js';
 import { LoggingExecutor } from './rules/LoggingExecutor.js';
+import type { DecisionExecutor } from './rules/types.js';
+import { AutomationStateStore } from './playback/AutomationStateStore.js';
+import { PlaybackContextCache } from './playback/playbackContext.js';
+import { SkipDrain } from './playback/skipDrain.js';
+import { SkipExecutor } from './playback/SkipExecutor.js';
+import { SpotifyPlayerClient } from './playback/spotifyPlayerClient.js';
+import { SqliteSkipAttemptRepository } from './playback/SqliteSkipAttemptRepository.js';
+import { UpstreamMetrics } from './playback/upstreamMetrics.js';
 import { RuleSetWatcher } from './rules/RuleSetWatcher.js';
 import { RuleStore } from './rules/RuleStore.js';
 import { formatDecisionSummary } from './rules/decisionSummary.js';
@@ -99,6 +108,9 @@ if (config.historyEnabled) {
           // ⚠️ This fires ONLY after recordPlay() succeeded. A failed write takes the other
           // path below, because a permanently-null playId would otherwise mean both "the play
           // never closed" (expected) and "the write failed" (a fault) — BR-24.3a.
+          // ⚠️ This links the skip attempt too, via the coordinator's `attachPlayId` callback — which
+          // is where the "is this still the play that was decided" guard lives. Do NOT add a second
+          // call here; see the note on that callback.
           coordinator?.onPlayRecorded(record.trackId, playId);
           void enrichRecordedPlay(playId, record);
         },
@@ -433,12 +445,19 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
     releaseDate: enrichmentData?.releaseDate ?? null,
     ageYears: enrichmentData?.ageYears ?? null,
     following: enrichmentData?.following ?? null,
-    // ⚠️ U5 Step 9 populates BOTH from GET /me/player/currently-playing. The MCP getNowPlaying this
-    // sample is built from returns no context at all (BR-41.2) — which is why context_type has been
-    // null on every live play since v1 while backfilled rows carry it. `null` is the honest value
-    // until that fetch exists; it is EVIDENCE ONLY and never a rule input (BR-41.3).
-    contextType: null,
-    contextUri: null,
+    // ⚠️ U5, BR-41.1. The MCP `getNowPlaying` this sample is built from returns NO context (BR-41.2),
+    // which is why `context_type` was null on every live play since v1 while backfilled rows carried
+    // it — the field was available exactly where the outcome variable was not. These two come from
+    // `GET /me/player/currently-playing`, fetched once per TRACK by the tick handler.
+    //
+    // ⚠️ `null` on the first tick of a track, because the fetch has not returned yet — which is
+    // *unknown*, and correct. The play row is not written until the play CLOSES, by which time the
+    // value has arrived; this sample feeds the display, where a one-tick delay costs nothing.
+    //
+    // ⚠️ EVIDENCE ONLY, never a rule input (BR-41.3/41.5). `contextUri` goes stale on its own, and
+    // `contextType` cannot tell the AI DJ from a radio station — both are `type: playlist`.
+    contextType: playbackContext.get(snapshot.trackId).contextType,
+    contextUri: playbackContext.get(snapshot.trackId).contextUri,
     // U4 / schema v5. `?? null` is the right coalesce here and `?? false` would be a defect:
     // enrichment that has not landed, and a `GET /tracks/{id}` that failed, both arrive as
     // absent — and neither is evidence that the track is clean (BR-31.3b).
@@ -451,9 +470,18 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
  * ## U4: the rules engine, wired in dry-run
  *
  * ⚠️ **This is where U3's containment guarantee retires** (BR-30). U3's was "`git status src/`
- * shows only `src/rules/`"; from here the phase boundary rests on `src/playback/` not existing
- * and on `LoggingExecutor` taking no playback collaborator. Nothing below can skip a track —
- * there is no code in this process that can.
+ * shows only `src/rules/`"; U4's was `src/playback/` not existing.
+ *
+ * ⚠️ **BOTH ARE GONE AS OF U5, and the old sentence here — *"nothing below can skip a track, there
+ * is no code in this process that can"* — IS NO LONGER TRUE.** Corrected 2026-10-02. What replaces it:
+ *
+ *   - **`SKIP_EXECUTOR_ENABLED` is `false` by default**, so `SkipExecutor` is not even constructed.
+ *     That is a deployment-time posture, not a dev flag: it is what lets U5 ship **inert** while the
+ *     dry-run log is reviewed, which is BR-40.1's actual arming gate.
+ *   - **`globalAutomationEnabled` is `false` by default** and is re-read at the action point, so even a
+ *     constructed `SkipExecutor` cannot act until the switch is thrown (FR-47, BR-33.5).
+ *   - **`LoggingExecutor` still takes one collaborator**, pinned by `LoggingExecutor.length === 1`.
+ *   - **Nothing in `src/rules/` imports `src/playback/`**, pinned structurally (P-33).
  *
  * ⚠️ **Everything here is optional.** A rules subsystem that fails to start must never stop the
  * app recording: the play records are the artefact that cannot be regenerated, and rules are
@@ -472,13 +500,80 @@ const RULES_POLL_INTERVAL_MS = Number(process.env['RULES_POLL_INTERVAL_MS'] ?? 5
  */
 const ENRICHMENT_WAIT_MS = Number(process.env['ENRICHMENT_WAIT_MS'] ?? 10_000);
 
+/**
+ * ⚠️ **Which `DecisionExecutor` is CONSTRUCTED. Not the kill switch.**
+ *
+ * Two off switches, and they are not redundant (code-gen Q2):
+ *
+ *   | | answers | changing it | checked |
+ *   |---|---|---|---|
+ *   | `SKIP_EXECUTOR_ENABLED` | *is the skip machinery built at all?* | this file + restart | once, at startup |
+ *   | `globalAutomationEnabled` | *may a built attempt fire?* | one UI click | every attempt, at the action point |
+ *
+ * ⚠️ Collapsing them would break FR-38: a control that needs a restart cannot satisfy *no skip is
+ * issued after the switch is thrown*. And dropping this flag would lose the ability to deploy U5
+ * **inert** for the dry-run review.
+ */
+const SKIP_EXECUTOR_ENABLED = process.env['SKIP_EXECUTOR_ENABLED'] === 'true';
+
+/**
+ * ⚠️ On its own mount, NOT in `config/` (Infrastructure Q1 = C).
+ *
+ * `:rw` on `config/` would grant this app permission to overwrite the user's hand-authored
+ * `rules.json` — a permission no U5 code would use, and one BR-20.8 would not protect, since it
+ * reloads on a *parse failure* and a file truncated to valid-but-empty JSON parses fine.
+ *
+ * ⚠️ `data/` was rejected because of RESTORE: once W-5's full-inventory backup exists, restoring a
+ * week-old backup would restore the week-old latch and **silently re-arm automation**.
+ */
+const AUTOMATION_STATE_PATH =
+  process.env['AUTOMATION_STATE_PATH'] ?? '/state/automation-state.json';
+
 const liveFacts = new LiveFactSource(labelEnrichment !== null);
+
+/**
+ * M1–M4. Constructed unconditionally, because the question it answers — *is this app a good citizen
+ * of the vendor APIs?* — does not depend on whether automation is armed.
+ */
+const upstreamMetrics = new UpstreamMetrics();
+
+const automationState = new AutomationStateStore(AUTOMATION_STATE_PATH);
+
+/**
+ * ⚠️ **A PROBE, not an inference from `compose.yaml`**, and it runs whether or not automation is
+ * enabled — because the answer has to be known *before* the user reaches for the kill switch, not at
+ * the moment they need it.
+ *
+ * ⚠️ **It must not prevent startup** (NFR-13). An unwritable `/state` means automation cannot be
+ * **armed**; it does not mean the app stops **recording**. Recording is the irreplaceable function.
+ */
+const automationStateWritable = automationState.probeWritable();
+if (!automationStateWritable) {
+  console.error(
+    `[automation] ⚠️ ${AUTOMATION_STATE_PATH} is NOT WRITABLE. Automation cannot be armed, and a ` +
+      `kill-switch change would appear to work in the UI and not persist. Recording is unaffected. ` +
+      `Check that ./state is mounted :rw — and verify THROUGH THE CONTAINER, not on the host.`,
+  );
+}
+
+/**
+ * Playback context, fetched once per track (BR-41.1/41.2) — ~16 requests/hour, against the poll's 1,200.
+ *
+ * ⚠️ **Constructed unconditionally**, like `upstreamMetrics` and unlike `labelEnrichment`: `webApi` is
+ * non-nullable here, so there is no "only when the client exists" case to guard. A FAILED fetch is what
+ * leaves the field `null`, and `null` is *unknown* — the honest value, never a guess.
+ */
+const playbackContext = new PlaybackContextCache(webApi, (outcome) =>
+  upstreamMetrics.record('spotify', outcome === 'ok' ? 'ok' : 'error', Date.now()),
+);
 
 let ruleWatcher: RuleSetWatcher | null = null;
 let decisionLog: SqliteDecisionLogRepository | null = null;
 let coordinator: EvaluationCoordinator | null = null;
 let backTest: BackTestService | null = null;
 let lastRuleCheck: string | null = null;
+let skipAttempts: SqliteSkipAttemptRepository | null = null;
+let skipDrain: SkipDrain | null = null;
 
 // ⚠️ No repository means no decision log and no evaluation (BR-22.8a), accepted knowingly:
 // the trigger hangs off PlayObserver's hooks, and the log lives in history.db anyway.
@@ -492,14 +587,158 @@ if (repository !== null) {
       now: () => new Date().toISOString(),
     });
 
+    skipAttempts = new SqliteSkipAttemptRepository(repository.database);
+
+    /**
+     * ⚠️ **THE ONE PLACE THE TWO EXECUTORS DIVERGE, and the default is the inert one.**
+     *
+     * `LoggingExecutor` records and never acts (BR-30/33.6). `SkipExecutor` is a second implementation
+     * **added alongside it**, never grown out of it — so `LoggingExecutor.length === 1` still holds.
+     *
+     * ⚠️ With `SKIP_EXECUTOR_ENABLED` unset, nothing in this block is constructed: no player client,
+     * no drain, no attempt rows. That is how U5 ships **inert** for the dry-run review.
+     */
+    let executor: DecisionExecutor = new LoggingExecutor(decisionLog);
+
+    if (SKIP_EXECUTOR_ENABLED) {
+      const player = new SpotifyPlayerClient(
+        () => webApi.getAccessToken(),
+        () => webApi.invalidateAccessToken(),
+      );
+
+      const drain = new SkipDrain({
+        attempts: skipAttempts,
+        state: automationState,
+        decisions: decisionLog,
+        ruleSet: () => ruleWatcher!.current(),
+        recentPlays: (limit) => repository!.recentPlaysForCounting(limit),
+        // The POST is counted like every other upstream call (M1/M2). ⚠️ A 429 here is recorded as a
+        // rate limit rather than an error, because the two mean different things about this app's
+        // behaviour and `lastRetryAfterMs` is the only observed ceiling Spotify ever states.
+        player: {
+          skipToNext: async () => {
+            const outcome = await player.skipToNext();
+            upstreamMetrics.record(
+              'spotify',
+              outcome.kind === 'refused' && outcome.reason === 'upstream-rate-limited'
+                ? 'rate-limited'
+                : outcome.kind === 'failed'
+                  ? 'error'
+                  : 'ok',
+              Date.now(),
+            );
+            return outcome;
+          },
+        },
+        /**
+         * ⚠️ **`evaluationId`, not `trackId`, is what the attempt is matched against** — it is the only
+         * per-play identifier that exists while the play is OPEN, which is the same fact that made
+         * `skip_attempt.play_id` nullable. A repeat listen is a different play, so an attempt from the
+         * earlier one cannot fire against the later one.
+         *
+         * Returns `null` whenever the answer is not unambiguous — nothing playing, an error snapshot, no
+         * progress, or a snapshot whose track disagrees with the coordinator. **The drain reads `null` as
+         * `play-closed` and refuses**, which is what BR-34 wants when we cannot tell.
+         */
+        currentPlay: () => {
+          const inProgress = coordinator?.inProgress ?? null;
+          if (inProgress === null) return null;
+          const snapshot = nowPlaying.current;
+          if ('error' in snapshot || !snapshot.playing) return null;
+          if (!snapshot.trackId || snapshot.progressMs === null) return null;
+          if (snapshot.trackId !== inProgress.trackId) return null;
+          return {
+            evaluationId: inProgress.evaluationId,
+            trackId: snapshot.trackId,
+            progressMs: snapshot.progressMs,
+          };
+        },
+        nowIso: () => new Date().toISOString(),
+        nowMs: () => Date.now(),
+        // BR-43.4's confirmation grace. `unref` so a pending 3 s wait cannot hold the process open.
+        delay: (ms) =>
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, ms).unref();
+          }),
+        // ⚠️ The drain does not know the UI exists. It reports the latch here; the indicator reads the
+        // state file, which the drain has already written by the time this runs.
+        onHalt: (halt) =>
+          console.error(
+            `[automation] ⚠️ HALTED: ${halt.trigger} — observed ${halt.observedCount} against a ` +
+              `threshold of ${halt.threshold}. Automation is latched OFF and clears ONLY on explicit ` +
+              `acknowledgement (BR-35.6). Attempts: ${halt.attemptIds.join(', ')}`,
+          ),
+      });
+
+      /**
+       * ⚠️ **THE STARTUP SWEEP, AND IT RUNS BEFORE THE FIRST DRAIN EVER COULD** (P-29).
+       *
+       * A `queued` row that survived a restart is one whose drain never ran. Firing it would skip
+       * whatever is playing **now** rather than the track the rule matched — the clearest way this unit
+       * could do harm. Closed as `refused: play-closed` rather than deleted, because an attempt that
+       * never fired must stay distinguishable from one that never existed.
+       *
+       * ⚠️ `currentPlay` above would refuse them anyway, since no `evaluationId` from a previous process
+       * can match. **Two independent guards, and neither is grounds for dropping the other.**
+       */
+      const swept = drain.sweepOrphaned();
+      if (swept > 0) {
+        console.log(
+          `[automation] swept ${swept} skip attempt(s) left queued by a previous process — closed as ` +
+            `play-closed, NOT fired.`,
+        );
+      }
+
+      skipDrain = drain;
+      executor = new SkipExecutor({
+        log: decisionLog,
+        attempts: skipAttempts,
+        state: automationState,
+        nowIso: () => new Date().toISOString(),
+        // ⚠️ Scheduled, never awaited: `execute` is synchronous and is itself called unawaited from a
+        // timer. `drain` is contracted never to throw, and the 3 s tick calls the SAME drain as a
+        // backstop — one drain function, two entry points.
+        scheduleDrain: () => {
+          setImmediate(() => void drain.drain());
+        },
+      });
+
+      console.log(
+        `[automation] SkipExecutor is CONSTRUCTED and can issue skips. ⚠️ Whether one fires is still ` +
+          `governed by the kill switch, which is OFF by default and re-read at every action point.`,
+      );
+    }
+
     coordinator = new EvaluationCoordinator({
       rules: () => ruleWatcher!.rules(),
       ruleSet: () => ruleWatcher!.current(),
       liveFacts,
-      executor: new LoggingExecutor(decisionLog),
+      executor,
       historyCounts: (trackId, artistId, beforeIso) =>
         repository!.historyCountsBefore(trackId, artistId, beforeIso),
-      attachPlayId: (evaluationId, playId) => decisionLog!.attachPlayId(evaluationId, playId),
+      /**
+       * ⚠️ **BOTH links go through THIS ONE callback, because the GUARD lives in the coordinator.**
+       *
+       * `onPlayRecorded` fires when a play CLOSES, and by then `#current` may already be the next
+       * track — so the coordinator checks `play.trackId === trackId && play.decided` before calling
+       * this. An independent `skipAttempts.attachPlayId` on the `onPlayRecorded` hook would NOT have
+       * that check, and would attach the closing play's id to the NEXT play's attempt.
+       *
+       * ⚠️ That is the WebSocket `403` shape again: one rule implemented twice, with the second copy
+       * missing a term. One call site, one guard — and `src/rules/` still imports nothing from
+       * `src/playback/` (P-33), because the coordinator only knows it was handed a function.
+       */
+      attachPlayId: (evaluationId, playId) => {
+        decisionLog!.attachPlayId(evaluationId, playId);
+        // ⚠️ Convenience for analysis, never load-bearing: the one-attempt guard keys on
+        // `evaluationId` and does not read `play_id`. Caught here so it cannot cost the decision
+        // log its own link, which IS load-bearing (BR-24.1).
+        try {
+          skipAttempts?.attachPlayId(evaluationId, playId);
+        } catch (error) {
+          console.error('[automation] could not link a skip attempt to its play row:', error);
+        }
+      },
       markLinkFailed: (evaluationId) => decisionLog!.markLinkFailed(evaluationId),
       nowMs: () => Date.now(),
       newEvaluationId: () => randomUUID(),
@@ -576,6 +815,13 @@ app.use(
             lastRuleCheck = new Date().toISOString();
             return outcome;
           },
+    // U5. ⚠️ The STORE itself, with no adapter: `AutomationControl` names `probeWritable` so the
+    // store satisfies it structurally. One implementation, reached one way.
+    automation: automationState,
+    // ⚠️ The POSTURE, not the switch. False means `SkipExecutor` was never constructed, so the UI
+    // must say *the machinery is not built* rather than draw a switch that would do nothing if thrown.
+    skipExecutorEnabled: SKIP_EXECUTOR_ENABLED,
+    skipAttempts,
   }),
 );
 
@@ -608,7 +854,45 @@ async function runDiagnosticsReport() {
       startupError: labelStartupError,
       userAgent: labelUserAgent,
     },
+    automationDiagnostics(),
   );
+}
+
+/**
+ * The U5 half of the diagnostics input.
+ *
+ * ⚠️ **Reads the state FRESH on every sweep**, and probes writability fresh with it. Both are cheap
+ * (one small file), and a cached copy would answer *what did startup see* — which is precisely the
+ * question that was already stale when someone threw the switch and wondered why nothing changed.
+ */
+function automationDiagnostics(): AutomationDiagnosticsInput {
+  const read = automationState.read();
+  const queued = skipAttempts?.queued() ?? [];
+  const nowMs = Date.now();
+  const oldest = queued
+    .map((a) => Date.parse(a.enqueuedAt))
+    .filter((ms) => Number.isFinite(ms))
+    .reduce<number | null>((min, ms) => (min === null || ms < min ? ms : min), null);
+
+  return {
+    state: {
+      enabled: read.state.globalAutomationEnabled,
+      halt: read.state.runawayHalt,
+      source: read.source,
+      ...(read.detail === undefined ? {} : { detail: read.detail }),
+    },
+    executorEnabled: SKIP_EXECUTOR_ENABLED,
+    statePath: AUTOMATION_STATE_PATH,
+    stateWritable: automationState.probeWritable(),
+    queue: {
+      depth: queued.length,
+      // ⚠️ `null` with an empty queue, never 0 — and `Math.max(0, …)` because a clock that moved
+      // backwards must not produce a negative age that reads as a future timestamp.
+      oldestQueuedAgeMs: oldest === null ? null : Math.max(0, nowMs - oldest),
+    },
+    lastAttempt: skipAttempts?.latest() ?? null,
+    metrics: upstreamMetrics.snapshot(nowMs),
+  };
 }
 
 app.use(express.static(publicDir));
@@ -799,11 +1083,49 @@ nowPlaying.on('tick', (snapshot: Snapshot) => {
  * Registered AFTER the observer's tick handler, so the observer has opened the play (and the
  * coordinator has its boundary) before the first evaluation attempt for that track.
  */
+/**
+ * Count this poll, and fetch the track's playback context if it is new. ⚠️ IMPURE, and never throws.
+ *
+ * ## ⚠️ M4 is recorded on EVERY tick, including the ones that find nothing
+ *
+ * That is the entire point. *"No new play rows"* cannot distinguish **polling and hearing silence**
+ * from **not polling at all** — and the 2026-09-30 outage ran roughly 13 hours unnoticed for exactly
+ * that reason. A high idle share with a non-zero total says the instrument is alive and the listener is
+ * not listening. A total of zero says the instrument is down.
+ *
+ * ⚠️ So an early return on `nothing playing` would delete the signal this exists to produce.
+ */
+function recordPollMetrics(snapshot: Snapshot): void {
+  const errored = 'error' in snapshot;
+  const playing = !errored && snapshot.playing === true;
+
+  upstreamMetrics.recordPoll(playing);
+  upstreamMetrics.record('mcp', errored ? 'error' : 'ok', Date.now());
+
+  // BR-41.1: once per TRACK, not once per tick — the cache decides, not this call site. A per-tick
+  // fetch would DOUBLE this app's Spotify footprint to collect a value that cannot change within a
+  // play. ⚠️ Unawaited: `ensure` never throws, and a failure records `null`, which is *unknown*.
+  if (playing && !errored && snapshot.trackId) {
+    void playbackContext.ensure(snapshot.trackId);
+  }
+}
+
 function registerEvaluationTick(): void {
   if (coordinator === null) return;
   nowPlaying.on('tick', (snapshot: Snapshot) => {
+    recordPollMetrics(snapshot);
+
     try {
       coordinator!.onTick(toEvaluationSample(snapshot), Date.now());
+
+      // ⚠️ **THE DRAIN'S BACKSTOP, and it is load-bearing rather than belt-and-braces** (P-29). It is
+      // what moves an attempt whose scheduled drain was lost — process exit, an unhandled rejection
+      // upstream of it — to a terminal state, instead of leaving it `queued` for ever. The drain's own
+      // re-entrancy guard is what makes two entry points safe.
+      //
+      // ⚠️ Inside the try, so a throw lands on the same handler: a failure here must never reach the
+      // recorder or the display, exactly as for evaluation.
+      void skipDrain?.drain();
     } catch (error) {
       // ⚠️ Rules are text that can be retyped; the play records cannot be regenerated. A
       // failure here must never reach the recorder or the display (BR-20.10).

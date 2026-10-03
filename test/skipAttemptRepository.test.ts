@@ -380,3 +380,63 @@ describe('firedSince — BR-35.2s rolling window input, WITH ids', () => {
     db.close();
   });
 });
+
+describe('latest() — what diagnostics shows as the last attempt', () => {
+  it('is null when nothing has ever been attempted', () => {
+    const db = freshDb();
+    assert.equal(new SqliteSkipAttemptRepository(db).latest(), null);
+    db.close();
+  });
+
+  it('⭐ returns the most recent attempt in ANY state, including refused', () => {
+    // A "last attempt" that showed only the ones that fired would answer *when did automation last
+    // act* while appearing to answer *is automation working*. Those diverge in exactly the case worth
+    // seeing: a rule matching repeatedly and being refused every time, which from the outside looks
+    // identical to no matches at all.
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+    const firstPlay = insertPlay(db, 't1', '2026-10-02T09:00:00.000Z');
+    const first = repo.enqueue(attempt(firstPlay, 't1', { evaluationId: 'ev-1' }));
+    repo.transition(first, 'confirmed', { firedAt: '2026-10-02T09:00:05.000Z' });
+
+    const secondPlay = insertPlay(db, 't2', '2026-10-02T09:05:00.000Z');
+    const second = repo.enqueue(attempt(secondPlay, 't2', { evaluationId: 'ev-2' }));
+    repo.transition(second, 'refused', { refusedReason: 'already-attempted' });
+
+    const last = repo.latest();
+    assert.equal(last?.id, second, 'the refused one is the latest, and must not be skipped over');
+    assert.equal(last?.state, 'refused');
+    assert.equal(last?.refusedReason, 'already-attempted');
+    db.close();
+  });
+
+  it('⚠️ orders by rowid, not by enqueued_at', () => {
+    // The timestamp has second-ish resolution, so two attempts inside one second would order
+    // arbitrarily -- and the display would flip between them for no reason a reader could see. The
+    // rowid is monotonic by construction.
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+    const sameInstant = '2026-10-02T09:00:00.000Z';
+    const a = repo.enqueue(
+      attempt(insertPlay(db, 't1', sameInstant), 't1', { evaluationId: 'ev-a', enqueuedAt: sameInstant }),
+    );
+    const b = repo.enqueue(
+      attempt(insertPlay(db, 't2', sameInstant), 't2', { evaluationId: 'ev-b', enqueuedAt: sameInstant }),
+    );
+
+    assert.ok(b > a);
+    assert.equal(repo.latest()?.id, b);
+    db.close();
+  });
+
+  it('still returns a queued attempt, so a stuck one is visible', () => {
+    const db = freshDb();
+    const repo = new SqliteSkipAttemptRepository(db);
+    const id = repo.enqueue(attempt(insertPlay(db, 't1', '2026-10-02T09:00:00.000Z'), 't1'));
+    const last = repo.latest();
+    assert.equal(last?.id, id);
+    assert.equal(last?.state, 'queued');
+    assert.equal(last?.firedAt, null);
+    db.close();
+  });
+});

@@ -103,6 +103,22 @@ export class SpotifyWebApiClient {
    * GETs a Web API path. `path` is relative to /v1, e.g. "/tracks/{id}".
    * Returns null for 204/404 so "no content" is not an error condition.
    */
+  /**
+   * Drop the cached access token, so the next `getAccessToken()` refreshes.
+   *
+   * ⚠️ **U5. Added for the ONE 401 retry the player client is allowed** (P-30). `get()` does this
+   * internally via its private field, but `spotifyPlayerClient` deliberately does not hold this class —
+   * it takes a token provider instead, so that the one module able to act on the player does not also
+   * gain a general read-and-write surface onto Spotify.
+   *
+   * ⚠️ Re-issuing after a 401 is **not** a retry of the skip: the request was rejected at the edge and
+   * provably never reached the device, so re-issuing *completes* the first attempt rather than making a
+   * second one. BR-43.5 forbids the second.
+   */
+  invalidateAccessToken(): void {
+    this.#accessToken = null;
+  }
+
   async get<T>(path: string, params?: Record<string, string>): Promise<T | null> {
     const url = new URL(`https://api.spotify.com/v1${path}`);
     for (const [key, value] of Object.entries(params ?? {})) {

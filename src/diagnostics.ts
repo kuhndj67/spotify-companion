@@ -9,6 +9,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { config } from './config.js';
+import type { RunawayHalt, SkipAttempt } from './playback/types.js';
+import type { UpstreamSnapshot } from './playback/upstreamMetrics.js';
 import type { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import type { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import type { EnrichmentService } from './spotify/enrichment.js';
@@ -54,6 +56,18 @@ export interface DiagnosticsReport {
   steps: DiagnosticStep[];
   /** Absent when label enrichment is disabled or history is unavailable. */
   coverage?: CoverageReport;
+  /**
+   * M1–M4 (U5). Absent when automation is not deployed.
+   *
+   * ⚠️ **Rides alongside `steps` for the same reason `coverage` does**: these are measurements, and
+   * the step renderer only speaks ok/fail/skip. *1,216 Spotify requests in the last hour* is not a
+   * green tick or a red cross — Spotify publishes no limit to compare it against, so rendering it as a
+   * verdict would assert a judgement the data does not contain.
+   *
+   * ⚠️ **And no separate route** (Infrastructure Q6). `/api/diagnostics` is already the on-demand
+   * sweep; a second endpoint would be a second thing to remember to look at.
+   */
+  metrics?: UpstreamSnapshot;
 }
 
 async function step(
@@ -109,12 +123,179 @@ export interface LabelDiagnosticsInput {
   userAgent: string | null;
 }
 
+/**
+ * U5 subsystems. Passed in for the same reason as the U2 ones — diagnostics must still answer when
+ * automation is not deployed, and must say *not deployed* rather than failing.
+ */
+export interface AutomationDiagnosticsInput {
+  /**
+   * ⚠️ **Read FRESH at diagnostics time, never cached.** The whole point of this entry is to answer
+   * *what will the next action point see*, and a cached copy answers *what did startup see* — which is
+   * the question that was already wrong when someone threw the switch.
+   */
+  state: {
+    enabled: boolean;
+    halt: RunawayHalt | null;
+    /** `file` | `absent` | `unreadable`. ⚠️ Part of the answer, not debug detail. */
+    source: string;
+    detail?: string;
+  };
+  /** Is `SkipExecutor` CONSTRUCTED — `SKIP_EXECUTOR_ENABLED`, not the kill switch. */
+  executorEnabled: boolean;
+  statePath: string;
+  /** ⚠️ A probe, not an inference from `compose.yaml`. */
+  stateWritable: boolean;
+  queue: { depth: number; oldestQueuedAgeMs: number | null };
+  lastAttempt: SkipAttempt | null;
+  metrics: UpstreamSnapshot;
+}
+
+/**
+ * ⚠️ How long a `queued` attempt may sit before this reports a fault.
+ *
+ * The drain has two entry points and the slower of them is the 3-second poll tick, so 60 s is **20
+ * missed ticks** — generous by design. ⚠️ **Arbitrary, and deliberately so**: it is a liveness
+ * heuristic for a human reading a diagnostics page, not a pre-registered threshold, and nothing
+ * measured depends on its value. Contrast `MAX_UNOBSERVED_TAIL_MS`, which must not be tuned.
+ */
+const QUEUE_STALE_MS = 60_000;
+
+/**
+ * The U5 steps, as their own function so they can be TESTED.
+ *
+ * ## ⚠️ Why this is extracted rather than inlined like the U2 block
+ *
+ * `runDiagnostics` reaches for the MCP client, the Web API and the credentials file, so it is one of the
+ * three modules this project knowingly leaves untested — `ALLOWED_ORPHANS` records that. Inlining the
+ * automation steps would put **the halt banner, the unwritable-`/state` fault and the stale-queue
+ * threshold** inside that untested region, which is the `recordSuccessorLag` trap: logic that is live,
+ * reachable, and covered by nothing.
+ *
+ * ⚠️ This function takes **plain data only** — no clients, no clock, no filesystem — so every branch
+ * below is reachable from a test. That is the point of the extraction, not tidiness.
+ */
+export async function automationDiagnosticSteps(
+  automation: AutomationDiagnosticsInput,
+): Promise<DiagnosticStep[]> {
+  const steps: DiagnosticStep[] = [];
+
+  /**
+   * ⚠️ **OFF IS NOT A FAULT, and this step must never report one for it.**
+   *
+   * `globalAutomationEnabled: false` is FR-47's default and the correct state for a fresh install.
+   * A red cross here would train the reader to ignore red crosses on the one page where the unit
+   * that can cause harm reports itself.
+   *
+   * ⚠️ `source` is reported in the same breath as the value, because `absent` and `unreadable` both
+   * read as *off* and are different facts: the first is correct behaviour, the second is a file this
+   * app could not parse — where a switch thrown in the UI would appear to work and not persist.
+   */
+  steps.push(
+    await step('Automation posture', async () => {
+      const machinery = automation.executorEnabled
+        ? 'SkipExecutor constructed'
+        : 'SkipExecutor NOT constructed (SKIP_EXECUTOR_ENABLED unset) — no skip can be issued';
+      const switchState = automation.state.enabled ? 'kill switch ON' : 'kill switch off';
+      const from = `state read from: ${automation.state.source}`;
+      const why = automation.state.detail === undefined ? '' : ` (${automation.state.detail})`;
+      return `${machinery} · ${switchState} · ${from}${why}`;
+    }),
+  );
+
+  /**
+   * The halt latch (BR-35).
+   *
+   * ⚠️ **A standing halt IS a fault, and is reported as one.** It is the system saying it stopped
+   * itself, and it clears only on an explicit acknowledgement — so leaving it green would hide the
+   * one condition the user is required to act on. The evidence names real attempt ids (BR-35.8).
+   */
+  steps.push(
+    await step('Runaway halt', async () => {
+      const halt = automation.state.halt;
+      if (halt === null) return 'Not halted';
+      throw new Error(
+        `HALTED at ${halt.haltedAt} by ${halt.trigger}: observed ${halt.observedCount} against a ` +
+          `threshold of ${halt.threshold}. Attempts: ${halt.attemptIds.join(', ')}. ` +
+          `Clears only on explicit acknowledgement (BR-35.6).`,
+      );
+    }),
+  );
+
+  /**
+   * ⚠️ **Writability is a PROBE, not an inference from `compose.yaml`** — and the answer has to be
+   * known *before* the user reaches for the switch, not at the moment they need it.
+   *
+   * `skip` rather than `fail` when the executor was never constructed: an unwritable `/state` is
+   * harmless if nothing can write it, and a red cross for a mount that is not in use yet is noise.
+   */
+  steps.push(
+    await step('Automation state file', async () => {
+      if (automation.stateWritable) return `${automation.statePath} · writable`;
+      if (!automation.executorEnabled) return null;
+      throw new Error(
+        `${automation.statePath} is NOT writable. The kill switch would appear to change in the UI ` +
+          `and not persist, so automation cannot be armed. Recording is unaffected (NFR-13). ` +
+          `Check that ./state is mounted :rw — and verify THROUGH THE CONTAINER, not on the host.`,
+      );
+    }),
+  );
+
+  /**
+   * ⚠️ **An attempt stuck in `queued` is the one failure mode a count of rows cannot show.** The
+   * drain has two entry points, the slower being the 3 s tick, so a minute in the queue means ~20
+   * missed ticks — the drain is not running, and the attempt will neither fire nor close.
+   *
+   * ⚠️ Depth alone is NOT the signal. A depth of 1 is normal for the second or two between the
+   * decision and the `POST`; what matters is how long the oldest one has waited.
+   */
+  steps.push(
+    await step('Skip attempt queue', async () => {
+      const { depth, oldestQueuedAgeMs } = automation.queue;
+      if (depth === 0) return 'Empty';
+      const age = oldestQueuedAgeMs === null ? 'age unknown' : `oldest ${oldestQueuedAgeMs} ms`;
+      if (oldestQueuedAgeMs !== null && oldestQueuedAgeMs > QUEUE_STALE_MS) {
+        throw new Error(
+          `${depth} attempt(s) queued, ${age} — past ${QUEUE_STALE_MS} ms. The drain appears not to ` +
+            `be running: it is called from the 3 s tick as well as on enqueue, so an attempt this ` +
+            `old has survived ~${Math.round(oldestQueuedAgeMs / 3000)} ticks.`,
+        );
+      }
+      return `${depth} queued · ${age}`;
+    }),
+  );
+
+  /**
+   * ⚠️ **Reports the last attempt in ANY state, including `refused`.**
+   *
+   * A "last attempt" that showed only the ones that fired would answer *when did automation last
+   * act* while appearing to answer *is automation working* — and those diverge in exactly the case
+   * worth seeing: a rule matching repeatedly and being refused every time, which from the outside
+   * looks identical to no matches at all.
+   *
+   * ⚠️ **Never a fault.** Most refusals ARE the system working — `automation-off` is the default,
+   * `already-attempted` is the loop guard, `no-active-device` is the listener pressing stop. A red
+   * cross on any of those would be the opposite of informative.
+   */
+  steps.push(
+    await step('Last skip attempt', async () => {
+      const last = automation.lastAttempt;
+      if (last === null) return 'None recorded';
+      const why = last.refusedReason === null ? '' : ` (${last.refusedReason})`;
+      const playRow = last.playId === null ? 'play row not yet linked' : `play ${last.playId}`;
+      return `#${last.id} ${last.state}${why} · rule ${last.ruleId} · ${last.enqueuedAt} · ${playRow}`;
+    }),
+  );
+
+  return steps;
+}
+
 export async function runDiagnostics(
   mcp: SpotifyMcpClient,
   api: SpotifyWebApiClient,
   enrichment: EnrichmentService,
   history?: HistoryDiagnosticsInput,
   labels?: LabelDiagnosticsInput,
+  automation?: AutomationDiagnosticsInput,
 ): Promise<DiagnosticsReport> {
   const steps: DiagnosticStep[] = [];
   let trackId: string | null = null;
@@ -327,10 +508,19 @@ export async function runDiagnostics(
     );
   }
 
+  // --- U5: automated skipping --------------------------------------------
+  //
+  // ⚠️ Extracted so the halt banner, the unwritable-`/state` fault and the stale-queue threshold are
+  // reachable from a test — this function is not.
+  if (automation !== undefined) {
+    steps.push(...(await automationDiagnosticSteps(automation)));
+  }
+
   return {
     ranAt: new Date().toISOString(),
     ok: steps.every((s) => s.status !== 'fail'),
     steps,
     ...(labels?.coverage ? { coverage: labels.coverage } : {}),
+    ...(automation ? { metrics: automation.metrics } : {}),
   };
 }

@@ -262,11 +262,25 @@ export class EvaluationCoordinator {
     return Math.min(HOLD_MAX_MS, halfDuration);
   }
 
-  /** In-progress state for diagnostics. Never used to make a decision. */
-  get inProgress(): { trackId: string; decided: boolean } | null {
+  /**
+   * In-progress state for diagnostics — and, from U5, the key the action point matches against.
+   *
+   * ⚠️ **Never used to make a decision.** The drain uses `evaluationId` to answer *is this still the
+   * play the rule matched?*, which is a check about identity rather than a judgement about facts. The
+   * boundary is still `PlayObserver`'s: this class only reports what it was told.
+   *
+   * ⚠️ `evaluationId` is exposed because it is the only per-play identifier that exists **while the
+   * play is open** — `playId` is written when the play closes. That is the same fact that made
+   * `skip_attempt.play_id` nullable.
+   */
+  get inProgress(): { trackId: string; evaluationId: string; decided: boolean } | null {
     return this.#current === null
       ? null
-      : { trackId: this.#current.trackId, decided: this.#current.decided };
+      : {
+          trackId: this.#current.trackId,
+          evaluationId: this.#current.evaluationId,
+          decided: this.#current.decided,
+        };
   }
 
   #decide(

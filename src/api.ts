@@ -46,6 +46,9 @@ import type { BackTestService } from './rules/BackTestService.js';
 import type { DecisionLogRepository } from './rules/DecisionLogRepository.js';
 import type { LoadOutcome } from './rules/RuleStore.js';
 import type { DecisionFilter, LoadedRuleSet } from './rules/types.js';
+import type { ReadResult as AutomationReadResult } from './playback/AutomationStateStore.js';
+import type { SkipAttemptRepository } from './playback/SkipAttemptRepository.js';
+import type { AutomationState, WriteOutcome } from './playback/types.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
 import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { LABEL_CLASSIFIER_VERSION } from './musicbrainz/LabelEnrichmentService.js';
@@ -96,6 +99,47 @@ export interface ApiDeps {
   backTest: BackTestService | null;
   /** Re-reads the rules file. ⚠️ Re-reads only: nothing in U4 writes rules. */
   reloadRules: (() => Promise<LoadOutcome>) | null;
+
+  // -- U5: automated skipping ------------------------------------------------
+  //
+  // ⚠️ **The first WRITE surface this app has ever exposed**, and it writes to `/state`, never to
+  // `./config` — which stays mounted `:ro` so no route can reach the user's hand-authored rules.
+  //
+  // ⚠️ **No route for metrics and no new WebSocket surface** (Infrastructure Q6). M1–M4 ride on
+  // `/api/diagnostics`, which already exists and is already on-demand.
+
+  /**
+   * The kill switch's durable state. `null` when U5 is not deployed at all.
+   *
+   * ⚠️ Narrow on purpose — these three methods are all `AutomationStateStore` exposes that a route
+   * needs, and a route that could reach the whole store could reach the file path.
+   */
+  automation: AutomationControl | null;
+
+  /**
+   * ⚠️ **Is `SkipExecutor` CONSTRUCTED** — which is not the same question as whether automation is on.
+   *
+   * `SKIP_EXECUTOR_ENABLED` is a deployment-time posture fixed at startup; `globalAutomationEnabled` is
+   * the operating switch, changed by one click and re-read at every action point. Reported so the UI can
+   * say *the machinery is not built* rather than drawing an off switch that would do nothing if thrown.
+   */
+  skipExecutorEnabled: boolean;
+
+  /** Attempt rows, for the queue depth and the last attempt. `null` when history is off. */
+  skipAttempts: SkipAttemptRepository | null;
+}
+
+/**
+ * What a route may do to the automation state.
+ *
+ * ⚠️ `probeWritable` is named to match `AutomationStateStore`, so the store satisfies this
+ * structurally and `server.ts` passes it with no adapter. **One implementation, reached one way** — the
+ * WebSocket `403` happened because one admission rule was implemented twice and the copies diverged.
+ */
+export interface AutomationControl {
+  read(): AutomationReadResult;
+  write(next: AutomationState): WriteOutcome;
+  probeWritable(): boolean;
 }
 
 export function createApi(deps: ApiDeps): Router {
@@ -488,6 +532,170 @@ export function createApi(deps: ApiDeps): Router {
       version: set.version,
       state: set.state,
       rejection: set.rejection,
+    });
+  });
+
+  // -- U5: automated skipping ------------------------------------------------
+
+  /**
+   * Everything the automation indicator and the kill switch need, in one read.
+   *
+   * ## ⚠️ This route reports FACTS, and computes no state name
+   *
+   * FC-U5-1's seven states are derived in `statusBar.ts`, which is pure and tested. Deriving them here
+   * would put the judgement in an untestable place and give the client a second opinion to disagree
+   * with — and a UI that renders a state the server named cannot be driven into that state by a test.
+   *
+   * ⚠️ **`source` is part of the answer, not debug detail.** `absent` and `unreadable` both read as
+   * *off*, and they are different facts: the first is a fresh install behaving correctly, the second is
+   * a file this app could not parse — where the switch would appear to work in the UI and not persist.
+   */
+  router.get('/api/automation', (_req, res) => {
+    if (deps.automation === null) {
+      res.status(503).json({ error: 'Automation is unavailable.' });
+      return;
+    }
+
+    const read = deps.automation.read();
+    const queued = deps.skipAttempts?.queued() ?? [];
+    const nowMs = Date.parse(deps.now());
+    const oldest = queued
+      .map((a) => Date.parse(a.enqueuedAt))
+      .filter((ms) => Number.isFinite(ms))
+      .reduce<number | null>((min, ms) => (min === null || ms < min ? ms : min), null);
+
+    res.json({
+      enabled: read.state.globalAutomationEnabled,
+      halt: read.state.runawayHalt,
+      source: read.source,
+      detail: read.detail ?? null,
+      writable: deps.automation.probeWritable(),
+      executorEnabled: deps.skipExecutorEnabled,
+      queue: {
+        depth: queued.length,
+        // ⚠️ `null` with an empty queue, never 0: "nothing waiting" and "something waiting for no time
+        // at all" are different facts, and the standing rule is that `null` is unknown.
+        oldestQueuedAgeMs: oldest === null ? null : Math.max(0, nowMs - oldest),
+      },
+      lastAttempt: deps.skipAttempts?.latest() ?? null,
+    });
+  });
+
+  /**
+   * Arm or disarm automation (FR-47, FR-38).
+   *
+   * ## ⚠️ The response is READ BACK FROM DISK, never echoed from the request
+   *
+   * The button must reflect what persisted. An optimistic response would show *on* after a write that
+   * failed — on an unwritable `/state`, the one case where the user most needs to know the switch did
+   * not take. So every path below re-reads and returns `GET`'s own shape.
+   *
+   * ⚠️ **Arming is refused while a halt stands** (BR-35.6): a latch cleared as a side effect of
+   * flipping a switch is not an acknowledgement. `409`, and the body names the route that can clear it.
+   *
+   * ⚠️ **Disarming is never refused for that reason.** Turning automation OFF must work in every
+   * state the app can be in, including halted and including mid-drain.
+   */
+  router.post('/api/automation', (req, res) => {
+    if (deps.automation === null) {
+      res.status(503).json({ error: 'Automation is unavailable.' });
+      return;
+    }
+
+    const body = req.body as { enabled?: unknown } | undefined;
+    if (typeof body?.enabled !== 'boolean') {
+      // ⚠️ A boolean and nothing else. `'false'`, `0` and `undefined` are all falsy and would arm or
+      // disarm by accident; this is the surface that controls whether the app touches playback.
+      res.status(400).json({ error: 'enabled must be a boolean.' });
+      return;
+    }
+    const enabled = body.enabled;
+
+    const before = deps.automation.read();
+    if (enabled && before.state.runawayHalt !== null) {
+      res.status(409).json({
+        error: 'Automation is halted and cannot be armed by this route.',
+        detail:
+          'A runaway halt clears only on explicit acknowledgement (BR-35.6). ' +
+          'POST /api/automation/acknowledge-halt.',
+        halt: before.state.runawayHalt,
+      });
+      return;
+    }
+
+    const outcome = deps.automation.write({ ...before.state, globalAutomationEnabled: enabled });
+    const after = deps.automation.read();
+
+    // 200 only when the write landed. ⚠️ A 503 whose body still carries the state read back from disk:
+    // the request failed and the UI must still render the truth, which is the PREVIOUS value.
+    res.status(outcome.ok ? 200 : 503).json({
+      enabled: after.state.globalAutomationEnabled,
+      halt: after.state.runawayHalt,
+      source: after.source,
+      writable: deps.automation.probeWritable(),
+      error: outcome.ok ? undefined : 'Could not persist the automation state.',
+      detail: outcome.ok ? undefined : outcome.reason,
+    });
+  });
+
+  /**
+   * Acknowledge a runaway halt (BR-35.5, BR-35.8).
+   *
+   * ## ⚠️ TWO STATEMENTS, not one with a default
+   *
+   * *"I have reviewed this"* and *"turn automation back on"* are different decisions, so `reArm` is
+   * required rather than defaulted. A default of `true` would re-arm on a click meant only to clear the
+   * banner; a default of `false` would silently discard the user's intent to resume. Neither is a thing
+   * to guess at the surface that releases a safety latch.
+   *
+   * ⚠️ **`409` when nothing is halted, rather than an idempotent success.** Otherwise this route is a
+   * second way to arm automation — `{ reArm: true }` with no halt present would bypass the check the
+   * `POST /api/automation` handler makes. The body carries the current state so the UI re-renders
+   * correctly instead of showing an error it cannot explain.
+   */
+  router.post('/api/automation/acknowledge-halt', (req, res) => {
+    if (deps.automation === null) {
+      res.status(503).json({ error: 'Automation is unavailable.' });
+      return;
+    }
+
+    const body = req.body as { reArm?: unknown } | undefined;
+    if (typeof body?.reArm !== 'boolean') {
+      res.status(400).json({
+        error: 'reArm must be a boolean.',
+        detail:
+          'false acknowledges the halt and leaves automation off; true also turns it back on. ' +
+          'There is no default, because the two are different decisions (BR-35.5).',
+      });
+      return;
+    }
+    const reArm = body.reArm;
+
+    const before = deps.automation.read();
+    if (before.state.runawayHalt === null) {
+      res.status(409).json({
+        error: 'Nothing is halted.',
+        enabled: before.state.globalAutomationEnabled,
+        halt: null,
+        source: before.source,
+      });
+      return;
+    }
+
+    const outcome = deps.automation.write({
+      ...before.state,
+      runawayHalt: null,
+      globalAutomationEnabled: reArm,
+    });
+    const after = deps.automation.read();
+
+    res.status(outcome.ok ? 200 : 503).json({
+      enabled: after.state.globalAutomationEnabled,
+      halt: after.state.runawayHalt,
+      source: after.source,
+      acknowledged: after.state.runawayHalt === null,
+      error: outcome.ok ? undefined : 'Could not persist the acknowledgement.',
+      detail: outcome.ok ? undefined : outcome.reason,
     });
   });
 

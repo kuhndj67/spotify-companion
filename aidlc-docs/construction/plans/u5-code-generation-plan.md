@@ -367,16 +367,31 @@ against a fake player client before `server.ts` ever constructs the real one.
 - [x] ⚠️ **M2 must count, not log.** `webApiClient.ts:125` currently throws the `Retry-After` away
       inside a message string — **PBT-50**
 
-### Step 10 — `api.ts`, `server.ts`, `diagnostics.ts`
-- [ ] `POST /api/automation` (arm/disarm) · `POST /api/automation/acknowledge-halt` ·
+### Step 10 — `api.ts`, `server.ts`, `diagnostics.ts` — ✅ DONE 2026-10-02
+- [x] `POST /api/automation` (arm/disarm) · `POST /api/automation/acknowledge-halt` ·
       `GET /api/automation`
-- [ ] All three in **`api.ts`**, collaborators injected including `now`
-- [ ] ⚠️ **No new route for metrics** and **no new WebSocket surface** (Infra Q6)
-- [ ] `server.ts`: executor selection by `SKIP_EXECUTOR_ENABLED` (Q2), the drain timer, the **startup
-      sweep** closing surviving `queued` rows as `refused: play-closed` (P-29)
-- [ ] ⚠️ **Leave the `upgrade` handler in `server.ts`** — `localGuard.test.ts` pins it structurally
-- [ ] `diagnostics.ts`: automation state **and where it was read from**, halt with trigger, queue depth
+- [x] All three in **`api.ts`**, collaborators injected including `now` — `automationRoutes.test.ts`
+      (22 tests over real HTTP). ⚠️ **Every response is read back from disk**, so a failed write is
+      `503` carrying the PREVIOUS value; arming while halted is `409` and writes nothing; `reArm` has
+      **no default**; acknowledging with nothing halted is `409`, so it cannot become a second way to arm
+- [x] ⚠️ **No new route for metrics** and **no new WebSocket surface** (Infra Q6) — M1–M4 ride
+      alongside `steps` on `/api/diagnostics`, as `coverage` does
+- [x] `server.ts`: executor selection by `SKIP_EXECUTOR_ENABLED` (Q2), the drain on the 3 s tick **and**
+      `scheduleDrain`, the **startup sweep** closing surviving `queued` rows as `refused: play-closed`
+      (P-29). ⚠️ Sweep ordering is pinned structurally, because the ordering *is* the guarantee
+- [x] ⚠️ **Leave the `upgrade` handler in `server.ts`** — untouched; `localGuard.test.ts` still passes
+- [x] `diagnostics.ts`: automation state **and where it was read from**, halt with trigger, queue depth
       and oldest queued age, last attempt + reason, **`/state` writability**
+- [x] ⚠️ **EXTRACTED as `automationDiagnosticSteps`, taking plain data only.** Inlining would have put
+      the halt banner, the unwritable-`/state` fault and the stale-queue threshold inside
+      `diagnostics.ts`, which is in `ALLOWED_ORPHANS` — live code covered by nothing
+- [x] `test/playbackBoundary.test.ts` — **P-33 moved from Step 12 to here**, because this is the step
+      that spends U4's boundary. Pins the import direction, the one-method player client, one `SkipDrain`,
+      and the sweep-before-executor ordering
+- [x] ⚠️ **Defect found in review**: `skipAttempts.attachPlayId` had TWO call sites, and the one on
+      `PlayObserver.onPlayRecorded` lacked the coordinator's *"is this still the play that was decided"*
+      guard — so on a fast transition it would attach the **closing play's id to the next play's
+      attempt**. Fixed by **removing the copy**, not by adding the term; pinned structurally
 
 ### Step 11 — UI (FC-U5-1, FC-U5-2, FC-U5-3)
 - [ ] **`src/ui/statusBar.ts` ⚙️ tested** — `automationIndicator`, seven states, **a glyph per state**
@@ -391,6 +406,11 @@ against a fake player client before `server.ts` ever constructs the real one.
       `recordSuccessorLag` trap in UI form
 
 ### Step 12 — Tests, purity, orphans, and the CI guards
+
+> ⚠️ **P-33's structural tests MOVED TO STEP 10** (`test/playbackBoundary.test.ts`), because step 10 is
+> the step that spends U4's boundary — leaving the replacement two steps downstream would have left the
+> guarantee unenforced across the very commits that break it. What remains here is purity, orphans and
+> the CI guards from NFR Q9.
 - [ ] **PBT-34 … PBT-50**, including **PBT-34a** and **PBT-41**
 - [ ] Extend `test/purity.test.ts` to `automationPredicate`, `safetyCounters`, `armingProjection`,
       `statusBar`'s new derivation, and `upstreamMetrics`' pure aggregation

@@ -51,6 +51,7 @@ function orNull<T>(value: T | undefined | null): T | null {
 export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
   readonly #insert: StatementSync;
   readonly #byId: StatementSync;
+  readonly #latest: StatementSync;
   readonly #queued: StatementSync;
   readonly #attempted: StatementSync;
   readonly #firedSince: StatementSync;
@@ -69,6 +70,9 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     );
 
     this.#byId = db.prepare(`SELECT * FROM skip_attempt WHERE id = ?`);
+    // ⚠️ `ORDER BY id DESC`, not `enqueued_at DESC`: the timestamp has second-ish resolution and two
+    // attempts in one second would order arbitrarily. The rowid is monotonic by construction.
+    this.#latest = db.prepare(`SELECT * FROM skip_attempt ORDER BY id DESC LIMIT 1`);
 
     this.#queued = db.prepare(`SELECT * FROM skip_attempt WHERE state = 'queued' ORDER BY id`);
 
@@ -162,6 +166,11 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
 
   get(id: number): SkipAttempt | null {
     const row = this.#byId.get(id) as unknown as AttemptRow | undefined;
+    return row === undefined ? null : toAttempt(row);
+  }
+
+  latest(): SkipAttempt | null {
+    const row = this.#latest.get() as unknown as AttemptRow | undefined;
     return row === undefined ? null : toAttempt(row);
   }
 }

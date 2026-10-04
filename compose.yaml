@@ -146,7 +146,10 @@ services:
       #
       # With this unset, NOTHING is constructed: no player client, no drain, no attempt rows.
       # The rules engine keeps evaluating and logging exactly as it did in U4.
-      SKIP_EXECUTOR_ENABLED: "false"
+      # ⚠️ FLIPPED TO "true" 2026-10-04, to make the kill switch usable. This BUILDS the machinery;
+      # it ARMS NOTHING. `globalAutomationEnabled` is still false and is still the only thing that
+      # lets an attempt fire — so with this true and that false, the app still cannot skip a track.
+      SKIP_EXECUTOR_ENABLED: "true"
 
       # Where the kill switch and the runaway latch live. See the ./state mount below.
       #

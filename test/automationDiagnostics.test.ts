@@ -44,6 +44,7 @@ function input(overrides: Partial<AutomationDiagnosticsInput> = {}): AutomationD
     statePath: '/state/automation-state.json',
     stateWritable: true,
     queue: { depth: 0, oldestQueuedAgeMs: null },
+    unlinkedFiredAttempts: 0,
     lastAttempt: null,
     metrics: new UpstreamMetrics().snapshot(0),
     ...overrides,
@@ -157,6 +158,31 @@ describe('the state file is PROBED, and the verdict depends on whether anything 
   });
 });
 
+describe('⭐ an UNLINKED fired attempt is a fault, because it weakens the halt', () => {
+  /**
+   * ⚠️ The consecutive counter joins `skip_attempt` on `play_id`. An attempt that reached the player and
+   * was never linked is invisible to it — and a halt that under-counts is a halt that does not fire.
+   *
+   * The previous design tried to make the key immune to a missing link and broke on an 11–14 ms race
+   * instead. **A visible failure beats a clever key**, which is what this step is.
+   */
+  it('zero is ok, and says so positively', async () => {
+    const steps = await automationDiagnosticSteps(input({ unlinkedFiredAttempts: 0 }));
+    const step = byName(steps, 'Skip attempts linked to plays');
+    assert.equal(step.status, 'ok');
+    assert.match(step.detail, /All issued skips are linked/);
+  });
+
+  it('⚠️ non-zero FAILS, and says the halt is under-counting by that many', async () => {
+    const steps = await automationDiagnosticSteps(input({ unlinkedFiredAttempts: 2 }));
+    const step = byName(steps, 'Skip attempts linked to plays');
+    assert.equal(step.status, 'fail');
+    assert.match(step.detail, /2 issued skip/);
+    assert.match(step.detail, /UNDER-COUNTING/);
+    assert.match(step.detail, /could not link/, 'and points at the log line that explains why');
+  });
+});
+
 describe('⭐ the queue: AGE is the signal, not depth', () => {
   it('an empty queue is ok', async () => {
     const steps = await automationDiagnosticSteps(input());
@@ -240,7 +266,9 @@ describe('⭐ the last attempt is reported in ANY state, and is never a fault', 
 describe('every step carries a name, a status and a duration', () => {
   it('and there are five of them', async () => {
     const steps = await automationDiagnosticSteps(input());
-    assert.equal(steps.length, 5);
+    // SIX since 2026-10-04: the unlinked-attempt fault was added when a missing `play_id` turned out
+    // to be the thing that would quietly weaken the halt.
+    assert.equal(steps.length, 6);
     for (const step of steps) {
       assert.ok(step.name.length > 0);
       assert.ok(['ok', 'fail', 'skip'].includes(step.status));

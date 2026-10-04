@@ -886,6 +886,29 @@ slow"*, not *"the generator is wrong"*. Build the child arbitrary **once** and r
 folding punctuation turns `["hip hop","rapcore"]` into `"hiphoprapcore"`, where a match crosses a
 boundary that exists in the data but not in the string. Both read as working rules.
 
+**⚠️ A GUARD THAT READS A LABEL IS A GUARD A LABELLING BUG DISABLES — measured 2026-10-04, twice.**
+BR-35's 3-consecutive halt counted `play.skip_source === 'rule'`, and **nothing ever wrote `'rule'`**:
+`PlayObserver` hardcoded `'user'` from U1, sound while nothing else could skip. So the primary runaway
+guard **could not fire at all**, through four live skips. ⚠️ `safetyCounters.ts` was at **100% on every
+axis** and PBT-46/47 passed — they test the counter against *supplied* input, and nothing asserted that
+anything ever supplies `true`. **A structurally empty column reads as *this never happens*.**
+✅ The counter now joins `skip_attempt` **directly** and never reads the label.
+
+⚠️ **AND THE FIRST FIX FAILED LIVE BY 11–14 MILLISECONDS.** It matched the attempt to the play by TIME
+WINDOW, reasoning that `play_id` is backfilled in a try/catch and could be missing. But `ended_at` is **the
+last observation in the trail**, and the attempt is enqueued from the decision taken on that same tick —
+*just after it*. All four real skips landed 11–14 ms outside their own window. ⚠️ **It worked for
+refusals**, whose plays run on for minutes, so the broken case was exactly a SKIP — which by definition
+ends the play it fired during. **The fixtures used generous windows: a fixture never shows you a 14 ms
+race.** The reasoning was sound and the measurement said the opposite; `play_id` was populated correctly
+every time. ✅ Keyed on `play_id` now, with a missing link **surfaced** on `/api/diagnostics` rather than
+designed around — **a visible failure beats a clever key.**
+
+⚠️ **THE FOURTH CONSECUTIVE SKIP LATCHES THE HALT, NOT THE THIRD**, because the counter reads *closed*
+plays and the skip being checked has not closed yet. **Four tracks are skipped before automation stops.**
+Accepted (user, 2026-10-04) on condition it is stated **wherever the threshold is stated** — saying "3"
+alone under-describes it by one track.
+
 **✅ THE INODE HAZARD IS NOW VERIFIED LIVE, not merely described — 2026-10-03.** U5's
 `AutomationStateStore.write` does write-temp-then-rename into `/state`, and after a kill-switch change
 the **host and the container see identical file content**. So the directory mount is what makes that

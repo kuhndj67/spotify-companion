@@ -22,6 +22,31 @@
 | **Rolling hour** | `MAX_RULE_SKIPS_PER_HOUR` | **10** | BR-35.2 |
 | Window | `RULE_SKIP_WINDOW_MS` | 3 600 000 ms, half-open | BR-35.2 |
 
+### ⚠️ THE FOURTH CONSECUTIVE SKIP IS WHAT LATCHES THE HALT, NOT THE THIRD
+
+Added 2026-10-04, after the first live arming. **The counter reads CLOSED plays**, and the skip that
+triggers the check has not closed yet — the track change it causes is what closes it. So at the check
+following skip N the counter sees at most N−1 closed rule-skips:
+
+| skip | counter sees | halt? |
+|---|---|---|
+| 1 | 0 | no |
+| 2 | 1 | no |
+| 3 | 2 | no |
+| **4** | **3** | ⚠️ **yes** |
+
+**Four tracks are skipped before automation stops.** This is **inherent to counting closed plays**, not an
+implementation slip, and it is **ACCEPTED** (user, 2026-10-04) — on the condition that it is **stated
+wherever the threshold is stated.** Anything that says *"3"* without saying *"the 4th skip latches it"*
+under-describes the behaviour by one track, and a listener who counts four skips against a stated limit of
+three will reasonably conclude the limit is broken.
+
+⚠️ It is stated in: `MAX_CONSECUTIVE_RULE_SKIPS`'s docstring, FC-U5-1's `halted` detail, FC-U5-3's
+acknowledgement panel, and pinned by `ruleSkipAgreement.test.ts`.
+
+⚠️ **The threshold itself is unchanged**, so §4's amendment procedure does not apply — this records what
+3 has always meant in practice, not a new value.
+
 Both live in `src/playback/types.ts`. ⚠️ **Neither is an environment variable, and that is deliberate
 in a file where every other cadence is one** — `POLL_INTERVAL_MS`, `RULES_POLL_INTERVAL_MS`,
 `ENRICHMENT_WAIT_MS` and `COMPLETION_THRESHOLD` are all settings. The precedent is the hypothesis

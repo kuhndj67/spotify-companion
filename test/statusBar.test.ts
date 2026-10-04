@@ -309,6 +309,18 @@ describe('⭐ FC-U5-1 — the halt outranks the switch it turned off', () => {
     assert.match(i.detail, /acknowledge/i);
   });
 
+  it('⭐ ⚠️ the CONSECUTIVE wording names the skip that latched it, which is threshold + 1', () => {
+    // `MAX_CONSECUTIVE_RULE_SKIPS` is 3 and the FOURTH skip is what latches the halt, because the
+    // counter reads closed plays and trails the skip being checked by one. Accepted on condition that
+    // it is stated wherever the threshold is stated (user, 2026-10-04) -- saying only "3" would
+    // under-describe what the listener just heard by one track.
+    const i = automationIndicator(
+      automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
+    );
+    assert.match(i.detail, /3 rule-skips in a row/);
+    assert.match(i.detail, /4th is what latched it/);
+  });
+
   it('⚠️ halted is NOT `fail` — the system protecting you is not the system breaking', () => {
     const halted = automationIndicator(
       automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),

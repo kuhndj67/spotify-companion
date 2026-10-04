@@ -319,9 +319,11 @@ export interface HaltSummary {
 export function automationIndicator(state: AutomationIndicatorState): Indicator {
   // 1. The halt, before the switch it turned off.
   if (state.halt !== null) {
+    // ⚠️ Consecutive: names the skip that latched it, which is threshold + 1. See
+    // `MAX_CONSECUTIVE_RULE_SKIPS`.
     const what =
       state.halt.trigger === 'consecutive'
-        ? `${state.halt.observedCount} rule-skips in a row`
+        ? `${state.halt.observedCount} rule-skips in a row — the ${state.halt.observedCount + 1}th is what latched it`
         : `${state.halt.observedCount} rule-skips in one hour`;
     return indicator(
       'halted',

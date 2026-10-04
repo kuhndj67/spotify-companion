@@ -224,6 +224,29 @@ export type WriteOutcome = { readonly ok: true } | { readonly ok: false; readonl
  * BR-35: *"If a legitimate rule trips the halt, that is information about the rule."* Change them by
  * amending the pre-registration, never by editing code to make a favourite rule work.
  */
+/**
+ * BR-35.1. ⚠️ **THE FOURTH CONSECUTIVE SKIP IS THE ONE THAT LATCHES THE HALT, not the third.**
+ *
+ * The counter reads **closed** plays, and the skip that triggers the check has not closed yet — the
+ * track change it causes is what closes it. So at the check following skip N the counter sees at most
+ * N−1 closed rule-skips:
+ *
+ * | skip | counter sees | halt? |
+ * |---|---|---|
+ * | 1 | 0 | no |
+ * | 2 | 1 | no |
+ * | 3 | 2 | no |
+ * | **4** | **3** | ⚠️ **yes** |
+ *
+ * **Four tracks are skipped before automation stops.** Measured and pinned by
+ * `ruleSkipAgreement.test.ts`.
+ *
+ * ⚠️ **This is inherent to counting closed plays**, not an implementation slip, and it is **accepted**
+ * (user, 2026-10-04) on the condition that it is stated **wherever the threshold is stated**. Anything
+ * that says "3" without saying "the 4th skip latches it" under-describes the behaviour by one track.
+ *
+ * ⚠️ A pre-registered constant, not a setting — see `safety-thresholds/pre-registration.md`.
+ */
 export const MAX_CONSECUTIVE_RULE_SKIPS = 3;
 export const MAX_RULE_SKIPS_PER_HOUR = 10;
 

@@ -95,6 +95,8 @@ const ENTRY_POINTS = [
   { file: 'verify-all-backups.mjs', args: [] },
   { file: 'reclassify-unobserved-tails.mjs', args: [], tsx: true },
   { file: 'repair-backfill-timestamps.mjs', args: [] },
+  // Dry run by default; `--apply` is required. Refuses while the container is up.
+  { file: 'repair-skip-source.mjs', args: [] },
   { file: 'hypothesis-gate.mjs', args: [] },
   { file: 'measure-confound.mjs', args: [] },
   { file: 'check-rules-schema.mjs', args: [], tsx: true },

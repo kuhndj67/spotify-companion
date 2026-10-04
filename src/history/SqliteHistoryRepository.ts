@@ -659,6 +659,22 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
    * is what `consecutiveRuleSkips` requires. Doing it in one `ASC` query would take the OLDEST N plays
    * in the corpus — a counter answering about August while the halt is about now.
    */
+  /**
+   * Correct `skip_source` to `'rule'` once the attempt is linked to this play.
+   *
+   * ⚠️ **An UPDATE, and the only one of its kind on a freshly-written play row.** `PlayObserver` writes
+   * `'user'` provisionally because a rule-skip is identified by `skip_attempt.play_id`, which cannot be
+   * set until the play row exists. `updateOutcome` is the precedent: a play row is not immutable, and
+   * FR-20 already depends on that.
+   *
+   * ⚠️ **The SAFETY LIMIT does not read this column** — `recentPlaysForCounting` joins `skip_attempt`
+   * directly. This is a denormalised label for exports and for R1's eligibility, so a failure here
+   * costs analysis accuracy and never costs a halt.
+   */
+  markSkippedByRule(playId: number): void {
+    this.#db.prepare(`UPDATE play SET skip_source = 'rule' WHERE id = ?`).run(playId);
+  }
+
   recentPlaysForCounting(limit: number): { playId: number; skippedByRule: boolean }[] {
     /*
      * ⚠️ **THIS NO LONGER READS `skip_source`, AND THAT IS THE FIX.** Found 2026-10-04.

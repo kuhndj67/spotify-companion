@@ -120,16 +120,26 @@ export interface SkipAttemptRepository {
   latest(): SkipAttempt | null;
 
   /**
-   * Did an attempt for `trackId` reach the player while a play was open between `fromIso` and `toIso`?
+   * Did any attempt for this evaluation reach the player?
    *
    * ⚠️ **This is what decides `play.skip_source`.** `PlayObserver` hardcoded
    * `outcome === 'skipped' ? 'user' : null` from U1 — sound while nothing else could skip, and **wrong
-   * the moment U5 shipped**. A rule-skip recorded as the user's own would enter R1's data as a genuine
+   * the moment U5 shipped**. A rule-skip recorded as the user's own enters R1's data as a genuine
    * rejection, and the hypothesis gate's `ELIGIBLE` predicate has no `skip_source` guard: arm a rule
    * that skips major-label tracks and the corpus then *"shows"* the listener skipping major-label
    * tracks, by construction.
    *
-   * ⚠️ Keyed on the TIME WINDOW, not on `play_id`, which does not exist yet when this is asked.
+   * ⚠️ Keyed on `evaluation_id`, which exists from the moment the attempt is enqueued — unlike
+   * `play_id`, and unlike the TIME WINDOW a previous version used, which failed live by 11–14 ms.
    */
-  firedDuring(trackId: string, fromIso: string, toIso: string): boolean;
+  reachedPlayerForEvaluation(evaluationId: string): boolean;
+
+  /**
+   * Attempts that reached the player and have **no `play_id`**.
+   *
+   * ⚠️ **This is the state that would silently disable the consecutive halt**, because the counter
+   * joins on `play_id`. Non-zero is a fault and `/api/diagnostics` reports it as one — the risk is
+   * instrumented rather than designed around.
+   */
+  unlinkedFiredCount(): number;
 }

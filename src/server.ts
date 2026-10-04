@@ -120,28 +120,6 @@ if (config.historyEnabled) {
           coordinator?.onPlayDropped(record.trackId);
         },
       },
-      /**
-       * ⚠️ **What makes `skip_source = 'rule'` reachable** (BR-35.3). Added 2026-10-04: until then
-       * `PlayObserver` hardcoded `'user'` for every skip, so a rule-skip was filed as the listener's own
-       * rejection — and the hypothesis gate has no `skip_source` guard, so it would have entered R1's
-       * data as a genuine rejection.
-       *
-       * ⚠️ `skipAttempts` is `null` until the `if (repository !== null)` block below constructs it, and
-       * this closure is not called until a play CLOSES — long after. Read lazily for that reason; an
-       * eager capture would bind `null` for the lifetime of the process.
-       *
-       * ⚠️ Returns `false` on an error rather than throwing: a label is not worth a lost play record,
-       * which is the one artefact here that cannot be regenerated. ⚠️ The SAFETY LIMIT does not depend on
-       * this succeeding — `recentPlaysForCounting` reads `skip_attempt` directly.
-       */
-      (trackId, startedAt, endedAt) => {
-        try {
-          return skipAttempts?.firedDuring(trackId, startedAt, endedAt) ?? false;
-        } catch (error) {
-          console.error('[automation] could not determine skip_source; recording `user`:', error);
-          return false;
-        }
-      },
     );
     exportService = new ExportService(repository);
 
@@ -759,6 +737,24 @@ if (repository !== null) {
         // log its own link, which IS load-bearing (BR-24.1).
         try {
           skipAttempts?.attachPlayId(evaluationId, playId);
+
+          /*
+           * ⚠️ **AND the `skip_source` label, here and nowhere else** (BR-35.3).
+           *
+           * This is the first instant at which the question is answerable by the key that works:
+           * `skip_attempt.play_id` has just been set, one line above. `PlayObserver` wrote `'user'`
+           * provisionally because the play row did not exist when it ran.
+           *
+           * ⚠️ A previous fix answered it inside `PlayObserver` by matching the attempt against the
+           * play's time window, and it failed live by **11–14 ms** — `ended_at` is the last observation
+           * and the attempt is enqueued from the decision taken just after it.
+           *
+           * ⚠️ The SAFETY LIMIT does not depend on this: `recentPlaysForCounting` joins `skip_attempt`
+           * directly, so a failure here costs analysis accuracy and never costs a halt.
+           */
+          if (skipAttempts?.reachedPlayerForEvaluation(evaluationId) === true) {
+            repository!.markSkippedByRule(playId);
+          }
         } catch (error) {
           console.error('[automation] could not link a skip attempt to its play row:', error);
         }
@@ -915,6 +911,8 @@ function automationDiagnostics(): AutomationDiagnosticsInput {
       oldestQueuedAgeMs: oldest === null ? null : Math.max(0, nowMs - oldest),
     },
     lastAttempt: skipAttempts?.latest() ?? null,
+    // ⚠️ Non-zero means the consecutive halt is under-counting. See the diagnostics step.
+    unlinkedFiredAttempts: skipAttempts?.unlinkedFiredCount() ?? 0,
     metrics: upstreamMetrics.snapshot(nowMs),
   };
 }

@@ -199,6 +199,16 @@ describe('FC-U5-3 — the acknowledgement panel', () => {
     assert.match(p.detail, /2026-10-02T11:00:00.000Z/);
   });
 
+  it('⭐ ⚠️ explains that the NEXT skip after the threshold is what latched it', () => {
+    // The counter reads closed plays, so it trails the skip being checked by one: with a threshold of 3
+    // the FOURTH skip latches the halt, and four tracks were skipped. The panel has to say so, or the
+    // listener counts four skips against a stated limit of three and concludes the limit is broken.
+    const p = haltPanel(HALT)!;
+    assert.match(p.detail, /3 rule-skips in a row/);
+    assert.match(p.detail, /4th skip is what latched this/);
+    assert.match(p.detail, /trails the skip being checked by one/);
+  });
+
   it('distinguishes the two triggers in words, not just by a field', () => {
     assert.match(haltPanel(HALT)!.detail, /in a row/);
     assert.match(

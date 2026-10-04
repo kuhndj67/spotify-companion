@@ -146,6 +146,14 @@ export interface AutomationDiagnosticsInput {
   /** ⚠️ A probe, not an inference from `compose.yaml`. */
   stateWritable: boolean;
   queue: { depth: number; oldestQueuedAgeMs: number | null };
+  /**
+   * Attempts that reached the player and were never linked to a play row.
+   *
+   * ⚠️ **Non-zero means the consecutive halt is UNDER-COUNTING**, because the counter joins on
+   * `play_id`. Instrumented rather than designed around — the previous attempt to make that key immune
+   * to a missing link broke on an 11–14 ms race instead.
+   */
+  unlinkedFiredAttempts: number;
   lastAttempt: SkipAttempt | null;
   metrics: UpstreamSnapshot;
 }
@@ -261,6 +269,27 @@ export async function automationDiagnosticSteps(
         );
       }
       return `${depth} queued · ${age}`;
+    }),
+  );
+
+  /**
+   * ⚠️ **The state that would quietly weaken the runaway halt.**
+   *
+   * `recentPlaysForCounting` joins `skip_attempt` on `play_id`, so an attempt that reached the player and
+   * was never linked is invisible to the consecutive count — and a halt that under-counts is a halt that
+   * does not fire. `attachPlayId` runs inside a try/catch, so this is reachable.
+   *
+   * ⚠️ Instrumented rather than designed around: the previous attempt to make the key immune to a
+   * missing link broke on an 11–14 ms race instead. A visible failure beats a clever key.
+   */
+  steps.push(
+    await step('Skip attempts linked to plays', async () => {
+      if (automation.unlinkedFiredAttempts === 0) return 'All issued skips are linked to a play row';
+      throw new Error(
+        `${automation.unlinkedFiredAttempts} issued skip(s) have no play_id. The consecutive halt counts ` +
+          `through that link, so it is UNDER-COUNTING by that many. Check the ` +
+          `'[automation] could not link' lines in the container log.`,
+      );
     }),
   );
 

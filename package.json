@@ -24,6 +24,7 @@
     "check:rules-schema": "node --import tsx scripts/check-rules-schema.mjs",
     "reporting:build": "node --import tsx scripts/build-reporting-db.mjs",
     "reclassify": "node --import tsx scripts/reclassify-unobserved-tails.mjs",
+    "repair:skip-source": "node scripts/repair-skip-source.mjs",
     "db:backup": "node scripts/backup-history.mjs",
     "db:restore": "node scripts/restore-history.mjs",
     "db:verify-backups": "node scripts/verify-all-backups.mjs",

@@ -176,6 +176,14 @@ export interface HistoryRepository {
    * ⚠️ **Oldest-first**, because `consecutiveRuleSkips` counts the trailing run and a reversed array
    * silently returns a different number.
    */
+  /**
+   * Mark a play as skipped BY A RULE, once the attempt has been linked to it (BR-35.3).
+   *
+   * ⚠️ A correction, not the first write: see the implementation for why the answer is not available
+   * when the row is inserted.
+   */
+  markSkippedByRule(playId: number): void;
+
   recentPlaysForCounting(limit: number): { readonly playId: number; readonly skippedByRule: boolean }[];
 
   close(): void;

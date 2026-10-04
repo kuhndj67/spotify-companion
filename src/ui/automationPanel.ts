@@ -175,9 +175,12 @@ export interface HaltPanel {
 export function haltPanel(halt: HaltView | null): HaltPanel | null {
   if (halt === null) return null;
 
+  // ⚠️ The CONSECUTIVE wording names the skip that latched it, which is one MORE than the threshold:
+  // the counter reads closed plays, so the skip being checked has not closed yet. Saying only "3" would
+  // under-describe what the listener just heard by one track.
   const what =
     halt.trigger === 'consecutive'
-      ? `${halt.observedCount} rule-skips in a row`
+      ? `${halt.observedCount} rule-skips in a row (the ${halt.observedCount + 1}th skip is what latched this — the count reads completed plays, so it trails the skip being checked by one)`
       : `${halt.observedCount} rule-skips within one hour`;
 
   return {

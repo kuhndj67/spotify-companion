@@ -178,6 +178,7 @@ describe('degraded operation (BR-3.8, BR-3.9)', () => {
       },
       v5Watermark: () => null,
       // U5, BR-35.1. Unused here: PlayObserver does not count rule skips.
+      markSkippedByRule: () => undefined,
       recentPlaysForCounting: () => [],
       coverage: () => {
         throw new Error('unused');

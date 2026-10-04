@@ -37,31 +37,39 @@ interface AttemptRow {
 const REACHED_THE_PLAYER: readonly SkipAttemptState[] = ['fired', 'confirmed', 'unconfirmed'];
 
 /**
- * ⚠️ **THE ONE DEFINITION of "a rule skipped this play", as SQL.** Two call sites use it:
+ * ⚠️ **THE ONE DEFINITION of "a rule skipped this play", as SQL.** `play_id` is the key.
  *
- *   1. `SqliteSkipAttemptRepository.firedDuring` — which decides the `skip_source` LABEL written on
- *      the play row, for exports and for R1's eligibility.
- *   2. `SqliteHistoryRepository.recentPlaysForCounting` — which feeds the **3-consecutive SAFETY
- *      LIMIT** (BR-35.1/35.9).
+ * ## 🔧 A TIME-WINDOW VERSION OF THIS FAILED LIVE, by 11–14 MILLISECONDS (2026-10-04)
  *
- * ⚠️ **It is keyed on the TRACK and the play's TIME WINDOW, never on `skip_attempt.play_id`.**
- * `play_id` is backfilled after the play row is written (`attachPlayId`), inside a try/catch that is
- * explicitly allowed to fail because it is not load-bearing. A safety limit that read it would
- * **under-count whenever that backfill failed** — and a halt that under-counts is a halt that does not
- * fire. The window cannot fail: both ends are columns on the play row itself.
+ * The first attempt matched on `track_id` plus `enqueued_at BETWEEN started_at AND ended_at`, reasoning
+ * that `play_id` is backfilled inside a try/catch and could therefore be missing, while the window's
+ * two ends are columns on the play row and cannot be.
  *
- * ⚠️ A repeat listen is a different window, so it cannot inherit an earlier play's attempt.
+ * ⚠️ **It was wrong, and wrong in the one case that matters.** `ended_at` is **the last observation in
+ * the trail**, and the attempt is enqueued from the decision taken on that same tick — a few
+ * milliseconds *after* it. Measured on four real skips: enqueued **11, 13, 14 and 14 ms after**
+ * `ended_at`. Every one fell outside its own play's window.
  *
- * ⚠️ `ended_at IS NULL` is tolerated for a play still open. `test/ruleSkipAgreement.test.ts` pins
- * that the two call sites answer identically on the same data — one rule invoked twice, never written
- * twice, which is the lesson of the WebSocket `403`.
+ * ⚠️ **And it worked for refusals**, whose plays run on for minutes afterwards — so the broken case was
+ * precisely a SKIP, which by definition ends the play it fired during. The tests passed because their
+ * fixtures used generous windows: *a fixture never shows you a 14 ms race.*
+ *
+ * ⚠️ The argument for the window was **reasoning, not measurement**. On the same four skips `play_id`
+ * was populated correctly every time. The fragile-looking key was the reliable one.
+ *
+ * ## Both call sites, still one definition
+ *
+ *   1. `SqliteHistoryRepository.recentPlaysForCounting` — the **consecutive SAFETY LIMIT** (BR-35.1).
+ *   2. The `skip_source` LABEL, written from `server.ts` in the same callback that creates the link.
+ *
+ * ⚠️ **The `play_id`-missing risk is now INSTRUMENTED rather than designed around**:
+ * `/api/diagnostics` fails on any attempt that reached the player with no `play_id`, because that is
+ * exactly the state that would silently disable the halt. A visible failure beats a clever key.
  */
 export const RULE_SKIPPED_THIS_PLAY_SQL = `
   EXISTS (SELECT 1 FROM skip_attempt sa
-           WHERE sa.track_id = %PLAY%.track_id
-             AND sa.state IN ('fired', 'confirmed', 'unconfirmed')
-             AND sa.enqueued_at >= %PLAY%.started_at
-             AND (%PLAY%.ended_at IS NULL OR sa.enqueued_at <= %PLAY%.ended_at))`;
+           WHERE sa.play_id = %PLAY%.id
+             AND sa.state IN ('fired', 'confirmed', 'unconfirmed'))`;
 
 /** Bind the shared predicate to a table alias. */
 export function ruleSkippedThisPlay(playAlias: string): string {
@@ -84,7 +92,8 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
   readonly #insert: StatementSync;
   readonly #byId: StatementSync;
   readonly #latest: StatementSync;
-  readonly #firedDuring: StatementSync;
+  readonly #reachedPlayer: StatementSync;
+  readonly #unlinked: StatementSync;
   readonly #queued: StatementSync;
   readonly #attempted: StatementSync;
   readonly #firedSince: StatementSync;
@@ -107,15 +116,19 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     // attempts in one second would order arbitrarily. The rowid is monotonic by construction.
     this.#latest = db.prepare(`SELECT * FROM skip_attempt ORDER BY id DESC LIMIT 1`);
 
-    // ⚠️ The same window rule as `ruleSkippedThisPlay`, expressed against bound parameters because
-    // here there is no play row to join to — `PlayObserver` asks this BEFORE the row exists.
-    this.#firedDuring = db.prepare(
+    this.#reachedPlayer = db.prepare(
       `SELECT 1 AS hit FROM skip_attempt
-        WHERE track_id = ?
+        WHERE evaluation_id = ?
           AND state IN ('fired', 'confirmed', 'unconfirmed')
-          AND enqueued_at >= ?
-          AND enqueued_at <= ?
         LIMIT 1`,
+    );
+
+    // ⚠️ The state that would silently disable the consecutive halt: an attempt that reached the
+    // player and never got linked to its play row. Reported on /api/diagnostics.
+    this.#unlinked = db.prepare(
+      `SELECT COUNT(*) AS n FROM skip_attempt
+        WHERE play_id IS NULL
+          AND state IN ('fired', 'confirmed', 'unconfirmed')`,
     );
 
     this.#queued = db.prepare(`SELECT * FROM skip_attempt WHERE state = 'queued' ORDER BY id`);
@@ -218,8 +231,12 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     return row === undefined ? null : toAttempt(row);
   }
 
-  firedDuring(trackId: string, fromIso: string, toIso: string): boolean {
-    return this.#firedDuring.get(trackId, fromIso, toIso) !== undefined;
+  reachedPlayerForEvaluation(evaluationId: string): boolean {
+    return this.#reachedPlayer.get(evaluationId) !== undefined;
+  }
+
+  unlinkedFiredCount(): number {
+    return (this.#unlinked.get() as unknown as { n: number }).n;
   }
 }
 

@@ -225,25 +225,33 @@ export type WriteOutcome = { readonly ok: true } | { readonly ok: false; readonl
  * amending the pre-registration, never by editing code to make a favourite rule work.
  */
 /**
- * BR-35.1. ⚠️ **THE FOURTH CONSECUTIVE SKIP IS THE ONE THAT LATCHES THE HALT, not the third.**
+ * BR-35.1. **Three consecutive rule-skips latch the halt, and the FOURTH track is refused.**
  *
- * The counter reads **closed** plays, and the skip that triggers the check has not closed yet — the
- * track change it causes is what closes it. So at the check following skip N the counter sees at most
- * N−1 closed rule-skips:
+ * ## ⚠️ AN EARLIER VERSION OF THIS DOCSTRING CLAIMED THE 4TH SKIP LATCHED IT. That was WRONG.
  *
- * | skip | counter sees | halt? |
- * |---|---|---|
- * | 1 | 0 | no |
- * | 2 | 1 | no |
- * | 3 | 2 | no |
- * | **4** | **3** | ⚠️ **yes** |
+ * The reasoning was that the counter reads **closed** plays, so the skip being checked cannot have
+ * closed yet, so the count must trail by one. **The measurement says otherwise**, and the reason is
+ * BR-43.4's confirmation grace: `#checkHalt` runs *after* the 3-second wait, by which time the track
+ * change has happened, the play has closed, `recordPlay` has run and `attachPlayId` has linked it. The
+ * counter sees the skip it is checking.
  *
- * **Four tracks are skipped before automation stops.** Measured and pinned by
- * `ruleSkipAgreement.test.ts`.
+ * Measured live, 2026-10-04 — three Def Leppard tracks:
  *
- * ⚠️ **This is inherent to counting closed plays**, not an implementation slip, and it is **accepted**
- * (user, 2026-10-04) on the condition that it is stated **wherever the threshold is stated**. Anything
- * that says "3" without saying "the 4th skip latches it" under-describes the behaviour by one track.
+ * | event | time |
+ * |---|---|
+ * | 3rd skip enqueued | `15:14:00.112` |
+ * | fired | `15:14:00.281` |
+ * | **halt latched**, `observedCount: 3` | `15:14:03.294` |
+ * | 4th track → **refused `runaway-halted`** | `15:14:06.101` |
+ *
+ * ⚠️ **The wrong claim had a passing test.** It asserted `[0,1,2,3]` because the fixture inserted the
+ * play row *after* the halt check, modelling the belief rather than the code. **A fixture built around a
+ * mental model confirms the model** — the second time in one day that happened here, after the 14 ms
+ * window race.
+ *
+ * ⚠️ So the plain reading is the correct one, and it still needs stating precisely: **three skips
+ * happen, then automation stops.** The third track IS skipped — the limit is not "two skips and a
+ * warning".
  *
  * ⚠️ A pre-registered constant, not a setting — see `safety-thresholds/pre-registration.md`.
  */

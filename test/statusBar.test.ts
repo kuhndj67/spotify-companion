@@ -300,25 +300,22 @@ describe('⭐ FC-U5-1 — the halt outranks the switch it turned off', () => {
     assert.match(i.label, /HALTED/);
   });
 
-  it('says what tripped it and that only an acknowledgement clears it', () => {
-    const i = automationIndicator(
-      automation({ halt: { trigger: 'hourly-rate', observedCount: 10, threshold: 10 } }),
-    );
-    assert.match(i.detail, /10 rule-skips in one hour/);
-    assert.match(i.detail, /limit of 10/);
-    assert.match(i.detail, /acknowledge/i);
-  });
-
-  it('⭐ ⚠️ the CONSECUTIVE wording names the skip that latched it, which is threshold + 1', () => {
-    // `MAX_CONSECUTIVE_RULE_SKIPS` is 3 and the FOURTH skip is what latches the halt, because the
-    // counter reads closed plays and trails the skip being checked by one. Accepted on condition that
-    // it is stated wherever the threshold is stated (user, 2026-10-04) -- saying only "3" would
-    // under-describe what the listener just heard by one track.
-    const i = automationIndicator(
-      automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
-    );
-    assert.match(i.detail, /3 rule-skips in a row/);
-    assert.match(i.detail, /4th is what latched it/);
+  it('⭐ ⚠️ the detail is a POINTER, not an explanation — the main screen stays clean', () => {
+    // Changed 2026-10-04 at the user's direction, after the first live halt put a paragraph on the
+    // primary screen. The counts, trigger, threshold and attempt ids belong on the Rules pop-up beside
+    // the buttons that can clear it. This text also reaches the aria-label, so it is read aloud in full.
+    for (const halt of [
+      { trigger: 'hourly-rate' as const, observedCount: 10, threshold: 10 },
+      { trigger: 'consecutive' as const, observedCount: 3, threshold: 3 },
+    ]) {
+      const i = automationIndicator(automation({ halt }));
+      assert.match(i.detail, /Rules panel/, 'it says where to go');
+      assert.match(i.detail, /stopped itself/i, 'and what happened');
+      // ⚠️ No counts, no threshold, no trigger name. Those are the Rules panel's job.
+      assert.doesNotMatch(i.detail, /\d/, 'no numbers on the primary screen');
+      assert.doesNotMatch(i.detail, /hourly-rate|consecutive/);
+      assert.ok(i.detail.length < 120, `one sentence, got ${i.detail.length} chars`);
+    }
   });
 
   it('⚠️ halted is NOT `fail` — the system protecting you is not the system breaking', () => {
@@ -474,7 +471,10 @@ describe('⭐ the bar with automation present', () => {
     assert.match(bar.indicators[4]!.label, /Automation/);
   });
 
-  it('⚠️ a standing halt DOES produce the one message when nothing has failed', () => {
+  it('⭐ ⚠️ a standing halt produces NO message — the dot carries it instead', () => {
+    // Changed 2026-10-04 at the user's direction. The primary screen stays visible for hours and a halt
+    // stands until acknowledged, so a halt here would park a paragraph indefinitely -- noise, and a
+    // hiding place for the next real fault. The DOT still says `Automation HALTED`.
     const bar = statusBar({
       recording: recording(),
       rules: rules(),
@@ -482,13 +482,13 @@ describe('⭐ the bar with automation present', () => {
       spotify: { snapshotError: null, hasSnapshot: true },
       automation: automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
     });
-    assert.match(bar.message!, /Stopped itself/);
+    assert.equal(bar.message, null, 'no banner text on the primary screen');
+    assert.match(bar.indicators[4]!.label, /HALTED/, 'but the dot is unmistakable');
+    assert.equal(bar.indicators[4]!.level, 'halted');
   });
 
-  it('⭐ ⚠️ but a `fail` OUTRANKS a halt regardless of position', () => {
-    // A halt can stand for days, since only an acknowledgement clears it. A single pass accepting
-    // either level would let it permanently occupy the one message slot and hide every later fault --
-    // and `automation` sits last, so position alone would not save it.
+  it('⚠️ and a real `fail` still takes the slot while halted', () => {
+    // Withholding the halt's prose must not cost the message slot to something that IS broken.
     const bar = statusBar({
       recording: recording({ repositoryOpen: false }),
       rules: rules(),

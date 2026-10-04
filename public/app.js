@@ -1221,7 +1221,10 @@ function refreshStats(trackId, artistId, artistName) {
 const CONNECTION_GLYPH = { ok: '●', warn: '◐', fail: '✕', unknown: '○' };
 
 /** Levels that produce the one status message, most serious first. ⚠️ Mirrors `statusBar.ts`. */
-const MESSAGE_LEVELS = ['fail', 'halted'];
+// ⚠️ `halted` is NOT here (2026-10-04, user direction). The dot says `Automation HALTED`; the
+// explanation lives on the Rules pop-up beside the buttons that can clear it. A standing halt would
+// otherwise park a paragraph on the primary screen until someone acknowledged it.
+const MESSAGE_LEVELS = ['fail'];
 
 let connectionState = null;
 let lastServerStatus = null;

@@ -68,11 +68,13 @@ describe('⭐ the status message precedence exists exactly once, in two places',
     );
   });
 
-  it('⚠️ and `fail` comes before `halted`, which is the part worth being wrong about', () => {
-    // A halt clears only on a deliberate acknowledgement, so it can stand for days. If it outranked
-    // `fail`, it would permanently occupy the single message slot and hide every later fault --
-    // including a Recording failure, which loses what cannot be recreated.
-    assert.deepEqual(serverOrder(), ['fail', 'halted']);
+  it('⭐ ⚠️ `fail` is the ONLY level that takes the message slot', () => {
+    // `halted` was in here until 2026-10-04, on the reasoning that a halt is the one thing the user must
+    // act on. The reasoning held and the conclusion did not: the DOT already says `Automation HALTED`,
+    // and the explanation belongs on the Rules pop-up beside the buttons that can clear it. The primary
+    // screen stays visible for hours and a halt stands until acknowledged, so it would have parked a
+    // paragraph there indefinitely.
+    assert.deepEqual(serverOrder(), ['fail']);
   });
 
   it('every level named in the precedence is a real IndicatorLevel', () => {

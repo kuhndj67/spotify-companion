@@ -111,17 +111,33 @@ export function switchView(view: AutomationView): SwitchView {
   // while it stands — so the switch stays pressable for the direction that always has to work: off.
   const halted = view.halt !== null;
 
+  /*
+   * ⚠️ **HALTED-AND-STILL-ARMED IS A REAL STATE, and it had no branch until 2026-10-04.**
+   *
+   * BR-33.4 keeps the halt a **separate latch** and never writes the kill switch — so after a halt
+   * `globalAutomationEnabled` is still `true` while every attempt is refused `runaway-halted`. Observed
+   * live on the first halt.
+   *
+   * The old text said *"Acknowledge the halt below before turning it back on"* over a button reading
+   * *"Turn automation off"*. It **was** on. A control that misdescribes its own state is the defect this
+   * component exists to avoid, one layer in.
+   */
+  const explanation = halted
+    ? on
+      ? 'Automation is ON but HALTED, so nothing will be skipped — the halt is a separate latch. ' +
+        'Acknowledge it below to resume, or turn automation off here.'
+      : 'Automation is halted. Acknowledge the halt below before turning it back on.'
+    : on
+      ? 'Rules that match will skip the track.'
+      : 'Rules are evaluated and logged. Nothing will be skipped.';
+
   return {
     label: on ? 'Turn automation off' : 'Turn automation on',
     nextEnabled: !on,
     // ⚠️ Arming is refused while halted, so the button that would arm must not be offered. Disarming
     // is never refused, so it stays live even then.
     disabled: halted && !on,
-    explanation: halted
-      ? 'Automation is halted. Acknowledge the halt below before turning it back on.'
-      : on
-        ? 'Rules that match will skip the track.'
-        : 'Rules are evaluated and logged. Nothing will be skipped.',
+    explanation,
     warning: warningFor(view),
     on,
   };
@@ -175,12 +191,12 @@ export interface HaltPanel {
 export function haltPanel(halt: HaltView | null): HaltPanel | null {
   if (halt === null) return null;
 
-  // ⚠️ The CONSECUTIVE wording names the skip that latched it, which is one MORE than the threshold:
-  // the counter reads closed plays, so the skip being checked has not closed yet. Saying only "3" would
-  // under-describe what the listener just heard by one track.
+  // ⚠️ This briefly claimed the NEXT skip was what latched it. Wrong — measured 2026-10-04: three
+  // skips happened and the fourth track was refused. BR-43.4's confirmation grace means the play has
+  // closed by the time the halt is checked. See `MAX_CONSECUTIVE_RULE_SKIPS`.
   const what =
     halt.trigger === 'consecutive'
-      ? `${halt.observedCount} rule-skips in a row (the ${halt.observedCount + 1}th skip is what latched this — the count reads completed plays, so it trails the skip being checked by one)`
+      ? `${halt.observedCount} rule-skips in a row`
       : `${halt.observedCount} rule-skips within one hour`;
 
   return {

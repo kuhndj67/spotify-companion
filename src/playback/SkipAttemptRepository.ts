@@ -142,4 +142,14 @@ export interface SkipAttemptRepository {
    * instrumented rather than designed around.
    */
   unlinkedFiredCount(): number;
+
+  /**
+   * The ids of attempts that reached the player for these plays, oldest first.
+   *
+   * ⚠️ **This is BR-35.8's evidence for a CONSECUTIVE halt.** `firedSince` answers the hourly
+   * window's question and is the wrong set for this trigger: the first live halt recorded
+   * `attemptIds: [3,4,5,6,9,10,11]` for a run of **three**, because ids 3–6 were from an unrelated test
+   * an hour earlier. The user would have opened seven attempts to review three.
+   */
+  firedForPlays(playIds: readonly number[]): number[];
 }

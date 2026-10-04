@@ -270,7 +270,8 @@ export class SkipDrain {
   #checkHalt(automationAtStart: { globalAutomationEnabled: boolean }): void {
     const { attempts, recentPlays, state, nowMs, onHalt } = this.#deps;
 
-    const consecutive = consecutiveRuleSkips(recentPlays(CONSECUTIVE_LOOKBACK));
+    const recent = recentPlays(CONSECUTIVE_LOOKBACK);
+    const consecutive = consecutiveRuleSkips(recent);
     const windowStart = new Date(nowMs() - RULE_SKIP_WINDOW_MS).toISOString();
     const fired = attempts.firedSince(windowStart);
     const inWindow = ruleSkipsInWindow(
@@ -288,10 +289,22 @@ export class SkipDrain {
       // ⚠️ The limit in force AT THIS MOMENT, denormalised so a later change to the constant cannot
       // silently rewrite history.
       threshold: trigger.threshold,
-      // ⚠️ REAL attempt ids, so BR-35.8's review has rows to open. An earlier draft synthesised these
-      // from array indices, which would have pointed the user at attempts that do not exist -- in the
-      // one place they are asked to review evidence before clearing a safety latch.
-      attemptIds: fired.map((f) => f.id),
+      /*
+       * ⚠️ REAL attempt ids, so BR-35.8's review has rows to open. An earlier draft synthesised these
+       * from array indices, which would have pointed the user at attempts that do not exist.
+       *
+       * ⚠️ **AND THE SET MUST MATCH THE TRIGGER** — fixed 2026-10-04 after the first live halt recorded
+       * `[3,4,5,6,9,10,11]` for a run of **three**. `fired` is the HOURLY window, so ids 3–6 came from an
+       * unrelated test an hour earlier: the user would have opened seven attempts to review three.
+       * Evidence that includes rows the trigger did not count is worse than no list, because it reads as
+       * authoritative.
+       */
+      attemptIds:
+        trigger.trigger === 'consecutive'
+          ? attempts.firedForPlays(
+              recent.slice(recent.length - consecutive).map((p) => p.playId),
+            )
+          : fired.map((f) => f.id),
     };
 
     // ⚠️ Written, not merely reported. BR-35.7: the halt persists across restart and fails closed.

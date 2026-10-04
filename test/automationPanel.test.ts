@@ -199,14 +199,14 @@ describe('FC-U5-3 — the acknowledgement panel', () => {
     assert.match(p.detail, /2026-10-02T11:00:00.000Z/);
   });
 
-  it('⭐ ⚠️ explains that the NEXT skip after the threshold is what latched it', () => {
-    // The counter reads closed plays, so it trails the skip being checked by one: with a threshold of 3
-    // the FOURTH skip latches the halt, and four tracks were skipped. The panel has to say so, or the
-    // listener counts four skips against a stated limit of three and concludes the limit is broken.
+  it('⭐ ⚠️ states the count plainly — an earlier version claimed the NEXT skip latched it', () => {
+    // That claim was WRONG and was reverted 2026-10-04. Measured live: three skips happened and the
+    // FOURTH track was refused `runaway-halted`. BR-43.4's confirmation grace means the play has closed
+    // by the time the halt is checked, so the counter sees the skip it is checking. 3 means 3.
     const p = haltPanel(HALT)!;
     assert.match(p.detail, /3 rule-skips in a row/);
-    assert.match(p.detail, /4th skip is what latched this/);
-    assert.match(p.detail, /trails the skip being checked by one/);
+    assert.doesNotMatch(p.detail, /4th/, 'no off-by-one claim');
+    assert.doesNotMatch(p.detail, /trails the skip/);
   });
 
   it('distinguishes the two triggers in words, not just by a field', () => {

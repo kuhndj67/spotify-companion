@@ -238,6 +238,22 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
   unlinkedFiredCount(): number {
     return (this.#unlinked.get() as unknown as { n: number }).n;
   }
+
+  firedForPlays(playIds: readonly number[]): number[] {
+    if (playIds.length === 0) return [];
+    // ⚠️ Built per call rather than prepared once: the placeholder count varies with the run length.
+    // Every value is a number from the repository's own rows, so there is nothing to inject.
+    const holes = playIds.map(() => '?').join(', ');
+    const rows = this.#db
+      .prepare(
+        `SELECT id FROM skip_attempt
+          WHERE play_id IN (${holes})
+            AND state IN ('fired', 'confirmed', 'unconfirmed')
+          ORDER BY id`,
+      )
+      .all(...playIds) as unknown as { id: number }[];
+    return rows.map((r) => r.id);
+  }
 }
 
 function toAttempt(row: AttemptRow): SkipAttempt {

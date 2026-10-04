@@ -120,6 +120,48 @@ function harness(
     repo.transition(id, 'fired', { firedAt: '2026-10-02T11:30:00.000Z' });
   }
 
+  /*
+   * ⚠️ **A rule-skipped play has a LINKED fired attempt, so the fixture must create one.**
+   *
+   * Added 2026-10-04. `firedExtra` leaves `play_id` null, which was consistent with the old halt record
+   * (it listed the whole HOURLY window) and inconsistent with reality. The first live halt recorded
+   * `attemptIds: [3,4,5,6,9,10,11]` for a run of three, so `attemptIds` now comes from the plays in the
+   * consecutive run — and a fixture whose rule-skipped plays have no attempts would produce an empty
+   * evidence list while claiming a halt.
+   */
+  for (const p of over.recentPlays ?? []) {
+    if (!p.skippedByRule) continue;
+    // ⚠️ A real play row, because `skip_attempt.play_id` has a FOREIGN KEY to `play(id)`. The fake
+    // `recentPlays` ids were fictional; linking an attempt to one fails the constraint.
+    db.prepare(
+      `INSERT INTO play (id, track_id, title, artist_name, album_name, started_at, ended_at,
+                         outcome, close_reason, provenance, classifier_version,
+                         ev_listened_ms, ev_duration_ms, ev_completion_ratio, ev_max_progress_ms,
+                         ev_max_gap_ms, ev_observation_count, ev_saw_pause, ev_rewound,
+                         ev_ended_with_idle)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(p.playId, `track-${p.playId}`, 't', 'a', 'al', '2026-10-02T11:58:00.000Z',
+          '2026-10-02T11:59:00.000Z', 'skipped', 'track-change', 'live', 1,
+          0, 0, 0, 0, 0, 1, 0, 0, 0);
+
+    const id = repo.enqueue({
+      evaluationId: `ev-play-${p.playId}`,
+      playId: null,
+      trackId: `track-${p.playId}`,
+      ruleId: 'r1',
+      state: 'queued',
+      enqueuedAt: '2026-10-02T11:59:00.000Z',
+      firedAt: null,
+      refusedReason: null,
+      reportedTrackIdBefore: null,
+      reportedProgressMsBefore: null,
+      reportedTrackIdAfter: null,
+      reportedProgressMsAfter: null,
+    });
+    repo.transition(id, 'confirmed', { firedAt: '2026-10-02T11:59:00.000Z' });
+    repo.attachPlayId(`ev-play-${p.playId}`, p.playId);
+  }
+
   let posts = 0;
   const written: AutomationState[] = [];
   const halts: RunawayHalt[] = [];
@@ -543,6 +585,19 @@ describe('BR-35 — the halt is latched, with the threshold in force', () => {
 
     const ids = h.halts()[0]?.attemptIds ?? [];
     assert.ok(ids.length > 0, 'the review surface needs rows to open');
+    /*
+     * ⭐ ⚠️ **AND THE SET MATCHES THE TRIGGER.** The first live halt listed `[3,4,5,6,9,10,11]` for a
+     * run of THREE, because `attemptIds` came from the hourly window and ids 3–6 were an unrelated test
+     * an hour earlier. The user would have opened seven attempts to review three.
+     *
+     * Here: three plays in the consecutive run, plus two older `firedExtra` attempts inside the hour
+     * that belong to NO play. A consecutive halt must name the three.
+     */
+    assert.equal(
+      ids.length,
+      3,
+      'a consecutive halt names the consecutive run, not everything fired this hour',
+    );
     for (const id of ids) {
       assert.ok(h.repo.get(id), `attempt ${id} must exist`);
     }

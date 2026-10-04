@@ -904,10 +904,23 @@ race.** The reasoning was sound and the measurement said the opposite; `play_id`
 every time. ✅ Keyed on `play_id` now, with a missing link **surfaced** on `/api/diagnostics` rather than
 designed around — **a visible failure beats a clever key.**
 
-⚠️ **THE FOURTH CONSECUTIVE SKIP LATCHES THE HALT, NOT THE THIRD**, because the counter reads *closed*
-plays and the skip being checked has not closed yet. **Four tracks are skipped before automation stops.**
-Accepted (user, 2026-10-04) on condition it is stated **wherever the threshold is stated** — saying "3"
-alone under-describes it by one track.
+✅ **THE HALT WORKS, AND "3 CONSECUTIVE" MEANS 3** — measured on the first live halt, 2026-10-04. Three
+tracks were skipped, the halt latched at `observedCount: 3`, and the **fourth matching track was refused
+`runaway-halted` rather than skipped.** ⚠️ **A docstring, the UI, the pre-registration and a test all
+briefly claimed the FOURTH skip latched it** — reasoned from "the counter reads closed plays so it must
+trail by one", which BR-43.4's 3-second confirmation grace defeats: the play has closed by the time
+`#checkHalt` runs. ⚠️ **The wrong claim had a PASSING TEST**, whose fixture inserted the play row after
+the check — modelling the belief rather than the code. **A fixture built around a mental model confirms
+the model**, which happened twice in one day here.
+
+⚠️ **A halt's `attemptIds` must match its TRIGGER.** The first live halt listed **7 ids for a run of 3**,
+because the field was filled from the *hourly* window regardless of what fired — four of them were an
+unrelated test an hour earlier. BR-35.8 exists so the user can review *which skips counted*; evidence
+that includes rows the trigger did not count is worse than no list, because it reads as authoritative.
+
+⚠️ **`globalAutomationEnabled` stays `true` through a halt** (BR-33.4 — separate latch, never a write to
+the switch), so **halted-and-still-armed is a real state** and had no UI branch: the button read *"Turn
+automation off"* while the text said *"before turning it back on"*. It **was** on.
 
 **✅ THE INODE HAZARD IS NOW VERIFIED LIVE, not merely described — 2026-10-03.** U5's
 `AutomationStateStore.write` does write-temp-then-rename into `/state`, and after a kill-switch change

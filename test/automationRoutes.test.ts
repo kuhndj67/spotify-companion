@@ -108,6 +108,7 @@ function attempts(rows: { queued?: SkipAttempt[]; latest?: SkipAttempt | null })
     latest: () => rows.latest ?? null,
     reachedPlayerForEvaluation: () => false,
     unlinkedFiredCount: () => 0,
+    firedForPlays: () => [],
   };
 }
 

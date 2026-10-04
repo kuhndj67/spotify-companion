@@ -22,30 +22,31 @@
 | **Rolling hour** | `MAX_RULE_SKIPS_PER_HOUR` | **10** | BR-35.2 |
 | Window | `RULE_SKIP_WINDOW_MS` | 3 600 000 ms, half-open | BR-35.2 |
 
-### ⚠️ THE FOURTH CONSECUTIVE SKIP IS WHAT LATCHES THE HALT, NOT THE THIRD
+### ⚠️ WHAT "3 CONSECUTIVE" MEANS, MEASURED — and a wrong claim that was published here first
 
-Added 2026-10-04, after the first live arming. **The counter reads CLOSED plays**, and the skip that
-triggers the check has not closed yet — the track change it causes is what closes it. So at the check
-following skip N the counter sees at most N−1 closed rule-skips:
+**Three skips happen, then automation stops. The fourth matching track is refused, not skipped.**
+Measured on the first live halt, 2026-10-04 (three Def Leppard tracks):
 
-| skip | counter sees | halt? |
-|---|---|---|
-| 1 | 0 | no |
-| 2 | 1 | no |
-| 3 | 2 | no |
-| **4** | **3** | ⚠️ **yes** |
+| event | time |
+|---|---|
+| 3rd skip enqueued | `15:14:00.112` |
+| fired | `15:14:00.281` |
+| **halt latched**, `observedCount: 3` | `15:14:03.294` |
+| 4th matching track → **refused `runaway-halted`** | `15:14:06.101` |
 
-**Four tracks are skipped before automation stops.** This is **inherent to counting closed plays**, not an
-implementation slip, and it is **ACCEPTED** (user, 2026-10-04) — on the condition that it is **stated
-wherever the threshold is stated.** Anything that says *"3"* without saying *"the 4th skip latches it"*
-under-describes the behaviour by one track, and a listener who counts four skips against a stated limit of
-three will reasonably conclude the limit is broken.
+⚠️ **This section briefly said the FOURTH skip latched it. That was wrong, and it was wrong here before
+it was wrong anywhere else.** The reasoning: the counter reads *closed* plays, so the skip being checked
+cannot have closed yet, so the count must trail by one. **BR-43.4's 3-second confirmation grace defeats
+that** — `#checkHalt` runs after the wait, by which time the track change has happened, the play has
+closed, and `attachPlayId` has linked it.
 
-⚠️ It is stated in: `MAX_CONSECUTIVE_RULE_SKIPS`'s docstring, FC-U5-1's `halted` detail, FC-U5-3's
-acknowledgement panel, and pinned by `ruleSkipAgreement.test.ts`.
+⚠️ **And the wrong claim had a passing test**, which asserted `[0,1,2,3]` because its fixture inserted
+the play row *after* the halt check — modelling the belief rather than the code. **A fixture built around
+a mental model confirms the model.** Second occurrence in one day, after the 11–14 ms window race.
 
-⚠️ **The threshold itself is unchanged**, so §4's amendment procedure does not apply — this records what
-3 has always meant in practice, not a new value.
+⚠️ **The threshold itself never changed**, so §4's amendment procedure does not apply. What changed is a
+*description* of behaviour, corrected by measurement — recorded rather than quietly edited, because this
+document's whole value is that its claims can be checked against what was known when.
 
 Both live in `src/playback/types.ts`. ⚠️ **Neither is an environment variable, and that is deliberate
 in a file where every other cadence is one** — `POLL_INTERVAL_MS`, `RULES_POLL_INTERVAL_MS`,

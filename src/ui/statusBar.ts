@@ -319,17 +319,24 @@ export interface HaltSummary {
 export function automationIndicator(state: AutomationIndicatorState): Indicator {
   // 1. The halt, before the switch it turned off.
   if (state.halt !== null) {
-    // ⚠️ Consecutive: names the skip that latched it, which is threshold + 1. See
-    // `MAX_CONSECUTIVE_RULE_SKIPS`.
-    const what =
-      state.halt.trigger === 'consecutive'
-        ? `${state.halt.observedCount} rule-skips in a row — the ${state.halt.observedCount + 1}th is what latched it`
-        : `${state.halt.observedCount} rule-skips in one hour`;
+    /*
+     * ⚠️ **A POINTER, NOT AN EXPLANATION**, and deliberately short (user direction, 2026-10-04).
+     *
+     * The counts, the trigger, the threshold in force and the attempt ids are all on the Rules pop-up,
+     * beside the two buttons that can clear it — the only place any of it is actionable. Repeating them
+     * here would put a paragraph on a screen meant to be glanceable, and this text reaches the
+     * aria-label too, so it is read aloud in full.
+     *
+     * ⚠️ The halt is NOT under-reported: the dot has its own label, glyph, colour, badge and pulse.
+     * What is withheld is only the prose.
+     *
+     * ⚠️ It still says what to do and where, because a dot that only says `HALTED` leaves the reader
+     * with nowhere to go. One sentence is the budget.
+     */
     return indicator(
       'halted',
       'Automation HALTED',
-      `Stopped itself after ${what}, against a limit of ${state.halt.threshold}. ` +
-        `Automation is off and stays off until you acknowledge this on the Rules panel.`,
+      'Automation stopped itself. Open the Rules panel to review it and clear the halt.',
     );
   }
 
@@ -445,17 +452,23 @@ export function statusBar(state: StatusBarState): StatusBar {
     ...(state.automation === null ? [] : [automationIndicator(state.automation)]),
   ];
 
-  // ⚠️ Recording first, always. It is the only subsystem whose failure loses something that
-  // cannot be recreated; the others lose a view of data that is still being collected.
-  //
-  // ⚠️ **TWO passes, and `fail` outranks `halted` regardless of position** (U5). A halt is the
-  // system working as designed and is cleared by a deliberate act; a `fail` is something broken. A
-  // single pass accepting either would let a standing halt — which can last days, since only an
-  // acknowledgement clears it — permanently occupy the one message slot and hide every later fault.
-  const worst =
-    indicators.find((i) => i.level === 'fail') ??
-    indicators.find((i) => i.level === 'halted') ??
-    null;
+  /*
+   * ⚠️ Recording first, always. It is the only subsystem whose failure loses something that cannot be
+   * recreated; the others lose a view of data that is still being collected.
+   *
+   * ⚠️ **`halted` DELIBERATELY DOES NOT TAKE THE MESSAGE SLOT** — changed 2026-10-04 at the user's
+   * direction, after the first live halt put a paragraph of prose on the primary screen.
+   *
+   * It was in here on the reasoning that a halt is the one thing the user must act on. That reasoning
+   * holds and the conclusion did not: the DOT already says `Automation HALTED`, with its own glyph,
+   * colour, badge and pulse. What belongs beside the two buttons that can clear it is the explanation,
+   * and that is the Rules pop-up.
+   *
+   * ⚠️ **The primary screen is a display, not a console.** It stays visible for hours, and a halt
+   * stands until someone acknowledges it — so a halt here would park a paragraph indefinitely, which is
+   * both noise and a hiding place for the next real fault.
+   */
+  const worst = indicators.find((i) => i.level === 'fail') ?? null;
 
   return {
     indicators,

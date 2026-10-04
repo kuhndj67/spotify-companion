@@ -689,17 +689,26 @@ export function createApi(deps: ApiDeps): Router {
   /**
    * Acknowledge a runaway halt (BR-35.5, BR-35.8).
    *
-   * ## ⚠️ TWO STATEMENTS, not one with a default
+   * ## ⚠️ IT ALWAYS LEAVES AUTOMATION OFF. There is no `reArm`, by design.
    *
-   * *"I have reviewed this"* and *"turn automation back on"* are different decisions, so `reArm` is
-   * required rather than defaulted. A default of `true` would re-arm on a click meant only to clear the
-   * banner; a default of `false` would silently discard the user's intent to resume. Neither is a thing
-   * to guess at the surface that releases a safety latch.
+   * Revised 2026-10-04. It used to take `reArm: boolean`, required and undefaulted, so that
+   * *"I have reviewed this"* and *"turn automation back on"* stayed distinct decisions (BR-35.5).
+   * **The distinction is right; putting it in this route was wrong.**
    *
-   * ⚠️ **`409` when nothing is halted, rather than an idempotent success.** Otherwise this route is a
-   * second way to arm automation — `{ reArm: true }` with no halt present would bypass the check the
-   * `POST /api/automation` handler makes. The body carries the current state so the UI re-renders
-   * correctly instead of showing an error it cannot explain.
+   * ⚠️ Acknowledging now **unconditionally sets `globalAutomationEnabled: false`**, so resuming is a
+   * **second, deliberate** act performed on `POST /api/automation` — the ordinary switch. That separates
+   * the two acts more strictly than a parameter did: with `reArm`, a single click could clear a safety
+   * latch *and* re-arm in one request, which is precisely what BR-35.5 exists to prevent.
+   *
+   * ⚠️ **And it collapses the UI's state space.** Three simultaneous controls — the kill switch plus two
+   * halt buttons — made a linear recovery combinatorial, with orderings that had to be defined and added
+   * nothing. One action here, one on the switch afterwards.
+   *
+   * ⚠️ **`reArm` in the body is now a 400, not an ignored field.** A stale client sending `reArm: true`
+   * would otherwise believe it had resumed, and be wrong — the silent-success failure mode.
+   *
+   * ⚠️ **`409` when nothing is halted**, rather than an idempotent success, so this cannot become a
+   * second route that touches the switch. The body carries the current state so the UI re-renders.
    */
   router.post('/api/automation/acknowledge-halt', (req, res) => {
     if (deps.automation === null) {
@@ -708,16 +717,17 @@ export function createApi(deps: ApiDeps): Router {
     }
 
     const body = req.body as { reArm?: unknown } | undefined;
-    if (typeof body?.reArm !== 'boolean') {
+    if (body !== undefined && 'reArm' in body) {
+      // ⚠️ Refused rather than ignored: a client that sent `reArm: true` and got a 200 would believe it
+      // had resumed automation. Silently doing less than asked is the worst of the three options.
       res.status(400).json({
-        error: 'reArm must be a boolean.',
+        error: 'reArm is no longer accepted.',
         detail:
-          'false acknowledges the halt and leaves automation off; true also turns it back on. ' +
-          'There is no default, because the two are different decisions (BR-35.5).',
+          'Acknowledging a halt always leaves automation OFF. Resume with ' +
+          'POST /api/automation {"enabled":true}, which is a separate, deliberate act (BR-35.5).',
       });
       return;
     }
-    const reArm = body.reArm;
 
     const before = deps.automation.read();
     if (before.state.runawayHalt === null) {
@@ -730,10 +740,12 @@ export function createApi(deps: ApiDeps): Router {
       return;
     }
 
+    // ⚠️ BOTH fields, every time. Clearing the latch without disarming would let automation resume the
+    // instant the halt went away — which is the compound action BR-35.5 forbids, just implicit.
     const outcome = deps.automation.write({
       ...before.state,
       runawayHalt: null,
-      globalAutomationEnabled: reArm,
+      globalAutomationEnabled: false,
     });
     const payload = automationPayload(deps.automation, outcome.ok ? null : outcome.reason);
 

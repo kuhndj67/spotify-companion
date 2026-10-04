@@ -107,9 +107,17 @@ describe('⚠️ app.js still derives nothing else about the bar', () => {
     // The documented worst case is a kill switch that works in the UI and does not persist. These
     // three are what `switchView` returns, and app.js must not second-guess any of them.
     const source = app();
-    for (const field of ['view.label', 'view.disabled', 'view.warning', 'view.explanation']) {
+    for (const field of ['view.label', 'view.disabled', 'view.warning', 'view.explanation', 'view.rendered']) {
       assert.ok(source.includes(field), `${field} must come from the server`);
     }
+    // ⚠️ ONE halt button, and app.js must not invent a second. Three controls on screen at once is
+    // what made recovery combinatorial (2026-10-04).
+    assert.ok(!source.includes('automation-rearm'), 'the re-arm button is gone, not merely unused');
+    assert.equal(
+      (source.match(/data\.haltPanel/g) ?? []).length >= 1,
+      true,
+      'the panel is still rendered from the server view',
+    );
   });
 
   it('⭐ ⚠️ app.js keeps NO optimistic enabled state', () => {

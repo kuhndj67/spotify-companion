@@ -44,6 +44,24 @@ export interface HaltView {
 }
 
 export interface SwitchView {
+  /**
+   * ⚠️ **Whether the switch is shown AT ALL.** `false` while halted.
+   *
+   * ## ⚠️ ONE CONTROL AT A TIME, because three buttons is a state machine
+   *
+   * Until 2026-10-04 a halt rendered **three** controls together: the kill switch, *"I have reviewed
+   * this"* and *"turn automation back on"*. That turns a linear recovery into a combinatorial one —
+   * every ordering has to be defined and defended, and none of the variations adds anything.
+   *
+   * ⚠️ **And the switch LIED.** `globalAutomationEnabled` stays `true` through a halt (BR-33.4 — the
+   * halt is a third latch, never a write to the switch), so it read *"Turn automation off"* while nothing
+   * could be skipped. A control that describes a state the system is not in is worse than no control.
+   *
+   * While halted there is exactly one thing to do, so exactly one button is offered. The switch returns
+   * once the halt is cleared, and it then reads `Turn automation on` — because acknowledging lands in the
+   * off state by construction.
+   */
+  readonly rendered: boolean;
   /** What the button says. */
   readonly label: string;
   /** What pressing it would ask for. `null` when the button must not be pressable. */
@@ -82,6 +100,7 @@ export function switchView(view: AutomationView): SwitchView {
 
   if (view.enabled === null) {
     return {
+      rendered: true,
       label: 'Automation',
       nextEnabled: null,
       disabled: true,
@@ -93,6 +112,7 @@ export function switchView(view: AutomationView): SwitchView {
 
   if (!view.executorEnabled) {
     return {
+      rendered: true,
       label: 'Automation unavailable',
       nextEnabled: null,
       disabled: true,
@@ -107,37 +127,35 @@ export function switchView(view: AutomationView): SwitchView {
     };
   }
 
-  // ⚠️ The halt is not handled here. It is a separate control (FC-U5-3), and the API refuses to ARM
-  // while it stands — so the switch stays pressable for the direction that always has to work: off.
-  const halted = view.halt !== null;
-
   /*
-   * ⚠️ **HALTED-AND-STILL-ARMED IS A REAL STATE, and it had no branch until 2026-10-04.**
+   * ⚠️ **WHILE HALTED, THE SWITCH IS NOT RENDERED AT ALL** (2026-10-04, user direction).
    *
-   * BR-33.4 keeps the halt a **separate latch** and never writes the kill switch — so after a halt
-   * `globalAutomationEnabled` is still `true` while every attempt is refused `runaway-halted`. Observed
-   * live on the first halt.
-   *
-   * The old text said *"Acknowledge the halt below before turning it back on"* over a button reading
-   * *"Turn automation off"*. It **was** on. A control that misdescribes its own state is the defect this
-   * component exists to avoid, one layer in.
+   * Nothing is being skipped — the halt guarantees that — so the switch has no safety role here, and
+   * showing it alongside the halt panel's button was the whole source of the combinatorial mess. The
+   * single action on the panel lands in the off state, which is the only destination the switch could
+   * have offered anyway.
    */
-  const explanation = halted
-    ? on
-      ? 'Automation is ON but HALTED, so nothing will be skipped — the halt is a separate latch. ' +
-        'Acknowledge it below to resume, or turn automation off here.'
-      : 'Automation is halted. Acknowledge the halt below before turning it back on.'
-    : on
-      ? 'Rules that match will skip the track.'
-      : 'Rules are evaluated and logged. Nothing will be skipped.';
+  if (view.halt !== null) {
+    return {
+      rendered: false,
+      label: '',
+      nextEnabled: null,
+      disabled: true,
+      explanation:
+        'Automation stopped itself and nothing is being skipped. Review the halt below to continue.',
+      warning: warningFor(view),
+      on,
+    };
+  }
 
   return {
+    rendered: true,
     label: on ? 'Turn automation off' : 'Turn automation on',
     nextEnabled: !on,
-    // ⚠️ Arming is refused while halted, so the button that would arm must not be offered. Disarming
-    // is never refused, so it stays live even then.
-    disabled: halted && !on,
-    explanation,
+    disabled: false,
+    explanation: on
+      ? 'Rules that match will skip the track.'
+      : 'Rules are evaluated and logged. Nothing will be skipped.',
     warning: warningFor(view),
     on,
   };
@@ -177,9 +195,22 @@ export interface HaltPanel {
   /** ⚠️ Real `skip_attempt` ids. An empty list is itself worth showing — see `attemptsNote`. */
   readonly attemptIds: readonly number[];
   readonly attemptsNote: string;
-  /** BR-35.5 — two statements, two buttons. */
+  /**
+   * ⚠️ **ONE button, and it clears the halt AND leaves automation OFF.**
+   *
+   * ## Why not two
+   *
+   * FC-U5-3 originally specified two — *"I have reviewed this"* and *"turn automation back on"* — to keep
+   * acknowledging distinct from resuming (BR-35.5). **The distinction is right and the mechanism was
+   * wrong**: shown together, with the kill switch beside them, three controls made a linear recovery
+   * into a state machine whose orderings all had to be defined and none of which added anything.
+   *
+   * ⚠️ **Sequencing separates the two acts more cleanly than juxtaposing them.** Acknowledging forces
+   * `globalAutomationEnabled: false`, so resuming is unavoidably a **second, deliberate** act performed
+   * on the ordinary switch — which is exactly what BR-35.5 is protecting, and it can no longer be done
+   * by accident while reaching for the other button.
+   */
   readonly acknowledgeLabel: string;
-  readonly reArmLabel: string;
 }
 
 /**
@@ -203,14 +234,15 @@ export function haltPanel(halt: HaltView | null): HaltPanel | null {
     heading: 'Automation stopped itself',
     detail:
       `${what}, against a limit of ${halt.threshold}, at ${halt.haltedAt}. ` +
-      'Automation has been off since then and will stay off until you act on this. ' +
+      'Nothing has been skipped since. ' +
       '⚠️ The limit is a safety bound, not a setting — if it was reached legitimately, the rule is ' +
-      'matching far more than expected and is worth reading before it is re-armed.',
+      'matching far more than expected and is worth reading before automation is turned back on. ' +
+      'Clearing this halt leaves automation OFF; turn it back on from the switch above when you are ready.',
     attemptIds: halt.attemptIds,
     attemptsNote: attemptsNote(halt.attemptIds),
-    // ⚠️ Two statements, and the labels say which is which. Neither is the default.
-    acknowledgeLabel: 'I have reviewed this',
-    reArmLabel: 'Turn automation back on',
+    // ⚠️ The label states BOTH effects, because the button does both: it clears the latch and leaves
+    // automation off. A label reading only "I have reviewed this" would hide the second half.
+    acknowledgeLabel: 'I have reviewed this — clear the halt and leave automation off',
   };
 }
 

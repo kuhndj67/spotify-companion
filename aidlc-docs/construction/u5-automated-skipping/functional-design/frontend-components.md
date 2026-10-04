@@ -137,9 +137,36 @@ surface state **what tripped it**.
 | The count observed, and the threshold in force **at that moment** | `RunawayHalt.observedCount`, `.threshold` |
 | A link to the `SkipAttempt` rows that counted | `RunawayHalt.attemptIds` |
 
-⚠️ **Acknowledging is a separate act from enabling automation** (BR-35.5). Two buttons, never one:
-*"I have reviewed this"* and *"turn automation back on"* are different statements, and a single button
-would make the system's halt indistinguishable from the user's own choice.
+⚠️ **REVISED 2026-10-04 — ONE button, not two.** The original text follows, struck through, because the
+*distinction* it protects is right and its *mechanism* was wrong.
+
+~~Two buttons, never one: *"I have reviewed this"* and *"turn automation back on"* are different
+statements, and a single button would make the system's halt indistinguishable from the user's own
+choice.~~
+
+**What was wrong with it.** Shown together — and alongside the kill switch, which BR-33.4 leaves reading
+*"Turn automation off"* through a halt — that is **three controls on screen for one recovery**. Every
+ordering then has to be defined and defended (what does pressing the switch before acknowledging mean?),
+and none of the variations adds anything. ⚠️ **It turns a linear process into a state machine.**
+
+**What replaces it, and why it is stricter rather than looser:**
+
+| State | Controls shown |
+|---|---|
+| **Halted** | **one** — *"I have reviewed this — clear the halt and leave automation off"* |
+| Not halted | **one** — the ordinary kill switch |
+
+⚠️ **Acknowledging unconditionally sets `globalAutomationEnabled: false`**, so resuming is unavoidably a
+**second, deliberate act** on the ordinary switch. With two buttons, one click could clear a safety latch
+*and* re-arm — which is precisely what BR-35.5 exists to prevent. **Sequencing the two acts separates
+them more strictly than juxtaposing them.**
+
+⚠️ **The switch is NOT RENDERED while halted**, because nothing is being skipped and it has no safety
+role there. The region is not blank: it explains why, and points down at the one available action.
+
+⚠️ **BR-35.5 and BR-35.6 are UNCHANGED.** BR-35.5 says the halt is a *third latch* and that
+acknowledging and enabling are *different acts*; both hold. BR-35.6's *explicit acknowledgement only*
+holds — the single button is that acknowledgement.
 
 ⚠️ **The acknowledgement must not be the only place the halt is visible.** A user who does not open
 the Rules pop-up would see automation silently doing nothing. That is what FC-U5-1's `halted` state is

@@ -1593,19 +1593,24 @@ function renderAutomation() {
   const row = document.createElement('div');
   row.className = 'automation-row';
 
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'automation-switch';
-  button.dataset.testid = 'automation-switch';
-  // ⚠️ Every one of these comes from the server's derived view. None is decided here.
-  button.textContent = view.label;
-  button.disabled = view.disabled;
-  button.dataset.on = String(view.on);
-  button.setAttribute('aria-pressed', String(view.on));
-  if (view.nextEnabled !== null) {
-    button.addEventListener('click', () => void setAutomation(view.nextEnabled));
+  // ⚠️ **ONE CONTROL AT A TIME.** While halted the server returns `rendered: false` and the halt panel
+  // below owns the only available action. Showing the switch as well is what made recovery a state
+  // machine -- and it read "Turn automation off" while the halt already guaranteed nothing was skipped.
+  if (view.rendered) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'automation-switch';
+    button.dataset.testid = 'automation-switch';
+    // ⚠️ Every one of these comes from the server's derived view. None is decided here.
+    button.textContent = view.label;
+    button.disabled = view.disabled;
+    button.dataset.on = String(view.on);
+    button.setAttribute('aria-pressed', String(view.on));
+    if (view.nextEnabled !== null) {
+      button.addEventListener('click', () => void setAutomation(view.nextEnabled));
+    }
+    row.append(button);
   }
-  row.append(button);
 
   const explanation = document.createElement('span');
   explanation.className = 'muted';
@@ -1646,9 +1651,13 @@ function haltPanelView(panel) {
   attempts.className = 'muted';
   attempts.textContent = panel.attemptsNote;
 
-  // ⚠️ TWO buttons, never one (BR-35.5). "I have reviewed this" and "turn automation back on" are
-  // different statements; collapsing them would make the system's halt indistinguishable from the
-  // user's own choice. Neither is marked as the default.
+  // ⚠️ **ONE button.** It clears the halt AND leaves automation off, and its label says both.
+  //
+  // FC-U5-3 originally specified two -- "I have reviewed this" and "turn automation back on" -- to keep
+  // acknowledging distinct from resuming (BR-35.5). The distinction is right and the mechanism was
+  // wrong: three controls on screen at once made a linear recovery combinatorial. Sequencing the two
+  // acts separates them more strictly than juxtaposing them, because resuming now cannot happen in the
+  // same click.
   const actions = document.createElement('div');
   actions.className = 'automation-halt-actions';
 
@@ -1657,16 +1666,9 @@ function haltPanelView(panel) {
   acknowledge.className = 'automation-switch';
   acknowledge.dataset.testid = 'automation-acknowledge';
   acknowledge.textContent = panel.acknowledgeLabel;
-  acknowledge.addEventListener('click', () => void acknowledgeHalt(false));
+  acknowledge.addEventListener('click', () => void acknowledgeHalt());
 
-  const reArm = document.createElement('button');
-  reArm.type = 'button';
-  reArm.className = 'automation-switch';
-  reArm.dataset.testid = 'automation-rearm';
-  reArm.textContent = panel.reArmLabel;
-  reArm.addEventListener('click', () => void acknowledgeHalt(true));
-
-  actions.append(acknowledge, reArm);
+  actions.append(acknowledge);
   box.append(heading, detail, attempts, actions);
   return box;
 }
@@ -1682,8 +1684,12 @@ async function setAutomation(enabled) {
   await postAutomation('/api/automation', { enabled });
 }
 
-async function acknowledgeHalt(reArm) {
-  await postAutomation('/api/automation/acknowledge-halt', { reArm });
+/**
+ * ⚠️ No parameter. Acknowledging always leaves automation OFF; resuming is the ordinary switch, which
+ * reappears once the halt is cleared. The route rejects `reArm` outright rather than ignoring it.
+ */
+async function acknowledgeHalt() {
+  await postAutomation('/api/automation/acknowledge-halt', {});
 }
 
 async function postAutomation(path, payload) {

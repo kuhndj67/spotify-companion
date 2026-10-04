@@ -79,6 +79,8 @@ describe('FC-U5-2 — the ordinary two states', () => {
       view({ halt: HALT }),
       view({ enabled: true, halt: HALT }),
     ]) {
+      // ⚠️ Including the halted states, where the switch is not RENDERED -- the explanation is what
+      // occupies that space, so it matters more there, not less.
       assert.ok(switchView(v).explanation.length > 0, JSON.stringify(v));
     }
   });
@@ -166,23 +168,46 @@ describe('⭐ the asymmetry: an unwritable state file does NOT disable the switc
   });
 });
 
-describe('⭐ arming is refused while halted; disarming never is', () => {
-  it('⚠️ the ARM button is not offered while a halt stands', () => {
-    // BR-35.6: a latch cleared as a side effect of flipping a switch is not an acknowledgement. The API
-    // returns 409 for this, and offering a button that gets a 409 is offering a broken control.
-    const s = switchView(view({ enabled: false, halt: HALT }));
-    assert.equal(s.disabled, true);
-    assert.match(s.explanation, /Acknowledge the halt/);
+describe('⭐⭐ ONE CONTROL AT A TIME — the switch is not rendered while halted', () => {
+  /**
+   * ⚠️ Until 2026-10-04 a halt showed **three** controls at once: the kill switch, *"I have reviewed
+   * this"* and *"turn automation back on"*. Three buttons make a linear recovery combinatorial — every
+   * ordering has to be defined and defended, and none of the variations adds anything.
+   *
+   * ⚠️ **And the switch LIED.** `globalAutomationEnabled` stays `true` through a halt (BR-33.4 — a
+   * third latch, never a write to the switch), so it read *"Turn automation off"* while the halt already
+   * guaranteed nothing could be skipped.
+   */
+  it('⚠️ halted → rendered: false, whichever way the switch was left', () => {
+    for (const enabled of [true, false]) {
+      const s = switchView(view({ enabled, halt: HALT }));
+      assert.equal(s.rendered, false, `enabled=${enabled}`);
+      assert.equal(s.nextEnabled, null, 'and no direction is offered');
+    }
   });
 
-  it('⚠️ but DISARMING stays live even while halted', () => {
-    // Turning automation off must work in every state the app can reach. (A halt normally sets the
-    // switch off, so this is the state reached by a write that half-landed -- which is exactly when a
-    // user would most want to press stop.)
+  it('⚠️ it still explains WHY it is absent — never a blank space', () => {
+    // An empty region is the `Label detail` dash again: it reads as broken, or as nothing to do.
     const s = switchView(view({ enabled: true, halt: HALT }));
+    assert.match(s.explanation, /stopped itself/);
+    assert.match(s.explanation, /Review the halt below/);
+    assert.doesNotMatch(s.explanation, /Turn automation/, 'it does not describe a control that is absent');
+  });
+
+  it('⭐ and it comes BACK, reading `Turn automation on`, once the halt is cleared', () => {
+    // The linear path: acknowledge -> halt gone, automation off -> the ordinary switch offers `on`.
+    // Acknowledging always disarms, so this is the only state the panel can hand over to.
+    const s = switchView(view({ enabled: false, halt: null }));
+    assert.equal(s.rendered, true);
+    assert.match(s.label, /Turn automation on/);
+    assert.equal(s.nextEnabled, true);
     assert.equal(s.disabled, false);
-    assert.equal(s.nextEnabled, false);
-    assert.match(s.label, /Turn automation off/);
+  });
+
+  it('⚠️ every un-halted state renders the switch', () => {
+    for (const v of [view({ enabled: true }), view({ enabled: false }), view({ enabled: null }), view({ executorEnabled: false })]) {
+      assert.equal(switchView(v).rendered, true, JSON.stringify(v));
+    }
   });
 });
 
@@ -223,13 +248,24 @@ describe('FC-U5-3 — the acknowledgement panel', () => {
     assert.match(haltPanel(HALT)!.detail, /safety bound, not a setting/);
   });
 
-  it('⭐ ⚠️ two buttons, and the labels are two different statements', () => {
-    // BR-35.5. A single button would make the system's halt indistinguishable from the user's own
-    // choice -- which is the distinction the halt exists to create.
+  it('⭐⭐ ONE button, and its label states BOTH effects', () => {
+    // FC-U5-3 originally specified two, to keep acknowledging distinct from resuming (BR-35.5). The
+    // distinction is right and the mechanism was wrong: sequencing the two acts separates them more
+    // strictly than juxtaposing them, because resuming can no longer happen in the same click.
+    //
+    // ⚠️ The label must say it leaves automation OFF. "I have reviewed this" alone hides half of what
+    // the button does, and the user would expect skipping to resume.
     const p = haltPanel(HALT)!;
-    assert.match(p.acknowledgeLabel, /reviewed/);
-    assert.match(p.reArmLabel, /back on/);
-    assert.notEqual(p.acknowledgeLabel, p.reArmLabel);
+    assert.match(p.acknowledgeLabel, /reviewed/, 'it is still an acknowledgement');
+    assert.match(p.acknowledgeLabel, /clear the halt/);
+    assert.match(p.acknowledgeLabel, /leave automation off/i, 'and it says so');
+    assert.equal('reArmLabel' in p, false, 'the second button is gone, not merely unused');
+  });
+
+  it('⚠️ the detail says clearing it leaves automation off, and where to resume', () => {
+    const p = haltPanel(HALT)!;
+    assert.match(p.detail, /leaves automation OFF/);
+    assert.match(p.detail, /switch above/, 'it names where the second act happens');
   });
 
   it('names the real attempt ids', () => {

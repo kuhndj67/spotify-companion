@@ -182,7 +182,7 @@ describe('not deployed — every route degrades to 503 rather than throwing', ()
     it(`${method} ${path} is 503 when automation is null`, async () => {
       await withServer({ automation: null }, async (base) => {
         const response =
-          method === 'GET' ? await fetch(`${base}${path}`) : await post(base, path, { enabled: true, reArm: true });
+          method === 'GET' ? await fetch(`${base}${path}`) : await post(base, path, { enabled: true });
         assert.equal(response.status, 503);
       });
     });
@@ -408,82 +408,97 @@ describe('⭐ PBT-35 — the halt and the switch are two latches, not one', () =
     });
   });
 
-  it('acknowledging does NOT arm automation', async () => {
-    const c = control({ ...OFF, runawayHalt: HALT });
-    await withServer({ automation: c.api }, async (base) => {
-      await post(base, '/api/automation/acknowledge-halt', { reArm: false });
-      assert.equal(c.current().runawayHalt, null);
-      assert.equal(c.current().globalAutomationEnabled, false, 'reviewed is not resume');
-    });
+  it('⭐ acknowledging NEVER arms automation — even when it was armed before', async () => {
+    // Revised 2026-10-04: there is no `reArm` any more, so this is unconditional rather than a choice.
+    // ⚠️ The `enabled: true` case is the one that matters: the halt leaves the switch ON (BR-33.4), so
+    // clearing the latch WITHOUT disarming would resume skipping the instant the halt went away -- the
+    // compound action BR-35.5 forbids, just implicit instead of explicit.
+    for (const wasEnabled of [true, false]) {
+      const c = control({ globalAutomationEnabled: wasEnabled, runawayHalt: HALT, schemaVersion: 1 });
+      await withServer({ automation: c.api }, async (base) => {
+        const r = await post(base, '/api/automation/acknowledge-halt', {});
+        assert.equal(r.status, 200, `wasEnabled=${wasEnabled}`);
+        assert.equal(c.current().runawayHalt, null, 'latch cleared');
+        assert.equal(c.current().globalAutomationEnabled, false, 'and ALWAYS disarmed');
+      });
+    }
   });
 });
 
-describe('POST /api/automation/acknowledge-halt', () => {
-  it('clears the halt and leaves automation OFF when reArm is false', async () => {
+describe('POST /api/automation/acknowledge-halt — one action, no variations', () => {
+  it('⭐ clears the halt and leaves automation OFF, with no parameters', async () => {
     const c = control({ ...OFF, runawayHalt: HALT });
     await withServer({ automation: c.api }, async (base) => {
-      const response = await post(base, '/api/automation/acknowledge-halt', { reArm: false });
+      const response = await post(base, '/api/automation/acknowledge-halt', {});
       assert.equal(response.status, 200);
       const body: Body = await response.json();
       assert.equal(body.halt, null);
       assert.equal(body.acknowledged, true);
-      assert.equal(body.enabled, false, 'reviewed is not the same statement as resume');
+      assert.equal(body.enabled, false);
       assert.equal(c.current().runawayHalt, null);
       assert.equal(c.current().globalAutomationEnabled, false);
     });
   });
 
-  it('clears the halt and arms automation when reArm is true', async () => {
+  it('⭐ ⚠️ `reArm` is REFUSED, not ignored', async () => {
+    // A stale client sending `reArm: true` and receiving a 200 would believe it had resumed automation.
+    // Silently doing less than asked is the worst of the three options -- the failure is invisible.
     const c = control({ ...OFF, runawayHalt: HALT });
     await withServer({ automation: c.api }, async (base) => {
-      const body: Body = await (
-        await post(base, '/api/automation/acknowledge-halt', { reArm: true })
-      ).json();
-      assert.equal(body.halt, null);
-      assert.equal(body.enabled, true);
-      assert.equal(c.current().globalAutomationEnabled, true);
-    });
-  });
-
-  it('⚠️ reArm has NO DEFAULT — a missing field is 400', async () => {
-    // BR-35.5: the two buttons are different statements. A default of `true` would re-arm on a click
-    // meant only to clear the banner; a default of `false` would discard an intent to resume.
-    const c = control({ ...OFF, runawayHalt: HALT });
-    await withServer({ automation: c.api }, async (base) => {
-      for (const body of [{}, { reArm: 'true' }, { reArm: 1 }]) {
-        assert.equal(
-          (await post(base, '/api/automation/acknowledge-halt', body)).status,
-          400,
-          JSON.stringify(body),
-        );
+      for (const body of [{ reArm: true }, { reArm: false }]) {
+        const r = await post(base, '/api/automation/acknowledge-halt', body);
+        assert.equal(r.status, 400, JSON.stringify(body));
+        const j: Body = await r.json();
+        assert.match(j.detail, /always leaves automation OFF/);
+        assert.match(j.detail, /POST \/api\/automation/, 'and it names where resuming happens');
       }
-      assert.equal(c.writes.length, 0, 'the latch was not touched');
-      assert.deepEqual(c.current().runawayHalt, HALT);
+      assert.equal(c.writes.length, 0, 'and nothing was written');
+      assert.deepEqual(c.current().runawayHalt, HALT, 'the latch still stands');
     });
   });
 
-  it('⭐ ⚠️ is 409 when nothing is halted, so it cannot be used to arm automation', async () => {
-    // Otherwise `{reArm: true}` with no halt present is a second path to `globalAutomationEnabled:
-    // true` that skips the check POST /api/automation makes.
+  it('⭐ ⚠️ is 409 when nothing is halted, so it cannot touch the switch', async () => {
+    // Without this it would be a second route that writes `globalAutomationEnabled` -- now always to
+    // `false`, which would be a way to disarm by calling the acknowledgement endpoint.
     const c = control(OFF);
     await withServer({ automation: c.api }, async (base) => {
-      const response = await post(base, '/api/automation/acknowledge-halt', { reArm: true });
+      const response = await post(base, '/api/automation/acknowledge-halt', {});
       assert.equal(response.status, 409);
       const body: Body = await response.json();
       assert.equal(body.enabled, false, 'the body carries the real state so the UI re-renders');
       assert.equal(c.writes.length, 0);
-      assert.equal(c.current().globalAutomationEnabled, false);
+    });
+  });
+
+  it('⚠️ 409 even when automation is ON, rather than disarming it', async () => {
+    const c = control({ ...OFF, globalAutomationEnabled: true });
+    await withServer({ automation: c.api }, async (base) => {
+      assert.equal((await post(base, '/api/automation/acknowledge-halt', {})).status, 409);
+      assert.equal(c.current().globalAutomationEnabled, true, 'untouched');
     });
   });
 
   it('⚠️ a failed write reports 503 and does not claim the halt was acknowledged', async () => {
     const c = control({ ...OFF, runawayHalt: HALT }, { writeFails: 'EACCES' });
     await withServer({ automation: c.api }, async (base) => {
-      const response = await post(base, '/api/automation/acknowledge-halt', { reArm: false });
+      const response = await post(base, '/api/automation/acknowledge-halt', {});
       assert.equal(response.status, 503);
       const body: Body = await response.json();
       assert.equal(body.acknowledged, false);
       assert.deepEqual(body.halt, HALT, 'still halted, because the write did not land');
+    });
+  });
+
+  it('⭐ the halted response hands over to a switch that reads `Turn automation on`', async () => {
+    // The whole linear path in one assertion: acknowledge -> halt gone, disarmed, switch back and
+    // offering the one remaining action.
+    const c = control({ globalAutomationEnabled: true, runawayHalt: HALT, schemaVersion: 1 });
+    await withServer({ automation: c.api, skipExecutorEnabled: true }, async (base) => {
+      const body: Body = await (await post(base, '/api/automation/acknowledge-halt', {})).json();
+      assert.equal(body.haltPanel, null, 'the panel is gone');
+      assert.equal(body.view.rendered, true, 'and the switch is back');
+      assert.match(body.view.label, /Turn automation on/);
+      assert.equal(body.view.nextEnabled, true);
     });
   });
 });

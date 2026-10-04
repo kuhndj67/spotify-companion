@@ -43,6 +43,9 @@ import type {
   UnknownReason,
 } from '../musicbrainz/types.js';
 import { bucketOf } from './playStats.js';
+// ⚠️ The SAFETY LIMIT's definition of "a rule skipped this play". Imported, never re-expressed:
+// the label on `skip_source` and the halt counter must not be able to disagree.
+import { ruleSkippedThisPlay } from '../playback/SqliteSkipAttemptRepository.js';
 import type {
   CoverageStats,
   CloseReason,
@@ -657,21 +660,40 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
    * in the corpus — a counter answering about August while the halt is about now.
    */
   recentPlaysForCounting(limit: number): { playId: number; skippedByRule: boolean }[] {
+    /*
+     * ⚠️ **THIS NO LONGER READS `skip_source`, AND THAT IS THE FIX.** Found 2026-10-04.
+     *
+     * It used to be `outcome === 'skipped' && skip_source === 'rule'`. **Nothing in the codebase ever
+     * wrote `'rule'`**: `PlayObserver` hardcoded `outcome === 'skipped' ? 'user' : null` from U1, which
+     * was sound while nothing else could skip and became wrong the moment U5 shipped. So this method
+     * returned `skippedByRule: false` for every play, `consecutiveRuleSkips` could only ever return 0,
+     * and **the 3-consecutive runaway halt could not fire at all** — the primary safety limit, inert.
+     *
+     * ⚠️ It passed everything. `safetyCounters.ts` is at 100% coverage and PBT-46/47 pass, because they
+     * test the counter against *supplied* input; nothing asserted that anything ever supplies `true`.
+     * A column that is structurally empty reads as *this never happens* — the `recordSuccessorLag` shape
+     * for the third time.
+     *
+     * ⚠️ So the safety limit now reads `skip_attempt` DIRECTLY, and deliberately does not depend on the
+     * `skip_source` label being written correctly. The label is a denormalised convenience for exports
+     * and for R1 eligibility; **a guard that depends on a label is a guard that a labelling bug
+     * disables.** Both go through `ruleSkippedThisPlay`, and `ruleSkipAgreement.test.ts` pins that they
+     * agree.
+     *
+     * ⚠️ `outcome` is not tested either. An attempt that reached the player IS a rule skip, whatever
+     * the classifier later decided about the tail — and BR-35 counts what automation DID, not how the
+     * play was graded.
+     */
     const rows = this.#db
       .prepare(
-        `SELECT id, outcome, skip_source
-           FROM play
-          ORDER BY started_at DESC, id DESC
+        `SELECT p.id, ${ruleSkippedThisPlay('p')} AS skipped_by_rule
+           FROM play p
+          ORDER BY p.started_at DESC, p.id DESC
           LIMIT ?`,
       )
-      .all(limit) as unknown as { id: number; outcome: string; skip_source: string | null }[];
+      .all(limit) as unknown as { id: number; skipped_by_rule: number }[];
     return rows
-      .map((r) => ({
-        playId: r.id,
-        // ⚠️ BOTH conditions. `skip_source` is null on a non-skip, but a reader should not have to
-        // know that: "outcome is skipped AND a rule did it" is the fact BR-35.3 names.
-        skippedByRule: r.outcome === 'skipped' && r.skip_source === 'rule',
-      }))
+      .map((r) => ({ playId: r.id, skippedByRule: r.skipped_by_rule !== 0 }))
       .reverse();
   }
 

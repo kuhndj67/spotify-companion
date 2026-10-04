@@ -120,6 +120,28 @@ if (config.historyEnabled) {
           coordinator?.onPlayDropped(record.trackId);
         },
       },
+      /**
+       * ⚠️ **What makes `skip_source = 'rule'` reachable** (BR-35.3). Added 2026-10-04: until then
+       * `PlayObserver` hardcoded `'user'` for every skip, so a rule-skip was filed as the listener's own
+       * rejection — and the hypothesis gate has no `skip_source` guard, so it would have entered R1's
+       * data as a genuine rejection.
+       *
+       * ⚠️ `skipAttempts` is `null` until the `if (repository !== null)` block below constructs it, and
+       * this closure is not called until a play CLOSES — long after. Read lazily for that reason; an
+       * eager capture would bind `null` for the lifetime of the process.
+       *
+       * ⚠️ Returns `false` on an error rather than throwing: a label is not worth a lost play record,
+       * which is the one artefact here that cannot be regenerated. ⚠️ The SAFETY LIMIT does not depend on
+       * this succeeding — `recentPlaysForCounting` reads `skip_attempt` directly.
+       */
+      (trackId, startedAt, endedAt) => {
+        try {
+          return skipAttempts?.firedDuring(trackId, startedAt, endedAt) ?? false;
+        } catch (error) {
+          console.error('[automation] could not determine skip_source; recording `user`:', error);
+          return false;
+        }
+      },
     );
     exportService = new ExportService(repository);
 

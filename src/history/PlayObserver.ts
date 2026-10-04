@@ -100,14 +100,28 @@ export class PlayObserver {
   #gaps = 0;
   #lastRecordedAt: string | null = null;
 
+  /**
+   * Did a rule skip the play that is closing? `undefined` when automation is not deployed.
+   *
+   * ⚠️ **A FOURTH constructor argument rather than a hook**, because unlike every `PlayObserverHooks`
+   * member this one's answer goes INTO the record. A hook is fire-and-forget and is wrapped in
+   * `#safely`; this has to be read before `recordPlay` and its value stored.
+   *
+   * ⚠️ Takes the play's WINDOW, not a `playId` — the row does not exist yet. See
+   * `SkipAttemptRepository.firedDuring`.
+   */
+  readonly #skippedByRule?: (trackId: string, startedAt: string, endedAt: string) => boolean;
+
   constructor(
     repo: HistoryRepository,
     tolerances: ClassifierTolerances,
     hooks: PlayObserverHooks = {},
+    skippedByRule?: (trackId: string, startedAt: string, endedAt: string) => boolean,
   ) {
     this.#repo = repo;
     this.#tolerances = tolerances;
     this.#hooks = hooks;
+    this.#skippedByRule = skippedByRule;
   }
 
   /**
@@ -200,6 +214,11 @@ export class PlayObserver {
     const evidence = summarise(play.trail, this.#tolerances, endedWithIdle);
     const { outcome } = classify(evidence, this.#tolerances, reason);
 
+    // ⚠️ Hoisted so the record and the `skippedByRule` lookup below use the SAME window. Computing
+    // `endedAt` twice would be two expressions of one fact, and the second could drift.
+    const startedAt = new Date(play.startedAtMs).toISOString();
+    const endedAt = new Date(play.trail[play.trail.length - 1]!.atMs).toISOString();
+
     const record: NewPlayRecord = {
       trackId: play.sample.trackId,
       isrc: play.sample.isrc,
@@ -212,8 +231,8 @@ export class PlayObserver {
       following: play.sample.following,
       explicit: play.sample.explicit,
       albumType: play.sample.albumType,
-      startedAt: new Date(play.startedAtMs).toISOString(),
-      endedAt: new Date(play.trail[play.trail.length - 1]!.atMs).toISOString(),
+      startedAt,
+      endedAt,
       outcome,
       closeReason: reason,
       evidence,
@@ -232,7 +251,22 @@ export class PlayObserver {
       // rejections have already been separated from the transitions by the time this runs. The
       // `skip_attribution` column that used to carry that separation is retired — see
       // `skipAttribution.ts`. `user` vs `rule` remains a real question, and it is U5's.
-      skipSource: outcome === 'skipped' ? 'user' : null,
+      // ⚠️ **`'rule'` IS NOW REACHABLE, and until 2026-10-04 it was not.** This read
+      // `outcome === 'skipped' ? 'user' : null`, so every rule-skip would have been filed as the
+      // listener's own rejection — and the hypothesis gate's `ELIGIBLE` predicate has no `skip_source`
+      // guard, so they would enter R1's data as genuine rejections. Arm a rule that skips major-label
+      // tracks and the corpus then "shows" the listener skipping major-label tracks, by construction.
+      // The note above already said `user` vs `rule` "is U5's"; U5 shipped without it.
+      //
+      // ⚠️ `skippedByRule` is OPTIONAL, and absent means `'user'` rather than unknown: with no
+      // automation deployed, every live-observed skip really is the listener's. Asked only when the
+      // outcome IS `skipped`, so a non-skip costs no query.
+      skipSource:
+        outcome === 'skipped'
+          ? this.#skippedByRule?.(play.sample.trackId, startedAt, endedAt) === true
+            ? 'rule'
+            : 'user'
+          : null,
       // Measured when the NEXT play starts; unknowable now. ⚠️ Still never measured — see
       // `recordSuccessorLag`, which has no callers.
       successorLagMs: null,

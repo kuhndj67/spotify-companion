@@ -118,4 +118,18 @@ export interface SkipAttemptRepository {
    * matches at all.
    */
   latest(): SkipAttempt | null;
+
+  /**
+   * Did an attempt for `trackId` reach the player while a play was open between `fromIso` and `toIso`?
+   *
+   * ⚠️ **This is what decides `play.skip_source`.** `PlayObserver` hardcoded
+   * `outcome === 'skipped' ? 'user' : null` from U1 — sound while nothing else could skip, and **wrong
+   * the moment U5 shipped**. A rule-skip recorded as the user's own would enter R1's data as a genuine
+   * rejection, and the hypothesis gate's `ELIGIBLE` predicate has no `skip_source` guard: arm a rule
+   * that skips major-label tracks and the corpus then *"shows"* the listener skipping major-label
+   * tracks, by construction.
+   *
+   * ⚠️ Keyed on the TIME WINDOW, not on `play_id`, which does not exist yet when this is asked.
+   */
+  firedDuring(trackId: string, fromIso: string, toIso: string): boolean;
 }

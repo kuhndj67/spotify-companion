@@ -37,6 +37,38 @@ interface AttemptRow {
 const REACHED_THE_PLAYER: readonly SkipAttemptState[] = ['fired', 'confirmed', 'unconfirmed'];
 
 /**
+ * ⚠️ **THE ONE DEFINITION of "a rule skipped this play", as SQL.** Two call sites use it:
+ *
+ *   1. `SqliteSkipAttemptRepository.firedDuring` — which decides the `skip_source` LABEL written on
+ *      the play row, for exports and for R1's eligibility.
+ *   2. `SqliteHistoryRepository.recentPlaysForCounting` — which feeds the **3-consecutive SAFETY
+ *      LIMIT** (BR-35.1/35.9).
+ *
+ * ⚠️ **It is keyed on the TRACK and the play's TIME WINDOW, never on `skip_attempt.play_id`.**
+ * `play_id` is backfilled after the play row is written (`attachPlayId`), inside a try/catch that is
+ * explicitly allowed to fail because it is not load-bearing. A safety limit that read it would
+ * **under-count whenever that backfill failed** — and a halt that under-counts is a halt that does not
+ * fire. The window cannot fail: both ends are columns on the play row itself.
+ *
+ * ⚠️ A repeat listen is a different window, so it cannot inherit an earlier play's attempt.
+ *
+ * ⚠️ `ended_at IS NULL` is tolerated for a play still open. `test/ruleSkipAgreement.test.ts` pins
+ * that the two call sites answer identically on the same data — one rule invoked twice, never written
+ * twice, which is the lesson of the WebSocket `403`.
+ */
+export const RULE_SKIPPED_THIS_PLAY_SQL = `
+  EXISTS (SELECT 1 FROM skip_attempt sa
+           WHERE sa.track_id = %PLAY%.track_id
+             AND sa.state IN ('fired', 'confirmed', 'unconfirmed')
+             AND sa.enqueued_at >= %PLAY%.started_at
+             AND (%PLAY%.ended_at IS NULL OR sa.enqueued_at <= %PLAY%.ended_at))`;
+
+/** Bind the shared predicate to a table alias. */
+export function ruleSkippedThisPlay(playAlias: string): string {
+  return RULE_SKIPPED_THIS_PLAY_SQL.split('%PLAY%').join(playAlias);
+}
+
+/**
  * ⚠️ `undefined` is normalised to `null` on the way in, never left to the driver.
  *
  * `node:sqlite` rejects `undefined` as a bound value, so an optional field left unset would throw at
@@ -52,6 +84,7 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
   readonly #insert: StatementSync;
   readonly #byId: StatementSync;
   readonly #latest: StatementSync;
+  readonly #firedDuring: StatementSync;
   readonly #queued: StatementSync;
   readonly #attempted: StatementSync;
   readonly #firedSince: StatementSync;
@@ -73,6 +106,17 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
     // ⚠️ `ORDER BY id DESC`, not `enqueued_at DESC`: the timestamp has second-ish resolution and two
     // attempts in one second would order arbitrarily. The rowid is monotonic by construction.
     this.#latest = db.prepare(`SELECT * FROM skip_attempt ORDER BY id DESC LIMIT 1`);
+
+    // ⚠️ The same window rule as `ruleSkippedThisPlay`, expressed against bound parameters because
+    // here there is no play row to join to — `PlayObserver` asks this BEFORE the row exists.
+    this.#firedDuring = db.prepare(
+      `SELECT 1 AS hit FROM skip_attempt
+        WHERE track_id = ?
+          AND state IN ('fired', 'confirmed', 'unconfirmed')
+          AND enqueued_at >= ?
+          AND enqueued_at <= ?
+        LIMIT 1`,
+    );
 
     this.#queued = db.prepare(`SELECT * FROM skip_attempt WHERE state = 'queued' ORDER BY id`);
 
@@ -172,6 +216,10 @@ export class SqliteSkipAttemptRepository implements SkipAttemptRepository {
   latest(): SkipAttempt | null {
     const row = this.#latest.get() as unknown as AttemptRow | undefined;
     return row === undefined ? null : toAttempt(row);
+  }
+
+  firedDuring(trackId: string, fromIso: string, toIso: string): boolean {
+    return this.#firedDuring.get(trackId, fromIso, toIso) !== undefined;
   }
 }
 

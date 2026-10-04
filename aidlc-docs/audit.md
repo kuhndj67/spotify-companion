@@ -6468,3 +6468,94 @@ were fixed before any of this was measured, which is the whole point of fixing t
 
 Nothing was armed. `skip_attempt` still holds **0 rows**, `SKIP_EXECUTOR_ENABLED` is still `false`, and
 `globalAutomationEnabled` is still `false`.
+
+## 2026-10-04 — 🔧 THE 3-CONSECUTIVE RUNAWAY HALT COULD NOT FIRE. Found before arming, fixed.
+
+**Found while answering a user question**, not by a test — they asked whether the next step was to arm
+the rules and see three skips, and checking what *three* meant exposed this.
+
+### The defect
+
+`recentPlaysForCounting` derived `skippedByRule` from `play.skip_source === 'rule'`. **Nothing in the
+codebase ever wrote `'rule'`.** `PlayObserver.ts:235` hardcoded:
+
+```ts
+skipSource: outcome === 'skipped' ? 'user' : null,
+```
+
+— a U1 simplification (*"every live-observed skip is the user's"*) that was **sound while nothing else
+could skip, and wrong the moment U5 shipped**. Measured on the live database: 56 `'user'`, 831 `null`,
+**0 `'rule'`**.
+
+So `skippedByRule` was `false` for every play, `consecutiveRuleSkips` could only ever return `0`, and
+**BR-35.1's 3-consecutive halt was inert.**
+
+⚠️ **The hourly cap still worked** — it counts `skip_attempt` rows via `firedSince`, not play rows. But
+the 2026-10-03 back-test had already shown `10/hour` never trips on the loaded rules. **So arming
+`hip-hop` at a 25.8% match rate would have run with no effective runaway guard at all.**
+
+### ⚠️ Why it passed everything, and why that is the familiar shape
+
+`safetyCounters.ts` is at **100% line, branch and function**, and PBT-46/47 pass. They test the counter
+against **supplied** input; **nothing asserted that anything ever supplies `true`.** A column that is
+structurally empty reads as *this never happens*.
+
+That is the **`recordSuccessorLag` shape for the third time** — after the two dead writers in a live file
+and `npm run reclassify` being unable to start for a week. ⚠️ **And the first time it disabled a safety
+limit rather than losing a measurement.**
+
+⚠️ **`knip` did not see it either**, and could not: `skip_source` is both read and written — just never
+with that value. Dead-*value* analysis is not dead-code analysis.
+
+⚠️ **The comment directly above the defective line already said so**: *"`user` vs `rule` remains a real
+question, and it is U5's."* U5 shipped without it. **A recorded intention is not an implementation**, and
+a note sitting immediately above the wrong line did not stop it — the same decay as a recorded negative.
+
+### The fix: `skip_attempt` is the single authority, and the guard does not depend on the label
+
+| | Reads | Why |
+|---|---|---|
+| **Safety counter** (`recentPlaysForCounting`) | `skip_attempt` **directly** | ⚠️ **A guard that depends on a label is a guard that a labelling bug disables.** Which is exactly what just happened |
+| **`skip_source` label** (`PlayObserver`) | `skip_attempt` via `firedDuring` | Denormalised for exports and R1 eligibility |
+
+One SQL definition, `ruleSkippedThisPlay`, **imported rather than re-expressed**.
+
+⚠️ **Keyed on the track and the play's TIME WINDOW, never on `skip_attempt.play_id`.** `play_id` is
+backfilled by `attachPlayId`, inside a try/catch that is *explicitly allowed to fail* because it is not
+load-bearing. A safety limit reading it would **under-count whenever that backfill failed** — and a halt
+that under-counts is a halt that does not fire. Both ends of the window are columns on the play row, so
+they cannot be missing.
+
+⚠️ A **repeat listen is a different window**, so it cannot inherit an earlier play's attempt — which a
+track-id-only match would have allowed, making every later play of a once-skipped track count toward the
+halt.
+
+### `test/ruleSkipAgreement.test.ts` — 9 tests, and what each is for
+
+1. **The counter counts.** A fired attempt makes `skippedByRule` true. *This is the assertion whose
+   absence was the entire defect.*
+2. **`consecutiveRuleSkips` reaches `MAX_CONSECUTIVE_RULE_SKIPS`** end to end — the halt can fire.
+3. **The two call sites agree** over six window cases (inside, absent, before, after, at-start, at-end),
+   **and** the expected answers are asserted separately, so *"they agree"* cannot be satisfied by both
+   being wrong.
+4. **The counter works with `skip_source` still saying `'user'`** — the exact state the corpus was in.
+5. **And with `play_id` never backfilled.**
+6. A **refused** attempt does not count; an **unconfirmed** one does (P-30: unknown counts as landed).
+
+### What was NOT contaminated
+
+**Nothing.** `skip_attempt` still holds **0 rows** and no rule has ever skipped a track, so no play row
+was ever mislabelled. The fix landed **before** the first arming — which is the only reason this is a near
+miss rather than a repair.
+
+⚠️ Had it not been caught: rule-skips filed as `skip_source = 'user'`, entering R1's data as genuine
+rejections through an `ELIGIBLE` predicate (`outcome IN ('completed','skipped')`) that has **no
+`skip_source` guard**. Arm a rule that skips major-label tracks and the corpus then *"shows"* the listener
+skipping major-label tracks — **circular by construction**, and in the direction that would appear to
+support R1.
+
+### Verified live after the rebuild
+
+1243 tests · typecheck clean · smoke green · knip clean · schema **v7** · `recentPlaysForCounting` runs
+against the live database · `enabled: false`, `executorEnabled: true`, `halt: null`, `skip_attempt` **0
+rows**. The button reads **"Turn automation on"** and nothing is armed.

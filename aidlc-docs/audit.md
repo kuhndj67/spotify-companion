@@ -6364,3 +6364,107 @@ limit at a 27-play peak hour. ⚠️ **That changes which limit to expect:**
    history restore re-arms automation.
 5. **W-7** — idle poll backoff. Blocked on M1–M4, which now exist, so this is unblocked for the first
    time. ⚠️ It changes the **recording instrument**, which is why it was deliberately not in U5.
+
+## 2026-10-03 — The dry-run review's input: ALL THREE LOADED RULES TRIP THE 3-CONSECUTIVE HALT
+
+Measured read-only over the **329 plays U4 has evaluated** (2026-09-21 → 2026-10-03), reconstructed from
+`decision_log.fields_seen`. Nothing was armed and nothing was changed.
+
+### ⚠️ The pre-registration's prediction was right in direction and badly understated in magnitude
+
+Written hours earlier: *"expect `3 consecutive` to trip first, not `10/hour`"*, on the reasoning that
+16.4% overall says nothing about adjacency. ✅ Direction confirmed. ⚠️ **But not as an edge case — as the
+normal case:**
+
+| armed | would skip | rate | longest run | times it reached 3 |
+|---|---|---|---|---|
+| `hip-hop` | 85 / 329 | **25.8%** | **9** | **7** |
+| `major-label` | 31 / 329 | **9.4%** | **4** | **3** |
+| both | 112 / 329 | **34.0%** | **12** | **11** |
+| all three | 112 / 329 | 34.0% | 12 | 11 |
+
+⚠️ **Arming `hip-hop` alone would have latched the halt roughly every 1.7 days** over the measured
+window. `major-label`, the rule that looked safest on its hourly rate, still reaches 3 three times.
+
+⚠️ **`10/hour` never trips on any of these** — consistent with the pre-registration's 16.4% vs ~37%
+arithmetic. The hourly cap is not the binding constraint; **adjacency is**, and nothing before this
+measured it.
+
+### Which candidate narrowings actually survive
+
+| candidate | skips | rate | longest run | verdict |
+|---|---|---|---|---|
+| `hip hop` (as armed) | 85 | 25.8% | 9 | ❌ halts |
+| `major` (as armed) | 31 | 9.4% | 4 | ❌ halts |
+| **`hip hop AND major`** | **4** | **1.2%** | **1** | ✅ **never halts, and matches something** |
+| `major AND age > 5` | 11 | 3.3% | 3 | ❌ halts once |
+| `major AND NOT following` | **0** | 0.0% | 0 | ⚠️ never halts because it never matches |
+| `hip hop AND NOT following` | **0** | 0.0% | 0 | ⚠️ same |
+
+✅ **`hip hop AND major` is the only candidate that both matches plays and never reaches 3.** That is
+what BR-35's remedy looks like in practice: *narrow the rule, do not raise the limit.*
+
+⚠️ **The two `NOT following` variants match ZERO**, and that is a finding rather than a safe option: this
+listener follows essentially every artist they play, so `artist.following === false` is an empty
+population. A rule that never fires is not a safe rule, it is a rule that does nothing — the same shape
+as `old-and-major` below.
+
+### 🔎 `old-and-major` matched 0 of 329 and is NOT broken
+
+Worth recording because *"a rule that matched nothing"* reads as a defect:
+
+- `album.ageYears` resolved on **329 of 329** — the field works, the comparison works.
+- Only **1** play is over 20 years old. **Median age is 1 year**; just 3 plays exceed 15.
+- The intersection with `label = major` is empty.
+
+The three oldest plays explain it exactly:
+
+| age | track | label |
+|---|---|---|
+| 23y | *Graveyard* — The Devil Makes Three | `unknown` |
+| 18y | *Babylon* — Daron Malakian and Scars on Broadway | **`major`** |
+| 16y | *Find The Door* — The Haunted Windchimes | `unknown` |
+
+⚠️ **The 18-year-old track IS major** — so this rule misses its only candidate by **two years of
+threshold**, not by any defect. It is correctly narrow against a corpus of new music.
+
+### `hip-hop`'s unknown behaviour, since it is the rule most likely to be armed
+
+**304 of 329** plays have known genres; **25** do not. With `onUnknown: 'no-match'` those 25 are not
+skipped, so the rate is **25.8% of all plays** and **28.0% of plays with genres**. ⚠️ If genre coverage
+improves the rate drifts toward the second figure — modest headroom, not a cliff.
+
+### ⚠️⚠️ THE LIMITATION THAT BOUNDS EVERY NUMBER ABOVE, and it is worse for adjacency than for rates
+
+**This is a back-test over plays recorded while automation was OFF.** The pre-registration already calls
+the arming projection *"a projection, not a prediction"* — but **adjacency is affected far more severely
+than a rate is**:
+
+> **Skipping a track changes what plays next.** In the DJ context — 50–70% of listening, and the context
+> whose tracks are chosen *as it goes* (P-U5-1) — a skip alters the subsequent selection. So a run of 9
+> consecutive matches in un-skipped history **would not have occurred** once the first skip fired: the
+> feed would have diverged at play 1.
+
+⚠️ So *"longest run 9"* is **not** a prediction that automation would reach 9. The defensible reading is
+narrower and still decisive:
+
+- **A run of ≥ 3 is reachable, repeatedly, and from more than one rule.** That does not depend on what
+  the feed would have done afterwards — the first three are already in the record.
+- **Everything past 3 is hypothetical**, because the halt would have fired and stopped the sequence.
+- **`hits3` assumes immediate re-arming** after each halt. Live, automation stays off until
+  acknowledged, so the counts are an upper bound on *occasions requiring acknowledgement*.
+
+⚠️ **Which is also why `hip hop AND major` showing a longest run of 1 is weaker evidence than it looks.**
+It says the predicate did not match adjacent plays in *this* history; it cannot say the same would hold
+once the feed starts diverging. **It is the best-supported option, not a guarantee.**
+
+### What this does NOT decide
+
+**Which rule to arm, and whether `3` is the right limit.** Both are the user's. ⚠️ And the
+pre-registration's §3.2 defines the only path by which `3` may be raised — *three separate halts where
+the user affirms all three skips were correct* — so if these halts turn out to be correct skips, that is
+**evidence to be gathered under the stated procedure**, not a reason to edit the constant now. The limits
+were fixed before any of this was measured, which is the whole point of fixing them then.
+
+Nothing was armed. `skip_attempt` still holds **0 rows**, `SKIP_EXECUTOR_ENABLED` is still `false`, and
+`globalAutomationEnabled` is still `false`.

@@ -204,6 +204,7 @@ function render(data) {
   if (data.status) {
     lastServerStatus = data.status;
     renderStatusBar();
+    refreshAutomationIfStale(data.status.automation);
   }
 
   if (data.error) {
@@ -1558,6 +1559,47 @@ async function loadDecisions() {
 /** The last payload, so a failed write can re-render without a second request. */
 let lastAutomation = null;
 
+/** The automation level the Rules panel was last rendered against. ⚠️ See `refreshAutomationIfStale`. */
+let renderedAutomationLevel = null;
+
+/**
+ * Re-read `/api/automation` when the panel has gone stale, while the Rules pop-up is OPEN.
+ *
+ * ## ⚠️ The bug this fixes: two surfaces contradicting each other
+ *
+ * `loadAutomation()` ran only from the dialog's open handler, so a halt that latched **while the pop-up
+ * was already open** never reached it. Observed 2026-10-05: the status bar read `Automation HALTED` while
+ * the panel still showed `Turn automation off` and *"Rules that match will skip the track."*
+ *
+ * ⚠️ **That is worse than a missing alert.** The panel was not merely out of date, it was asserting the
+ * opposite of the truth — rules would NOT skip, the halt guaranteed it — and offering a switch that is
+ * meant to be suppressed while halted. A stale control that states a false fact is exactly what this
+ * component exists to prevent, and it reappeared one layer up.
+ *
+ * ## Driven by the snapshot, not a timer
+ *
+ * The WebSocket snapshot already carries the pre-derived automation indicator every 3 s, so the change is
+ * an event we already receive — no new polling, and no new WebSocket surface (Infrastructure Q6).
+ *
+ * ⚠️ **Only on a LEVEL CHANGE, deliberately not on every snapshot.** `loadAutomation()` replaces the
+ * panel's DOM children, which would move focus out from under someone reaching for a button if it ran
+ * every 3 s. The level encodes every state that changes what the panel renders: halted, disabled, idle,
+ * hold, decided, and the unconfirmed-skip failure.
+ *
+ * ⚠️ Known limit: a change that does NOT move the level — `/state` becoming unwritable, say — leaves the
+ * panel's warning stale until it is reopened. That is reported on `/api/diagnostics`, and it is not worth
+ * re-rendering under the user's cursor for.
+ */
+function refreshAutomationIfStale(indicator) {
+  const level = indicator?.level ?? null;
+  if (level === renderedAutomationLevel) return;
+  renderedAutomationLevel = level;
+
+  // Closed: the open handler will load it fresh, so there is nothing to refresh.
+  if (!el('rules')?.open) return;
+  void loadAutomation();
+}
+
 async function loadAutomation() {
   const section = el('automation-section');
   const body = el('automation-body');
@@ -1586,6 +1628,11 @@ function renderAutomation() {
   const body = el('automation-body');
   const data = lastAutomation;
   if (!body || !data) return;
+
+  // ⚠️ Keep the staleness marker in step with what is on screen. Without this, a change the user made
+  // THEMSELVES (acknowledging, or throwing the switch) would arrive on the next snapshot as a level
+  // change and trigger a redundant re-render a moment after their click.
+  renderedAutomationLevel = lastServerStatus?.automation?.level ?? renderedAutomationLevel;
 
   const view = data.view;
   const children = [];

@@ -6559,3 +6559,92 @@ support R1.
 1243 tests · typecheck clean · smoke green · knip clean · schema **v7** · `recentPlaysForCounting` runs
 against the live database · `enabled: false`, `executorEnabled: true`, `halt: null`, `skip_attempt` **0
 rows**. The button reads **"Turn automation on"** and nothing is armed.
+
+## 2026-10-05 — The Rules pop-up went stale, and the `unconfirmed` check is understood but left alone
+
+Two sessions, two findings. **1256 tests · verify green · 19 rule-skips across five live sessions.**
+
+### 🔧 The Rules pop-up did not refresh, and showed the OPPOSITE of the truth
+
+Reported by the user, who left the browser in the failing state so it could be observed directly. A halt
+latched **while the Rules pop-up was already open**:
+
+| Surface | Said |
+|---|---|
+| Status bar | `Automation HALTED` ✅ |
+| Rules panel | `Turn automation off` — *"Rules that match will skip the track."* ❌ |
+
+⚠️ **Worse than a missing alert.** The panel was not merely out of date, it was **asserting the opposite
+of the truth** — rules would NOT skip, the halt guaranteed it — and offering a switch that FC-U5-3
+deliberately suppresses while halted. **Two surfaces contradicting each other** is the defect this
+component was built to prevent, reappearing one layer up: the component guards against a stale *control*,
+and nothing guarded against a stale *panel*.
+
+**Cause**: `loadAutomation()` ran only from the dialog's open handler. The status bar updates because it
+rides the WebSocket snapshot; the panel had no feed.
+
+**Fix**: driven off that same snapshot, which already carries the pre-derived automation indicator every
+3 s. No new timer and **no new WebSocket surface** (Infrastructure Q6).
+
+⚠️ **On a LEVEL CHANGE only, not every snapshot.** `loadAutomation()` replaces the panel's DOM children,
+so re-rendering every 3 s would move focus out from under someone reaching for a button. The level encodes
+every state that alters what the panel renders.
+
+⚠️ **Stated limit**: a change that does not move the level — `/state` becoming unwritable — leaves the
+panel's warning stale until reopened. That one is reported on `/api/diagnostics`, and it is not worth
+re-rendering under the user's cursor for.
+
+⚠️ **`renderAutomation` also updates the staleness marker**, so a change the user made *themselves* does
+not arrive on the next snapshot as a level change and trigger a redundant re-render a moment after their
+click.
+
+**Verified by reproducing it**: halt cleared, pop-up opened, then a halt written into the state file by
+write-temp-then-rename exactly as `AutomationStateStore` does. The panel flipped in place — switch gone,
+halt panel shown, one button — **without the dialog being closed**.
+
+### 🔎 `confirmed()`'s false negative is now fully characterised — and DELIBERATELY NOT FIXED
+
+Across **all 19 fired attempts to date**:
+
+| `before` | n | result |
+|---|---|---|
+| 3000 ms | 1 | ⚠️ `unconfirmed` |
+| 5000–9000 ms | 18 | `confirmed` |
+
+`after` is **always 3000 ms** — the incoming track's first poll sample. So `after < before` fails
+**precisely and only** when the skip fired at 3000 ms, the earliest possible sample. **Deterministic, not
+flaky.**
+
+⚠️ **And the condition is arguably ill-founded rather than merely unlucky.** It compares `progressMs`
+across a **track change** — two positions in two *different* tracks, which is not a meaningful ordering.
+It read as correct because a natural boundary also yields a smaller number, so it **passed 18 times by
+arithmetic coincidence** rather than by measuring what it claims to.
+
+✅ **Left alone (user decision).** No unexpected behaviour across five sessions, and ⚠️ **the edit that
+would fix it is the same shape as the edit that once made this function always return `true`** — a
+permanently green light on the only unit that can cause harm. A cosmetic false negative does not justify
+touching a safety-adjacent predicate freshly in service.
+
+**Cost of leaving it, bounded**: safety is unaffected (P-30 counts unknown as landed, and #20 did count
+toward its halt). The only consequence is FC-U5-1 reading red `Skip unconfirmed` for a skip that landed,
+when such an attempt is the most recent.
+
+⚠️ **Recorded with the trap for whoever revisits it**: `<` → `<=` is the WRONG fix. Since `after` is
+always 3000 that makes the condition **unfalsifiable while still looking like a check** — a decorative
+guard, which this project has shipped twice and has a standing warning about. The defensible change is to
+confirm on the track-id change alone and keep both progress values as recorded evidence. Backlog **W-8**,
+with the full table in `confirmed()`'s own docstring where someone would look.
+
+### What the five live sessions established
+
+| | |
+|---|---|
+| Sessions | 5 · **19 rule-skips** · 6 halts |
+| Cost per skip | **3–9 s**, and ⚠️ **driven by enrichment settle time, not the skip mechanism** — all decided on complete data, `trigger: initial`. The "6–7 s" reported earlier was an artefact of the first sample |
+| Halt | latches on the **3rd** consecutive skip; the 4th matching track is refused `runaway-halted` |
+| `attemptIds` | names the consecutive run only |
+| `skip_source` | `rule` on every one, written by the live path |
+| `unlinkedFiredAttempts` | **0** throughout |
+
+⚠️ **Still never exercised live**: the `hourly-rate` trigger (the consecutive halt fires first and
+prevents reaching 10/hour) and the `no-active-device` refusal.

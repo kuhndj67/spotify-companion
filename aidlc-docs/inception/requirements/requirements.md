@@ -944,6 +944,37 @@ exists to break.**
 
 ---
 
+#### W-8 — `confirmed()` compares progress across a track change
+
+**Raised 2026-10-05**, from the live skip sessions. ⚠️ **Deliberately NOT fixed** (user decision, same
+day): no unexpected behaviour was observed across five sessions and nineteen skips.
+
+**The measurement.** `confirmed()` requires a track-id change **and** `after.progressMs <
+before.progressMs`. Over all 19 fired attempts, `after` was **always 3000 ms** — the incoming track's
+first poll sample — so the second condition fails **precisely and only** when the skip fired at 3000 ms,
+the earliest sample. One attempt (#20) did, and was recorded `unconfirmed`. Deterministic, not flaky.
+
+⚠️ **The condition is arguably ill-founded rather than merely unlucky**: it compares two positions in
+**two different tracks**, which is not a meaningful ordering. It read as correct because a natural
+boundary also yields a smaller number, so it passed 18 times by arithmetic coincidence.
+
+**Cost of leaving it.** Bounded and understood. Safety is unaffected — P-30 counts unknown as landed and
+#20 did count toward its halt. The only consequence is that FC-U5-1 shows red `Skip unconfirmed` for a
+skip that landed, if such an attempt is the most recent.
+
+**Why it is deferred rather than fixed.** ⚠️ **The edit that would fix it is the same shape as the edit
+that once made this function always return `true`** — a permanently green light on the one unit that can
+cause harm. A cosmetic false negative does not justify touching a safety-adjacent predicate while it is
+freshly in service.
+
+⚠️ **If revisited, `<` → `<=` is the WRONG fix.** Since `after` is always 3000 that makes the condition
+unfalsifiable while still looking like a check — a decorative guard, which this project has shipped twice
+and warns about. The defensible change is to confirm on the track-id change alone and keep both progress
+values as recorded evidence (*store observations; derive judgements*).
+
+**Where the detail lives**: the docstring on `confirmed()` in `src/playback/skipDrain.ts`, which carries
+the full table.
+
 #### W-7 — Adaptive poll backoff when nothing is playing
 
 **Raised 2026-09-30**, measuring the app's upstream footprint to answer the user's U5 NFR **Q8**

@@ -344,6 +344,39 @@ export class SkipDrain {
  * failure mode was a permanently green light: `confirmed` asserting something nobody had checked, which
  * is exactly what `frontend-components.md` §5 warns is worse than no indicator at all. Caught by the
  * "track change without a progress reset" test, 2026-10-02.
+ *
+ * ## ⚠️ KNOWN FALSE NEGATIVE, measured and DELIBERATELY NOT FIXED — 2026-10-05
+ *
+ * `progressReset` fails **precisely and only** when the skip fires at the track's first sampled
+ * position. Measured over **all 19 fired attempts to date**:
+ *
+ * | `before` | n | result |
+ * |---|---|---|
+ * | 3000 ms | 1 | ⚠️ `unconfirmed` |
+ * | 5000–9000 ms | 18 | `confirmed` |
+ *
+ * `after` is **always 3000 ms** — the incoming track's first poll sample — so `after < before` can only
+ * hold when `before` exceeded one poll interval. It is deterministic, not flaky.
+ *
+ * ⚠️ **And the condition is arguably ill-founded, not merely unlucky**: it compares `progressMs` across
+ * a **track change**, which is two positions in two different tracks. That is not a meaningful ordering.
+ * It read as correct because a natural boundary also yields a smaller number — so it passed 18 times by
+ * arithmetic coincidence rather than by measuring what it claims to.
+ *
+ * ⚠️ **Left alone on purpose** (user decision, 2026-10-05): no unexpected behaviour was observed across
+ * five live sessions, and **the edit that would "fix" this is the same shape as the edit that once made
+ * this function always return `true`.** A cosmetic false negative does not justify touching a
+ * safety-adjacent predicate.
+ *
+ * ⚠️ **The cost of leaving it is bounded and understood.** Safety is unaffected: P-30 counts unknown as
+ * landed, and attempt #20 — the one unconfirmed row — did count toward its halt. The only consequence is
+ * that FC-U5-1 shows red `Skip unconfirmed` if such an attempt is the most recent one, for a skip that
+ * did land. Backlog **W-8**.
+ *
+ * ⚠️ **If this is ever revisited, `<` → `<=` is the WRONG fix.** Since `after` is always 3000, that
+ * makes the condition unfalsifiable while still looking like a check — a decorative guard, which this
+ * project has shipped twice and has a standing warning about. The defensible change is to confirm on the
+ * track-id change alone and keep both progress values as recorded evidence.
  */
 function confirmed(before: CurrentPlay, after: Maybe<CurrentPlay>): boolean {
   if (after === null) return false;

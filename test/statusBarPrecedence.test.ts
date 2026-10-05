@@ -120,6 +120,27 @@ describe('⚠️ app.js still derives nothing else about the bar', () => {
     );
   });
 
+  it('⭐ ⚠️ the Rules panel is refreshed from the snapshot, not only on dialog open', () => {
+    // Found live 2026-10-05: a halt that latched while the pop-up was already OPEN never reached it, so
+    // the status bar read `Automation HALTED` while the panel still said "Rules that match will skip the
+    // track." Two surfaces contradicting each other, and the stale one asserting the opposite of the
+    // truth -- which is the defect this whole component exists to prevent, one layer up.
+    const source = app();
+    assert.ok(source.includes('refreshAutomationIfStale'), 'the refresh hook must exist');
+    // Positional rather than a regex: the call must sit in the snapshot handler, right after the
+    // status bar is painted, so both surfaces update from the same event.
+    const paint = source.indexOf('renderStatusBar();');
+    const refresh = source.indexOf('refreshAutomationIfStale(data.status.automation);');
+    assert.ok(paint > -1 && refresh > paint, 'it must be driven from the snapshot handler');
+    assert.ok(refresh - paint < 120, 'and immediately after it, not somewhere unrelated');
+    // ⚠️ Level-change only. Re-rendering every 3s would move focus out from under someone reaching for
+    // a button, and `loadAutomation` replaces the panel's children.
+    assert.ok(
+      source.includes('if (level === renderedAutomationLevel) return;'),
+      'it must early-return when nothing material changed',
+    );
+  });
+
   it('⭐ ⚠️ app.js keeps NO optimistic enabled state', () => {
     // The failure mode this prevents: the button flips from a local variable, the page looks right, and
     // a restart silently re-arms automation because nothing reached the file. Every render comes from a

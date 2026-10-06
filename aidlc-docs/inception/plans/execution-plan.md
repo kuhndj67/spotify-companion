@@ -216,6 +216,36 @@ decision as partial (FR-34/35). The feature degrades; it does not fail.
 
 ---
 
+### Phase 5 — **Share**: off this machine, and off one developer
+
+**Added 2026-10-06**, after Phases 0–4 delivered. ⚠️ **This phase adds no user-facing feature**, and that
+is the point: the deliverable is that a second person can review, run and contribute without the
+project's accumulated tacit knowledge, and that a deployment can live somewhere other than this laptop.
+
+| | |
+|---|---|
+| **Goal** | A second machine runs it; a second person can install and contribute |
+| **Runnable state** | Unchanged functionally. What changes is who can reach it and who can work on it |
+| **How to verify** | Reachable from a second machine under a chosen security posture · **WAL probed on the NAS volume** · WebSocket verified both directions · a contributor walks the install **cold** |
+| **Risk** | ⚠️ **Medium–High, and of a different kind** — the first phase whose failure mode is *exposure* rather than *a wrong number* |
+| **Cost of a significant miss** | ⚠️ **Asymmetric.** A mistake here can expose listening history or a Spotify refresh token on a network. Every earlier phase's worst case was recoverable data |
+
+⚠️ **The single-USER assumption does not change.** Each developer or user runs **their own deployment**
+with their own Spotify account and their own corpus. This is not multi-tenancy, and no user model is
+needed for separation — only, possibly, for access.
+
+⚠️ **Containment is deliberate**: the off-machine target is on the user's own LAN, so the security model
+is worked out without internet exposure in the same step.
+
+**The blocker, measured 2026-10-06**: `localGuard.ts` requires a **loopback `Host` header**, so an
+off-machine request 403s — page and WebSocket alike. That is option B (2026-09-05) working as specified,
+and changing it is a **security-posture decision**, surfaced rather than decided.
+
+▶ **Seven questions open**: [`phase-5-plan.md`](phase-5-plan.md). Nothing is designed until they are
+answered.
+
+---
+
 ### Phase summary
 
 | Phase | Delivers | Complexity | Consequence of a miss | Depends on |
@@ -224,6 +254,7 @@ decision as partial (FR-34/35). The feature degrades; it does not fail.
 | **2 Understand** | Labels + hypothesis test | Medium | Bounded to one module | Phase 1 (backfillable) |
 | **3 Decide** | Rules, dry-run only | **High** | **Contained — cannot act** | Phases 1–2 |
 | **4 Act** | Playback control + safety | Medium | Visible but reversible | Phase 3 |
+| **5 Share** | Off-machine deployment + team workflow | Medium | ⚠️ **Exposure, not data** — the first phase whose miss is not recoverable by recomputing | Phase 4 |
 
 **Every phase leaves a runnable, testable, independently useful app.** No phase requires the next
 one to justify itself.

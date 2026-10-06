@@ -34,6 +34,7 @@ tractable units while still shipping as one runnable checkpoint.
 | **U3** | 3 | Rule Model & Evaluation | Pure core | **CI green** |
 | **U4** | 3 | Rule Observability | Feature | CI green **+ live** |
 | **U5** | 4 | Automated Skipping | Feature | CI green **+ live** |
+| **U6** | **5** | **User-Data Lifecycle** | **Infrastructure** | ⚠️ **CI green + a VERIFIED CROSS-MACHINE ROUND TRIP** |
 
 ---
 
@@ -175,6 +176,34 @@ read-only (Q2 = A from Application Design).
 
 > The last criterion is verified by inspection of the import graph, not by a runtime flag. At the
 > end of U4, `src/playback/` does not exist.
+
+---
+
+## U6 — User-Data Lifecycle *(Phase 5)*
+
+**Purpose**: make the corpus **movable and recoverable**, so a deployment can exist somewhere other than
+the machine that created it.
+
+⚠️ **This unit adds no feature and changes no behaviour.** It is a prerequisite: U7's off-machine
+deployment cannot responsibly touch a corpus that cannot be moved back.
+
+**Modules**
+```
+scripts/   backup-history.mjs  restore-history.mjs  verify-all-backups.mjs   (EXTENDED, not replaced)
+scripts/   <migration tooling, shape TBD by the FD>
+```
+
+⚠️ **It EXTENDS a working pair rather than starting fresh.** `db:backup` / `db:restore` have existed
+since 2026-09-27 and a round trip is rehearsed — 850 plays → damaged to 0 → restored to 850,
+`integrity_check: ok`. **What is missing is everything that is not `history.db`, and a guard that works
+across machines.**
+
+**Stories**: none. ⚠️ **This is the first unit with no user story**, and that is accurate rather than an
+oversight — no user asked for it; U7 did. Recorded so nobody later invents a story to justify it.
+
+**Why it is `Infrastructure` and not `Feature`**: its output is a *property* of the system (the corpus can
+move) rather than something the user can see. Its exit criterion is therefore an operation performed, not a
+screen verified.
 
 ---
 

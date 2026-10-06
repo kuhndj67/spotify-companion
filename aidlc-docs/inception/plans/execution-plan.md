@@ -241,8 +241,22 @@ is worked out without internet exposure in the same step.
 off-machine request 403s — page and WebSocket alike. That is option B (2026-09-05) working as specified,
 and changing it is a **security-posture decision**, surfaced rather than decided.
 
-▶ **Seven questions open**: [`phase-5-plan.md`](phase-5-plan.md). Nothing is designed until they are
-answered.
+**Units**
+
+| Unit | Delivers | Gates |
+|---|---|---|
+| **U6** User-Data Lifecycle | Full backup, verified restore, **cross-machine migration** | ⚠️ **Prerequisite for everything else in the phase** |
+| **U7** Off-machine deployment | The NAS target, under a chosen security posture | U6 |
+| *(later)* team workflow + onboarding docs | CI gating, README/INSTALL/CONTRIBUTING/LICENSE | — |
+
+⚠️ **U6 is the gate, and it is the first unit in the project with NO user story** — U7 is its consumer.
+The `db:backup` / `db:restore` pair already works, so the migration is feasible today; what makes it
+unsafe is that **the writer-guard goes blind across machines**, the backup covers `history.db` only, and
+**restore is one-way with no merge**.
+
+▶ **Seven questions open**: [`phase-5-plan.md`](phase-5-plan.md), and six more in
+[`u6-functional-design-plan.md`](../../construction/plans/u6-functional-design-plan.md). Nothing is
+designed until they are answered.
 
 ---
 

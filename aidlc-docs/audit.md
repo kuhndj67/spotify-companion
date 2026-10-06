@@ -6766,3 +6766,126 @@ progress across a track change, deliberately not fixed.
 
 ⚠️ **The user also flagged the primary screen as \"currently sloppy\"** and deferred its cleanup until after
 the full alpha build. Nothing beyond the halt message has been touched there.
+
+## 2026-10-06 — Phase 5 opened, and U6 was promoted from backlog to its gate
+
+**Phases 0–4 are delivered. This is the first phase that adds no user-facing feature**, and that is the
+point: the deliverable is that a second person can review, run and contribute without the project's
+accumulated tacit knowledge, and that a deployment can live somewhere other than this laptop.
+
+### The distinction that bounds the phase
+
+| | |
+|---|---|
+| Single **user** | **UNCHANGED** — one listener, one Spotify account, one corpus per deployment |
+| Single **developer** | **CHANGES** — several people may review, test, contribute |
+| Single **machine** | **CHANGES** — a deployment moves to a Synology Docker host on the same LAN |
+
+**Each person runs their own deployment** (user). ⚠️ **So this is NOT multi-tenancy and needs no user model
+for separation** — only, possibly, for *access*. Getting that distinction wrong would have scoped a user
+system into an app that is single-user by design.
+
+⚠️ **Containment is deliberate** (user): the off-machine target is on their own network, so the security
+model gets worked out without internet exposure in the same step.
+
+### 🔧 A gap I own: two Q9 guards were specified for CI and shipped as local scripts
+
+NFR Q9 chose *"run each script's safe mode **in CI**"* and *"`knip` … **in CI**"*, and warned that the
+alternative *"is how this becomes the eleventh thing nobody runs."* I added `npm run smoke` and
+`npm run knip` and **wired neither into `ci.yml`** — building precisely the thing the question told me not
+to.
+
+⚠️ **And I had been treating CI as absent.** It exists, runs typecheck + coverage + build + a container
+build, and has been **green on every push**. Correcting that is what exposed the gap.
+
+### ⚠️ The blocker for off-machine deployment, measured
+
+`localGuard.ts:141` requires a **loopback `Host` header**. A request reaching the NAS carries
+`Host: <nas>:3010`, so **every page load and every WebSocket upgrade 403s.** That is option B (2026-09-05)
+working exactly as specified, not a defect — and replacing it is a **security-posture decision**, surfaced
+rather than decided (Phase 5 Q1).
+
+⚠️ **The recommendation is to resist building auth into the app** (option D). It is the only option that
+adds attack surface to the app itself, and it **must be implemented twice** — once for HTTP, once for the
+WebSocket upgrade, because `ws` does not run Express middleware. **That exact split caused the `403`
+incident, where every page returned 200 and every handshake 403 and it read as *Spotify is down*.**
+
+### ⚠️ `README.md` is the project's decay pattern on its most public surface
+
+463 lines opening with *"Status: walking skeleton, requirements in progress"* and *"the enrichment layer is
+**not built yet**"*, pointing at a clarification round that closed in August — for an app with **5
+delivered units, 1256 tests, automated skipping and 977 recorded plays**.
+
+Same shape as open item 2 reading stale for five weeks after shipping, and the `compose.yaml` `:rw` comment
+going stale twice. ⚠️ **A reviewer's first impression is a document that is wrong about what the software
+is.** Also absent: `LICENSE` (⚠️ contributors have no granted rights), `CONTRIBUTING`, `SECURITY`.
+
+---
+
+### ⭐ U6 — User-Data Lifecycle, promoted from W-5 by one question
+
+The user asked: *"does this raise a required prerequisite? … we could backup the data on Rancher Desktop,
+start up the NAS hosted app and once connected restore the data to that environment?"*
+
+**Yes.** And the proposed sequence is feasible **today** — `db:backup` / `db:restore` have existed since
+2026-09-27 with a rehearsed round trip (850 plays → damaged to 0 → restored to 850) and have been used in
+anger twice. ⚠️ **So U6 EXTENDS a working pair.** Starting over would discard a verifier that has already
+caught a real corrupt snapshot and a self-test that proves it can fail.
+
+**Three gaps make the migration unsafe**, and W-5 anticipated only part of one:
+
+**1. ⭐ The writer-guard goes blind across machines.** `assertNobodyElseHoldsIt` runs `docker ps` against
+the **local** daemon. Run a restore here against a NAS-mounted path and local `docker ps` reports
+*"nothing is running"* **about the wrong computer**, while the NAS container holds the file open.
+
+> ⚠️ **This is the U4 corruption's shape one layer out.** The original guard was an exclusive-lock probe
+> that could not see the container because **SQLite's locks do not cross the Rancher Desktop bind mount** —
+> it *"returned green exactly when the danger was present"* and mechanically explained the U4 incident.
+> `docker ps` fixed that. **Crossing machines reintroduces the same blindness**, because `docker ps` can
+> only interrogate one daemon and it must be the one that owns the file.
+
+⚠️ `SPOTIFY_CONTAINER_NAME` is configurable and does **not** help: the question is *which daemon*.
+
+⚠️ **The FD's recommendation (U6 Q1) is deliberately the boring option — refuse cross-machine operation
+entirely.** Every alternative replaces a guard that is *blind* with one that can be *wrong*: a database
+heartbeat goes stale and reads as dead (the WAL-mtime lesson), and an HTTP health check needs reachability
+that Phase 5 Q1 has not settled. **This project has already shipped two decorative guards.**
+
+**2. The backup covers `history.db` only.** `config/rules.json`, `secrets/*`, `data/artist-credits.json`,
+`snapshots/`, `reporting/` and the `metabase-app-db` **named Docker volume** do not travel.
+
+> ⚠️⚠️ **And `state/automation-state.json` MUST NOT.** The kill switch is on its own mount *specifically*
+> because restoring a week-old backup *"would restore the week-old latch and **silently re-arm
+> automation**"*. **A backup that helpfully includes `state/` is a backup that can re-arm playback
+> control.** U6 Q2 therefore prefers an **allowlist of travel tiers** over a denylist: a denylist includes
+> a newly-added state file **by default**, which fails silently; an allowlist misses it, which is visible.
+
+**3. ⚠️ There is no merge, and restore is one-way.** Dedup is keyed on `played_at` **within one database**,
+and two deployments recording the same account produce overlapping plays **plus colliding `observation` /
+`decision_log` / `skip_attempt` ids**. **So *migrate to the NAS* and *run both* are different decisions,
+and the second forecloses going back.** U6 Q3 refuses merge tooling **explicitly**, so it is not attempted
+after two corpora have already diverged — the worst possible moment.
+
+### Two things about U6 worth recording because they are firsts
+
+⚠️ **It is the first unit with NO user story.** No user asked for it; **U7 did**. Recorded so nobody later
+invents a story to justify it.
+
+⚠️ **It is the first unit typed `Infrastructure` rather than `Feature`**, because its output is a *property*
+— the corpus can move — rather than something on a screen. Its exit criterion is therefore **an operation
+performed, not a screen verified**: *a corpus backed up on one machine, restored on another, and the
+restored app runs.* **No test can prove that**, and ⚠️ the guard must be **demonstrated refusing** rather
+than asserted — a guard nobody has watched say no is decorative.
+
+⚠️ **U6 Q6 asks whether it gets FRs at all.** Every prior unit traced to numbered FRs; W-5 is a wishlist
+entry, and the wishlist is explicitly *not* requirements. Leaving it would break the traceability every
+build-and-test summary closes with — a unit with nothing to map can only be *asserted* complete.
+
+### Artefacts created
+
+`inception/plans/phase-5-plan.md` (7 questions) · `construction/u6-data-lifecycle/HANDOFF.md` ·
+`construction/plans/u6-functional-design-plan.md` (6 questions) · Phase 5 added to `execution-plan.md`
+with its units · U6 declared in `unit-of-work.md` and `unit-of-work-plan.md` · W-5 linked to U6 ·
+`aidlc-state.md` updated.
+
+**Nothing is built. `src/` and `scripts/` are untouched by this unit.**

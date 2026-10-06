@@ -138,6 +138,7 @@ Consistency cross-check:
 | **U3** Rule Model & Evaluation | 3 | Catalogue, facts, predicate, validator, engine, store | US-14, 15, 16, 17 |
 | **U4** Rule Observability | 3 | Decision log, dry-run, back-testing | US-20, 23, 24 |
 | **U5** Automated Skipping | 4 | Playback control, safety interlocks, timing | US-18, 19, 21, 22, rest of 13 |
+| **U6** User-Data Lifecycle | **5** | Full backup, verified restore, cross-machine migration | ⚠️ **none — U7 is the consumer, not a user** |
 | **U0** Existing (reference only) | 0 | Display, enrichment, guard, diagnostics | US-01–07, 26 |
 
 ---

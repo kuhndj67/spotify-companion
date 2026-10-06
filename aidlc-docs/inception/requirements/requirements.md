@@ -762,6 +762,22 @@ would destroy the fact that the user played the duo's record, which is real list
 
 #### W-5 — Full user-data backup and restore
 
+> ⚠️ **PROMOTED TO A UNIT, 2026-10-06. This is now [U6 — User-Data Lifecycle](../../construction/u6-data-lifecycle/HANDOFF.md)**,
+> and it **gates Phase 5**: an off-machine deployment cannot responsibly touch a corpus that cannot be
+> moved back. The user asked whether moving a corpus was a prerequisite; it is.
+>
+> ⚠️ **Three gaps were measured that this entry did not anticipate:** the writer-guard asks the **local**
+> `docker ps` and is therefore **blind across machines** (the U4 corruption's shape one layer out); the
+> backup covers `history.db` **only**; and **restore is one-way with no merge**, so *migrate* and *run both*
+> are different decisions and the second forecloses going back.
+>
+> ⚠️ **And one thing this entry gets right that must not be lost**: `state/automation-state.json` **must
+> not travel**, because restoring a stale latch can **silently re-arm automation**.
+>
+> Design questions: [`u6-functional-design-plan.md`](../../construction/plans/u6-functional-design-plan.md).
+> The text below is the original backlog entry, kept for the record.
+
+
 **Raised by the user, 2026-09-26**, while deciding how to protect `history.db` during probe P-U5-1:
 *"We eventually need a way to FULLY back up all the user specific information (configuration, data,
 etc…) and restore it."*

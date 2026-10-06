@@ -81,7 +81,33 @@ build and a container build — **neither `smoke` nor `knip`**. They exist only 
 
 ---
 
-## 3. Questions
+## 3. ⚠️ U6 IS A PREREQUISITE, and it gates Q2 and Q5
+
+**Added 2026-10-06**, after the user asked whether moving a corpus was a required prerequisite. **It is.**
+
+▶ **[`U6 — User-Data Lifecycle`](../../construction/u6-data-lifecycle/HANDOFF.md)** · FD plan:
+[`u6-functional-design-plan.md`](../../construction/plans/u6-functional-design-plan.md)
+
+The `db:backup` / `db:restore` pair already works and has a rehearsed round trip, so the proposed sequence
+— *back up here, start the NAS app, restore there* — is feasible today. **Three gaps make it unsafe:**
+
+1. ⚠️ **The guard goes blind across machines.** `assertNobodyElseHoldsIt` asks the **local** `docker ps`,
+   so a restore run here reports *"nothing is running"* about **the wrong computer** while the NAS holds
+   the file open. **That is the U4 corruption's shape one layer out** — the original lock probe was blind
+   for the analogous reason, and returned green exactly when the danger was present.
+2. ⚠️ **The backup covers `history.db` only.** Rules, the contact address, the refresh token and the
+   `metabase-app-db` **named volume** do not travel — and ⚠️ **`state/automation-state.json` MUST NOT**,
+   because restoring a stale latch can **silently re-arm automation**.
+3. ⚠️ **There is no merge.** Restore is one-way; two deployments diverge immediately with colliding
+   `observation` / `decision_log` / `skip_attempt` ids. **So *migrate* and *run both* are different
+   decisions, and the second forecloses going back.**
+
+⚠️ **Nothing touches the NAS corpus until U6 is done.** Q2 below is a choice between two options whose
+risk profiles only differ *because* of gap 3.
+
+---
+
+## 4. Questions
 
 ### Q1 — ⭐ What is the security model once the app is not loopback-only?
 
@@ -120,9 +146,12 @@ properties: DSM snapshots, scheduled backup jobs, possibly cloud sync.
 ⚠️ **And `secrets/spotify-config.json` holds a refresh token that the MCP server rewrites.** On shared
 NAS storage that may be swept into a backup target the user has not thought about as credential storage.
 
+⚠️ **GATED ON U6.** Both options below assume a corpus can be moved and moved back, which it currently
+cannot — see §3.
+
 | | Option |
 |---|---|
-| **A** | ⭐ Treat the NAS deployment as **the** deployment; move the corpus there, back it up with the existing verified pair |
+| **A** | ⭐ Treat the NAS deployment as **the** deployment; move the corpus there with U6's tooling |
 | **B** | NAS is a **second, throwaway** deployment with its own empty corpus; this machine stays authoritative |
 
 ⚠️ **B is the safer first step and is what the phase goal implies** — *work through the problems without
@@ -185,6 +214,9 @@ against a ceiling **Spotify does not publish**, and `M1–M4` now exist to measu
 | **B** | Both run; accept the doubled rate and watch M2 for 429s |
 | **C** | A second Spotify app registration for the NAS |
 
+⚠️ **GATED ON U6's Q3**: *run both* is the option that forecloses going back, because the two corpora
+diverge with no merge path.
+
 ⚠️ **B's risk is not symmetric**: a 429 storm would degrade *recording*, and recording is the one thing
 that cannot be regenerated. ⚠️ **And zero observed 429s is not headroom** — it bounds nothing.
 
@@ -224,8 +256,9 @@ need for a licence between collaborators.
 
 ---
 
-## 4. Proposed exit criteria
+## 5. Proposed exit criteria
 
+- [ ] ⚠️ **U6 complete** — a corpus moved between machines and back, with the guard demonstrated refusing
 - [ ] The app is reachable and fully functional from a second machine, under the Q1 posture
 - [ ] ⚠️ **WAL probed on the NAS volume** — not reasoned about. The existing proof covers a Rancher
       bind mount, and the standing advice is that WAL is unsafe on *network* filesystems
@@ -237,7 +270,7 @@ need for a licence between collaborators.
 - [ ] `CLAUDE.md`'s single-developer assumption rewritten
 - [ ] Backlog W-1…W-8 tracked wherever Q3's workflow says
 
-## 5. Explicitly NOT in this phase
+## 6. Explicitly NOT in this phase
 
 | | Why |
 |---|---|

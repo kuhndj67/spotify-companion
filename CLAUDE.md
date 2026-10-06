@@ -80,7 +80,44 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-06) — ✅ U5 COMPLETE AND LIVE-VERIFIED. ALL FIVE UNITS DELIVERED.
+## ▶ Current state (2026-10-06) — PHASE 5 OPEN. U6 IS ITS GATE. Phases 0–4 delivered.
+
+▶ **Read [`construction/u6-data-lifecycle/HANDOFF.md`](aidlc-docs/construction/u6-data-lifecycle/HANDOFF.md) first** —
+U6's single entry point. Then [`phase-5-plan.md`](aidlc-docs/inception/plans/phase-5-plan.md) (7 questions)
+and [`u6-functional-design-plan.md`](aidlc-docs/construction/plans/u6-functional-design-plan.md) (6
+questions). **Nothing in Phase 5 is designed until those are answered. `src/` and `scripts/` are untouched
+by U6.**
+
+**Phase 5 — *Share*: off this machine, and off one developer.** ⚠️ **The first phase that adds no
+user-facing feature**, and the first whose failure mode is **exposure** rather than a wrong number — so its
+miss is not recoverable by recomputing.
+
+⚠️ **THE SINGLE-*USER* ASSUMPTION DOES NOT CHANGE.** Each developer or user runs **their own deployment**
+with their own Spotify account and corpus. **Not multi-tenancy**, so no user model is needed for
+*separation* — only, possibly, for *access*. What changes is single-**developer** and single-**machine**.
+
+⚠️ **Q1 blocks the phase.** `localGuard.ts:141` requires a **loopback `Host`**, so every off-machine
+request 403s — page and WebSocket alike. That is option B (2026-09-05) working as specified. **Replacing it
+is a security-posture decision**, and the recommendation is to **resist building auth into the app**: it
+must then be implemented twice, once for HTTP and once for the WebSocket upgrade, which is the exact split
+that caused the `403` incident.
+
+⚠️ **U6 gates everything**, promoted from backlog W-5. **`db:backup`/`db:restore` already work** — U6
+EXTENDS them. Three gaps: the writer-guard asks the **local** `docker ps` and is **blind across machines**
+(the U4 corruption one layer out) · the backup covers `history.db` **only** · **restore is one-way with no
+merge**, so *migrate* and *run both* are different decisions and the second forecloses going back.
+⚠️ **`state/automation-state.json` must NOT travel** — a restored stale latch can **silently re-arm
+automation**.
+
+⚠️ **`README.md` is 463 lines describing a "walking skeleton" with "enrichment not built yet"** — for an
+app with five delivered units and 977 plays. **The decay pattern on the most public surface.** No `LICENSE`
+either, so contributors have no granted rights.
+
+⚠️ **A gap owed from U5**: NFR Q9 specified `smoke` and `knip` **in CI**; both shipped as local npm
+scripts and **neither is in `ci.yml`** — exactly the *"eleventh thing nobody runs"* the question warned
+about. ✅ CI itself exists and is green on every push.
+
+### Earlier state (2026-10-06) — ✅ U5 COMPLETE AND LIVE-VERIFIED. ALL FIVE UNITS DELIVERED.
 
 **Read [`construction/u5-automated-skipping/live-verification.md`](aidlc-docs/construction/u5-automated-skipping/live-verification.md)** —
 the record that closes U5. **Seven live sessions · 29 real skips · 6 runaway halts.**

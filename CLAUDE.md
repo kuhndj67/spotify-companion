@@ -80,7 +80,41 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-03) — U5 IS BUILT AND DEPLOYED, AND IT IS **INERT**
+## ▶ Current state (2026-10-06) — ✅ U5 COMPLETE AND LIVE-VERIFIED. ALL FIVE UNITS DELIVERED.
+
+**Read [`construction/u5-automated-skipping/live-verification.md`](aidlc-docs/construction/u5-automated-skipping/live-verification.md)** —
+the record that closes U5. **Seven live sessions · 29 real skips · 6 runaway halts.**
+1256 tests · typecheck clean · smoke green · knip clean · schema **v7** · **973 plays**.
+
+✅ **FR-46/BR-43.1 ANSWERED: a skip costs 1–9 s of the outgoing track, not 18–41 s.** ⚠️ **And the figure
+tracks ENRICHMENT LATENCY, not the skip mechanism** — every skip decided on complete data, and the 1 s case
+had a warm cache. I reported "6–7 s" at 13 skips and "3–9 s" at 19; **both were sample artefacts stated
+more confidently than the evidence supported.** The stable claim is the mechanism, not the number.
+
+✅ **Every BR-35 path has fired live** — 5 `consecutive` halts, **1 `hourly-rate`**, both refusal reasons,
+BR-35.9's reset, BR-35.6 surviving a restart, P-30's *unknown counts as landed*, FR-48's *never retry*.
+
+⚠️ **`hourly-rate` needed two of three rules DISABLED and hand-paced separators to reach**, because any
+rule broad enough for 10 skips/hour produces 3 adjacent first. **The hourly cap is mostly theoretical at a
+consecutive limit of 3**, and the pre-POST `rate-limited` refusal is nearly dead — the halt latches at the
+same threshold and is checked earlier.
+
+### ⚠️ EIGHT DEFECTS WERE FOUND LIVE AND NONE BY THE SUITE — and two had PASSING TESTS
+
+The full list is in the verification record §4. The one that outlives the unit:
+
+> ⚠️ **A FIXTURE BUILT AROUND A MENTAL MODEL CONFIRMS THE MODEL.** Twice in two days — the halt's
+> off-by-one (*"the counter reads closed plays so it must trail by one"*, which BR-43.4's confirmation
+> grace defeats) and the time-window key that failed by **11–14 ms**. Both wrong versions had tests that
+> **passed**, because the data was written to match the belief rather than the behaviour. **This is
+> invisible to coverage**: the line ran, the assertion ran, and the two agreed with each other and not
+> with reality. Neither `knip` nor 100% coverage can see it.
+
+⚠️ **And `skip_source` shows why dead-VALUE analysis is not dead-CODE analysis**: the column was read and
+written throughout — just never with `'rule'`, so BR-35's consecutive halt **could not fire at all** while
+`safetyCounters.ts` sat at 100% on every axis.
+
+### Earlier state (2026-10-03) — U5 BUILT AND DEPLOYED, INERT
 
 **Read [`aidlc-docs/construction/u5-automated-skipping/HANDOFF.md`](aidlc-docs/construction/u5-automated-skipping/HANDOFF.md) before anything else** — U5's single entry point; the current state is its top block.
 
@@ -409,7 +443,7 @@ attempt.
 | **U2 Label enrichment** | 2 | ✅ **Approved 2026-09-05** |
 | **U3 Rule model (pure core)** | 3 | ✅ **Built — 620 tests, not wired to anything** |
 | U4 Rule observability | 3 | Pending |
-| U5 Automated skipping | 4 | Pending |
+| **U5 Automated skipping** | 4 | ✅ **Complete and live-verified 2026-10-06** |
 
 620 tests passing · 99.19% line · 92.86% branch · typecheck clean · **427 plays recorded**
 · schema v4. The `played_at` duplicates were repaired 2026-09-06 — 84 rows re-timed, 41 deleted,

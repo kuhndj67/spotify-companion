@@ -1,70 +1,76 @@
 # U5 Handoff — U5's single entry point
 
-**Written 2026-09-22** at the U4/U5 boundary. **Updated 2026-10-03.** This is the single entry point
+**Written 2026-09-22** at the U4/U5 boundary. **Updated 2026-10-06.** This is the single entry point
 for U5.
 
 ---
 
-## ▶ CURRENT STATE (2026-10-03) — U5 IS BUILT AND DEPLOYED, AND IT IS **INERT**
+## ▶ U5 IS COMPLETE AND LIVE-VERIFIED (2026-10-06)
 
-✅ **All 13 code-generation steps are done. Migration 007 ran. The container is live on the new
-image.** 1228 tests · typecheck clean · `npm run smoke` green · `npm run knip` clean · **schema v7** ·
-**885 plays** · `integrity_check: ok`.
+✅ **All 13 code-generation steps done. Migration 007 applied. Seven live sessions, 29 real skips.**
+1256 tests · typecheck clean · `npm run smoke` green · `npm run knip` clean · schema **v7** ·
+**973 plays** · `integrity_check: ok`.
 
-⚠️ **NOTHING CAN SKIP A TRACK RIGHT NOW, and that is the intended delivered state.**
-`SKIP_EXECUTOR_ENABLED` is **`"false"`** in `compose.yaml`, so `SkipExecutor` is **never
-constructed** — no player client, no drain, no attempt rows. The rules engine keeps evaluating and
-logging exactly as it did in U4. This is **BR-40.1's arming gate**: U5 ships inert so the dry-run
-decision log can be reviewed *before* anything acts.
+▶ **Read [`live-verification.md`](live-verification.md) before anything else in this unit.** It is the
+record that closes U5, and it carries the eight defects the live sessions found, **none of which the test
+suite caught.**
 
-### ▶ THE NEXT STEP IS NOT CODE. It is the dry-run review.
+### The three exit criteria CI could not close are all closed
 
-**Three exit criteria remain, and none can be closed by CI.** Two of the three are now closed:
-
-| | Criterion | Status |
+| | Criterion | Closed |
 |---|---|---|
-| 1 | **`probeWritable` against the real `/state` mount, through the container** | ✅ **CLOSED 2026-10-03** — `/api/diagnostics` reports `writable` as the `node` user, and the kill switch was written and read back in both directions. Host and container see identical file content, so the **write-temp-then-rename survived the bind mount** |
-| 2 | **The dry-run review that arms the first rule** | ⚠️ **OPEN — this is the next step.** User judgement, not a test |
-| 3 | **The first real skip, heard by the user**, confirming it costs 2–3 s rather than 18–41 s | ⚠️ **OPEN** — needs (2) first |
+| 1 | `probeWritable` against the real `/state` mount, through the container | 2026-10-03 |
+| 2 | The dry-run review that armed the first rule | 2026-10-04 |
+| 3 | The first real skip, heard — **cost measured at 1–9 s** | 2026-10-04 |
 
-### How to arm it, when the review says so
+✅ **FR-46/BR-43.1's open question is answered: a skip costs 1–9 s of the outgoing track, not 18–41 s.**
+⚠️ **And the figure tracks ENRICHMENT LATENCY, not the skip mechanism** — every skip decided on complete
+data, and the 1 s case had a warm cache. Two earlier reports of "6–7 s" and "3–9 s" were sample artefacts
+stated more confidently than the evidence supported.
 
-1. Read the decision log on the Rules pop-up. ⚠️ **It is already populated** — U4 has been recording
-   decisions since 2026-09-11, so the review does not have to wait for new data.
-2. Decide which rule to arm, and **narrow it if the projection says it would match a lot**. The
-   currently-loaded `major-label` rule matches **145 of 885 plays (16.4%)** — measured, and see the
-   pre-registration before reading that as safe.
-3. Set `SKIP_EXECUTOR_ENABLED: "true"` in `compose.yaml` and `docker compose up -d`. ⚠️ **That builds
-   the machinery; it does not arm it.** `globalAutomationEnabled` is still `false`.
-4. Throw the switch on the **Rules pop-up**, which is the only control that acts without a restart.
+### Every BR-35 safety path has fired live
 
-⚠️ **Read [`safety-thresholds/pre-registration.md`](safety-thresholds/pre-registration.md) first.** It
-fixes the two halt limits **and what would count as evidence that either is wrong**, written while
-`skip_attempt` held 0 rows. ⚠️ **`3 consecutive` is the limit to expect first**, not `10/hour` — 16.4%
-overall says nothing about adjacency, and three consecutive major-label tracks is an ordinary run
-inside an album.
+6 halts — **5 `consecutive`, 1 `hourly-rate`** · `runaway-halted` and `automation-off` refusals · BR-35.9's
+reset · BR-35.6 surviving a restart · P-30's *unknown counts as landed* · FR-48's *surface, never retry*.
 
-### ⚠️ Rollback is VERIFIED LIVE, not inferred
+⚠️ **`hourly-rate` required disabling two of three rules and hand-paced separators to reach**, because
+any rule broad enough for 10 skips/hour produces 3 adjacent first. **So the hourly cap is mostly
+theoretical at a consecutive limit of 3**, and `rate-limited` is nearly dead — §3 of the verification
+record.
 
-U4's image is tagged **`spotify-now-playing:u4-rollback`**. Against a **v7 copy** it reports
-`{from: 7, to: 7, applied: []}`, every U4 read path works, and ⚠️ **a U4 `INSERT` into a v7
-`decision_log` succeeds with `trigger` defaulting to `'initial'`** — which is the clause that would
-have broken had that column been `NOT NULL` without a default. `integrity_check: ok` after that write.
+### ⚠️ The lesson this unit produced, which outlives it
 
-> ⚠️ Reading the *skip line* alone would have proved only that **007 is skipped**, not that U4's code
-> runs correctly against an unread table and three unread columns. The plan said so; the write is what
-> actually closes it.
+**Two defects I documented WRONGLY first, and both wrong versions had PASSING TESTS** — the halt's
+off-by-one, and the 11–14 ms time-window key.
+
+> ⚠️ **A fixture built around a mental model confirms the model.** Both tests passed because the data was
+> written to match a belief rather than the system. That is **invisible to coverage**: the line ran, the
+> assertion ran, and the two agreed with each other and not with reality.
+
+⚠️ **`knip` could not see the first defect either**: `skip_source` was read *and* written — just never
+with the value that mattered. **Dead-value analysis is not dead-code analysis.**
+
+### What is NOT verified live
+
+`no-active-device` · `upstream-rate-limited` (Spotify 429) · **P-30's 401 refresh-and-reissue**, which is
+indistinguishable from a proactive refresh because that path logs nothing · `rate-limited` · FR-33 `hold`.
+**All five are covered by tests** — listed because *covered* and *observed* are different claims, and this
+unit's history is that the second keeps finding what the first did not.
+
+### Open backlog from U5
+
+**W-6** (defect-class detection — `smoke` and `knip` were its first two guards) · **W-7** (idle poll
+backoff, now unblocked by M1–M4) · **W-8** (`confirmed()` compares progress across a track change —
+deliberately not fixed).
 
 ### Before running anything that touches the database
 
-⚠️ **`docker compose down` first.** The container is the deployment and it holds `history.db` open.
-**SQLite's locks do not cross the Rancher Desktop bind mount**, so the script-level lock probe cannot
-see it — `docker ps` is the only working check, and `backup-history.mjs` does both.
-
-Latest verified backup: **`data/backup-before-migration-007-deploy-20261003T135418Z`** — schema v6,
-879 plays, **all eight checks pass**.
+⚠️ **`docker compose down` first.** The container holds `history.db` open and **SQLite's locks do not
+cross the Rancher Desktop bind mount**, so `docker ps` is the only check that works.
 
 ---
+
+## Earlier state (2026-10-03)
 
 ## Earlier state (2026-09-30)
 

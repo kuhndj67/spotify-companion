@@ -6648,3 +6648,121 @@ with the full table in `confirmed()`'s own docstring where someone would look.
 
 ⚠️ **Still never exercised live**: the `hourly-rate` trigger (the consecutive halt fires first and
 prevents reaching 10/hour) and the `no-active-device` refusal.
+
+## 2026-10-06 — ✅ U5 IS COMPLETE AND LIVE-VERIFIED. All five units delivered.
+
+**7 live sessions · 29 real skips · 6 runaway halts · 1256 tests · schema v7 · 973 plays ·
+`integrity_check: ok`.** Record:
+[`construction/u5-automated-skipping/live-verification.md`](construction/u5-automated-skipping/live-verification.md).
+
+### The three exit criteria CI could not close are closed
+
+| | Criterion | Closed |
+|---|---|---|
+| 1 | `probeWritable` against the real `/state` mount, **through the container** | 2026-10-03 |
+| 2 | The dry-run review that armed the first rule | 2026-10-04 |
+| 3 | **The first real skip, heard** | 2026-10-04 |
+
+### ⭐ FR-46/BR-43.1 answered: 1–9 s, and the number is not what matters
+
+The design plan feared **18–41 s** of the outgoing track; probe P-U5-1 predicted **2–3 s**. Measured over
+29 real skips: **min 1,000 ms · median 6,000 ms · max 9,000 ms.** No lag guard needed.
+
+⚠️ **But the cost is ENRICHMENT LATENCY, not a property of the skip mechanism**, and I reported it twice
+before understanding that:
+
+- after 13 skips: *"6–7 s"*
+- after 19 skips: *"3–9 s"*
+- actual, 29 skips: **1–9 s**, bounded by `ENRICHMENT_WAIT_MS`
+
+Every skip decided on **complete** data (`partialData: 0`, `trigger: initial`) — none timed out. The 1 s
+case was a track played minutes earlier, so its enrichment was **cached** and the decision fired on the
+first tick. ⚠️ **Both earlier figures were sample artefacts stated more confidently than the evidence
+supported.** The durable claim is the mechanism: the cost tracks a latency this project already tunes.
+
+### Every BR-35 path has now fired live
+
+5 `consecutive` halts · **1 `hourly-rate`** · `runaway-halted` (5) · `automation-off` (8) · BR-35.9's reset
+across 4 separators · BR-35.6 surviving `compose up --build` · P-30's *unknown counts as landed* (all 3
+`unconfirmed` attempts counted) · FR-48's *surface, never retry*.
+
+⚠️ **`attemptIds` differs by trigger, and that is the point**: `consecutive` names the run (`[31,32,33]`),
+`hourly-rate` names the whole window (ten ids). Both confirmed live.
+
+### ⚠️ `hourly-rate` is near-unreachable in production — a real property, not a coverage gap
+
+Reaching it needed **two of three rules disabled** and hand-paced separators. Any rule broad enough to
+produce 10 skips in an hour will almost certainly produce **3 adjacent first**, so the consecutive guard
+pre-empts it. **`MAX_RULE_SKIPS_PER_HOUR = 10` is therefore mostly theoretical at
+`MAX_CONSECUTIVE_RULE_SKIPS = 3`.**
+
+⚠️ **Corollary: the pre-POST `rate-limited` refusal is nearly dead.** The halt latches at the same
+threshold and is checked earlier in `#process`. It is reachable only by acknowledging a halt while ≥10
+skips remain in the window.
+
+### ⚠️ EIGHT DEFECTS FOUND LIVE. NONE BY THE SUITE. TWO HAD PASSING TESTS.
+
+Full table in the record §4. Summary of how each was found:
+
+| Found by | Count |
+|---|---|
+| The user, using the app | **3** (prose on the primary screen · three-button recovery · stale pop-up) |
+| Reading code or a real record | **3** |
+| Answering a user question | **1** (the halt could not fire at all) |
+| A tool added for exactly this (`knip`) | **1** |
+| **The test suite** | **0** |
+
+> ⚠️ **A FIXTURE BUILT AROUND A MENTAL MODEL CONFIRMS THE MODEL.** Two defects were documented *wrongly
+> first*, and both wrong versions **had passing tests**:
+>
+> - **The halt's off-by-one.** I reasoned *"the counter reads closed plays, so it must trail by one"* and
+>   wrote *the 4th skip latches it* into a docstring, the UI, the pre-registration and a test. BR-43.4's
+>   3-second confirmation grace defeats it — the play has closed by the time `#checkHalt` runs. **3 means 3.**
+> - **The time-window key**, which failed live by **11–14 ms** because `ended_at` is the last observation
+>   and the attempt is enqueued from the decision taken on that same tick.
+>
+> Both tests passed because the data was written to match the belief rather than the behaviour. ⚠️ **This
+> is invisible to coverage**: the line ran, the assertion ran, and the two agreed with each other and not
+> with reality. It is a distinct failure mode from an untested path, and neither coverage nor `knip` can
+> see it.
+
+⚠️ **And `skip_source` shows why dead-VALUE analysis is not dead-CODE analysis.** The column was read and
+written throughout — just never with `'rule'` — so BR-35's consecutive halt **could not fire at all** while
+`safetyCounters.ts` sat at **100% line, branch and function** and PBT-46/47 passed. They tested the counter
+against *supplied* input; nothing asserted that anything ever supplies `true`.
+
+### The UX revision, and why it was structural
+
+Defects #4–#7 were one shape: **surfaces disagreeing about state.** Controls during a halt went **3 → 1**;
+the primary screen lost the prose and kept the dot; the switch is **not rendered** while halted; the panel
+refreshes off the snapshot.
+
+⚠️ **Acknowledging now unconditionally disarms**, so resuming is a second deliberate act — **stricter than
+FC-U5-3's original two buttons**, because the old `reArm` parameter let one request clear a safety latch
+*and* re-arm, which is what BR-35.5 exists to prevent. FC-U5-3 revised in place, struck through, with the
+reasoning. **BR-35.5 and BR-35.6 unchanged.**
+
+### ⚠️ Five paths still NOT verified live
+
+`no-active-device` · `upstream-rate-limited` (Spotify 429 — ⚠️ zero observed is **not** headroom, Spotify
+publishes no limit) · **P-30's 401 refresh-and-reissue**, which is **indistinguishable from a proactive
+refresh because that path logs nothing** · `rate-limited` · FR-33 `hold`.
+
+**All five are covered by tests.** Listed because *covered by a test* and *observed in service* are
+different claims, and this unit's history is that the second keeps finding what the first did not.
+
+### A rule that was right while the intent was wrong
+
+⚠️ The user disabled `hip-hop` on 2026-10-06 after it skipped a bbno$ track. **The rule fired correctly** —
+`artist.genres contains "hip hop"`, and that genre led the list with count 4. The other two rules correctly
+declined the same track (`independent`, age 0). **The rule was right and the intent was wrong**, which is
+exactly what a user-authored rules file and the dry-run review exist to surface rather than prevent.
+
+### Open backlog from U5
+
+**W-6** — defect-class detection; `smoke` and `knip` were its first two guards, and §4 is the argument for
+the rest of it · **W-7** — idle poll backoff, now unblocked by M1–M4 · **W-8** — `confirmed()` compares
+progress across a track change, deliberately not fixed.
+
+⚠️ **The user also flagged the primary screen as \"currently sloppy\"** and deferred its cleanup until after
+the full alpha build. Nothing beyond the halt message has been touched there.

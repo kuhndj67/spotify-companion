@@ -4,7 +4,8 @@
 - **Project Name**: Spotify Now Playing
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-24T13:17:23Z
-- **Current Stage**: CONSTRUCTION — **U5 IS BUILT AND DEPLOYED, AND IT IS INERT (2026-10-03). All 13 code-generation steps done, migration 007 ran, schema v7, container live on the new image. `SKIP_EXECUTOR_ENABLED` is `false`, so `SkipExecutor` is never constructed and nothing can skip a track. Next: THE DRY-RUN REVIEW — user judgement, not code.**
+- **Current Stage**: CONSTRUCTION — **✅ U5 IS COMPLETE AND LIVE-VERIFIED (2026-10-06). All five units delivered.** Seven live sessions, 29 real skips, 6 runaway halts including the `hourly-rate` trigger. A skip costs **1–9 s** of the outgoing track, not the 18–41 s the design feared — and the figure tracks **enrichment latency**, not the skip mechanism. ⚠️ **Eight defects were found live and NONE by the test suite**; two of them I had documented wrongly first, with passing tests whose fixtures encoded the belief rather than the behaviour. Record: [`construction/u5-automated-skipping/live-verification.md`](construction/u5-automated-skipping/live-verification.md). **Next: the user's call — backlog W-6/W-7/W-8, or the primary-screen cleanup they flagged.**
+  *(superseded) U5 was built and deployed INERT on 2026-10-03.* All 13 code-generation steps done, migration 007 ran, schema v7, container live on the new image. `SKIP_EXECUTOR_ENABLED` is `false`, so `SkipExecutor` is never constructed and nothing can skip a track. Next: THE DRY-RUN REVIEW — user judgement, not code.**
   ⚠️ **Two of the three non-CI exit criteria are now closed.** `probeWritable` is verified against the
   real `/state` mount **through the container**, and the kill switch was written and read back in both
   directions with host and container seeing identical content — so the write-temp-then-rename survived

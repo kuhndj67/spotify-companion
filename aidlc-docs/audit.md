@@ -7428,3 +7428,29 @@ pattern: **a host component updated under Modern Standby breaks the WSL plumbing
 small and **not growing** (if the 4.8 GB file survived, ask the user before deleting it) · the container is up and
 `/api/health` ok · plays are recording. If the Hyper-V socket error recurs on a clean boot, suspect a 26H2 ×
 Rancher Desktop 1.24.0 / WSL 3.0.1 incompatibility rather than standby.
+
+---
+
+## 2026-10-08T15:50:11Z — Post-reboot checks PASS; U7 NFR questions answered (all A)
+
+Reboot at 11:46 local. ✅ `docker ps` works from Windows (client 29.6.2-rd, server 29.5.3) · ✅ Rancher started a
+fresh `docker.log` (160 KB, growing ~0.6 KB/s, the normal k3s noise) — **the 4.8 GB file is gone**, nothing needed
+deleting · ✅ `spotify-now-playing` up and healthy, `/api/health` ok, UI 200 · ✅ polling, nothing playing at check time
+(so a new play row could not be observed yet).
+
+⚠️ **One `docker-proxy … bad file descriptor` line at 11:48:24, during startup**, with two brief Hyper-V socket
+timeouts in `wsl-helper.log`. It did **not** loop (count stayed 1). So the same error appears transiently at startup and
+normally recovers; this morning's state was the case where it did not.
+
+⚠️ **A misreading, corrected the same minute**: I read `pollsReturningNothingPlaying = 1` as a count (*"38 of 39
+playing"*) and suspected F5. It is a **share** (`upstreamMetrics.ts:162`) — 100% idle, consistent with the snapshot.
+A name that reads as a count but holds a ratio; worth renaming when BR-58.3 touches this code.
+
+U7 NFR Design plan: **Q1–Q7 all A.** Writing the deliverables.
+
+---
+
+## 2026-10-08T16:16:21Z — ✅ U7 NFR Design APPROVED
+
+User: *"Continue"* after the deliverables were presented as awaiting approval — taken as approval, and recorded
+in those words so the reading can be checked. P-49…P-57, LC-40…LC-48, PBT-59…PBT-67. Next: Infrastructure Design plan.

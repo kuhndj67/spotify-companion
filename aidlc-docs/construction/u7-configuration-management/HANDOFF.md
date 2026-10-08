@@ -2,7 +2,7 @@
 
 **Written 2026-10-08.** This is the only entry point for U7 — no parallel status or resume file.
 
-## ▶ CURRENT STATE — ✅ FUNCTIONAL DESIGN APPROVED (2026-10-08) · ▶ NFR DESIGN PLAN OPEN — answer 7 questions in [`../plans/u7-nfr-design-plan.md`](../plans/u7-nfr-design-plan.md)
+## ▶ CURRENT STATE — ✅ FUNCTIONAL DESIGN APPROVED (2026-10-08) · ▶ NFR DESIGN WRITTEN, AWAITING APPROVAL — [`nfr-design/`](nfr-design/) (P-49…P-57, LC-40…LC-48, PBT-59…PBT-67)
 
 ✅ Requirements ratified (Question 19 = A, 19a = A): **FR-66…FR-72, US-29** in `requirements.md` §3.8.
 ▶ **Review [`functional-design/`](functional-design/)** — `business-rules.md` (**BR-53…BR-60**, facts F1–F8, probes
@@ -19,9 +19,7 @@ P-U7-1…3), `domain-entities.md`, `business-logic-model.md`, `frontend-componen
 - Evidence that a refresh token **survives reuse**: the MCP server has refreshed hourly for weeks with the same
   one (F3).
 
-⚠️ **Before the U7 NFR questions, after the 2026-10-08 reboot**: verify the Docker CLI works and Rancher's
-`docker.log` is no longer growing (it reached 4.8 GB from a retry loop) — see `audit.md`, *Docker CLI failure
-diagnosed*. The `:3011` probes P-U7-1…3 need a working Docker CLI.
+✅ Post-reboot checks passed 2026-10-08 (Docker CLI restored, `docker.log` fresh) — the `:3011` probes can run.
 
 ## Why this unit exists
 

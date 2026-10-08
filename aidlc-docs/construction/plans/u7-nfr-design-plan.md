@@ -1,7 +1,7 @@
 # NFR Design Plan — U7: Configuration Management
 
 **Date**: 2026-10-08 · **Stage**: CONSTRUCTION — NFR Design, Unit U7
-**Status**: 📋 **PLAN — 7 questions open.** Nothing is designed until they are answered.
+**Status**: ✅ **ALL 7 ANSWERED (2026-10-08), every one A.** Deliverables: `nfr-design/nfr-design-patterns.md` (**P-49…P-57**) and `nfr-design/logical-components.md` (**LC-40…LC-48**, **PBT-59…PBT-67**) — ✅ **APPROVED 2026-10-08**.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: U7 Functional Design (approved 2026-10-08) — `business-rules.md` **BR-53…BR-60** (facts F1–F8, probes
 P-U7-1…3), `domain-entities.md`, `business-logic-model.md`, `frontend-components.md` · requirements **FR-66…FR-72**

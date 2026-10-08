@@ -59,9 +59,23 @@ export interface MovedRecord {
   noDatabase?: boolean;
 }
 
+/**
+ * U7 (BR-59.4/59.5): the backup's rules, carried OUT of the pending directory before cleanup removes it — only when
+ * the user ticked *"also replace my rules"*. The restorer never writes `config/` itself; `finishRestoreRules` does,
+ * and only once the restored database has opened.
+ */
+export interface PendingRules {
+  readonly content: string;
+  /** The current rules' hash when the user confirmed — BR-59.6 refuses to apply over a later hand edit. */
+  readonly expectedHash: string | null;
+}
+
+/** What became of the restore's rules, for the after-restart message (BR-59.7, frontend-components §4). */
+export type RulesRestoreResult = 'applied' | 'not-requested' | { readonly skipped: string };
+
 export type RestoreOutcome =
   | { kind: 'none' }
-  | { kind: 'applied'; takenAt: string | null; plays: number | null }
+  | { kind: 'applied'; takenAt: string | null; plays: number | null; rules?: PendingRules | null; rulesResult?: RulesRestoreResult }
   | { kind: 'failed'; reason: string };
 
 /**
@@ -100,7 +114,8 @@ export function applyPendingRestore(dataDir: string, options: RestoreOptions = {
   const journalPath = join(pending, JOURNAL);
   const manifest = readJson<{ takenAt?: string; counts?: Record<string, number> }>(join(pending, 'manifest.json'));
   // Written by MaintenanceService beside the manifest, so the backup's own manifest is never edited.
-  const stage = readJson<{ reason?: 'restore' | 'undo' }>(join(pending, STAGE_FILE));
+  // ⚠️ A U6-era stage.json has no `applyRules`, and reads as false: a restore staged by U6 never applies rules.
+  const stage = readJson<{ reason?: 'restore' | 'undo'; applyRules?: boolean; rulesHashAtConfirm?: string | null }>(join(pending, STAGE_FILE));
   const journal: Journal = readJson<Journal>(journalPath) ?? { id: `${now().getTime()}`, step: 'verify' };
   const startAt = ORDER.indexOf(journal.step);
 
@@ -185,9 +200,15 @@ export function applyPendingRestore(dataDir: string, options: RestoreOptions = {
 
     // ── 4. clean up — removing the pending directory (with its journal) is what marks the swap done ───────
     record('cleanup');
+    // U7: read the rules OUT first — cleanup deletes them. Reading is all that happens here; config/ is untouched.
+    const rulesFile = join(pending, 'rules.json');
+    const rules: PendingRules | null =
+      stage?.applyRules === true && existsSync(rulesFile)
+        ? { content: readFileSync(rulesFile, 'utf8'), expectedHash: stage.rulesHashAtConfirm ?? null }
+        : null;
     fault('rm:pending');
     rmSync(pending, { recursive: true, force: true });
-    return { kind: 'applied', takenAt: manifest?.takenAt ?? null, plays: manifest?.counts?.['play'] ?? null };
+    return { kind: 'applied', takenAt: manifest?.takenAt ?? null, plays: manifest?.counts?.['play'] ?? null, ...(rules ? { rules } : {}) };
   } catch (e) {
     if (isSimulatedCrash(e)) throw e;
     const reason = e instanceof Error ? e.message : String(e);
@@ -274,4 +295,24 @@ export function sweepLeftovers(dataDir: string): number {
     removed++;
   }
   return removed;
+}
+
+/**
+ * BR-59.5/59.6 — apply a restore's rules, or say why not. Called by `server.ts` AFTER the restored database has
+ * opened (step 5) and BEFORE the rules watcher starts, so the watcher's first load is already the restored set and
+ * no rule ever runs against the wrong corpus.
+ *
+ * ⚠️ `databaseOpened: false` means BR-48.6 fell back to the previous history — then the backup's rules must NOT be
+ * applied: they would sit on top of a corpus the user did not choose to restore over.
+ */
+export function finishRestoreRules(
+  outcome: RestoreOutcome,
+  databaseOpened: boolean,
+  writer: { applyAtStartup(content: string, expectedCurrentHash: string | null): { applied: true } | { applied: false; reason: string } },
+): RulesRestoreResult | null {
+  if (outcome.kind !== 'applied') return null;
+  if (!outcome.rules) return 'not-requested';
+  if (!databaseOpened) return { skipped: 'the restored history did not open, so its rules were not applied either' };
+  const r = writer.applyAtStartup(outcome.rules.content, outcome.rules.expectedHash);
+  return r.applied ? 'applied' : { skipped: r.reason };
 }

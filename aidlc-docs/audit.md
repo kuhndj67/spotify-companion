@@ -7549,3 +7549,11 @@ writes, read-back, views only. Suite 1486/1486. ⚠️ **Found from the code**: 
 credentials file for the process lifetime, so the planned *"drop the token"* would have kept using the OLD
 credentials — `forgetCredentials()` added. Same shape as F1 (the MCP server's in-memory client), one layer over:
 **a cache nobody listed is a second copy of the state you are replacing.**
+
+---
+
+## 2026-10-08T19:39:04Z — U7 Code Generation Step 7 done: restore can restore rules, only if asked
+
+Restorer carries an opted-in rules file out of `restore-pending/` (never writes `config/`); `finishRestoreRules`
+applies it after the restored database opens and only if the current rules are unchanged since confirm. PBT-67 at
+every fault point. Suite 1508/1508.

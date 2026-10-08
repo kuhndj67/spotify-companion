@@ -22,6 +22,7 @@
  * process.
  */
 
+import type { RulesComparison } from '../configuration/rulesComparison.js';
 import { randomUUID } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -51,8 +52,12 @@ export interface DatabaseSummary {
 export interface Comparison {
   backup: DatabaseSummary;
   current: DatabaseSummary;
-  /** BR-48.7 — compared and REPORTED; U6 never applies it. */
+  /** BR-48.7 — compared and REPORTED. U7 (BR-59) lets the user opt in to applying it. */
   rules: 'none' | 'identical' | 'differs';
+  /** U7 (BR-59.1): the full comparison when the backup's rules differ and are valid; `null` otherwise. */
+  rulesComparison: RulesComparison | null;
+  /** U7 (BR-59.2): the validator's errors when the backup's rules are INVALID — the checkbox is then disabled. */
+  rulesInvalid: readonly string[] | null;
 }
 
 export type Busy = null | 'backup' | 'restore-verify' | 'restore-stage' | 'restarting';
@@ -88,6 +93,13 @@ export interface MaintenanceDeps {
   /** From startup: what `applyPendingRestore` and `sweepLeftovers` reported. */
   startup?: { restore: RestoreOutcome; swept: number };
   caps?: { uploadBytes: number; expandedBytes: number };
+  /**
+   * U7 (BR-59.1): compare a backup's rules with the current ones — `RulesWriter.compareCandidate`, so the restore
+   * dialog and the Rules pop-up use ONE comparison (BR-53.7). Absent → rules are reported only, as in U6.
+   */
+  rulesCandidate?: (text: string) => { ok: true; comparison: RulesComparison } | { ok: false; errors: readonly string[] };
+  /** U7 (BR-59.4/59.6): the current rules' hash, recorded at confirm. */
+  currentRulesHash?: () => string | null;
 }
 
 export type Refused = { ok: false; status: 400 | 409 | 413 | 422 | 503; reason: string; rule?: string };
@@ -98,6 +110,8 @@ interface Staged {
   reason: 'restore' | 'undo';
   expiresAt: number;
 }
+
+const NO_RULES_DETAIL = { rulesComparison: null, rulesInvalid: null } as const;
 
 export class MaintenanceService {
   readonly #deps: MaintenanceDeps;
@@ -205,13 +219,15 @@ export class MaintenanceService {
         return this.#refuse(workDir, 422, { rule: 'BR-47', detail: describeVerdict(verdict, verification) });
       }
 
+      const rules = this.#compareRules(join(staged, 'rules.json'));
       const comparison: Comparison = {
         backup: summaryFrom(manifest.takenAt ?? null, verification),
         current: this.#currentSummary(),
-        rules: this.#compareRules(join(staged, 'rules.json')),
+        rules,
+        ...this.#rulesDetail(join(staged, 'rules.json'), rules),
       };
-      // BR-48.7 — the archive's rules are compared and reported, then DISCARDED: U6 never writes config/.
-      rmSync(join(staged, 'rules.json'), { force: true });
+      // U7 (BR-59.1, amending BR-48.7): the archive's rules are KEPT in the work dir until confirm decides — moved
+      // into restore-pending/ only if the user opts in, removed with the work dir otherwise.
       const token = this.#stage(workDir, comparison, 'restore');
       return { ok: true, token, comparison };
     } catch (e) {
@@ -247,6 +263,7 @@ export class MaintenanceService {
         backup: summaryFrom(moved.movedAt, verification),
         current: this.#currentSummary(),
         rules: 'none',
+        ...NO_RULES_DETAIL,
       };
       const token = this.#stage(workDir, comparison, 'undo');
       return { ok: true, token, comparison };
@@ -259,7 +276,11 @@ export class MaintenanceService {
 
   // ── restore: confirm and stage (BR-48.2–48.4) ──────────────────────────────────────────────────────────
 
-  confirm(token: string, typed: string): { ok: true; restarting: boolean } | Refused {
+  /**
+   * @param applyRules U7 (BR-59.2–59.4): the opt-in *"also replace my rules"*. Off by default. The same typed
+   *   `RESTORE` confirms both (BR-59.3) — the rules comparison is on the same dialog.
+   */
+  confirm(token: string, typed: string, applyRules = false): { ok: true; restarting: boolean } | Refused {
     this.#expire();
     if (typed !== CONFIRM_WORD) {
       return { ok: false, status: 400, reason: `Type ${CONFIRM_WORD} to confirm.`, rule: 'BR-48.2' };
@@ -267,6 +288,17 @@ export class MaintenanceService {
     const staged = this.#staged.get(token);
     if (staged === undefined) {
       return { ok: false, status: 409, reason: 'This restore is no longer waiting — it was confirmed, cancelled or timed out. Upload the file again.' };
+    }
+    if (applyRules && staged.comparison.rulesComparison === null) {
+      return {
+        ok: false,
+        status: 400,
+        reason:
+          staged.comparison.rulesInvalid !== null
+            ? "This backup's rules are not valid, so they cannot be applied. Restore without them."
+            : 'This backup has no rules that differ from yours — there is nothing to replace.',
+        rule: 'BR-59.2',
+      };
     }
     if (!this.#acquire('restore-stage')) return this.#busyRefusal();
     try {
@@ -280,7 +312,16 @@ export class MaintenanceService {
       const from = join(staged.workDir, 'staged');
       renameSync(join(from, 'history.db'), join(pending, 'history.db'));
       renameSync(join(from, MANIFEST_NAME), join(pending, MANIFEST_NAME));
-      writeFileSync(join(pending, STAGE_FILE), JSON.stringify({ reason: staged.reason }));
+      // U7 (BR-59.4): only an opted-in rules file travels into restore-pending/, with the hash it was confirmed against.
+      if (applyRules) renameSync(join(from, 'rules.json'), join(pending, 'rules.json'));
+      writeFileSync(
+        join(pending, STAGE_FILE),
+        JSON.stringify(
+          applyRules
+            ? { reason: staged.reason, applyRules: true, rulesHashAtConfirm: this.#deps.currentRulesHash?.() ?? null }
+            : { reason: staged.reason },
+        ),
+      );
       // BR-48.3 — `ready` LAST. A pending directory without it is incomplete and is swept, never applied.
       writeFileSync(join(pending, READY_MARKER), '');
       this.#staged.delete(token);
@@ -391,6 +432,17 @@ export class MaintenanceService {
       return mine !== null && mine.equals(readFileSync(stagedRules)) ? 'identical' : 'differs';
     } catch {
       return 'differs';
+    }
+  }
+
+  /** BR-59.1 — the full comparison through `RulesWriter`, or the validator's errors. Only when the rules differ. */
+  #rulesDetail(stagedRules: string, rules: Comparison['rules']): Pick<Comparison, 'rulesComparison' | 'rulesInvalid'> {
+    if (rules !== 'differs' || this.#deps.rulesCandidate === undefined) return NO_RULES_DETAIL;
+    try {
+      const result = this.#deps.rulesCandidate(readFileSync(stagedRules, 'utf8'));
+      return result.ok ? { rulesComparison: result.comparison, rulesInvalid: null } : { rulesComparison: null, rulesInvalid: result.errors };
+    } catch (e) {
+      return { rulesComparison: null, rulesInvalid: [e instanceof Error ? e.message : String(e)] };
     }
   }
 

@@ -14,7 +14,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -23,10 +23,12 @@ import { afterEach, describe, it } from 'node:test';
 import fc from 'fast-check';
 import './fc-config.js';
 
+import { RulesWriter } from '../src/configuration/RulesWriter.js';
 import { SqliteHistoryRepository } from '../src/history/SqliteHistoryRepository.js';
 import { CONFIRM_WORD, MaintenanceService, STAGING_TTL_MS } from '../src/maintenance/MaintenanceService.js';
 import { WORK_DIR_NAME } from '../src/maintenance/onlineBackup.js';
-import { PENDING_DIR, READY_MARKER, applyPendingRestore, type RestoreOutcome } from '../src/maintenance/startupRestorer.js';
+import { PENDING_DIR, READY_MARKER, STAGE_FILE, applyPendingRestore, finishRestoreRules, type RestoreOutcome } from '../src/maintenance/startupRestorer.js';
+import { hashRuleSetContent } from '../src/rules/ruleHash.js';
 
 const roots: string[] = [];
 const open: SqliteHistoryRepository[] = [];
@@ -81,7 +83,14 @@ function newService(box: Install, startup?: { restore: RestoreOutcome; swept: nu
     now: () => new Date(box.clock.t),
     caps: box.caps,
     startup,
+    // U7 (BR-59.1): the same comparison the Rules pop-up uses, through RulesWriter.
+    rulesCandidate: (text) => rulesWriterFor(box).compareCandidate(text),
+    currentRulesHash: () => rulesWriterFor(box).download()?.hash ?? null,
   });
+}
+
+function rulesWriterFor(box: Install): RulesWriter {
+  return new RulesWriter({ rulesPath: box.rulesPath, watcher: null, now: () => box.clock.t });
 }
 
 function gapsIn(repo: SqliteHistoryRepository): number {
@@ -257,5 +266,75 @@ describe('one operation at a time (BR-51.3)', () => {
     assert.equal(s.supervised, true);
     assert.ok(s.sizes.databaseBytes !== null && s.sizes.databaseBytes > 0);
     assert.equal(s.previous, null);
+  });
+});
+
+// ─── U7 — restore can also restore rules, only if asked (FR-72, BR-59) ─────────────────────────────────────────
+
+const ruleJson = (id: string) =>
+  JSON.stringify({ version: 1, rules: [{ id, name: id, enabled: true, action: 'skip', onUnknown: 'no-match', dryRun: true, predicate: { kind: 'compare', field: 'album.ageYears', op: 'gt', value: 40 } }] });
+
+describe('U7 — the opt-in rules choice in the restore flow', () => {
+  it('BR-59.1: staging compares the backup’s rules through RulesWriter (added / removed by id)', async () => {
+    const a = install(3, ruleJson('theirs'));
+    const b = install(1, ruleJson('mine'));
+    const received = await b.service.receiveUpload(createReadStream(await download(a)));
+    assert.ok(received.ok);
+    if (!received.ok) return;
+    assert.equal(received.comparison.rules, 'differs');
+    assert.deepEqual(received.comparison.rulesComparison?.added.map((r) => r.id), ['theirs']);
+    assert.deepEqual(received.comparison.rulesComparison?.removed.map((r) => r.id), ['mine']);
+    b.service.cancel(received.token);
+  });
+
+  it('opted IN: the rules travel into restore-pending/ with the hash confirmed against, and apply after the restart', async () => {
+    const a = install(3, ruleJson('theirs'));
+    const b = install(1, ruleJson('mine'));
+    const received = await b.service.receiveUpload(createReadStream(await download(a)));
+    if (!received.ok) assert.fail(received.reason);
+    assert.deepEqual(b.service.confirm(received.token, CONFIRM_WORD, true), { ok: true, restarting: true });
+
+    const pending = join(b.dataDir, PENDING_DIR);
+    assert.equal(readFileSync(join(pending, 'rules.json'), 'utf8'), ruleJson('theirs'));
+    assert.deepEqual(JSON.parse(readFileSync(join(pending, STAGE_FILE), 'utf8')), {
+      reason: 'restore', applyRules: true, rulesHashAtConfirm: hashRuleSetContent(ruleJson('mine')),
+    });
+    assert.equal(readFileSync(b.rulesPath, 'utf8'), ruleJson('mine'), 'nothing in config/ changes before the restart');
+
+    b.repo.close();
+    const outcome = applyPendingRestore(b.dataDir);
+    b.repo = new SqliteHistoryRepository(join(b.dataDir, 'history.db'));
+    open.push(b.repo);
+    assert.equal(finishRestoreRules(outcome, true, rulesWriterFor(b)), 'applied');
+    assert.equal(readFileSync(b.rulesPath, 'utf8'), ruleJson('theirs'));
+    assert.equal(gapsIn(b.repo), 3);
+  });
+
+  it('opted OUT (the default): no rules in restore-pending/, and the current rules survive the restore', async () => {
+    const a = install(3, ruleJson('theirs'));
+    const b = install(1, ruleJson('mine'));
+    const received = await b.service.receiveUpload(createReadStream(await download(a)));
+    if (!received.ok) assert.fail(received.reason);
+    b.service.confirm(received.token, CONFIRM_WORD);
+    assert.equal(existsSync(join(b.dataDir, PENDING_DIR, 'rules.json')), false);
+
+    b.repo.close();
+    const outcome = applyPendingRestore(b.dataDir);
+    b.repo = new SqliteHistoryRepository(join(b.dataDir, 'history.db'));
+    open.push(b.repo);
+    assert.equal(finishRestoreRules(outcome, true, rulesWriterFor(b)), 'not-requested');
+    assert.equal(readFileSync(b.rulesPath, 'utf8'), ruleJson('mine'));
+  });
+
+  it('BR-59.2: INVALID backup rules are reported with the validator’s reason, and cannot be opted in', async () => {
+    const a = install(3, '{"version":1,"rules":[{"id":"broken"}]}');
+    const b = install(1, ruleJson('mine'));
+    const received = await b.service.receiveUpload(createReadStream(await download(a)));
+    if (!received.ok) assert.fail(received.reason);
+    assert.equal(received.comparison.rulesComparison, null);
+    assert.ok((received.comparison.rulesInvalid?.length ?? 0) > 0);
+    const r = b.service.confirm(received.token, CONFIRM_WORD, true);
+    assert.ok(!r.ok && r.status === 400 && /not valid/.test(r.reason));
+    b.service.cancel(received.token);
   });
 });

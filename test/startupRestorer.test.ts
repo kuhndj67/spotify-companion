@@ -20,20 +20,23 @@
  */
 
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, it } from 'node:test';
 
 import { MANIFEST_NAME, maxIds, schemaVersionOf, sha256, tableCounts } from '../src/backup/manifest.js';
+import { RulesWriter } from '../src/configuration/RulesWriter.js';
 import { MIGRATIONS, migrate } from '../src/history/migrations.js';
+import { hashRuleSetContent } from '../src/rules/ruleHash.js';
 import {
   PENDING_DIR,
   PREVIOUS_DIR,
   READY_MARKER,
   STAGE_FILE,
   applyPendingRestore,
+  finishRestoreRules,
   revertToPrevious,
   sweepLeftovers,
   type FaultPoint,
@@ -244,5 +247,89 @@ describe('sweepLeftovers — LC-38 (BR-50.4, BR-50.6)', () => {
     const dataDir = fixture();
     assert.equal(sweepLeftovers(dataDir), 0);
     assert.ok(existsSync(join(dataDir, PENDING_DIR, READY_MARKER)));
+  });
+});
+
+// ─── U7 — PBT-67: restore with rules (BR-59.4–59.6) ───────────────────────────────────────────────────────────
+
+const CURRENT_RULES = JSON.stringify({ version: 1, rules: [{ id: 'mine', name: 'Mine', enabled: true, action: 'skip', onUnknown: 'no-match', dryRun: true, predicate: { kind: 'compare', field: 'album.ageYears', op: 'gt', value: 40 } }] });
+const BACKUP_RULES = JSON.stringify({ version: 1, rules: [{ id: 'theirs', name: 'From the backup', enabled: true, action: 'skip', onUnknown: 'no-match', dryRun: true, predicate: { kind: 'compare', field: 'album.ageYears', op: 'gt', value: 10 } }] });
+
+/** `fixture()` plus a config/rules.json beside data/, and the backup's rules staged — opted in or not. */
+function fixtureWithRules(applyRules: boolean | 'u6-era'): { dataDir: string; rulesPath: string } {
+  const dataDir = fixture();
+  const rulesPath = join(dirname(dataDir), 'config', 'rules.json');
+  mkdirSync(dirname(rulesPath));
+  writeFileSync(rulesPath, CURRENT_RULES);
+  const pending = join(dataDir, PENDING_DIR);
+  writeFileSync(join(pending, 'rules.json'), BACKUP_RULES);
+  writeFileSync(
+    join(pending, STAGE_FILE),
+    JSON.stringify(applyRules === true ? { reason: 'restore', applyRules: true, rulesHashAtConfirm: hashRuleSetContent(CURRENT_RULES) } : { reason: 'restore' }),
+  );
+  return { dataDir, rulesPath };
+}
+
+const writerFor = (rulesPath: string) => new RulesWriter({ rulesPath, watcher: null, now: () => Date.parse('2026-10-08T12:00:00Z') });
+
+describe('U7 — restore with rules (BR-59)', () => {
+  it('the restorer carries an opted-in rules file OUT of pending/ and never writes config/ itself', () => {
+    const { dataDir, rulesPath } = fixtureWithRules(true);
+    const outcome = applyPendingRestore(dataDir);
+    assert.equal(outcome.kind, 'applied');
+    assert.deepEqual(outcome.kind === 'applied' && outcome.rules, { content: BACKUP_RULES, expectedHash: hashRuleSetContent(CURRENT_RULES) });
+    assert.equal(readFileSync(rulesPath, 'utf8'), CURRENT_RULES, 'config/ untouched by the restorer');
+  });
+
+  it('BR-59.4 + the U6 compatibility rule: a stage.json WITHOUT applyRules never carries rules', () => {
+    const { dataDir } = fixtureWithRules('u6-era');
+    const outcome = applyPendingRestore(dataDir);
+    assert.equal(outcome.kind === 'applied' && outcome.rules, undefined);
+    assert.equal(finishRestoreRules(outcome, true, writerFor('unused')), 'not-requested');
+  });
+
+  it('BR-59.5: applied after the database opens', () => {
+    const { dataDir, rulesPath } = fixtureWithRules(true);
+    const outcome = applyPendingRestore(dataDir);
+    assert.equal(finishRestoreRules(outcome, true, writerFor(rulesPath)), 'applied');
+    assert.equal(readFileSync(rulesPath, 'utf8'), BACKUP_RULES);
+  });
+
+  it('⚠️ BR-59.5: the restored database did NOT open → rules NOT applied', () => {
+    const { dataDir, rulesPath } = fixtureWithRules(true);
+    const outcome = applyPendingRestore(dataDir);
+    const r = finishRestoreRules(outcome, false, writerFor(rulesPath));
+    assert.ok(typeof r === 'object' && r !== null && 'skipped' in r);
+    assert.equal(readFileSync(rulesPath, 'utf8'), CURRENT_RULES);
+  });
+
+  it('BR-59.6: a hand edit between confirm and startup → not applied, and says why', () => {
+    const { dataDir, rulesPath } = fixtureWithRules(true);
+    const outcome = applyPendingRestore(dataDir);
+    writeFileSync(rulesPath, CURRENT_RULES.replace('Mine', 'Mine, edited'));
+    const r = finishRestoreRules(outcome, true, writerFor(rulesPath));
+    assert.ok(typeof r === 'object' && r !== null && /changed after you confirmed/.test(r.skipped));
+    assert.match(readFileSync(rulesPath, 'utf8'), /edited/);
+  });
+
+  describe('⭐ PBT-67 — a crash at EVERY restorer step leaves the current rules untouched unless the restore completes', () => {
+    const points = countFaultPoints();
+    for (let k = 0; k < points.length; k++) {
+      it(`crash at #${k} (${points[k]}) → rules are the current set, or the backup's only with the backup's history`, () => {
+        const { dataDir, rulesPath } = fixtureWithRules(true);
+        let n = 0;
+        assert.throws(() => applyPendingRestore(dataDir, { fault: () => { if (n++ === k) throw new SimulatedCrash(points[k]); } }), SimulatedCrash);
+        assert.equal(readFileSync(rulesPath, 'utf8'), CURRENT_RULES, 'a crash inside the restorer never touches config/');
+
+        // The next start: restorer, then (database opened) the rules step.
+        const outcome = applyPendingRestore(dataDir);
+        sweepLeftovers(dataDir);
+        finishRestoreRules(outcome, true, writerFor(rulesPath));
+
+        const rules = readFileSync(rulesPath, 'utf8');
+        assert.ok(rules === CURRENT_RULES || rules === BACKUP_RULES);
+        if (rules === BACKUP_RULES) assert.equal(rowsIn(dataDir), NEW_ROWS, 'backup rules only ever arrive WITH the backup history');
+      });
+    }
   });
 });

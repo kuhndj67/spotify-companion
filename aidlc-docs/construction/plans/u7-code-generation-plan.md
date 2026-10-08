@@ -140,11 +140,14 @@ credential shows red. Steps that move existing code (2) run the existing tests *
 - `validateMusicBrainzContact` extracted from `loadMusicBrainzIdentity` — one rule for startup and Settings. `MusicBrainzClient` takes a User-Agent **getter** (BR-57.4).
 - ⚠️ **Limit, stated**: if labels were DISABLED at startup because the contact was missing, saving one in Settings does not enable them until a restart — the label pipeline is not constructed. Settings must say so (Step 11).
 
-### Step 7 — Restore with rules *(LC-46, BR-59)*
-- [ ] Staging validates and compares the archive's `rules.json`; confirm records `applyRules`, `rulesHashAtConfirm`
-- [ ] `StartupRestorer` applies rules via `RulesWriter` only after step 5 succeeds and the hash matches, before the
+### Step 7 — Restore with rules — ✅ DONE 2026-10-08 *(LC-46, BR-59)*
+- [x] Staging validates and compares the archive's `rules.json`; confirm records `applyRules`, `rulesHashAtConfirm`
+- [x] `StartupRestorer` applies rules via `RulesWriter` only after step 5 succeeds and the hash matches, before the
       watcher starts; a U6-era `stage.json` reads as `applyRules: false`
-- [ ] **PBT-67** — fault at each startup step leaves current rules untouched
+- [x] **PBT-67** — fault at each startup step leaves current rules untouched
+- ✅ Full suite **1508/1508**. PBT-67 runs at **every counted fault point** of the restorer (reusing U6's PBT-55 harness) and asserts backup rules only ever arrive **with** the backup's history.
+- Shape, recorded: the restorer **never writes `config/`** — before cleanup deletes `restore-pending/`, it carries an opted-in `rules.json` OUT in its outcome; `finishRestoreRules` (tested, in `startupRestorer.ts`) applies it via `RulesWriter.applyAtStartup` only when `server.ts` reports the restored database **opened** (BR-48.6's fallback → not applied). ⚠️ Consequence: a crash between cleanup and that call loses the rules choice — the current rules stay, which is the safe direction.
+- `MaintenanceService` gains `rulesCandidate` / `currentRulesHash` deps (→ `RulesWriter`, one comparison) and `confirm(token, word, applyRules = false)`; the archive's rules are kept in the work dir until confirm decides. U6's tests pass with one fixture gaining the two new `Comparison` fields.
 
 ### Step 8 — Routes 🔌 *(BR-60)*
 - [ ] `GET /api/rules/file` · `POST /api/rules/upload` · `POST /api/rules/confirm` · `POST /api/rules/undo/stage` ·

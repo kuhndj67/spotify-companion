@@ -81,6 +81,8 @@ describe('comparisonView (BR-47.6, BR-48.2)', () => {
     backup: { takenAt: '2026-10-02T21:14:00Z', plays: 951, decisions: 1120, schemaVersion: 7 },
     current: { takenAt: null, plays: 977, decisions: 1214, schemaVersion: 7 },
     rules: 'differs',
+    rulesComparison: null,
+    rulesInvalid: null,
   };
 
   it('shows the backup beside the current history, row by row', () => {

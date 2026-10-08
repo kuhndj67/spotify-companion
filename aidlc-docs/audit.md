@@ -7391,3 +7391,40 @@ FR-67's staleness check) and **BR-59.3** (one typed `RESTORE` confirms database 
 
 User: *"Agree with 54.4 and 59.3 business rules. approve design, commit then continue"*. Both flagged decisions
 accepted as written. NFR Requirements skipped as for U1–U6; next: U7 NFR Design plan.
+
+---
+
+## 2026-10-08T14:15:59Z — U7 NFR Design plan written (7 questions)
+
+`construction/plans/u7-nfr-design-plan.md`. ⚠️ **Found while gathering facts**: the MCP server's token refresh is
+read → network round trip → write the whole object, so credentials the app writes during that window are
+**overwritten with the old ones plus a fresh token — silently, and working**. Q1 proposes stopping the MCP
+process before writing. Q5 proposes a test that scans the MCP server source for its error templates, because the
+server is fetched at image build and its wording can change. ⚠️ The Docker CLI on Windows has failed since the
+reboot (engine healthy in the VM), which blocks the `:3011` probes.
+
+---
+
+## 2026-10-08T15:44:21Z — Docker CLI failure diagnosed: Windows 11 26H2 feature update, not this project
+
+User asked for the cause before a restart, and to make sure it was not something we did. **It was not.** Timeline
+(local, from the System log and Rancher Desktop logs): 26H2 downloaded 00:09 and installed 00:10; `MoUsoCoreWorker`
+restarted the machine at 01:30:27. Seconds after boot the machine entered **Modern Standby** (01:31:28). During it
+the Hyper-V switches were deleted and the **WSL Service was set to disabled, then reinstalled** (01:31:32–42).
+Rancher Desktop started at 01:31:51; its Win32 socket proxy crashed 8× (*timed out dialing Hyper-V socket*), then
+connected at 01:32:08. There were six standby cycles to 08:54. At **08:57:07** the first `docker` call since boot
+found the in-VM listener dead: `docker-proxy: … accept() … bad file descriptor` in a **tight loop with no
+backoff**. When it died is unknowable, because nothing connected before.
+
+Only read-only commands were run today (`docker ps`, `context ls`, `version`, `rdctl shell`, `curl`); no
+Rancher/WSL/Docker setting was changed. **The app was unaffected throughout** — port forwarding is a separate
+path; `/api/health` stayed ok.
+
+⚠️ **Side effect: `docker.log` reached 4.8 GB, growing ~0.5 MB/s (~1.8 GB/h), on C: (110 GB free).** The user quit
+Rancher Desktop, it would not relaunch, so the user is **rebooting**. This is a third variant of the 2026-09-30
+pattern: **a host component updated under Modern Standby breaks the WSL plumbing while recording survives.**
+
+▶ **After the reboot, check**: `docker ps` works from Windows · `%LOCALAPPDATA%/rancher-desktop/logs/docker.log` is
+small and **not growing** (if the 4.8 GB file survived, ask the user before deleting it) · the container is up and
+`/api/health` ok · plays are recording. If the Hyper-V socket error recurs on a clean boot, suspect a 26H2 ×
+Rancher Desktop 1.24.0 / WSL 3.0.1 incompatibility rather than standby.

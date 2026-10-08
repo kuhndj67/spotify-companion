@@ -115,12 +115,18 @@ credential shows red. Steps that move existing code (2) run the existing tests *
 - ✅ Full suite **1450/1450**. `McpToolError` (does **not** drop the connection — the server is fine, Spotify refused); the snapshot says *"Spotify returned an error: …"* (≤ 200 chars) rather than *"could not reach the MCP server"*, which would point at the wrong component. `pollOutcomeOf` lives in the pure `upstreamMetrics` so PBT-65 can test it; `idleShare` is **null** for an all-error run (unknown, not 100% idle).
 - ⚠️ Found while testing: a **static** import of `spotifyMcpClient` in a test loads `config.ts` before the test sets `POLL_INTERVAL_MS`, and two change-detection tests then failed. Dynamic import, with a comment saying why.
 
-### Step 5 — `RulesWriter` 🔌 *(LC-43, P-52, BR-53/54/55)*
-- [ ] Download (hash header) · stage (admission → parse → validate → compare) · confirm (token, hash, `REPLACE` rule,
+### Step 5 — `RulesWriter` 🔌 — ✅ DONE 2026-10-08 *(LC-43, P-52, BR-53/54/55)*
+- [x] Download (hash header) · stage (admission → parse → validate → compare) · confirm (token, hash, `REPLACE` rule,
       mutex, previous via atomicWrite, current via atomicWrite, `reloadNow()`) · undo (swap, same path)
-- [ ] Returns the **watcher's** outcome; refusal reasons each with their own message
-- [ ] **PBT-63** (positive control: the running set changes), **PBT-64** (concurrent confirms: exactly one applies)
-- [ ] Structural test: `RulesWriter` imports nothing from `src/playback/`
+- [x] Returns the **watcher's** outcome; refusal reasons each with their own message
+- [x] **PBT-63** (positive control: the running set changes), **PBT-64** (concurrent confirms: exactly one applies)
+- [x] Structural test: `RulesWriter` imports nothing from `src/playback/`
+- ✅ 21 tests over a **real** `RuleStore` + `RuleSetWatcher` (no stub watcher). Deviations, each recorded:
+  - **One parser**: `parseRuleSetText` (pure, in `ruleValidator.ts`) is now what `RuleStore` uses for the file and `RulesWriter` for an upload — an upload is judged by exactly the code that will load it. Store/watcher/validator tests unchanged (132).
+  - **Stagings are per token** (bounded at 8, TTL 10 min), not *"one at a time"* (`domain-entities.md`): with one slot, PBT-64's two-tab case could not occur. The lock plus BR-54.3's hash make exactly one of N concurrent confirms apply.
+  - Two refusal reasons added beyond the design's six: `write-failed`, `reload-rejected` (the watcher's verdict, so *"applied"* is never claimed on the write alone); `too-large` split from `invalid`.
+  - `compareCandidate` (compare without staging) and `applyAtStartup` added for Step 7, so restore uses this class rather than a second write path.
+  - Caps `RULES_UPLOAD_CAP_BYTES` / `CREDENTIALS_CAP_BYTES` live in `ingest/types.ts` beside U6's.
 
 ### Step 6 — `CredentialsWriter` 🔌 *(LC-44, LC-45 close, P-49, P-50, P-53, BR-56/57)*
 - [ ] MusicBrainz validator extracted from `loadMusicBrainzIdentity` and shared; client identity behind a getter

@@ -25,6 +25,7 @@
 
 import { findField, operatorAllowed } from './fieldCatalogue.js';
 import { depthOf } from './predicate.js';
+import { hashRuleSetContent } from './ruleHash.js';
 import {
   MAX_PREDICATE_DEPTH,
   MAX_RULES,
@@ -331,4 +332,30 @@ export function validateRuleSet(raw: unknown): ValidationResult<LoadedRule[]> {
   if (errors.length > 0) return { ok: false, errors };
 
   return { ok: true, value: parsed.map((rule) => ({ rule, status: semanticStatus(rule) })) };
+}
+
+/**
+ * A rules file's TEXT → validated rules and the set's content hash. ⚙️ PURE
+ *
+ * U7 (BR-53.3): the ONE parser for rules text. `RuleStore` uses it for the file on disk and `RulesWriter` for an
+ * upload, so an upload is judged exactly as the file will be loaded — a second parse path is how an upload could
+ * be accepted that the watcher then rejects.
+ *
+ * ⚠️ `JSON.parse` can throw `RangeError` on pathologically nested input; that is caught here, which is why a deep
+ * file is a structural failure rather than a crash.
+ */
+export function parseRuleSetText(
+  text: string,
+): { readonly ok: true; readonly rules: LoadedRule[]; readonly contentHash: string } | { readonly ok: false; readonly errors: readonly string[] } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return { ok: false, errors: [`invalid JSON: ${(error as Error).message}`] };
+  }
+  const result = validateRuleSet(parsed);
+  if (!result.ok) return { ok: false, errors: result.errors };
+  // Hashed over the file's TEXT, so adding, removing or reordering a rule changes the set's identity even when
+  // every individual rule survives unchanged.
+  return { ok: true, rules: result.value, contentHash: hashRuleSetContent(text) };
 }

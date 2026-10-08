@@ -21,6 +21,13 @@ export const UPLOAD_CAP_BYTES = 64 * 1024 * 1024;
 export const EXPANDED_CAP_BYTES = 256 * 1024 * 1024;
 
 /**
+ * U7's body caps (BR-46.4, BR-60.2), kept beside U6's so every limit on outside input is in one file. A rules
+ * file is hand-written text — dozens of rules — so 256 KB is generous; credentials are four short strings.
+ */
+export const RULES_UPLOAD_CAP_BYTES = 256 * 1024;
+export const CREDENTIALS_CAP_BYTES = 16 * 1024;
+
+/**
  * The archive allowlist (BR-45.2, P-45). Keys are the ONLY entry names accepted; values are the fixed
  * names written to disk. ⚠️ The value is never derived from the entry name — P-39's guarantee is that no
  * name from an archive is ever used as a path, and keeping the output name a constant here is what makes

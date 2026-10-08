@@ -7530,3 +7530,12 @@ and `MCP_SERVER_REF=main` floats, which is exactly why the scan earns its place.
 
 Text errors from the MCP server throw `McpToolError`; the poll publishes *"Spotify returned an error: …"*; polls are
 three-way and M4 is `idleShare` (null for an all-error run). Tests use P-U7-3's real strings. Full suite 1450/1450.
+
+---
+
+## 2026-10-08T19:31:24Z — U7 Code Generation Step 5 done: RulesWriter
+
+`configuration/RulesWriter.ts` — stage (shared parser → compare), confirm under a lock with BR-54's hash checks
+and `REPLACE` rule, atomic previous + current, the watcher's reload as the verdict; undo swaps; `applyAtStartup` for
+BR-59.5. 21 tests on a real store and watcher, including PBT-63 (positive control) and PBT-64 (N concurrent tabs →
+exactly one applies). Deviation: stagings keyed per token, not one slot.

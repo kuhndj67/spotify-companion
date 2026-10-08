@@ -38,8 +38,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { hashRuleSetContent } from './ruleHash.js';
-import { validateRuleSet } from './ruleValidator.js';
+import { parseRuleSetText } from './ruleValidator.js';
 import { MAX_RULES_FILE_BYTES, type LoadedRule } from './types.js';
 
 /**
@@ -195,20 +194,9 @@ export class RuleStore {
       return { kind: 'failed', errors: [`cannot read ${this.#path}: ${code ?? String(error)}`] };
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch (error) {
-      // JSON.parse can also throw RangeError on pathologically nested input. Caught here, which
-      // is why a deep file is a structural failure rather than an unhandled crash.
-      return { kind: 'failed', errors: [`invalid JSON: ${(error as Error).message}`] };
-    }
-
-    const result = validateRuleSet(parsed);
+    // U7: the shared parser (`parseRuleSetText`) — an upload is judged by exactly this code (BR-53.3).
+    const result = parseRuleSetText(text);
     if (!result.ok) return { kind: 'failed', errors: result.errors };
-
-    // Hashed over the file's TEXT, so adding, removing or reordering a rule changes the set's
-    // identity even when every individual rule survives unchanged.
-    return { kind: 'loaded', rules: result.value, contentHash: hashRuleSetContent(text) };
+    return { kind: 'loaded', rules: result.rules, contentHash: result.contentHash };
   }
 }

@@ -80,7 +80,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-08 UTC) — ▶ U7 CODE GENERATION PLAN OPEN (2 questions, `construction/plans/u7-code-generation-plan.md`) — read `construction/u7-configuration-management/HANDOFF.md`. FR-66…72 + US-29 ratified. ⚠️ Broken Spotify credentials currently show PAUSED / "Spotify: ok" (fixed by FR-71). App versioning is Requirements Q18, owned by U8.
+## ▶ Current state (2026-10-08 UTC) — ✅ U7 CODE GENERATION COMPLETE, AWAITING REVIEW — 1563 tests, nothing deployed; ▶ Build & Test next. ⚠️ `./config` and `musicbrainz.json` are now `:rw` in compose.yaml (deliberate, IN-U7-1/2) — older notes below saying config stays `:ro` describe U3–U6 — read `construction/u7-configuration-management/HANDOFF.md`. FR-66…72 + US-29 ratified. ⚠️ Broken Spotify credentials currently show PAUSED / "Spotify: ok" (fixed by FR-71). App versioning is Requirements Q18, owned by U8.
 
 ### Earlier (2026-10-08) — ✅ U6 DEPLOYED AND VERIFIED. Build & Test complete (`construction/build-and-test/u6-build-and-test-summary.md`). Next unit: U7 Configuration Management. Open: BR-52 legacy-backup cleanup awaits confirmation
 

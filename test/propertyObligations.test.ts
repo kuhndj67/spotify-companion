@@ -44,6 +44,8 @@ const SOURCES = [
   'aidlc-docs/construction/u5-automated-skipping/nfr-design/logical-components.md',
   // U6 — PBT-51…PBT-58 (2026-10-07).
   'aidlc-docs/construction/u6-data-lifecycle/nfr-design/logical-components.md',
+  // U7 — PBT-59…PBT-67 (2026-10-08).
+  'aidlc-docs/construction/u7-configuration-management/nfr-design/logical-components.md',
 ];
 
 /** Obligations whose home is a document, not a test — each needs a reason. */
@@ -147,6 +149,15 @@ describe('the obligations table itself stayed readable', () => {
     const declared = new Set(declaredIn(SOURCES[0]!).map((id) => id.replace(/[a-z]$/, '')));
     const gaps: string[] = [];
     for (let n = 34; n <= 50; n += 1) {
+      if (!declared.has(`PBT-${n}`)) gaps.push(`PBT-${n}`);
+    }
+    assert.deepEqual(gaps, [], `declared nowhere in the table: ${gaps.join(', ')}`);
+  });
+
+  it('declares the U7 range PBT-59 … PBT-67 with no gaps', () => {
+    const declared = new Set(declaredIn(SOURCES[2]!).map((id) => id.replace(/[a-z]$/, '')));
+    const gaps: string[] = [];
+    for (let n = 59; n <= 67; n += 1) {
       if (!declared.has(`PBT-${n}`)) gaps.push(`PBT-${n}`);
     }
     assert.deepEqual(gaps, [], `declared nowhere in the table: ${gaps.join(', ')}`);

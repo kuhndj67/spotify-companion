@@ -194,66 +194,53 @@ services:
       # above would be a subtle and hard-to-diagnose mistake.
       - ./data:/data:rw
 
-      # NFR-14 contact address (U2). Mounted READ-ONLY, unlike the Spotify config
-      # above: nothing rewrites this file, and copying the `rw` out of habit would
-      # grant a write capability with no use.
-      - ./secrets/musicbrainz.json:/app/secrets/musicbrainz.json:ro
+      # NFR-14 contact address (U2).
+      #
+      # READ-WRITE since U7 (IN-U7-2): the app writes the `contact` field from Settings (FR-70), through
+      # `CredentialsWriter`, and NOTHING ELSE — `appName`/`appVersion` are preserved untouched. It used to be :ro
+      # because "nothing rewrites this file"; U7 gives the write a use, which is the condition that comment set.
+      #
+      # ⚠️ Still a SINGLE-FILE mount, so the app writes it IN PLACE (same inode). A write-temp-then-rename here
+      # would detach the container's view — the hazard the ./config note below describes. In place is the pattern
+      # the MCP server already uses through the spotify-config.json mount above, hourly, so it is proven here.
+      - ./secrets/musicbrainz.json:/app/secrets/musicbrainz.json:rw
 
-      # Rule definitions (U3).
+      # Rule definitions (U3) — WRITABLE BY THE APP since U7 (IN-U7-1, FD Q1 = A).
       #
-      # The DIRECTORY is mounted, not the file -- the same distinction as ./data above,
-      # for a different reason. A single-file bind mount binds an INODE, and the safe way
-      # to write a config file is write-temp-then-rename, which REPLACES the inode. Through
-      # a single-file mount that rename either fails or silently detaches the container's
-      # view from the host file. U3 only reads, so the bug would be invisible here and
-      # would surface the first time the U4 rule editor saves.
+      # 1. THE RULE NOW. ./config holds the rules. The app writes them ONLY through `RulesWriter`
+      #    (src/configuration/): the upload is validated by the same parser that loads the file, compared, shown,
+      #    confirmed — with a typed REPLACE when it would remove all or most rules, or when its base is unknown —
+      #    hash-checked against the file under a lock, the previous version kept as rules.previous.json, written by
+      #    temp-then-rename, and reported only once the rules engine has reloaded it (BR-53, BR-54). It writes
+      #    NOTHING else here. Those guards, not this mount, are what protect a hand-authored rules.json now.
       #
-      # READ-ONLY, like ./secrets/musicbrainz.json and unlike ./data: nothing in U3 OR U4
-      # writes rules. `npm run rules:init` creates the file on the host; the app never does.
+      # 2. WHAT STILL HOLDS. App-written RUNTIME state lives in ./state, not here. ⚠️ The automation kill switch
+      #    must NEVER move into this directory: anything that may edit rules — a person, the app, a future AI agent —
+      #    must not be able to reach the switch that stops it. `RulesWriter` imports nothing from src/playback/, and
+      #    a test pins that.
       #
-      # ⚠️ CORRECTED 2026-09-21. This previously said "this becomes :rw at U4 when the
-      # editor needs to write". U4 HAS NO EDITOR -- it is read-only observability, and its
-      # reload button re-READS the file. Left as written, that sentence was an instruction a
-      # later session would follow without re-deriving, granting a write capability a whole
-      # unit before anything used it.
+      # 3. WHY A DIRECTORY MOUNT. A single-file bind mount binds an INODE, and temp-then-rename REPLACES the inode:
+      #    through a single-file mount the rename fails or silently detaches the container's view. Since U7 this is
+      #    live, not theoretical — `RulesWriter` does exactly that rename. Same reason as ./data (SQLite's -wal/-shm)
+      #    and ./state (the kill switch).
       #
-      # ⚠️ CORRECTED AGAIN 2026-10-03, and the OUTCOME was right while the REASON was wrong.
-      # It said :rw arrives "in the unit that adds RULE EDITING", which implies rule editing is
-      # the only thing that could make this directory writable. U5 adds app-written state and
-      # this mount STAYS :ro -- so that framing would have invited the wrong change.
+      # 4. HISTORY, CONDENSED. This was :ro from U3 to U6 on purpose, and its comment was corrected twice
+      #    (2026-09-21: "becomes :rw at U4" — U4 had no editor; 2026-10-03: right outcome, wrong reason) so that no
+      #    session would loosen it early. ⚠️ The reason it was :ro still matters: BR-20.8's last-known-good reload
+      #    protects against a MALFORMED file, not a valid-but-EMPTY one, which parses fine. BR-54.1's typed
+      #    confirmation for mass removal is what now covers that case. Loosened deliberately, 2026-10-08.
       #
-      # The rule to apply instead, which does not depend on which unit comes next:
-      #
-      #     ./config holds USER-AUTHORED INTENT and the app never writes it.
-      #     App-written state lives in ./state.
-      #
-      # ⚠️ :rw here would grant this app permission to overwrite the hand-authored rules.json --
-      # a permission no U5 code would use, and one BR-20.8 does NOT protect: that path reloads
-      # the last-known-good set when a new file FAILS TO PARSE, and a file truncated to
-      # valid-but-empty JSON parses fine.
-      #
-      # ⚠️ And this gets stronger, not weaker, when the planned AI-authored rules system lands:
-      # a kill switch stored in the same writable directory as the file an AI agent edits is a
-      # kill switch that agent can disable.
-      #
-      # NOT under ./data on purpose. That directory holds history.db, the one artefact here
-      # that cannot be regenerated. Rules are user-authored text that costs retyping.
-      # Keeping the hand-edited file out of the directory nobody should hand-edit is the
-      # whole point.
+      # NOT under ./data on purpose: that directory holds history.db, the one artefact that cannot be regenerated,
+      # and rules travel separately in a backup (and are restored only if the user opts in, FR-72).
       #
       # ⚠️ Run `npm run rules:init` BEFORE the first `compose up`.
       #
-      # ⚠️ CORRECTED 2026-09-21: the reason previously given here was stated as fact and was
-      # NOT observed on this host. The claim was that Docker creates a missing bind-mount
-      # source directory owned by ROOT, leaving the app -- which drops to `node` -- unable to
-      # read its own rules. That hazard is real on a Linux host. Measured 2026-09-11 on
-      # Rancher Desktop / Windows, it does not occur: the bind mount synthesises
-      # `rwxrwxrwx root:root` regardless, so reads work.
-      #
-      # Keep the script; it still saves you a confusing empty rule set on first run. Do not
-      # cite the root-ownership reason as if it had been seen here. An untested justification
-      # repeated confidently is how a wrong reason outlives the decision it justified.
-      - ./config:/config:ro
+      # ⚠️ CORRECTED 2026-09-21: the reason previously given for that was stated as fact and was NOT observed on
+      # this host — that Docker creates a missing bind-mount source directory owned by ROOT, leaving the app (which
+      # drops to `node`) unable to read its own rules. Real on a Linux host; measured 2026-09-11 on Rancher Desktop /
+      # Windows, it does not occur (the mount synthesises `rwxrwxrwx root:root`). Keep the script; do not cite the
+      # root-ownership reason as if it had been seen here.
+      - ./config:/config:rw
 
       # -- U5: the kill switch and the runaway latch -----------------------------
       #
@@ -270,8 +257,9 @@ services:
       # a single-file mount would detach the container's view on the first kill-switch change.
       # U3 and U4 could only describe this bug; U5 would hit it.
       #
-      # ⚠️ WHY NOT ./config: that would grant write access to the user's hand-authored rules.json.
-      # See the long note on that mount.
+      # ⚠️ WHY NOT ./config: that is where RULES are edited — by a person, by the app since U7, and perhaps one day
+      # by an agent. A kill switch in the same writable directory as the file an editor changes is a kill switch
+      # that editor can reach. See the note on that mount.
       #
       # ⚠️ WHY NOT ./data, which is already :rw -- and this is the less obvious half. It is about
       # RESTORE. Once W-5's full-inventory backup exists, restoring a week-old backup would

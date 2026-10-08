@@ -1,7 +1,7 @@
 # Code Generation Plan — U7: Configuration Management
 
 **Date**: 2026-10-08 · **Stage**: CONSTRUCTION — Code Generation (Part 1: Planning), Unit U7
-**Status**: ✅ **APPROVED 2026-10-08** (Q1 = A, Q2 = A). ▶ Part 2 in progress.
+**Status**: ✅ **ALL 13 STEPS DONE 2026-10-08** — `npm run verify` green, 1563 tests. Awaiting review. **Nothing deployed.**
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield — *generate* means modify existing files
 where they exist, never duplicate them.
 
@@ -177,15 +177,17 @@ credential shows red. Steps that move existing code (2) run the existing tests *
 - U6's panel test asserted the old *"not applied"* wording, which FR-72 changes on purpose; updated with a comment.
 - `#rules button[disabled]` gets U6's visibly-disabled style — the Rules pop-up now holds destructive controls too. ⚠️ **Not yet seen in a browser**: Build & Test must click and LOOK (U6's lesson).
 
-### Step 12 — Infrastructure files *(IN-U7-1, IN-U7-2)*
-- [ ] `compose.yaml`: `./config` `:rw`, `musicbrainz.json` `:rw`, both comment blocks **rewritten** as IN-U7-1/2 specify
-- [ ] `compose.verify.yaml`: `./verify-install/config` `:rw`
+### Step 12 — Infrastructure files *(IN-U7-1, IN-U7-2)* — ✅ DONE 2026-10-08
+- [x] `compose.yaml`: `./config` `:rw`, `musicbrainz.json` `:rw`, both comment blocks **rewritten** as IN-U7-1/2 specify
+- [x] `compose.verify.yaml`: `./verify-install/config` `:rw`
+- ✅ Both compose files validate (`docker compose config`). The `./state` comment's *"why not ./config"* reworded to the reason that still holds (an editor must not reach the kill switch).
 
-### Step 13 — Verify and document
-- [ ] `npm run verify` green — typecheck, tests, smoke, knip
-- [ ] `propertyObligations.test.ts` reads U7's table: **PBT-59…67 all referenced**
-- [ ] `test/noOrphanModules.test.ts` passes with no new `ALLOWED_ORPHANS` entry
-- [ ] `code/code-summary.md`; update `HANDOFF.md`, `aidlc-state.md`; log in `audit.md`
+### Step 13 — Verify and document — ✅ DONE 2026-10-08
+- [x] `npm run verify` green — typecheck, tests, smoke, knip
+- [x] `propertyObligations.test.ts` reads U7's table: **PBT-59…67 all referenced**
+- [x] `test/noOrphanModules.test.ts` passes with no new `ALLOWED_ORPHANS` entry
+- [x] `code/code-summary.md`; update `HANDOFF.md`, `aidlc-state.md`; log in `audit.md`
+- ✅ **`npm run verify` green — 1563 tests**, typecheck, smoke, knip. `propertyObligations.test.ts` reads U7's table (PBT-59…67, no gaps). No new `ALLOWED_ORPHANS`. Summary: `u7-configuration-management/code/code-summary.md`.
 
 ---
 

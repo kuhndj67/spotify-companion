@@ -7584,3 +7584,13 @@ Rules pop-up *Rules file* section; Settings *Spotify* and *MusicBrainz*; restore
 server-side views. Deviation: the stale-check base is the last DOWNLOAD only (BR-54.2's "or displayed" would let an
 old file pass). Found: the purity test's `includes('config')` matched `configuration/` — narrowed to the module name
 with a two-way self-test. Suite 1561/1561. ⚠️ Not yet seen in a browser — Build & Test.
+
+---
+
+## 2026-10-08T19:52:23Z — ✅ U7 Code Generation COMPLETE (13 steps) — awaiting review; nothing deployed
+
+Step 12: `compose.yaml` `./config` and `musicbrainz.json` → `:rw`, comments rewritten (IN-U7-1/2); `compose.verify.yaml`
+config `:rw`. Step 13: **`npm run verify` green — 1563 tests**, smoke, knip; PBT-59…67 all referenced. Summary:
+`u7-configuration-management/code/code-summary.md`. Seven things were found by building that the design did not
+contain (listed there) — notably PBT-66 correcting F7, the Web API client's whole-file credential cache, and a
+shutdown hang. ⚠️ Not yet seen in a browser; Build & Test next.

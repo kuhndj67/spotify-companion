@@ -42,7 +42,8 @@ services:
       # rotates refresh tokens, a second container refreshing a copy of the live token could invalidate it.
       - ./verify-install/secrets/spotify-config.json:/opt/spotify-mcp/spotify-config.json:rw
       - ./verify-install/data:/data:rw
-      - ./verify-install/config:/config:ro
+      # U7 (IN-U7-1): :rw like the live mount, so the exit test exercises the real mode — rules upload, undo, restore.
+      - ./verify-install/config:/config:rw
       - ./verify-install/state:/state:rw
     # Needed: a staged restore exits 0 and relies on Docker to bring the app back (probed 2026-10-07).
     restart: unless-stopped

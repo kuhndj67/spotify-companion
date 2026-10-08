@@ -7454,3 +7454,28 @@ U7 NFR Design plan: **Q1–Q7 all A.** Writing the deliverables.
 
 User: *"Continue"* after the deliverables were presented as awaiting approval — taken as approval, and recorded
 in those words so the reading can be checked. P-49…P-57, LC-40…LC-48, PBT-59…PBT-67. Next: Infrastructure Design plan.
+
+---
+
+## 2026-10-08T16:16:32Z — U7 Infrastructure Design plan written (6 questions)
+
+`construction/plans/u7-infrastructure-design-plan.md`. Q1/Q2 are the deliberate reversal of `./config`'s and
+`musicbrainz.json`'s `:ro` — surfaced as posture, with the compose comments to be rewritten, not edited. ✅ In-place
+writes through a single-file mount are **already proven on this host** (the MCP server's hourly token rewrite).
+⚠️ Q3: P-U7-1 needs **real** credentials on the `:3011` copy, which IN-U6-3 forbade — proposed as a written,
+probe-only amendment.
+
+---
+
+## 2026-10-08T19:08:27Z — U7 Infrastructure Design answered (Q1–Q6 all A); deliverables written
+
+User: *"accept recommended values, doc updated"*. Written: `infrastructure-design/infrastructure-design.md`
+(**IN-U7-1…6**) and `deployment-architecture.md`. ⚠️ IN-U7-3 is a **written, probe-only amendment** to IN-U6-3:
+a reduced copy of the real credentials on the `:3011` copy for P-U7-1/2, removed by `verify:down`; the
+no-credentials contract applies again for everything else. Awaiting approval.
+
+---
+
+## 2026-10-08T19:12:37Z — ✅ U7 Infrastructure Design APPROVED
+
+User: *"approve and continue"*. IN-U7-1…6. Next: U7 Code Generation plan.

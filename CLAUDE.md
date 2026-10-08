@@ -80,7 +80,7 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-08 UTC) — ▶ U7 NFR DESIGN WRITTEN, AWAITING APPROVAL — read `construction/u7-configuration-management/HANDOFF.md`. FR-66…72 + US-29 ratified. ⚠️ Broken Spotify credentials currently show PAUSED / "Spotify: ok" (fixed by FR-71). App versioning is Requirements Q18, owned by U8.
+## ▶ Current state (2026-10-08 UTC) — ▶ U7 INFRASTRUCTURE DESIGN WRITTEN, AWAITING APPROVAL — read `construction/u7-configuration-management/HANDOFF.md`. FR-66…72 + US-29 ratified. ⚠️ Broken Spotify credentials currently show PAUSED / "Spotify: ok" (fixed by FR-71). App versioning is Requirements Q18, owned by U8.
 
 ### Earlier (2026-10-08) — ✅ U6 DEPLOYED AND VERIFIED. Build & Test complete (`construction/build-and-test/u6-build-and-test-summary.md`). Next unit: U7 Configuration Management. Open: BR-52 legacy-backup cleanup awaits confirmation
 

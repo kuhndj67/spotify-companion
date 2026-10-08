@@ -21,6 +21,9 @@ const POLL_MS = 5;
 process.env.POLL_INTERVAL_MS = String(POLL_MS);
 
 const { NowPlayingService } = await import('../src/nowPlayingService.js');
+// ⚠️ Dynamic too, and for the same reason: a STATIC import of the client loads config.ts before the line above
+// sets the interval, and the change-detection tests then see one poll and fail (found 2026-10-08).
+const { McpToolError } = await import('../src/mcp/spotifyMcpClient.js');
 
 /** Long enough for several poll cycles plus the async enrichment hop. */
 const SEVERAL_POLLS = POLL_MS * 12;
@@ -141,6 +144,35 @@ describe('NowPlayingService', () => {
     const error = snapshot as { error: string; detail: string };
     assert.match(error.error, /Spotify MCP server/);
     assert.match(error.detail, /mcp down/);
+  });
+
+  it('FR-71: a Spotify error that arrived as TEXT is an error snapshot naming Spotify, not "could not reach"', async () => {
+    // Verbatim from probe P-U7-3 (2026-10-08): a corrupted refresh token, on the real server.
+    const text =
+      'Error getting current track: Failed to refresh access token. Please run "npm run auth" to re-authenticate.';
+    const service = makeService({ mcpError: new McpToolError('getNowPlaying', text) });
+    const tick = once(service, 'tick');
+    service.start();
+    const [snapshot] = await tick;
+    service.stop();
+
+    const error = snapshot as { error: string; detail: string };
+    assert.match(error.error, /^Spotify returned an error: Error getting current track: Failed to refresh/);
+    assert.equal(error.detail, text);
+    assert.ok(!('playing' in (snapshot as object)), 'never a now-playing snapshot — the F5 shape');
+  });
+
+  it('BR-58.2: the reason on the indicator is bounded; the full text stays in detail', async () => {
+    const text = `Error getting current track: ${'x'.repeat(500)}`;
+    const service = makeService({ mcpError: new McpToolError('getNowPlaying', text) });
+    const tick = once(service, 'tick');
+    service.start();
+    const [snapshot] = await tick;
+    service.stop();
+
+    const error = snapshot as { error: string; detail: string };
+    assert.ok(error.error.length <= 'Spotify returned an error: '.length + 200);
+    assert.equal(error.detail, text);
   });
 
   it('exposes the latest snapshot via .current', async () => {

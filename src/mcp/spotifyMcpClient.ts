@@ -9,7 +9,27 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { config } from '../config.js';
+import { isMcpErrorText } from '../configuration/mcpErrorText.js';
 import { parseNowPlaying, type NowPlaying } from './parseNowPlaying.js';
+
+/**
+ * A tool that answered with an error **as text** (FR-71, BR-58.1).
+ *
+ * ⚠️ The server's process is fine — it reached Spotify and was refused — so this does NOT drop the connection,
+ * unlike a transport failure. What it must never become is data: read as a now-playing block, a failed refresh
+ * was a snapshot with every field null, shown as PAUSED and *"Spotify: ok"* (F5, confirmed live by P-U7-3).
+ */
+export class McpToolError extends Error {
+  readonly tool: string;
+  readonly toolText: string;
+
+  constructor(tool: string, toolText: string) {
+    super(`MCP tool "${tool}" reported an error: ${toolText}`);
+    this.name = 'McpToolError';
+    this.tool = tool;
+    this.toolText = toolText;
+  }
+}
 
 export class SpotifyMcpClient {
   #client: Client | null = null;
@@ -67,10 +87,14 @@ export class SpotifyMcpClient {
     }
 
     const content = Array.isArray(result.content) ? result.content : [];
-    return content
+    const text = content
       .filter((block): block is { type: 'text'; text: string } => block?.type === 'text')
       .map((block) => block.text)
       .join('\n');
+
+    // FR-71: the server reports failures as ordinary text, without `isError`. Treat it exactly like `isError`.
+    if (isMcpErrorText(text)) throw new McpToolError(name, text);
+    return text;
   }
 
   /** Returns the current track, or null when nothing is playing. */

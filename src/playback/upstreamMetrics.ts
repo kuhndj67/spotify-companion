@@ -34,11 +34,34 @@
  * hours unnoticed for exactly want of it, because *"no new rows"* is ambiguous in both directions.
  * ⚠️ **It makes the state visible; it does not alert.** A monitor cannot live in the container when the
  * failure mode is *the container is not running*.
+ *
+ * ## ⚠️ U7 (P-55, BR-58.3): a poll has THREE outcomes, and the field is a SHARE
+ *
+ * Until U7 a poll was a boolean, and that is how both halves of one defect happened: a Spotify error that arrived
+ * as **text** was counted as *playing* (F5 — confirmed live by probe P-U7-3), and a *thrown* MCP error was counted
+ * as *idle* (F6). So **historic M4 figures mixed both** (BR-58.6); none were used to conclude anything (W-7 not
+ * started). Now `idleShare = idle ÷ (playing + idle)` and errors are counted on their own.
+ *
+ * The field was also renamed. `pollsReturningNothingPlaying` held a **share** but read as a **count**, and was
+ * misread exactly that way on 2026-10-08 while checking the app after a reboot.
  */
 
 import { RULE_SKIP_WINDOW_MS } from './types.js';
 
 export type Upstream = 'spotify' | 'musicbrainz' | 'mcp';
+
+/** What one poll of the now-playing surface found (P-55). An error is neither playing nor idle. */
+export type PollOutcome = 'playing' | 'idle' | 'error';
+
+/**
+ * The one place a now-playing snapshot becomes a poll outcome (P-55, PBT-65). Structural, so this pure module
+ * need not import the impure poll service: an error snapshot carries `error`, a playing one `playing: true`.
+ * ⚠️ `error` is checked FIRST — that ordering is the fix for F5/F6.
+ */
+export function pollOutcomeOf(snapshot: object): PollOutcome {
+  if ('error' in snapshot) return 'error';
+  return (snapshot as { playing?: unknown }).playing === true ? 'playing' : 'idle';
+}
 
 /** What became of one request, for M2. */
 export type RequestOutcome = 'ok' | 'rate-limited' | 'error';
@@ -78,15 +101,22 @@ export interface UpstreamSnapshot {
   >;
   /** M3: the efficiency ratio — requests per play, the *"light touch"* measure. */
   readonly requestsPerPlay: number | null;
-  /** M4: the positive liveness signal. `null` until at least one poll is recorded. */
-  readonly pollsReturningNothingPlaying: number | null;
+  /**
+   * M4: the positive liveness signal — a SHARE in [0, 1], `idle ÷ (playing + idle)`. `null` until a poll
+   * that was not an error has been recorded: a run of nothing but errors is not "100% idle", it is unknown.
+   */
+  readonly idleShare: number | null;
   readonly pollsTotal: number;
+  readonly pollsIdle: number;
+  /** ⚠️ Counted apart from the share: a credential outage must not read as listening silence. */
+  readonly pollsError: number;
 }
 
 export class UpstreamMetrics {
   #records: Record_[] = [];
   #polls = 0;
   #pollsIdle = 0;
+  #pollsError = 0;
   #plays = 0;
 
   /**
@@ -108,10 +138,11 @@ export class UpstreamMetrics {
     this.#prune(atMs);
   }
 
-  /** One poll of the now-playing surface. `playing: false` is what M4 counts. */
-  recordPoll(playing: boolean): void {
+  /** One poll of the now-playing surface (P-55). */
+  recordPoll(outcome: PollOutcome): void {
     this.#polls += 1;
-    if (!playing) this.#pollsIdle += 1;
+    if (outcome === 'idle') this.#pollsIdle += 1;
+    if (outcome === 'error') this.#pollsError += 1;
   }
 
   /** One play recorded, for M3's denominator. */
@@ -159,8 +190,10 @@ export class UpstreamMetrics {
       // ⚠️ `null` rather than 0 when there are no plays. A ratio with an empty denominator is not
       // "zero requests per play", it is unknown — and `null` is unknown, never 0.
       requestsPerPlay: this.#plays === 0 ? null : this.#records.length / this.#plays,
-      pollsReturningNothingPlaying: this.#polls === 0 ? null : this.#pollsIdle / this.#polls,
+      idleShare: this.#polls - this.#pollsError === 0 ? null : this.#pollsIdle / (this.#polls - this.#pollsError),
       pollsTotal: this.#polls,
+      pollsIdle: this.#pollsIdle,
+      pollsError: this.#pollsError,
     };
   }
 

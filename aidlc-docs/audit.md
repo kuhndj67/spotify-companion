@@ -7523,3 +7523,10 @@ A pattern built on F7 would have read those as data. Pattern widened to `^Error
 with `Error`); F7′ recorded. Same family as the plan's M4 claim this morning: **a count from a grep, recorded as
 though it were the population.** ⚠️ CI now fetches the MCP source at the Dockerfile's ref so PBT-66 can run there —
 and `MCP_SERVER_REF=main` floats, which is exactly why the scan earns its place.
+
+---
+
+## 2026-10-08T19:28:00Z — U7 Code Generation Step 4 done: FR-71 (a Spotify failure is a failure)
+
+Text errors from the MCP server throw `McpToolError`; the poll publishes *"Spotify returned an error: …"*; polls are
+three-way and M4 is `idleShare` (null for an all-error run). Tests use P-U7-3's real strings. Full suite 1450/1450.

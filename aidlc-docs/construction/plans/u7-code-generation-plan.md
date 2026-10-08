@@ -105,13 +105,15 @@ credential shows red. Steps that move existing code (2) run the existing tests *
   - `maskClientId` reveals 4+4 only from **16** characters (domain-entities said 9): 8 of 9 characters is not masking. Email reveals ≤ 2 of the local part.
   - `ruleHash.canonicalise` is now exported — one canonicaliser, used by the comparison.
 
-### Step 4 — FR-71: a Spotify failure is a failure *(LC-45, LC-47, P-55, BR-58)*
-- [ ] `SpotifyMcpClient.#callToolText` throws on a matching text result, as for `isError`
-- [ ] `upstreamMetrics.recordPoll(outcome)`; `pollsIdle`, `pollsError`, `idleShare`; `pollsReturningNothingPlaying`
+### Step 4 — FR-71: a Spotify failure is a failure — ✅ DONE 2026-10-08 *(LC-45, LC-47, P-55, BR-58)*
+- [x] `SpotifyMcpClient.#callToolText` throws on a matching text result, as for `isError`
+- [x] `upstreamMetrics.recordPoll(outcome)`; `pollsIdle`, `pollsError`, `idleShare`; `pollsReturningNothingPlaying`
       **removed** (P-55 — it read as a count); every reader updated (Diagnostics UI included)
-- [ ] `recordPollMetrics` derives the three-way outcome — **PBT-65**, using the server's real strings (P-U7-3's text added
+- [x] `recordPollMetrics` derives the three-way outcome — **PBT-65**, using the server's real strings (P-U7-3's text added
       as a fixture)
-- [ ] `upstreamMetrics.ts` header notes that historic M4 figures mixed F5 and F6 (BR-58.6)
+- [x] `upstreamMetrics.ts` header notes that historic M4 figures mixed F5 and F6 (BR-58.6)
+- ✅ Full suite **1450/1450**. `McpToolError` (does **not** drop the connection — the server is fine, Spotify refused); the snapshot says *"Spotify returned an error: …"* (≤ 200 chars) rather than *"could not reach the MCP server"*, which would point at the wrong component. `pollOutcomeOf` lives in the pure `upstreamMetrics` so PBT-65 can test it; `idleShare` is **null** for an all-error run (unknown, not 100% idle).
+- ⚠️ Found while testing: a **static** import of `spotifyMcpClient` in a test loads `config.ts` before the test sets `POLL_INTERVAL_MS`, and two change-detection tests then failed. Dynamic import, with a comment saying why.
 
 ### Step 5 — `RulesWriter` 🔌 *(LC-43, P-52, BR-53/54/55)*
 - [ ] Download (hash header) · stage (admission → parse → validate → compare) · confirm (token, hash, `REPLACE` rule,

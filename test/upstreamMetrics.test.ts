@@ -16,7 +16,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { SPOTIFY_WINDOW_MS, UpstreamMetrics } from '../src/playback/upstreamMetrics.js';
+import fc from 'fast-check';
+import './fc-config.js';
+
+import { pollOutcomeOf, SPOTIFY_WINDOW_MS, UpstreamMetrics } from '../src/playback/upstreamMetrics.js';
 
 const NOW = 1_700_000_000_000;
 
@@ -128,9 +131,9 @@ describe('M3 — requests per play, the efficiency measure', () => {
 describe('⭐ M4 — the positive liveness signal', () => {
   it('reports the share of polls that found nothing playing', () => {
     const m = new UpstreamMetrics();
-    for (let i = 0; i < 3; i += 1) m.recordPoll(true);
-    for (let i = 0; i < 1; i += 1) m.recordPoll(false);
-    assert.equal(m.snapshot(NOW).pollsReturningNothingPlaying, 0.25);
+    for (let i = 0; i < 3; i += 1) m.recordPoll('playing');
+    for (let i = 0; i < 1; i += 1) m.recordPoll('idle');
+    assert.equal(m.snapshot(NOW).idleShare, 0.25);
     assert.equal(m.snapshot(NOW).pollsTotal, 4);
   });
 
@@ -139,19 +142,60 @@ describe('⭐ M4 — the positive liveness signal', () => {
     // directions. A high idle share with a non-zero total says the instrument is alive and the user is
     // not listening; a total of zero says the instrument is not running.
     const alive = new UpstreamMetrics();
-    for (let i = 0; i < 100; i += 1) alive.recordPoll(false);
+    for (let i = 0; i < 100; i += 1) alive.recordPoll('idle');
     const dead = new UpstreamMetrics();
 
-    assert.equal(alive.snapshot(NOW).pollsReturningNothingPlaying, 1, 'alive, hearing silence');
+    assert.equal(alive.snapshot(NOW).idleShare, 1, 'alive, hearing silence');
     assert.equal(alive.snapshot(NOW).pollsTotal, 100);
 
-    assert.equal(dead.snapshot(NOW).pollsReturningNothingPlaying, null, 'not polling at all');
+    assert.equal(dead.snapshot(NOW).idleShare, null, 'not polling at all');
     assert.equal(dead.snapshot(NOW).pollsTotal, 0);
   });
 
   it('⚠️ is NULL before any poll, not zero', () => {
     const m = new UpstreamMetrics();
-    assert.equal(m.snapshot(NOW).pollsReturningNothingPlaying, null);
+    assert.equal(m.snapshot(NOW).idleShare, null);
+  });
+  // ─── U7 (P-55, BR-58.3) ────────────────────────────────────────────────────────────────────────────────
+  it('PBT-65: an error poll is neither playing nor idle — it is counted apart and excluded from the share', () => {
+    fc.assert(
+      fc.property(fc.array(fc.constantFrom('playing' as const, 'idle' as const, 'error' as const)), (outcomes) => {
+        const m = new UpstreamMetrics();
+        for (const o of outcomes) m.recordPoll(o);
+        const snap = m.snapshot(NOW);
+        const playing = outcomes.filter((o) => o === 'playing').length;
+        const idle = outcomes.filter((o) => o === 'idle').length;
+        const errors = outcomes.filter((o) => o === 'error').length;
+        assert.equal(snap.pollsTotal, outcomes.length);
+        assert.equal(snap.pollsIdle, idle);
+        assert.equal(snap.pollsError, errors);
+        assert.equal(snap.idleShare, playing + idle === 0 ? null : idle / (playing + idle));
+      }),
+    );
+  });
+
+  it('⚠️ a run of nothing but errors is UNKNOWN, not "100% idle" — a credential outage is not listening silence', () => {
+    const m = new UpstreamMetrics();
+    for (let i = 0; i < 5; i += 1) m.recordPoll('error');
+    assert.equal(m.snapshot(NOW).idleShare, null);
+    assert.equal(m.snapshot(NOW).pollsError, 5);
+  });
+});
+
+describe('pollOutcomeOf — PBT-65, the snapshot shapes the poll service really publishes', () => {
+  it('an error snapshot is an error — checked before `playing`', () => {
+    assert.equal(pollOutcomeOf({ error: 'Spotify returned an error: x', detail: 'x' }), 'error');
+  });
+
+  it('F5 regression: the text-error snapshot that USED to arrive (playing: true, fields null) was a "playing" poll', () => {
+    // Kept to document the defect: before FR-71 this exact shape reached recordPollMetrics. FR-71 turns it into
+    // an error snapshot upstream; if that ever regresses, this is what the metric would see.
+    assert.equal(pollOutcomeOf({ playing: true, track: null, trackId: null, isPlaying: false }), 'playing');
+  });
+
+  it('nothing playing is idle; a track is playing', () => {
+    assert.equal(pollOutcomeOf({ playing: false }), 'idle');
+    assert.equal(pollOutcomeOf({ playing: true, trackId: 'abc' }), 'playing');
   });
 });
 
@@ -161,7 +205,7 @@ describe('PBT-50 — the snapshot is a function of (records, now) alone', () => 
       const m = new UpstreamMetrics();
       m.record('spotify', 'ok', NOW - 1_000);
       m.record('musicbrainz', 'rate-limited', NOW - 2_000, 1_200);
-      m.recordPoll(true);
+      m.recordPoll('playing');
       m.recordPlay();
       return m;
     };

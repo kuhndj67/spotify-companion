@@ -12,7 +12,7 @@
 
 import { EventEmitter } from 'node:events';
 import { config } from './config.js';
-import { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
+import { McpToolError, SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import type { NowPlaying } from './mcp/parseNowPlaying.js';
 import type { EnrichmentService, Enrichment } from './spotify/enrichment.js';
 
@@ -20,6 +20,13 @@ export type Snapshot =
   | { playing: false }
   | ({ playing: true; enrichment: Enrichment | null } & NowPlaying)
   | { error: string; detail: string };
+
+/** BR-58.2: the reason shown on the Spotify indicator is bounded; the full text stays in `detail` and the log. */
+const MAX_REASON_CHARS = 200;
+
+function clip(text: string): string {
+  return text.length <= MAX_REASON_CHARS ? text : `${text.slice(0, MAX_REASON_CHARS - 1)}…`;
+}
 
 /** Fields that mean "something actually changed", ignoring progress ticks. */
 function signature(snapshot: Snapshot): string {
@@ -73,6 +80,13 @@ export class NowPlayingService extends EventEmitter {
       const cached = nowPlaying.trackId ? this.#enrichment.get(nowPlaying.trackId) ?? null : null;
       snapshot = { playing: true, enrichment: cached, ...nowPlaying };
     } catch (error) {
+      // FR-71 (BR-58.2): Spotify ANSWERED and refused — the MCP server is fine. Say so, with Spotify's reason,
+      // rather than "could not reach", which would send the user looking at the wrong component.
+      if (error instanceof McpToolError) {
+        console.error('[now-playing] Spotify returned an error:', error.toolText);
+        this.#publish({ error: `Spotify returned an error: ${clip(error.toolText)}`, detail: error.toolText });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       console.error('[now-playing] MCP call failed:', detail);
       this.#publish({ error: 'Could not reach the Spotify MCP server.', detail });

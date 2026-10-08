@@ -24,7 +24,7 @@ import { SkipDrain } from './playback/skipDrain.js';
 import { SkipExecutor } from './playback/SkipExecutor.js';
 import { SpotifyPlayerClient } from './playback/spotifyPlayerClient.js';
 import { SqliteSkipAttemptRepository } from './playback/SqliteSkipAttemptRepository.js';
-import { UpstreamMetrics } from './playback/upstreamMetrics.js';
+import { pollOutcomeOf, UpstreamMetrics } from './playback/upstreamMetrics.js';
 import { RuleSetWatcher } from './rules/RuleSetWatcher.js';
 import { RuleStore } from './rules/RuleStore.js';
 import { formatDecisionSummary } from './rules/decisionSummary.js';
@@ -1269,16 +1269,19 @@ nowPlaying.on('tick', (snapshot: Snapshot) => {
  * ⚠️ So an early return on `nothing playing` would delete the signal this exists to produce.
  */
 function recordPollMetrics(snapshot: Snapshot): void {
-  const errored = 'error' in snapshot;
-  const playing = !errored && snapshot.playing === true;
+  // U7 (P-55, BR-58.3): three outcomes. A Spotify error — including one the MCP server returned as TEXT, now an
+  // error snapshot (FR-71) — is neither playing nor idle, and it is an MCP error for M2.
+  const outcome = pollOutcomeOf(snapshot);
+  const errored = outcome === 'error';
+  const playing = outcome === 'playing';
 
-  upstreamMetrics.recordPoll(playing);
+  upstreamMetrics.recordPoll(outcome);
   upstreamMetrics.record('mcp', errored ? 'error' : 'ok', Date.now());
 
   // BR-41.1: once per TRACK, not once per tick — the cache decides, not this call site. A per-tick
   // fetch would DOUBLE this app's Spotify footprint to collect a value that cannot change within a
   // play. ⚠️ Unawaited: `ensure` never throws, and a failure records `null`, which is *unknown*.
-  if (playing && !errored && snapshot.trackId) {
+  if (playing && 'trackId' in snapshot && snapshot.trackId) {
     void playbackContext.ensure(snapshot.trackId);
   }
 }

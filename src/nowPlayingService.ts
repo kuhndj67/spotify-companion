@@ -113,13 +113,34 @@ export class NowPlayingService extends EventEmitter {
 
   start(): void {
     if (this.#timer) return;
-    void this.#poll();
-    this.#timer = setInterval(() => void this.#poll(), config.pollIntervalMs);
+    this.#track(this.#poll());
+    this.#timer = setInterval(() => this.#track(this.#poll()), config.pollIntervalMs);
     this.#timer.unref();
   }
 
   stop(): void {
     if (this.#timer) clearInterval(this.#timer);
     this.#timer = null;
+  }
+
+  /**
+   * U7 (P-49): stop polling AND wait for any poll already in flight, so nothing is inside an MCP call while the
+   * credentials file is replaced. `stop()` alone only prevents the NEXT poll.
+   */
+  async pause(): Promise<void> {
+    this.stop();
+    await Promise.allSettled([...this.#inFlight]);
+  }
+
+  /** Resume after `pause()`. Polls immediately, so the new credentials are tried at once. */
+  resume(): void {
+    this.start();
+  }
+
+  readonly #inFlight = new Set<Promise<void>>();
+
+  #track(poll: Promise<void>): void {
+    this.#inFlight.add(poll);
+    void poll.finally(() => this.#inFlight.delete(poll));
   }
 }

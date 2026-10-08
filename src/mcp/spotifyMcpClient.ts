@@ -11,6 +11,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { config } from '../config.js';
 import { isMcpErrorText } from '../configuration/mcpErrorText.js';
 import { parseNowPlaying, type NowPlaying } from './parseNowPlaying.js';
+import { waitForProcessExit } from './processExit.js';
 
 /**
  * A tool that answered with an error **as text** (FR-71, BR-58.1).
@@ -33,6 +34,8 @@ export class McpToolError extends Error {
 
 export class SpotifyMcpClient {
   #client: Client | null = null;
+  /** The live client's transport — its `pid` is how `close()` knows the child is really gone (P-49). */
+  #transport: StdioClientTransport | null = null;
   /** In-flight connection, so concurrent callers share one handshake instead of racing. */
   #connecting: Promise<Client> | null = null;
 
@@ -58,6 +61,7 @@ export class SpotifyMcpClient {
     };
 
     this.#client = client;
+    this.#transport = transport;
     return client;
   }
 
@@ -110,8 +114,18 @@ export class SpotifyMcpClient {
     return tools.map((tool) => tool.name);
   }
 
+  /**
+   * Close the connection and resolve only when the child process has EXITED (P-49, probe P-U7-2: ~2 s after the
+   * SDK's close returns). Rejects if it is still running after the bound — the caller must then NOT write the
+   * credentials file, because the old server could still be inside a refresh that would overwrite it.
+   */
   async close(): Promise<void> {
-    await this.#client?.close();
+    if (this.#connecting) await this.#connecting.catch(() => undefined);
+    const client = this.#client;
+    const pid = this.#transport?.pid ?? null;
     this.#client = null;
+    this.#transport = null;
+    await client?.close();
+    if (pid !== null) await waitForProcessExit(pid);
   }
 }

@@ -245,19 +245,32 @@ export function loadMusicBrainzIdentity(readFileSync: (path: string) => string):
     throw new Error(`${config.musicbrainzConfigPath} is not valid JSON.`);
   }
 
-  const contact = typeof parsed.contact === 'string' ? parsed.contact.trim() : '';
-  if (contact === '' || contact.includes('example.com')) {
-    throw new Error(
-      `${config.musicbrainzConfigPath} needs a real "contact" address. ` +
-        'MusicBrainz policy requires a way to reach whoever is making the requests.',
-    );
+  const checked = validateMusicBrainzContact(parsed.contact);
+  if (!checked.ok) {
+    throw new Error(`${config.musicbrainzConfigPath} needs a real "contact" address. ${checked.message}`);
   }
 
   return {
-    contact,
+    contact: checked.contact,
     appName: typeof parsed.appName === 'string' ? parsed.appName : 'SpotifyNowPlaying',
     appVersion: typeof parsed.appVersion === 'string' ? parsed.appVersion : '0.1.0',
   };
+}
+
+/**
+ * Is this a usable MusicBrainz contact? (NFR-14, BR-57.2)
+ *
+ * ⚠️ **The ONE copy of this rule** — used at startup by `loadMusicBrainzIdentity` and by U7's Settings save
+ * (`CredentialsWriter`). A second copy is how the two would come to disagree, so that Settings accepts a contact
+ * the app then refuses to start with.
+ */
+export function validateMusicBrainzContact(
+  raw: unknown,
+): { readonly ok: true; readonly contact: string } | { readonly ok: false; readonly message: string } {
+  const contact = typeof raw === 'string' ? raw.trim() : '';
+  if (contact === '') return { ok: false, message: 'MusicBrainz policy requires a way to reach whoever is making the requests.' };
+  if (contact.includes('example.com')) return { ok: false, message: 'That is the placeholder from the example file — enter your own contact.' };
+  return { ok: true, contact };
 }
 
 /** The header MusicBrainz asks for: application, version, and a way to reach us. */

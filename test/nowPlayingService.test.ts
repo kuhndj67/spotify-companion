@@ -175,6 +175,22 @@ describe('NowPlayingService', () => {
     assert.equal(error.detail, text);
   });
 
+  it('U7 (P-49): pause() waits for a poll already IN FLIGHT, not just the next one', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    // Hold the first poll open inside "the MCP call".
+    const mcp = { getNowPlaying: async () => { await gate; return null; } };
+    const held = new NowPlayingService(mcp as unknown as SpotifyMcpClient, { get: () => undefined } as unknown as EnrichmentService);
+    held.start();
+    let paused = false;
+    const pausing = held.pause().then(() => (paused = true));
+    await settle(POLL_MS * 3);
+    assert.equal(paused, false, 'must not report paused while a poll is inside the MCP call');
+    release();
+    await pausing;
+    assert.equal(paused, true);
+  });
+
   it('exposes the latest snapshot via .current', async () => {
     const service = makeService({ nowPlaying: track() });
     assert.deepEqual(service.current, { playing: false });

@@ -53,8 +53,11 @@ export class MusicBrainzError extends Error {
 
 export interface MusicBrainzClientOptions {
   queue: RequestQueue;
-  /** The contact address NFR-14 requires. Read from `secrets/`, never committed. */
-  userAgent: string;
+  /**
+   * The contact address NFR-14 requires. Read from `secrets/`, never committed.
+   * U7 (BR-57.4): may be a GETTER, so a contact saved in Settings applies to the next request without a restart.
+   */
+  userAgent: string | (() => string);
   baseUrl?: string;
   timeoutMs?: number;
   /**
@@ -76,7 +79,7 @@ interface RecordingLookup {
 
 export class MusicBrainzClient {
   readonly #queue: RequestQueue;
-  readonly #userAgent: string;
+  readonly #userAgent: () => string;
   readonly #baseUrl: string;
   readonly #timeoutMs: number;
   readonly #maxAttempts: number;
@@ -86,7 +89,8 @@ export class MusicBrainzClient {
 
   constructor(options: MusicBrainzClientOptions) {
     this.#queue = options.queue;
-    this.#userAgent = options.userAgent;
+    const ua = options.userAgent;
+    this.#userAgent = typeof ua === 'function' ? ua : () => ua;
     this.#baseUrl = (options.baseUrl ?? 'https://musicbrainz.org/ws/2').replace(/\/+$/, '');
     this.#timeoutMs = options.timeoutMs ?? 15_000;
     this.#maxAttempts = options.maxAttempts ?? 3;
@@ -158,7 +162,7 @@ export class MusicBrainzClient {
       let response: Response;
       try {
         response = await this.#fetch(url, {
-          headers: { 'User-Agent': this.#userAgent, Accept: 'application/json' },
+          headers: { 'User-Agent': this.#userAgent(), Accept: 'application/json' },
           signal: controller.signal,
         });
       } catch (error) {

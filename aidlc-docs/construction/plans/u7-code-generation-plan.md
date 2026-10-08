@@ -128,12 +128,17 @@ credential shows red. Steps that move existing code (2) run the existing tests *
   - `compareCandidate` (compare without staging) and `applyAtStartup` added for Step 7, so restore uses this class rather than a second write path.
   - Caps `RULES_UPLOAD_CAP_BYTES` / `CREDENTIALS_CAP_BYTES` live in `ingest/types.ts` beside U6's.
 
-### Step 6 — `CredentialsWriter` 🔌 *(LC-44, LC-45 close, P-49, P-50, P-53, BR-56/57)*
-- [ ] MusicBrainz validator extracted from `loadMusicBrainzIdentity` and shared; client identity behind a getter
-- [ ] `SpotifyMcpClient.close()` resolves when the child has exited (per P-U7-2)
-- [ ] Spotify save: validate → pause poll → close MCP and await exit → write in place (BR-56.4 shape, or Question 1's
+### Step 6 — `CredentialsWriter` 🔌 — ✅ DONE 2026-10-08 *(LC-44, LC-45 close, P-49, P-50, P-53, BR-56/57)*
+- [x] MusicBrainz validator extracted from `loadMusicBrainzIdentity` and shared; client identity behind a getter
+- [x] `SpotifyMcpClient.close()` resolves when the child has exited (per P-U7-2)
+- [x] Spotify save: validate → pause poll → close MCP and await exit → write in place (BR-56.4 shape, or Question 1's
       fallback) → drop Web API token → resume → **read back and compare**
-- [ ] Views only; error text from field names only — **PBT-61** (leak property + positive control)
+- [x] Views only; error text from field names only — **PBT-61** (leak property + positive control)
+- ✅ Full suite **1486/1486**. The ORDER test pins P-49 (pause → close with the file still old → write → forget → resume); PBT-61 runs four paths × generated secrets with its positive control.
+- ⚠️ **Found while building — the app-side twin of F1**: `SpotifyWebApiClient` caches the **whole credentials file** (`#credentials`) for the process lifetime. The plan's *"drop the Web API token"* would have kept refreshing with the OLD client id, secret and refresh token. Added `forgetCredentials()`; `CredentialsWriter` calls that, not `invalidateAccessToken`.
+- `NowPlayingService.pause()` awaits polls **in flight** (tracked set), not just the timer; `SpotifyMcpClient.close()` awaits the child's exit via `mcp/processExit.ts` (bound 6 s, P-U7-2 measured ~2 s) and rejects past it — then nothing is written (`mcp-did-not-stop`).
+- `validateMusicBrainzContact` extracted from `loadMusicBrainzIdentity` — one rule for startup and Settings. `MusicBrainzClient` takes a User-Agent **getter** (BR-57.4).
+- ⚠️ **Limit, stated**: if labels were DISABLED at startup because the contact was missing, saving one in Settings does not enable them until a restart — the label pipeline is not constructed. Settings must say so (Step 11).
 
 ### Step 7 — Restore with rules *(LC-46, BR-59)*
 - [ ] Staging validates and compares the archive's `rules.json`; confirm records `applyRules`, `rulesHashAtConfirm`

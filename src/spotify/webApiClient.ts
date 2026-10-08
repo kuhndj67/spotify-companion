@@ -119,6 +119,20 @@ export class SpotifyWebApiClient {
     this.#accessToken = null;
   }
 
+  /**
+   * U7 (BR-56.5): forget the credentials themselves, so the next request re-reads the file.
+   *
+   * ⚠️ **`invalidateAccessToken` is NOT enough after new credentials are saved.** `#loadCredentials` caches the
+   * whole file for the process lifetime, so dropping only the token would refresh again with the OLD client id,
+   * secret and refresh token — the app-side twin of the MCP server's in-memory cache (FD F1). Found while
+   * building `CredentialsWriter`, 2026-10-08.
+   */
+  forgetCredentials(): void {
+    this.#credentials = null;
+    this.#accessToken = null;
+    this.#expiresAt = 0;
+  }
+
   async get<T>(path: string, params?: Record<string, string>): Promise<T | null> {
     const url = new URL(`https://api.spotify.com/v1${path}`);
     for (const [key, value] of Object.entries(params ?? {})) {

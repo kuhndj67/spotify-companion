@@ -7539,3 +7539,13 @@ three-way and M4 is `idleShare` (null for an all-error run). Tests use P-U7-3's 
 and `REPLACE` rule, atomic previous + current, the watcher's reload as the verdict; undo swaps; `applyAtStartup` for
 BR-59.5. 21 tests on a real store and watcher, including PBT-63 (positive control) and PBT-64 (N concurrent tabs →
 exactly one applies). Deviation: stagings keyed per token, not one slot.
+
+---
+
+## 2026-10-08T19:35:23Z — U7 Code Generation Step 6 done: CredentialsWriter — and the app-side twin of F1
+
+`configuration/CredentialsWriter.ts`: P-49's sequence with the child's exit awaited (`mcp/processExit.ts`), in-place
+writes, read-back, views only. Suite 1486/1486. ⚠️ **Found from the code**: `SpotifyWebApiClient` caches the whole
+credentials file for the process lifetime, so the planned *"drop the token"* would have kept using the OLD
+credentials — `forgetCredentials()` added. Same shape as F1 (the MCP server's in-memory client), one layer over:
+**a cache nobody listed is a second copy of the state you are replacing.**

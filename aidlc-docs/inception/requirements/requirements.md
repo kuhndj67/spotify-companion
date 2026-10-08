@@ -435,6 +435,34 @@ activities"* (FD T2, 2026-10-07).
 ⚠️ **FR-56** (*"a dated export snapshot on a schedule… so a backup exists"*) is **not** superseded: it writes
 CSV/JSON *exports*, and an export is not a restorable backup. Scheduled **backups** are W-9.
 
+### 3.8 Configuration management — *new 2026-10-08; U7 (Phase 5)*
+
+✅ **Ratified 2026-10-08** in Requirements Analysis (U7 round, Question 19 = A, Question 19a = A) — **before** U7's
+Functional Design, from the answers in `construction/plans/u7-functional-design-plan.md` §3/§3a. On an appliance
+the user cannot edit host files, so rules and credentials become manageable from inside the app.
+**Placement (Q19a = A)**: every rules action is in the **Rules pop-up**, except the opt-in rules choice inside a
+backup restore (FR-72); credentials are in **Settings**. FR-63 is unchanged.
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-66 | **Download and upload the rules.** Download gives the current `rules.json`. An upload passes FR-64's admission path and U3's validator **before anything is written**; the user then sees a **comparison** — rules added, removed and changed, by id, and any that would become *disabled with a reason* — and confirms. Applied **without a restart**. A refused upload changes nothing, and the refusal names the rule and field | Must | ⬜ New |
+| FR-67 | **A rules write can never silently lose rules.** An upload that removes **every** rule, or **more than half**, needs a typed confirmation. An upload based on an **older version** than the file now on disk is **refused**. A rules write **never** changes the automation switch or halt latch | Must | ⬜ New |
+| FR-68 | **Undo last rules change**: exactly one previous rules file is kept and can be put back | Must | ⬜ New |
+| FR-69 | **Spotify credentials in Settings**: fields for client id, client secret, redirect URI and refresh token, plus *Upload spotify-config.json* that fills the same form. Saving **requires every field** and **replaces the whole set** — nothing is carried over and **no previous copy is kept**, which the UI states before saving. The secret and refresh token are **never shown back**; the client id is shown partly, the redirect URI in full. **Guidance text** explains how to obtain each value | Must | ⬜ New |
+| FR-70 | **MusicBrainz contact in Settings**: one field, shown masked, refused if empty or a placeholder — the rule the app already applies at startup (NFR-14) | Should | ⬜ New |
+| FR-71 | **A Spotify failure is never reported as "nothing playing".** When the Spotify connection returns an error, the poll is a **failure**: the Spotify indicator shows it with the reason, and it is not counted as an idle poll (M4). A genuine *nothing playing* still reads as healthy | Must | ⬜ New |
+| FR-72 | **Restore can also restore rules — only if asked.** When a backup holds rules, the restore dialog says whether they are identical to or differ from the current ones and offers an **opt-in, unchecked** *"also replace my rules"*, with FR-66's comparison and FR-67's guards. Applied **only if the database restore succeeds**; otherwise, and when not ticked, the current rules are untouched. **Amends FR-58** (U6's BR-48.7 discarded backup rules) | Should | ⬜ New |
+
+⚠️ **FR-71 is a precondition of FR-69, not a companion.** FR-69 writes credentials without checking them first
+(U7 FD Q5 = B — *"if the user wants to backtrack they need to do it themselves"*), so the user finds out about a
+bad credential **only** through FR-71. It ships no later than FR-69. ⚠️ **Historic M4 figures are unreliable in
+both directions** — corrected 2026-10-08 from the source: a text-error poll was counted as **playing**, a thrown
+error as **idle** (U7 FD F5–F6). M4 has not yet been used to conclude anything.
+
+Still binding: **FR-60** (restore never changes credentials), **FR-61** (nor the automation state), **NFR-01…04**
+(every new route local-only until NFR-29 / U9). Out of scope: a built-in rules editor (later) · in-app Spotify
+OAuth (**W-10**).
+
 ---
 
 ## 4. Non-Functional Requirements

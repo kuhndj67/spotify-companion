@@ -89,7 +89,7 @@ US-01, US-02, US-04, US-05, US-06, US-07, US-09, US-19, US-26
   unrecoverable one is not.
 
 ### Stories
-US-14, US-15, US-17, US-18, US-20, US-21, US-22, US-23, US-24
+US-14, US-15, US-17, US-18, US-20, US-21, US-22, US-23, US-24, US-29
 
 ---
 

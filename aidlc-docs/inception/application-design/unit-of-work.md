@@ -280,6 +280,8 @@ short README + `docs/INSTALL.md` + `CONTRIBUTING.md` (**Q15 = A**) · `SECURITY.
 (**Q16 = C**; ⚠️ the bundled MCP server has **no licence** — no built image may be published until resolved) · an install routine written once for both a person and an AI agent, every step with its verification
 command and expected output (**Q17 = C**) · each user registers their own Spotify app (**Q17a = A**) ·
 credentials never in the repo, enforced in CI (**Q17b = B**) · rewrite `CLAUDE.md`'s single-developer assumption.
+**Added 2026-10-08**: the **application version scheme** — today `0.1.0` since the first commit, in four
+unmanaged places (Requirements **Question 18**, open; becomes an NFR once answered).
 
 **Requirements**: **FR-65**, **NFR-28, NFR-30–NFR-33**.
 

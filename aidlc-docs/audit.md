@@ -7290,3 +7290,104 @@ re-import that cannot happen without Spotify · `db:backup`'s printed hint no lo
 User: *"approve and continue"*. U6 complete (local half; cross-machine restore is U9's). BR-52 deletion and the commit asked separately — the approval did not name them, and deletion is irreversible.
 
 **2026-10-08T02:31:07Z — BR-52 done** (user confirmed): re-checked that the `unverifiable` set was exactly the 10 listed, deleted them; sweep now **4 verified · 0 unverifiable · 1 CORRUPT**; `--self-test` passes. In-app archive copied to the user's Downloads (`spotify-backup-20261008T022355Z.tar.gz`). Committing and pushing at the user's request.
+
+---
+
+## 2026-10-08T02:34:59Z — U7 Configuration Management: Functional Design plan written
+
+User: *"yes"* to starting U7. Plan: `construction/plans/u7-functional-design-plan.md` — 9 questions (rules storage,
+write guards incl. valid-but-empty and stale-hash, upload UX, which credentials, probe-before-apply, the defect
+below, applying a backup's rules, a story, and requirements-first ordering). Entry point:
+`construction/u7-configuration-management/HANDOFF.md`.
+
+⚠️ **Defect found while gathering facts — traced to its cause.** The MCP server returns a failed `getNowPlaying`
+as **plain text without `isError`** (`.mcp-server/src/read.ts:283–291`), so the app parses broken credentials as
+**"nothing playing"** and reports **"Spotify: ok"** — the exact display U6's credential-less copy showed. Metric
+**M4** therefore counts credential failures as idle polls. Not yet fixed; plan Q6 proposes fixing it in U7.
+
+⚠️ **Q5 flags an unverified Spotify behaviour** — whether a refresh token survives being used — that must be
+**probed** before a probe-before-apply design is written.
+
+---
+
+## 2026-10-08T13:11:55Z — App versioning raised; assigned to U8 (Requirements Question 18)
+
+User asked, before starting U7, whether the app has a Major.Minor scheme like the schema's whole-number one.
+**Measured: no.** `package.json` is `0.1.0` since the first commit (114 commits, U0–U6). The version appears in
+four places, none managed: `package.json`; the image tag `spotify-now-playing:0.1.0`, which every build
+overwrites (hence the hand-made `u4-rollback`/`u5-rollback` tags); U6's backup manifest `appVersion`, which
+therefore always says `0.1.0`; and the MusicBrainz User-Agent, read from a **second, per-install copy** in the
+gitignored `secrets/musicbrainz.json`. No git tags.
+
+User: *"Add to Unit 8 since that's the logical place for it and that's also when using it will start to be
+important."* Recorded as **Requirements Question 18** (an addendum to the completed Phase 5 round, per the
+standard process — new scope re-enters Inception) and noted in U8's unit entry. Recommendation: SemVer with
+`0.x` for development, `-beta.N` pre-releases once others install, `1.0.0` after FR-65's cold walk, one source
+of truth in `package.json`. ⚠️ Accepted consequence: backups taken before U8 (U7's included) record `0.1.0`.
+U7 proceeds unchanged.
+
+---
+
+## 2026-10-08T13:37:23Z — U7 FD plan: Q1–Q9 answered; follow-ups Q4a and Q7a
+
+Answers: Q1 A · Q2 A · Q3 A · **Q4 A + "the settings screen should have sections for user entry of both spotify
+and musicbrainz configs (with appropriate masking)"** · **Q5 B** — *"entering new auth information wipes the old
+information and if the user wants to backtrack they need to do it themselves"* · Q6 A · **Q7 A, with the user's
+reading of an opt-in "replace the rules" choice in the restore flow** · Q8 A · Q9 A.
+
+Analysis (plan §3a): ⚠️ the user's Q7 reading matches **BR-48.7** ("U7 will add that option to this same flow");
+the plan's option A had wrongly moved it to a separate post-restore action — corrected, not argued. Q4's note
+extends T3 = A to entry fields and reverses 4c → **Q4a**. **Q5 = B depends on Q6 = A**: without the fix a bad
+credential shows "Spotify: ok", so the fix must ship no later than the credentials feature. Q5 = B drops the
+refresh-token rotation probe and the "probed before applied" exit criterion. Q7a asks when restored rules take
+effect, given a restore can fall back at startup (BR-48.6).
+
+---
+
+## 2026-10-08T13:44:31Z — U7 follow-ups answered; requirements round opened (Questions 19–19a)
+
+Q4a: *"A - and if the process to get spotify authenticated is not trivial we should include text guidance for
+users."* · Q7a: A. Per Q9 = A, U7's requirements go to ratification **before** the FD: Question 19 proposes
+**FR-66…FR-72 and US-29** (not yet written into `requirements.md`); Question 19a asks where the rules transfer
+controls go, because ratified FR-63 keeps rules on the main screen. The guidance text from Q4a is folded into FR-69.
+
+---
+
+## 2026-10-08T13:56:45Z — ✅ U7 requirements RATIFIED (Question 19 = A, Question 19a = A)
+
+Q19: A. Q19a: *"A - the backup restore process can affect rules as part of it... but all other rules processes
+should be in the rules pop-up to keep it straightforward for users."* Written into `requirements.md` §3.8
+(**FR-66…FR-72**, 72 FRs total) and `stories.md` (**US-29**, P2; traceability row added; P2's story list updated).
+FR-72 amends FR-58 / BR-48.7. Question 18 (app versioning, U8) remains open — not needed for U7.
+▶ Next: U7 Functional Design artifacts.
+
+---
+
+## 2026-10-08T14:01:53Z — U7 Functional Design written, awaiting approval
+
+`construction/u7-configuration-management/functional-design/`: **BR-53…BR-60**, domain entities, logic model,
+frontend components. No migration (schema v7); `config/` `:ro`→`:rw` and `musicbrainz.json` `:ro`→`:rw` are left
+to Infrastructure Design.
+
+**Found while designing, from source (not yet probed):**
+- ⚠️ **A `spotify-config.json` without `accessToken` does not work** — the MCP server falls back to
+  client-credentials and never refreshes. FR-69's four fields alone would write a dead file. BR-56.4 writes a
+  placeholder token + `expiresAt: 0`; **probe P-U7-1** must confirm before that code is written.
+- ⚠️ **Correction to the plan's own §2 claim** (*"M4 counts auth failures as idle"*): the text error parses to
+  `playing: true` with null fields → counted as **playing**, MCP recorded **ok**. Separately, a *thrown* MCP error
+  **is** counted idle today. Inference recorded as measurement — caught by reading `recordPollMetrics` before
+  designing the fix. FR-71 therefore needs a three-way poll outcome (BR-58.3). Plan §2 and `requirements.md`
+  corrected with dated notes.
+- The server reports errors as text in 20 places, so BR-58.1 sits at the one MCP call site.
+- **Evidence that a refresh token survives reuse** (the question once proposed as a probe for Q5): the server
+  refreshes hourly with the same token and never stores a new one, and has run for weeks.
+
+Flagged for the user's review: **BR-54.4** (unknown base → `REPLACE` confirmation, not refusal — the limit of
+FR-67's staleness check) and **BR-59.3** (one typed `RESTORE` confirms database and rules together).
+
+---
+
+## 2026-10-08T14:14:50Z — ✅ U7 Functional Design APPROVED
+
+User: *"Agree with 54.4 and 59.3 business rules. approve design, commit then continue"*. Both flagged decisions
+accepted as written. NFR Requirements skipped as for U1–U6; next: U7 NFR Design plan.

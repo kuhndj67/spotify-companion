@@ -625,6 +625,26 @@ NAS, or a mistake — without re-arming anything or exposing my credentials.
 > once connected restore the data to that environment?"* — and FD Q6 = A / FQ3 = A, which made U6 a
 > first-class unit with a story. Until then U6 was recorded as having none, deliberately.
 
+### US-29 — Change my rules and credentials from inside the app ⬜
+**As** the Curator, **I want** to change my rules and my credentials from inside the app, on any machine it
+runs on, **so that** I can manage an installation whose files I cannot edit — without ever silently losing
+rules or breaking recording.
+
+**Acceptance criteria**
+- [ ] From the Rules pop-up I can download my rules, upload a changed file, see what it adds, removes and
+      changes **before** I confirm, and have it take effect without a restart
+- [ ] An upload that would remove all or most of my rules asks me to type a confirmation; an upload based on an
+      out-of-date download is refused; an invalid one changes nothing and tells me which rule and field
+- [ ] I can undo my last rules change once
+- [ ] Changing rules never arms automation
+- [ ] In Settings I can replace my Spotify credentials (fields or the config file) with guidance on where each
+      value comes from; secrets are never shown back, and I am told the old ones will not be kept
+- [ ] ⚠️ If my Spotify credentials are wrong, the Spotify indicator says so — it never reads "ok"
+- [ ] When I restore a backup that holds rules, I can choose to restore them too; if I do not, or the restore
+      fails, my current rules are untouched
+
+*Covers FR-66–FR-72 · Persona P2 · Source: U7 FD Q8 = A (2026-10-08)*
+
 ---
 
 ## INVEST Validation
@@ -661,6 +681,7 @@ NAS, or a mistake — without re-arming anything or exposing my credentials.
 | FR-23 | US-13 | NFR-01–07 | US-26 |
 | FR-24, 26, 27, 28, 29 | US-14 | FR-49–54 | US-25 |
 | | | FR-57–64 | US-28 |
+| | | FR-66–72 | US-29 |
 
 **All in-scope functional requirements are covered.** FR-55 was withdrawn on 2026-08-25 and moved
 to the wishlist (§5.1, W-1); US-27 is retained as a **deferred** story documenting why, and is

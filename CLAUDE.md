@@ -36,9 +36,9 @@ what was rejected.
 |---|---|
 | `aidlc-docs/aidlc-state.md` | **Current state. Start here.** |
 | `aidlc-docs/audit.md` | Append-only history of decisions and findings |
-| `aidlc-docs/inception/requirements/requirements.md` | 65 FRs, 33 NFRs, risks, wishlist |
+| `aidlc-docs/inception/requirements/requirements.md` | 72 FRs, 33 NFRs, risks, wishlist |
 | `aidlc-docs/inception/research/research-findings.md` | **Live API probe results — authoritative** |
-| `aidlc-docs/inception/user-stories/` | 28 stories, 3 personas |
+| `aidlc-docs/inception/user-stories/` | 29 stories, 3 personas |
 | `aidlc-docs/inception/plans/execution-plan.md` | The four delivery phases |
 | `aidlc-docs/inception/application-design/` | Components, methods, units |
 | `aidlc-docs/construction/` | Per-unit design, code summaries, build-and-test |
@@ -80,7 +80,9 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-08 UTC) — ✅ U6 DEPLOYED AND VERIFIED. Build & Test complete (`construction/build-and-test/u6-build-and-test-summary.md`). Next unit: U7 Configuration Management. Open: BR-52 legacy-backup cleanup awaits confirmation
+## ▶ Current state (2026-10-08 UTC) — ▶ U7 FUNCTIONAL DESIGN APPROVED, NFR DESIGN NEXT — read `construction/u7-configuration-management/HANDOFF.md`. FR-66…72 + US-29 ratified. ⚠️ Broken Spotify credentials currently show PAUSED / "Spotify: ok" (fixed by FR-71). App versioning is Requirements Q18, owned by U8.
+
+### Earlier (2026-10-08) — ✅ U6 DEPLOYED AND VERIFIED. Build & Test complete (`construction/build-and-test/u6-build-and-test-summary.md`). Next unit: U7 Configuration Management. Open: BR-52 legacy-backup cleanup awaits confirmation
 
 ⚠️ **U6 Build & Test lesson**: the destructive *Restore* button looked ENABLED while disabled — every test passed, because tests asserted the `disabled` STATE, which was right. Only a screenshot saw it. **Click-test and LOOK at destructive controls.**
 

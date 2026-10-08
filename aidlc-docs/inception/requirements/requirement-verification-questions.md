@@ -463,3 +463,100 @@ What this does and does not affect (plain language, not legal advice):
   publish an image until this is resolved** (NFR-32). Options for U8: ask the author to add a licence ·
   replace the server · keep build-it-yourself as the only install path.
 
+
+---
+
+# Addendum to the Phase 5 round — app versioning (2026-10-08)
+
+Raised by the user before U7 began: the **schema** is versioned (v7, forward-only migrations), but is the
+**app**? Owner settled by the user: **U8**, because that is when installs by someone else begin and a version
+starts to matter. Only the scheme is open.
+
+## Question 18 — The application version scheme
+
+**Measured 2026-10-08**: the app has been `0.1.0` since the first commit — 114 commits and seven delivered units
+(U0–U6) later. It is written in four places, none of them managed:
+
+| Where | Problem |
+|---|---|
+| `package.json` `version` | never bumped |
+| image tag `spotify-now-playing:0.1.0` (`compose.yaml`, `compose.verify.yaml`) | every build **overwrites** it, so rollback has relied on hand-made tags (`u4-rollback`, `u5-rollback`) |
+| U6 backup manifest `appVersion` (BR-44.4), read from `package.json` | always `0.1.0` — **looks like provenance, records none** |
+| MusicBrainz User-Agent, from `appVersion` in the gitignored `secrets/musicbrainz.json` | a **second copy, per install**, that no bump can reach — the User-Agent would misreport the version (NFR-14) |
+
+No git tags exist. ⚠️ **The schema version stays separate** whatever is chosen: it answers *can this database be
+opened*, the app version answers *which code is this*.
+
+A) **Semantic Versioning, pre-1.0 = development.** `0.MINOR.PATCH` — MINOR per delivered unit, PATCH per fix
+release (today would be `0.7.0`). `1.0.0-beta.N` pre-releases once someone else installs it (U8/U9), **`1.0.0`
+when FR-65's install routine has been walked cold**. After 1.0, MAJOR means *an existing user must act by hand*
+— an existing `rules.json` no longer loads, an older backup cannot be restored, or credential setup changes; the
+UI's own HTTP API is not a public interface. **One source of truth** (`package.json`): the image tag, the backup
+manifest and the User-Agent all derive from it, `appVersion` is removed from `musicbrainz.json`, each release
+gets a git tag `vX.Y.Z`, rollback uses the previous version's image instead of `uN-rollback`, and the version is
+shown in the UI / `/api/diagnostics` ⭐ *recommended*
+
+B) As A, but with `0.x` itself carrying the stage (e.g. `0.1–0.4` alpha, `0.5–0.9` beta) instead of SemVer
+pre-release labels. ⚠️ Tools that compare versions do not know that convention; `-beta.N` they do
+
+C) Calendar versioning (`2026.10.0`). Says *when*, not *what changed*. ⚠️ Cannot express "this release breaks
+your rules file", which is the one thing a user installing it needs to know
+
+X) Other (please describe after [Answer]: tag below)
+
+⚠️ **Until U8, every backup's manifest records `0.1.0`** — U7's included. Accepted when the owner was chosen.
+
+[Answer]:
+
+---
+
+# U7 round — Requirements Analysis for Configuration Management (2026-10-08)
+
+Per U7 FD plan **Q9 = A**: U7's requirements are ratified **here, before** its Functional Design is written — the
+order U6 had to correct afterwards (Question 12). Their content comes from your answers in
+[`u7-functional-design-plan.md`](../../construction/plans/u7-functional-design-plan.md) §3 and §3a. **Nothing
+below is in `requirements.md` yet**; it is written there only once ratified.
+
+## Question 19 — Ratify U7's requirements
+
+| ID | Proposed requirement | From |
+|---|---|---|
+| FR-66 | **Download and upload the rules.** Download gives the current `rules.json`. An upload passes FR-64's admission path and U3's validator **before anything is written**; the user then sees a **comparison** — rules added, removed and changed, by id, and any that would become *disabled with a reason* — and confirms. Applied **without a restart**. A refused upload changes nothing, and the refusal names the rule and field | Q1, Q2a, Q3 |
+| FR-67 | **A rules write can never silently lose rules.** An upload that removes **every** rule, or **more than half**, needs a typed confirmation. An upload based on an **older version** than the file now on disk (changed by hand or in another tab since it was downloaded) is **refused**. A rules write **never** changes the automation switch or halt latch | Q2b, c, e |
+| FR-68 | **Undo last rules change**: exactly one previous rules file is kept and can be put back | Q1, Q2d |
+| FR-69 | **Spotify credentials in Settings**: fields for client id, client secret, redirect URI and refresh token, plus *Upload spotify-config.json* that fills the same form. Saving **requires every field** and **replaces the whole set** — nothing is carried over and **no previous copy is kept**, which the UI states before saving. The secret and refresh token are **never shown back** (only *set · replaced &lt;when&gt;*); the client id is shown partly, the redirect URI in full. **Guidance text** in the section explains how to obtain each value (registering a Spotify app, running `npm run auth`) | Q4, Q4a, Q5 |
+| FR-70 | **MusicBrainz contact in Settings**: one field, shown masked (`k…7@gmail.com`), refused if empty or a placeholder — the same rule the app applies at startup (NFR-14) | Q4b |
+| FR-71 | **A Spotify failure is never reported as "nothing playing".** When the Spotify connection returns an error, the poll is a **failure**: the Spotify indicator shows it with the reason, and it is not counted as an idle poll (M4). A genuine *nothing playing* still reads as healthy | Q6 |
+| FR-72 | **Restore can also restore rules — only if asked.** When a backup holds rules, the restore dialog says whether they are identical to or differ from the current ones and offers an **opt-in, unchecked** *"also replace my rules"*, with FR-66's comparison and FR-67's guards. The rules are applied **only if the database restore succeeds**; otherwise, and when not ticked, the current rules are untouched. **Amends BR-48.7 / FR-58** | Q7, Q7a |
+| US-29 | Persona **P2 (Curator)**: *"Change my rules and my credentials from inside the app, on any machine it runs on, without ever silently losing rules or breaking recording."* | Q8 |
+
+Unchanged and still binding: **FR-60** (restore never changes credentials) · **FR-61** (nor the automation state) ·
+**NFR-01…04** (every new route is local-only until NFR-29/U9).
+
+⚠️ **FR-71 is a precondition of FR-69**, not a companion: with FR-69's *"write it and let the user find out"*
+(Q5 = B), finding out depends on a bad credential showing as a failure. It ships no later than FR-69.
+
+A) Ratify as written ⭐
+
+B) Ratify with amendments (describe after [Answer]: tag below)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+A
+---
+
+## Question 19a — Where do the rules download/upload controls go?
+
+⚠️ **FR-63** (ratified, Question 12) says *"rules and the automation switch stay on the main screen"* — the Rules
+pop-up opened from it — while backup, export and diagnostics live in Settings.
+
+A) **In the existing Rules pop-up**, beside the rules they act on; credentials go in Settings. FR-63 unchanged ⭐
+
+B) In Settings with the other file transfers (backup, export). ⚠️ Amends FR-63
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+A - the backup restore process can affect rules as part of it... but all other rules processes should be in the rules pop-up to keep it straightforward for users.
+---

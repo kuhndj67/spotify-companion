@@ -7566,3 +7566,12 @@ Rules: `GET /api/rules/file`, `GET /api/rules/file/status`, `POST /api/rules/upl
 `POST /api/rules/undo`, `POST /api/rules/confirm`. Settings: `GET /api/settings/credentials`, `POST /api/settings/spotify`,
 `POST /api/settings/musicbrainz`. Restore confirm takes `applyRules` (literal `true` only). Every POST behind
 `ingestGuard`; `localGuard.test.ts` unchanged.
+
+---
+
+## 2026-10-08T19:44:28Z — U7 Code Generation Steps 9–10 done: Configuration diagnostics; server wiring
+
+Diagnostics gains a Configuration block (writability probed fresh each sweep, last writes, three-way polls). Server:
+rules writer before the watcher, restore's rules applied after the database opens, credentials writer on the poll
+loop / MCP / Web API ports. ⚠️ Found: shutdown would have **hung** on a child that would not exit, now that `close()`
+awaits the exit — fixed to exit regardless; restarts get ~2 s longer. Suite 1540/1540.

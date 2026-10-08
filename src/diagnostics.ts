@@ -17,6 +17,7 @@ import type { EnrichmentService } from './spotify/enrichment.js';
 
 import type { MaintenanceStatus } from './maintenance/MaintenanceService.js';
 import { maintenanceDiagnosticSteps } from './maintenance/maintenanceDiagnostics.js';
+import { configurationDiagnosticSteps, type ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
 
 export interface DiagnosticStep {
   name: string;
@@ -329,6 +330,7 @@ export async function runDiagnostics(
   labels?: LabelDiagnosticsInput,
   automation?: AutomationDiagnosticsInput,
   maintenance?: MaintenanceStatus,
+  configuration?: ConfigurationDiagnosticsInput,
 ): Promise<DiagnosticsReport> {
   const steps: DiagnosticStep[] = [];
   let trackId: string | null = null;
@@ -553,6 +555,9 @@ export async function runDiagnostics(
   //
   // ⚠️ Extracted and pure for the same reason as U5's: decided here, nothing could test it.
   if (maintenance !== undefined) steps.push(...maintenanceDiagnosticSteps(maintenance));
+
+  // --- U7: configuration (IN-U7-6) ------------------------------------------
+  if (configuration !== undefined) steps.push(...configurationDiagnosticSteps(configuration));
 
   return {
     ranAt: new Date().toISOString(),

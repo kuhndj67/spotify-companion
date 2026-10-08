@@ -156,12 +156,15 @@ credential shows red. Steps that move existing code (2) run the existing tests *
 - [x] Every `POST` behind `ingestGuard`; body caps 256 KB / 16 KB; route tests; `localGuard.test.ts` **unchanged**
 - ✅ 15 route tests + `localGuard.test.ts` **unchanged** (60 pass). `ingestGuard` asserted on all five new POSTs × U6's three refusals, each also proving nothing was written. Deviations: undo is `POST /api/rules/undo` and confirms through the **same** `/api/rules/confirm` (one confirm path, not `undo/stage` + `undo/confirm`); `GET /api/rules/file/status` added (base hash, `hasPrevious`, last write) and `GET /api/settings/credentials` returns both views. The rules upload travels as **`text/plain`** with the base in `X-Rules-Base-Hash`, because the router's JSON parser caps at 64 KB — under the 256 KB rules cap; an oversized body is a JSON 413, never Express's HTML page.
 
-### Step 9 — Diagnostics *(IN-U7-6)*
-- [ ] *Configuration* block: `config/` and `musicbrainz.json` writable (probed at startup), last rules write, last
+### Step 9 — Diagnostics *(IN-U7-6)* — ✅ DONE 2026-10-08
+- [x] *Configuration* block: `config/` and `musicbrainz.json` writable (probed at startup), last rules write, last
       credentials write (never values), poll counts
+- ✅ `configuration/configurationDiagnostics.ts` (pure) + `probeFileWritable` (opens `r+` and closes — never writes, never creates). A refused rules write is NOT a fault (the guard working); only `write-failed` / `reload-rejected` are. Mostly-error polls FAIL in words, beside the red indicator.
 
-### Step 10 — `server.ts` wiring
-- [ ] Construct the writers; inject into `createApi`; restorer gets `RulesWriter` before the watcher starts
+### Step 10 — `server.ts` wiring — ✅ DONE 2026-10-08
+- [x] Construct the writers; inject into `createApi`; restorer gets `RulesWriter` before the watcher starts
+- ✅ Full suite **1540/1540**. `RulesWriter` is built right after `RULES_PATH`, before the watcher; `finishRestoreRules` runs there (the restored database has already opened — `openHistory` turns a fallback into `failed`); the watcher is attached once built. `CredentialsWriter` gets the poll loop, the MCP client and the Web API client as ports. The MusicBrainz client reads `labelUserAgent` through a getter.
+- ⚠️ **Found while wiring**: shutdown did `spotify.close().then(() => process.exit(0))`. With `close()` now awaiting the child's exit and rejecting past its bound, a child that would not die would have turned shutdown into a **hang**. Now exits regardless. ⚠️ It also adds ~2 s (P-U7-2) to every restart, including U6's restore restart — measure in Build & Test.
 
 ### Step 11 — UI *(LC-48, frontend-components.md)*
 - [ ] Pure panel modules with tests (`rulesFilePanel.ts`, `credentialsPanel.ts`)

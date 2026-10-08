@@ -52,12 +52,17 @@ import {
 } from './musicbrainz/LabelEnrichmentService.js';
 import { LabelBackfillJob } from './musicbrainz/LabelBackfillJob.js';
 import { LikedSetCache } from './spotify/LikedSetCache.js';
-import { loadMusicBrainzIdentity, userAgentFrom } from './config.js';
+import { loadMusicBrainzIdentity, userAgentFrom, type MusicBrainzIdentity } from './config.js';
+import { probeDirectoryWritable, probeFileWritable } from './configuration/atomicWrite.js';
+import type { ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
+import { CredentialsWriter } from './configuration/CredentialsWriter.js';
+import { RulesWriter } from './configuration/RulesWriter.js';
 import { readFileSync } from 'node:fs';
 import type { NewPlayRecord } from './history/types.js';
 import { MaintenanceService } from './maintenance/MaintenanceService.js';
 import {
   applyPendingRestore,
+  finishRestoreRules,
   revertToPrevious,
   sweepLeftovers,
   type RestoreOutcome,
@@ -202,6 +207,8 @@ let labelEnrichment: LabelEnrichmentService | null = null;
 let labelBackfill: LabelBackfillJob | null = null;
 let likedSet: LikedSetCache | null = null;
 let labelUserAgent: string | null = null;
+/** U7: kept so a contact saved in Settings can rebuild the User-Agent (BR-57.4). */
+let labelIdentity: MusicBrainzIdentity | null = null;
 let labelStartupError: string | null = null;
 let backfillTimer: NodeJS.Timeout | null = null;
 
@@ -211,12 +218,14 @@ if (config.labelsEnabled && repository !== null) {
     // project made, and unidentified traffic sent while believing we are compliant is worse
     // than refusing to start.
     const identity = loadMusicBrainzIdentity((path) => readFileSync(path, 'utf8'));
+    labelIdentity = identity;
     labelUserAgent = userAgentFrom(identity);
 
     labelQueue = new RequestQueue();
     const client = new MusicBrainzClient({
       queue: labelQueue,
-      userAgent: labelUserAgent,
+      // U7 (BR-57.4): a GETTER, so a contact saved in Settings applies to the next request without a restart.
+      userAgent: () => labelUserAgent ?? '',
       baseUrl: config.musicbrainzBaseUrl,
     });
     const cache = new LabelCache({
@@ -542,6 +551,23 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
  */
 const RULES_PATH = process.env['RULES_PATH'] ?? '/config/rules.json';
 const RULES_POLL_INTERVAL_MS = Number(process.env['RULES_POLL_INTERVAL_MS'] ?? 5_000);
+
+/**
+ * U7 — the ONE path by which the app writes `rules.json` (LC-43). Constructed BEFORE the watcher, with none
+ * attached, because BR-59.5 applies a restored backup's rules here — after the restored database has opened
+ * (`openHistory` above) and before the watcher's first load, so no rule ever runs against the wrong corpus.
+ */
+const rulesWriter = new RulesWriter({ rulesPath: RULES_PATH, watcher: null, now: () => Date.now() });
+{
+  // `startupRestore` is still `applied` only if the restored database OPENED: `openHistory` turns it into `failed`
+  // when it falls back to the previous history (BR-48.6) — and then the backup's rules must not be applied either.
+  const rulesResult = finishRestoreRules(startupRestore, repository !== null, rulesWriter);
+  if (rulesResult !== null && startupRestore.kind === 'applied') {
+    startupRestore = { ...startupRestore, rulesResult };
+    if (rulesResult === 'applied') console.log('[restore] the backup’s rules were applied, as requested');
+    else if (typeof rulesResult === 'object') console.warn(`[restore] the backup’s rules were NOT applied: ${rulesResult.skipped}`);
+  }
+}
 /**
  * ⚠️ **An admitted guess, and the only number in U4 openly unmeasured** (BR-22.3). The
  * enrichment latency it waits on has never been measured — the 0.2 s figure that looked like a
@@ -639,6 +665,8 @@ if (repository !== null) {
       intervalMs: RULES_POLL_INTERVAL_MS,
       now: () => new Date().toISOString(),
     });
+    // U7: an interactive rules write reports the WATCHER's verdict, so the writer needs it from here on.
+    rulesWriter.attachWatcher(ruleWatcher);
 
     skipAttempts = new SqliteSkipAttemptRepository(repository.database);
 
@@ -862,8 +890,34 @@ const maintenance: MaintenanceService | null = config.historyEnabled
       supervised: config.inContainer,
       now: () => new Date(),
       startup: { restore: startupRestore, swept: startupSwept },
+      // U7 (BR-59.1, BR-59.4): one comparison, one hash — the rules writer's.
+      rulesCandidate: (text) => rulesWriter.compareCandidate(text),
+      currentRulesHash: () => rulesWriter.download()?.hash ?? null,
     })
   : null;
+
+/**
+ * U7 — Spotify credentials and the MusicBrainz contact from Settings (LC-44). The poll loop, the MCP client and the
+ * Web API client are passed as PORTS: the writer pauses the first, waits for the second's child to EXIT (P-49),
+ * and makes the third forget the credentials it cached (it caches the whole file, not just the token).
+ */
+const credentials = new CredentialsWriter({
+  spotifyConfigPath: config.spotifyConfigPath,
+  musicbrainzPath: config.musicbrainzConfigPath,
+  poller: nowPlaying,
+  mcp: spotify,
+  webApi,
+  // BR-57.4: the MusicBrainz client reads its User-Agent through `labelUserAgent`, so the next request carries the
+  // new contact. ⚠️ If labels were DISABLED at startup (no contact then), nothing is constructed to use it until a
+  // restart — the Settings route says so (`restartNeeded`).
+  onContactChanged: (contact) => {
+    if (labelIdentity !== null) {
+      labelIdentity = { ...labelIdentity, contact };
+      labelUserAgent = userAgentFrom(labelIdentity);
+    }
+  },
+  now: () => Date.now(),
+});
 
 function readAppVersion(): string {
   try {
@@ -924,6 +978,10 @@ app.use(
     // must say *the machinery is not built* rather than draw a switch that would do nothing if thrown.
     skipExecutorEnabled: SKIP_EXECUTOR_ENABLED,
     skipAttempts,
+    // U7. Behind `localGuard` (app-wide) AND `ingestGuard` (per route, in api.ts), like U6.
+    rulesWriter,
+    credentials,
+    labelsActive: labelUserAgent !== null,
   }),
 );
 
@@ -958,7 +1016,27 @@ async function runDiagnosticsReport() {
     },
     automationDiagnostics(),
     maintenance?.status(),
+    configurationDiagnostics(),
   );
+}
+
+/**
+ * U7 (IN-U7-6) — probed FRESH on every sweep, through the container, like `/state`'s: a `:ro` left in place then
+ * shows on the first page load rather than on the first save. Credential VALUES never reach this (P-53).
+ */
+function configurationDiagnostics(): ConfigurationDiagnosticsInput {
+  const m = upstreamMetrics.snapshot(Date.now());
+  return {
+    configWritable: probeDirectoryWritable(RULES_PATH),
+    rulesPath: RULES_PATH,
+    musicbrainzWritable: probeFileWritable(config.musicbrainzConfigPath),
+    musicbrainzPath: config.musicbrainzConfigPath,
+    spotifyWritable: probeFileWritable(config.spotifyConfigPath),
+    spotifyPath: config.spotifyConfigPath,
+    lastRulesWrite: rulesWriter.lastWrite(),
+    lastCredentialsWrite: credentials.lastWrite(),
+    polls: { total: m.pollsTotal, idle: m.pollsIdle, error: m.pollsError, idleShare: m.idleShare },
+  };
 }
 
 /**
@@ -1465,7 +1543,9 @@ function shutdown(why: string): void {
   }
 
   for (const client of wss.clients) client.close();
-  server.close(() => void spotify.close().then(() => process.exit(0)));
+  // U7: `close()` now waits for the MCP child to EXIT (P-49) and rejects past its bound — so exit regardless, or a
+  // child that will not die would turn a shutdown into a hang. ⚠️ It also adds ~2 s (P-U7-2) to a restart.
+  server.close(() => void spotify.close().catch((error: unknown) => console.warn('[shutdown] MCP child:', error)).finally(() => process.exit(0)));
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

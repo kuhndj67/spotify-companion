@@ -116,6 +116,8 @@ const PURE_MODULES = [
   'configuration/masking.ts',
   // Decides whether Spotify's answer is a failure (FR-71). Pure so PBT-66 can hold it against the server's source.
   'configuration/mcpErrorText.ts',
+  // Diagnostics' Configuration block (IN-U7-6). Pure so a writability answer is judged only as given.
+  'configuration/configurationDiagnostics.ts',
   // ⚠️ What the surface that can REPLACE the corpus says. app.js cannot be tested; this can, so it decides.
   'ui/maintenancePanel.ts',
 ];

@@ -16,7 +16,7 @@
  * can leave at most ONE stray temp file per target rather than an unbounded number.
  */
 
-import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
 export type AtomicWriteOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string };
@@ -64,6 +64,23 @@ export function probeDirectoryWritable(path: string): boolean {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(probe, 'probe', 'utf8');
     rmSync(probe, { force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Can this process write `path` IN PLACE? (IN-U7-6) — for the single-file mounts (`musicbrainz.json`,
+ * `spotify-config.json`), where `probeDirectoryWritable` is the wrong question: a single-file mount's directory is
+ * the container's, not the host's.
+ *
+ * ⚠️ Opens for read-write (`r+`) and closes — no byte is written and the file is never truncated or created, so a
+ * probe can never damage the credentials it checks. A missing file is `false`: there is nothing to write in place.
+ */
+export function probeFileWritable(path: string): boolean {
+  try {
+    closeSync(openSync(path, 'r+'));
     return true;
   } catch {
     return false;

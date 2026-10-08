@@ -61,3 +61,7 @@ Thumbs.db
 
 # Ops baseline for the reboot check (scripts/post-boot-check.ps1) — disposable
 .boot-check-baseline.json
+
+# U6: the throwaway verification installation (compose.verify.yaml). All its state lives here, including a
+# PLACEHOLDER Spotify config — removed whole by `npm run verify:down`.
+verify-install/

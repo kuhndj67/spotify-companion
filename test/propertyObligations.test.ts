@@ -42,6 +42,8 @@ const TEST_DIR = join(ROOT, 'test');
  */
 const SOURCES = [
   'aidlc-docs/construction/u5-automated-skipping/nfr-design/logical-components.md',
+  // U6 — PBT-51…PBT-58 (2026-10-07).
+  'aidlc-docs/construction/u6-data-lifecycle/nfr-design/logical-components.md',
 ];
 
 /** Obligations whose home is a document, not a test — each needs a reason. */

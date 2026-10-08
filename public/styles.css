@@ -969,3 +969,24 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+/* ── U6: Settings — Backup & restore (frontend-components.md §2) ─────────────────────────────── */
+/* Colour is never the only channel (BR-51.4): every state below also carries words. */
+.maintenance-row { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.maintenance-row p { margin: 0; flex: 1 1 14rem; }
+/* ⚠️ Found in Build & Test (2026-10-07): a disabled .primary rendered solid green, identical to an enabled one —
+   the destructive Restore button LOOKED pressable while its accessibility state said disabled. Every disabled
+   maintenance control is now visibly so; colour is never the only channel (BR-51.4). */
+#settings button[disabled] { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.6); }
+.maintenance-last { margin: 0 0 0.5rem; padding: 0.5rem 0.6rem; border-left: 3px solid var(--line); }
+.maintenance-last[data-tone="ok"] { border-left-color: var(--accent); }
+.maintenance-last[data-tone="fail"] { border-left-color: var(--danger); }
+.maintenance-message { margin: 0.5rem 0; padding: 0.5rem 0.6rem; border-left: 3px solid var(--danger); }
+.restore-confirm { margin-top: 0.75rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 8px; }
+.restore-compare { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.restore-compare th, .restore-compare td { text-align: left; padding: 0.25rem 0.5rem; border-bottom: 1px solid var(--line); }
+.restore-warning { margin: 0.75rem 0; padding-left: 1.2rem; }
+.restore-warning li:first-child { font-weight: 600; }
+.restore-confirm input[type="text"] { display: block; margin: 0.35rem 0 0.75rem; padding: 0.4rem 0.5rem; width: 12rem; max-width: 100%;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.restore-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }

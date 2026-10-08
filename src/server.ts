@@ -55,6 +55,13 @@ import { LikedSetCache } from './spotify/LikedSetCache.js';
 import { loadMusicBrainzIdentity, userAgentFrom } from './config.js';
 import { readFileSync } from 'node:fs';
 import type { NewPlayRecord } from './history/types.js';
+import { MaintenanceService } from './maintenance/MaintenanceService.js';
+import {
+  applyPendingRestore,
+  revertToPrevious,
+  sweepLeftovers,
+  type RestoreOutcome,
+} from './maintenance/startupRestorer.js';
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -75,9 +82,53 @@ let exportService: ExportService | null = null;
 let snapshots: SnapshotScheduler | null = null;
 let historyStartupError: string | null = null;
 
+// ── U6: apply a staged restore, then sweep leftovers — BEFORE the database is opened (P-38, LC-37/38) ──
+//
+// ⚠️ THIS ORDER IS THE WHOLE GUARANTEE, and `test/maintenanceWiring.test.ts` pins it. *Restore backup* stages a
+// verified file and exits; Docker restarts the app and the swap happens HERE, when nothing has the database open.
+// There is no second writer to guard against — on this machine or any other. Moving this below the repository's
+// construction would make the swap rename a file the app is already writing.
+let startupRestore: RestoreOutcome = { kind: 'none' };
+let startupSwept = 0;
+const historyDataDir = dirname(config.historyDbPath);
 if (config.historyEnabled) {
   try {
-    repository = new SqliteHistoryRepository(config.historyDbPath);
+    startupRestore = applyPendingRestore(historyDataDir);
+    startupSwept = sweepLeftovers(historyDataDir);
+    if (startupRestore.kind === 'applied') {
+      console.log(`[restore] applied at startup: ${startupRestore.plays ?? 'unknown'} plays, backup taken ${startupRestore.takenAt ?? 'at an unknown time'}`);
+    } else if (startupRestore.kind === 'failed') {
+      console.warn(`[restore] NOT applied: ${startupRestore.reason}`);
+    }
+    if (startupSwept > 0) console.warn(`[restore] removed ${startupSwept} leftover working file(s) — an operation was interrupted`);
+  } catch (error) {
+    // Never fatal: the app starts on whatever database is there. The restorer's own invariant is that this is
+    // never an empty one.
+    console.error('[restore] startup restore check failed:', error);
+  }
+}
+
+/**
+ * Open the history database. ⚠️ If a restore was applied at THIS start and the restored file will not open or
+ * migrate, put the previous database back and open that instead (BR-48.6) — never start empty.
+ */
+function openHistory(): SqliteHistoryRepository {
+  try {
+    return new SqliteHistoryRepository(config.historyDbPath);
+  } catch (error) {
+    if (startupRestore.kind === 'applied' && revertToPrevious(historyDataDir)) {
+      const reason = error instanceof Error ? error.message : String(error);
+      startupRestore = { kind: 'failed', reason: `the restored database would not open (${reason}); your previous history was put back` };
+      console.error(`[restore] ${startupRestore.reason}`);
+      return new SqliteHistoryRepository(config.historyDbPath);
+    }
+    throw error;
+  }
+}
+
+if (config.historyEnabled) {
+  try {
+    repository = openHistory();
     // Probe rather than assume: bind-mount permission problems otherwise surface at the first
     // play boundary, minutes after startup, behind a healthy-looking UI.
     repository.verifyWritable();
@@ -795,6 +846,35 @@ if (repository !== null) {
   }
 }
 
+/**
+ * U6 — backup, restore and undo (FR-57…FR-59). `null` when history is off, so the routes answer 503.
+ *
+ * ⚠️ `requestRestart` goes through the app's one `shutdown` path, and is deferred a tick so the 202 that
+ * says *restarting* reaches the browser before the server closes.
+ */
+const maintenance: MaintenanceService | null = config.historyEnabled
+  ? new MaintenanceService({
+      dataDir: historyDataDir,
+      rulesPath: RULES_PATH,
+      appVersion: readAppVersion(),
+      liveDb: () => repository?.database ?? null,
+      requestRestart: () => void setTimeout(() => shutdown('A restore was staged'), 250),
+      supervised: config.inContainer,
+      now: () => new Date(),
+      startup: { restore: startupRestore, swept: startupSwept },
+    })
+  : null;
+
+function readAppVersion(): string {
+  try {
+    // `src/server.ts` and `dist/server.js` both sit one level below the project root.
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+    return String((JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version?: unknown }).version ?? 'unknown');
+  } catch {
+    return 'unknown';
+  }
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.use(localGuard);
@@ -838,6 +918,8 @@ app.use(
     // U5. ⚠️ The STORE itself, with no adapter: `AutomationControl` names `probeWritable` so the
     // store satisfies it structurally. One implementation, reached one way.
     automation: automationState,
+    // U6. Behind `localGuard` (app-wide, above) AND `ingestGuard` (per route, in api.ts).
+    maintenance,
     // ⚠️ The POSTURE, not the switch. False means `SkipExecutor` was never constructed, so the UI
     // must say *the machinery is not built* rather than draw a switch that would do nothing if thrown.
     skipExecutorEnabled: SKIP_EXECUTOR_ENABLED,
@@ -875,6 +957,7 @@ async function runDiagnosticsReport() {
       userAgent: labelUserAgent,
     },
     automationDiagnostics(),
+    maintenance?.status(),
   );
 }
 
@@ -1346,33 +1429,42 @@ server.listen(config.port, config.host, () => {
 });
 
 let shuttingDown = false;
+
+/**
+ * The ONE shutdown path — for a signal, and for a staged restore (U6). ⚠️ A restore reuses it rather than
+ * calling `process.exit` itself: the in-progress play must still be flushed as `unknown` and the database
+ * closed cleanly, or the swap at the next start would move aside a database with an unflushed WAL.
+ * Exits 0; under Docker, `restart: unless-stopped` brings the app back (probed 2026-10-07).
+ */
+function shutdown(why: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n${why}, shutting down.`);
+  nowPlaying.stop();
+  snapshots?.stop();
+  if (backfillTimer !== null) clearInterval(backfillTimer);
+
+  // Flush the in-progress play as `unknown` rather than discarding it (BR-2.6). Discarding
+  // would lose a real listening event; asserting completed or skipped would claim something
+  // unobserved. `unknown` records what actually happened: a play occurred, and its ending was
+  // not seen.
+  // Pending grace-window checks are completed rather than dropped (P-8, Q7 = C). Liked state
+  // is point-in-time: unlike an observation trail it cannot be reconstructed afterwards.
+  void likedSet
+    ?.flushPending()
+    .catch((error: unknown) => console.error('[labels] grace-window flush failed:', error));
+
+  try {
+    observer?.flush();
+    repository?.close();
+  } catch (error) {
+    console.error('[history] shutdown flush failed:', error);
+  }
+
+  for (const client of wss.clients) client.close();
+  server.close(() => void spotify.close().then(() => process.exit(0)));
+}
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => {
-    if (shuttingDown) return;
-    shuttingDown = true;
-    console.log(`\nReceived ${signal}, shutting down.`);
-    nowPlaying.stop();
-    snapshots?.stop();
-    if (backfillTimer !== null) clearInterval(backfillTimer);
-
-    // Flush the in-progress play as `unknown` rather than discarding it (BR-2.6). Discarding
-    // would lose a real listening event; asserting completed or skipped would claim something
-    // unobserved. `unknown` records what actually happened: a play occurred, and its ending was
-    // not seen.
-    // Pending grace-window checks are completed rather than dropped (P-8, Q7 = C). Liked state
-    // is point-in-time: unlike an observation trail it cannot be reconstructed afterwards.
-    void likedSet
-      ?.flushPending()
-      .catch((error: unknown) => console.error('[labels] grace-window flush failed:', error));
-
-    try {
-      observer?.flush();
-      repository?.close();
-    } catch (error) {
-      console.error('[history] shutdown flush failed:', error);
-    }
-
-    for (const client of wss.clients) client.close();
-    server.close(() => void spotify.close().then(() => process.exit(0)));
-  });
+  process.on(signal, () => shutdown(`Received ${signal}`));
 }

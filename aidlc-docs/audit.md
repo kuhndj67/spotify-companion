@@ -7125,3 +7125,168 @@ the install documentation. Added to U9's entry in `unit-of-work.md`: target **`S
 User: *"Approved."* FR-57…FR-64 had been ratified first (Requirements Question 12), so the standard order holds.
 Artifacts: `construction/u6-data-lifecycle/functional-design/` (BR-44…BR-52). **Next: U6 NFR Requirements.**
 Committed with this session's Phase 5 work at the user's request.
+
+---
+
+## 2026-10-07 (later) — Pushed; NFR Requirements SKIPPED for U6; NFR Design plan written
+
+Pushed `07e0e93` to `origin/main`.
+
+⚠️ **Correction of my own FQ3 text**: it claimed prior units ran *"FD → NFR Requirements → NFR Design → …"*.
+**False** — `execution-plan.md` sets NFR Requirements to **SKIP** for every unit (the 27 NFRs were settled in
+`requirements.md`), and U1–U5 all skipped it. Asked rather than assumed; user: **skip it, as U1–U5 did.**
+FQ3's text annotated with the correction.
+
+**U6 NFR Design plan** (`construction/plans/u6-nfr-design-plan.md`) — 10 questions. Measured for it:
+`backup()` copy 5.0 MB → **1.6 MB** gzipped · app start → listening **0.5 s**, → recent plays re-imported
+**0.9 s** (from container `StartedAt` and `docker logs -t`) · Docker stop/start overhead **not measured** ·
+`tar` 7.5.22, **BlueOak-1.0.0**, 5 transitive deps (GPL-3.0 compatibility to be confirmed, not assumed) · the
+image ships `dist/` only; three scripts already import `src/` via `--import tsx`.
+
+⚠️ **Finding**: U6's exit criterion (*restored on another machine*) **cannot be run on the NAS before U9** —
+a browser off-machine is refused by `localGuard` until NFR-29 is built. Raised as Q10 rather than discovered
+at Build & Test.
+
+**NFR Design Q10 = A** (user, in conversation): *"Agree with splitting the test to allow it to be locally
+checked at U6 and then remotely checked with U9."* U6's exit criterion is now a round trip into a **second
+installation on this machine**; the **cross-machine** restore on the NAS becomes a **U9** exit criterion.
+Propagated to U6's HANDOFF, US-28, `unit-of-work.md` (U6 and U9) and `execution-plan.md`. Q1–Q9 still open.
+
+---
+
+## 2026-10-07 (later) — U6 NFR Design answered (all A) and WRITTEN
+
+User: *"all recommendations accepted and plan saved"* — Q1–Q9 = **A** in the file, Q10 = A from conversation.
+
+**Q1's promised check, done**: `tar`'s licence **BlueOak-1.0.0** — the Blue Oak Council's FAQ states BlueOak
+software can be used, combined and distributed with GPLv3 software; OSI-approved 2024-01-19. Recorded as
+compatible with NFR-32, with that source (not FSF's list, which was not checked).
+
+**Written**: `construction/u6-data-lifecycle/nfr-design/nfr-design-patterns.md` — **P-38…P-48** (one writer
+does maintenance · parse never extract · validate then act · the body is the file · stricter guard composed
+after `decideAccess` · journaled idempotent swap · cleanup on every path · allowlist what travels · visible
+headroom · a restart that does not come back says so · split verification) and `logical-components.md` —
+**LC-32…LC-39** with **PBT-51…PBT-58**, each with a negative control (PBT-57's is a positive control: a guard
+that refuses everything would pass every refusal). The plan's candidate P-38…P-44 grew to P-48; noted in §5.1.
+
+**Awaiting approval. Next: Infrastructure Design.**
+
+
+---
+
+## 2026-10-07 (later) — ✅ U6 NFR Design APPROVED; Infrastructure Design plan written
+
+User: *"continue"* at the NFR Design review prompt — the *Continue to Next Stage* option, i.e. approval.
+
+**Infrastructure Design plan** (`construction/plans/u6-infrastructure-design-plan.md`) — 6 questions. U6 needs
+**no new mount, port, service or migration** (P-38 keeps maintenance inside the process; its working dirs live in
+the existing `./data` directory mount). Measured: container Node **v22.23.3** with `backup()` ✅, but
+`NODE_VERSION=22` **floats**; the image builds with **`npm install`, not `npm ci`** — the lockfile is not
+enforced, which matters now that `tar` is a new runtime dependency; **no polling off-switch** exists
+(`POLL_INTERVAL_MS` is the only knob); `container_name` is fixed, so the verification installation needs an
+override. ⚠️ U6 is the **first unit whose startup can rename `history.db`** — hence the rollback-image and
+pre-deploy-backup questions.
+
+**Infrastructure Q3 rewritten as an isolation contract** (user requirement: the second deployment must install
+and remove cleanly *"without impacting the primary deployment at all (either the deployment or the project
+artifacts that enable it)"*). ⚠️ **Measured trap**: the live Compose project is named `spotify`, derived from the
+directory — a second Compose file in the same directory would share it by default, so its `down` could act on
+the live project. Contract: standalone `compose.verify.yaml` with `name: spotify-verify`, no `build:` (references
+the live image tag), port 3011 (free), all state in one gitignored `verify-install/`, **no Spotify credentials**
+(designs out an unverified refresh-token-rotation risk to the live token; relies on the app starting without
+Spotify — to be seen in Build & Test), labels/snapshots/skip executor off; `verify:up`/`verify:down` refuse a
+wrong project name and prove the live container's id, start time, restart count, image and health are unchanged
+and no tracked file changed. User will answer Q1–Q6 in the file.
+
+---
+
+## 2026-10-07 (later) — U6 Infrastructure Design answered (all A) and WRITTEN
+
+Q1 pin Node minor 22.23 + startup capability check · Q2 `npm ci` · Q3 the isolated verification installation ·
+Q4 tag `u5-rollback`, verify live · Q5 verified backup before the first U6 deploy · Q6 Diagnostics + container
+log only. The user's Q3 note asked whether the copy needs Spotify to complete the validations — **no**: every
+U6 exit check (backup, restore, verify, counts, integrity, automation off, undo, reverse backup) runs without it;
+live display and recording are untouched by U6 and stay proven by the live deployment. The one assumption — the
+app starts without Spotify — is Build & Test step 1.
+
+**Written**: `infrastructure-design/infrastructure-design.md` (IN-U6-1…6, deployment steps) and
+`deployment-architecture.md` (the live deployment, and the verification installation's isolation contract with
+`verify:up`/`verify:down` and their no-impact proof). **Awaiting approval. Next: Code Generation.**
+
+---
+
+## 2026-10-08T01:47:42Z — ✅ U6 Infrastructure Design APPROVED; Code Generation plan written, approval requested
+
+User: *"approve and continue"*.
+
+**Code Generation Part 1** — `construction/plans/u6-code-generation-plan.md`, **13 steps**, pure before impure:
+dependency/build · pure admission core (PBT-51/52/57) · verifier moved into `src/backup/` **unchanged first**, with
+a checkpoint that `--self-test` still fails the CORRUPT snapshot, then BR-47.4's schema allowlist (PBT-53/54) ·
+archive parser/writer (PBT-51/56) · online backup · journaled startup swap + sweeper (PBT-55) · MaintenanceService ·
+routes + `ingestGuard` (PBT-58) · `server.ts` wiring (restorer before the repository, pinned) · Settings pop-up ·
+verification installation (`compose.verify.yaml`, `verify:up`/`verify:down` with a `--plan` safe mode for smoke) ·
+docs · `npm run verify` gate. ⚠️ No deploy and no `docker compose` in code generation — that is Build & Test.
+**Approval prompt issued**; no code written.
+
+---
+
+## 2026-10-08T01:49:28Z — U6 Code Generation plan APPROVED
+
+User: *"yea go"*. Part 2 (generation) begins at Step 1.
+
+---
+
+## 2026-10-08T02:14:55Z — ✅ U6 Code Generation COMPLETE (Part 2), awaiting review
+
+All 13 plan steps done; `npm run verify` green — **1400 tests** (was 1256), typecheck, smoke, knip. Schema v7, no
+migration. **Nothing deployed**: no `docker compose` ran; the live container still runs U5's image.
+
+**Five defects found during generation, all by tests or by walking fault points, none reaching production**: a
+damaged backup THREW (a crash path by upload) · an unclosed handle → Windows `EBUSY` · a lost journal after step 2
+would have **replaced `previous/` with an empty one** (deleting the old corpus) · an error mid-swap could
+**discard the old database's `-wal`** (its newest rows) — found by PBT-55 · an interrupted download raised an
+**uncaught `ENOENT`** (`tar` reads lazily). Plus two design findings: **two verifier classifiers disagreed**
+(unified) and the schema allowlist must be a **union across versions** (migration 004 dropped tables).
+
+Recorded for U8: `npm audit` — **6 pre-existing vulnerabilities** in the Express/MCP SDK chain, identical before
+`tar` was added, none in `tar`. Summary: `construction/u6-data-lifecycle/code/code-summary.md`.
+
+---
+
+## 2026-10-08T02:21:12Z — U6 Code Generation APPROVED; Build & Test begins
+
+User: *"approve/proceed"*. Following IN-U6 deployment steps in order.
+
+---
+
+## 2026-10-08T02:27:41Z — ✅ U6 Build & Test COMPLETE — deployed and verified (local half)
+
+Deployment per IN-U6: `u5-rollback` tagged · `compose down` → `db:backup --label before-u6` (1057 plays, all 8
+checks ✅) · build **exit 0** → live healthy (gap ~61 s, 0 plays missed) · guards in the real container: uploads
+403 without header / Origin / cross-site / rebinding Host; WebSocket **101 local, 403 cross-site**.
+
+**Rollback verified LIVE**: U5's image on a copy with U6's `previous/`, a ready `restore-pending/` and `.work/`
+planted — started on v7, UI 200, left all three untouched; copy `integrity_check: ok`, 1057 plays.
+
+**Exit test** (verification installation, `:3011`): ⚠️ **the app starts with no Spotify credentials** (degrades,
+does not crash) · live *Create backup* while recording (1.93 MB; entries exactly manifest/history/rules; no
+hostname) · restore into the copy: wrong word 400, `RESTORE` 202, **back in 3.8 s** · counts identical across all
+11 tables, integrity ok, automation off · undo ×2 (1057→0→1057) · reverse backup verified by the developer
+verifier · Settings click-tested in Chrome, no console errors · **`verify:down` no-impact proof ✅**.
+
+**Defects found in B&T, fixed, redeployed (~10 s gap)**: ⚠️ the disabled *Restore* button **looked enabled**
+(tests asserted the state, which was right — only a screenshot saw it) · the after-restore text claimed a
+re-import that cannot happen without Spotify · `db:backup`'s printed hint no longer ran after the verifier moved.
+
+**Observation, not U6's**: the credential-less copy reported *"Spotify: ok"* and *PAUSED* — absent data reading as
+"nothing playing". Pre-existing; relevant to U8's install routine. Not fixed.
+
+**Open**: BR-52 cleanup — list shown to the user, deletion awaits confirmation. Nothing committed.
+
+---
+
+## 2026-10-08T02:28:55Z — ✅ U6 Build & Test APPROVED
+
+User: *"approve and continue"*. U6 complete (local half; cross-machine restore is U9's). BR-52 deletion and the commit asked separately — the approval did not name them, and deletion is irreversible.
+
+**2026-10-08T02:31:07Z — BR-52 done** (user confirmed): re-checked that the `unverifiable` set was exactly the 10 listed, deleted them; sweep now **4 verified · 0 unverifiable · 1 CORRUPT**; `--self-test` passes. In-app archive copied to the user's Downloads (`spotify-backup-20261008T022355Z.tar.gz`). Committing and pushing at the user's request.

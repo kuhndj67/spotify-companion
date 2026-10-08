@@ -46,26 +46,23 @@
  * against a schema it does not know it has. That is refused unless `--allow-schema-downgrade`.
  *
  * usage:
- *   node scripts/restore-history.mjs <backup-dir> --verify-only   # safe, writes nothing
- *   node scripts/restore-history.mjs --self-test                  # prove the verifier rejects bad input
- *   node scripts/restore-history.mjs <backup-dir>                 # dry run: says what it would do
- *   node scripts/restore-history.mjs <backup-dir> --apply         # restores, after backing up current
+ *   node --import tsx scripts/restore-history.mjs <backup-dir> --verify-only   # safe, writes nothing
+ *   node --import tsx scripts/restore-history.mjs --self-test                  # prove the verifier rejects bad input
+ *   node --import tsx scripts/restore-history.mjs <backup-dir>                 # dry run: says what it would do
+ *   node --import tsx scripts/restore-history.mjs <backup-dir> --apply         # restores, after backing up current
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import {
-  MANIFEST_NAME,
-  assertNobodyElseHoldsIt,
-  maxIds,
-  schemaVersionOf,
-  sha256,
-  tableCounts,
-} from './backup-history.mjs';
+import { assertNobodyElseHoldsIt } from './backup-history.mjs';
+import { schemaVersionOf, tableCounts } from '../src/backup/manifest.js';
+// ⚠️ U6 (BR-47.1): verifyBackup and the verdict classifier MOVED to src/backup/verifier.ts — the app's
+// *Restore backup* imports the same copy. Re-exported for verify-all-backups.mjs. Runs under --import tsx.
+import { verdictOf, verifyBackup } from '../src/backup/verifier.js';
+export { verifyBackup };
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB = process.env.HISTORY_DB_PATH ?? join(projectRoot, 'data', 'history.db');
@@ -79,127 +76,8 @@ const ALLOW_DOWNGRADE = argv.includes('--allow-schema-downgrade');
 const OVERRIDE = argv.includes('--i-have-stopped-the-container');
 const DIR = argv.find((a) => !a.startsWith('--'));
 
-/**
- * Verify a backup directory. Returns { ok, checks: [{name, ok, detail}], manifest }.
- *
- * ⚠️ It works on a COPY in a temp directory and never opens the backup in place. Opening a SQLite
- * file read-write modifies it — a verifier that mutated the thing it was checking would slowly
- * consume the backups it exists to protect, and a read-only open still recreates a WAL beside them.
- */
-export function verifyBackup(dir) {
-  const checks = [];
-  const add = (name, ok, detail = '') => checks.push({ name, ok, detail });
-
-  const manifestPath = join(dir, MANIFEST_NAME);
-  let manifest = null;
-  if (existsSync(manifestPath)) {
-    try {
-      manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      add('manifest present and parses', true, `label=${manifest.label} takenAt=${manifest.takenAt}`);
-    } catch (e) {
-      add('manifest present and parses', false, e.message);
-    }
-  } else {
-    // ⚠️ Not a hard failure. Ten pre-existing backups have no manifest, and refusing to look at
-    // them would make this tool useless for exactly the backups most in need of checking. What is
-    // lost is completeness — integrity can still be checked, counts cannot be compared to anything.
-    add('manifest present and parses', false, 'NO MANIFEST — pre-dates backup-history.mjs');
-  }
-
-  const dbFile = join(dir, 'history.db');
-  if (!existsSync(dbFile)) {
-    add('history.db present', false, dir);
-    return { ok: false, checks, manifest };
-  }
-  add('history.db present', true, `${Math.round(statSync(dbFile).size / 1024)} KB`);
-
-  if (manifest?.sha256?.['history.db']) {
-    const actual = sha256(dbFile);
-    const expected = manifest.sha256['history.db'];
-    add('sha256 matches manifest', actual === expected, actual === expected ? '' : `${actual.slice(0, 16)}… != ${expected.slice(0, 16)}…`);
-  }
-
-  const work = mkdtempSync(join(tmpdir(), 'restore-verify-'));
-  try {
-    for (const suffix of ['', '-wal', '-shm']) {
-      const from = `${dbFile}${suffix}`;
-      if (existsSync(from)) copyFileSync(from, join(work, `history.db${suffix}`));
-    }
-    const db = new DatabaseSync(join(work, 'history.db'));
-
-    // ⚠️ THE CHECK THE CORRUPT SNAPSHOT FAILS. Everything else about that file looks fine.
-    const integrity = db.prepare('PRAGMA integrity_check').get().integrity_check;
-    add('integrity_check ok', integrity === 'ok', integrity);
-
-    const schemaVersion = schemaVersionOf(db);
-    const counts = tableCounts(db);
-    const ids = maxIds(db, counts);
-    db.close();
-
-    add('schema_version readable', schemaVersion !== null, `v${schemaVersion}`);
-
-    if (manifest) {
-      if (manifest.schemaVersion !== undefined) {
-        const ok = manifest.schemaVersion === schemaVersion;
-        add('schema_version matches manifest', ok, ok ? `v${schemaVersion}` : `v${schemaVersion} != v${manifest.schemaVersion}`);
-      }
-      if (manifest.counts) {
-        const bad = Object.entries(manifest.counts).filter(([t, c]) => counts[t] !== c);
-        add(
-          'every table count matches manifest',
-          bad.length === 0,
-          bad.length === 0
-            ? `${Object.keys(manifest.counts).length} tables`
-            : bad.map(([t, c]) => `${t}: ${counts[t]} != ${c}`).join(', '),
-        );
-      }
-      if (manifest.maxIds) {
-        const bad = Object.entries(manifest.maxIds).filter(([t, m]) => ids[t] !== m);
-        add(
-          'every max(id) matches manifest',
-          bad.length === 0,
-          bad.length === 0 ? '' : bad.map(([t, m]) => `${t}: ${ids[t]} != ${m}`).join(', '),
-        );
-      }
-    }
-
-    return { ok: checks.every((c) => c.ok), checks, manifest, schemaVersion, counts, maxIds: ids };
-  } finally {
-    rmSync(work, { recursive: true, force: true });
-  }
-}
-
-/**
- * Three outcomes, and conflating them is a real hazard — an earlier version of this script printed
- * "could not be checked against a manifest" for a backup whose manifest was present and DISAGREED.
- * Found by the tamper rehearsal, 2026-09-27.
- *
- *   corrupt        integrity_check failed — the bytes are damaged
- *   mismatch       ⚠️ integrity is fine and the manifest disagrees. This is NOT the database that
- *                  was backed up: rows are missing, or it is a different file entirely
- *   unverifiable   no manifest (the ten pre-2026-09-27 backups). Intact, completeness unknown
- *
- * ⚠️ The distinction matters because `integrity_check` and the manifest catch DIFFERENT failures and
- * neither catches the other's. Measured in the rehearsal: a backup with one play deleted returns
- * `integrity_check: ok`, and the CORRUPT snapshot returns plausible row counts. Integrity sees
- * damage; the manifest sees incompleteness. A verifier needs both.
- */
-function classify(result) {
-  const by = (n) => result.checks.find((c) => c.name === n);
-  if (by('integrity_check ok')?.ok === false) return 'corrupt';
-  const disagreements = [
-    'sha256 matches manifest',
-    'schema_version matches manifest',
-    'every table count matches manifest',
-    'every max(id) matches manifest',
-  ].map(by).filter((c) => c && !c.ok);
-  if (disagreements.length > 0) return 'mismatch';
-  if (by('manifest present and parses')?.ok === false) return 'unverifiable';
-  return 'other';
-}
-
 function diagnose(result) {
-  switch (classify(result)) {
+  switch (verdictOf(result)) {
     case 'corrupt':
       return '✖ NOT RESTORABLE: integrity_check failed — the file is damaged. Do not restore it.\n';
     case 'mismatch':
@@ -291,7 +169,7 @@ function main() {
   if (!ok) {
     console.error(`\n${diagnose(result)}`);
     // ⚠️ Corruption and disagreement are both refusals; only a MISSING manifest is a judgement call.
-    if (classify(result) !== 'unverifiable') process.exit(2);
+    if (verdictOf(result) !== 'unverifiable') process.exit(2);
   }
 
   // ── schema direction ────────────────────────────────────────────────────────────────────────

@@ -4,7 +4,11 @@
 # stdio child process, so both live in one image. If option B (two containers + bridge) is
 # chosen, this splits into two Dockerfiles.
 
-ARG NODE_VERSION=22
+# U6 (IN-U6-1): the MINOR is pinned because `node:sqlite`'s `backup()` -- which in-app backup
+# (P-38) depends on -- is absent from older 22.x releases. Patches still float, so security fixes
+# arrive on rebuild. ⚠️ The startup capability check is what protects a HOST deployment (`npm start`),
+# which this pin cannot reach.
+ARG NODE_VERSION=22.23
 ARG MCP_SERVER_REF=main
 
 # ---------------------------------------------------------------------------
@@ -37,8 +41,11 @@ RUN npm install && npm run build && npm prune --omit=dev
 FROM node:${NODE_VERSION}-bookworm-slim AS app-build
 
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install
+# U6 (IN-U6-2): `npm ci`, not `npm install` -- the lockfile is authoritative and a mismatch FAILS
+# the build. `tar` is the first new runtime dependency since U0, and P-39's argument is about WHICH
+# `tar` runs. The lockfile is named explicitly (no glob) so a missing one fails rather than skips.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src

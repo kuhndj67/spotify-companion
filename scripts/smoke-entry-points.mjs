@@ -89,17 +89,21 @@ const ENTRY_POINTS = [
   {
     file: 'restore-history.mjs',
     args: ['--self-test'],
+    // U6: imports the verifier from src/backup/ (BR-47.1), so it needs the loader.
+    tsx: true,
     // ⚠️ Works on a TEMP COPY of the deliberately-corrupt snapshot, and proves the verifier can FAIL.
     // This also evaluates `backup-history.mjs`, which it imports -- see that entry's skip reason.
   },
-  { file: 'verify-all-backups.mjs', args: [] },
+  { file: 'verify-all-backups.mjs', args: [], tsx: true },
   { file: 'reclassify-unobserved-tails.mjs', args: [], tsx: true },
   { file: 'repair-backfill-timestamps.mjs', args: [] },
   // Dry run by default; `--apply` is required. Refuses while the container is up.
-  { file: 'repair-skip-source.mjs', args: [] },
+  { file: 'repair-skip-source.mjs', args: [], tsx: true },
   { file: 'hypothesis-gate.mjs', args: [] },
   { file: 'measure-confound.mjs', args: [] },
   { file: 'check-rules-schema.mjs', args: [], tsx: true },
+  // U6: prints what verify:up/down would do and touches nothing — no Docker call in this mode.
+  { file: 'verify-install.mjs', args: ['--plan'] },
   { file: 'probe-p-u5-1-analyse.mjs', args: [] },
   { file: 'probe-p-u5-1-mark.mjs', args: [] },
   { file: 'probe-p-u5-1.mjs', args: ['--rehearse'] },

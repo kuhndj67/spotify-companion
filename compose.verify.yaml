@@ -1,0 +1,48 @@
+# U6 — the VERIFICATION INSTALLATION (IN-U6-3, deployment-architecture.md §2).
+#
+# A second, throwaway copy of the app for U6's exit test: back up the LIVE app, restore into THIS one, check it
+# runs. The cross-machine half of that test is U9's.
+#
+# ⚠️ NEVER run this file together with compose.yaml (`-f compose.yaml -f compose.verify.yaml`): merging would pull
+# in the live service. Use `npm run verify:up` / `npm run verify:down`, which refuse unless the project name
+# below resolves, and which PROVE the live deployment unchanged afterwards.
+#
+# ⚠️ `name:` IS LOAD-BEARING. The live deployment's Compose project is `spotify` — derived from this directory's
+# name (measured 2026-10-07). Without an explicit name, this file would share that project, and its `down` could
+# act on the live one.
+name: spotify-verify
+
+services:
+  now-playing:
+    # ⚠️ The live image, by tag. NO `build:` — this file can never rebuild or re-tag the live image. And removal
+    # never uses `--rmi`, which would delete that shared tag.
+    image: spotify-now-playing:0.1.0
+    container_name: spotify-now-playing-verify
+    ports:
+      - "127.0.0.1:3011:3000"
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOCAL_ONLY: "true"
+      TRUST_PUBLISHED_PORT: "true"
+      # Effectively idle — and with no real credentials it cannot poll Spotify anyway.
+      POLL_INTERVAL_MS: 3600000
+      SPOTIFY_CONFIG_PATH: /opt/spotify-mcp/spotify-config.json
+      HISTORY_DB_PATH: /data/history.db
+      SNAPSHOTS_ENABLED: "false"
+      # No MusicBrainz traffic, and so no need for the contact-address secret.
+      LABELS_ENABLED: "false"
+      RULES_PATH: /config/rules.json
+      # ⚠️ The skip machinery is never even built, and state/ starts empty (automation OFF): this copy cannot
+      # skip a track on the user's account.
+      SKIP_EXECUTOR_ENABLED: "false"
+      AUTOMATION_STATE_PATH: /state/automation-state.json
+    volumes:
+      # ⚠️ A PLACEHOLDER copied from secrets/spotify-config.example.json — NEVER the live file. If Spotify
+      # rotates refresh tokens, a second container refreshing a copy of the live token could invalidate it.
+      - ./verify-install/secrets/spotify-config.json:/opt/spotify-mcp/spotify-config.json:rw
+      - ./verify-install/data:/data:rw
+      - ./verify-install/config:/config:ro
+      - ./verify-install/state:/state:rw
+    # Needed: a staged restore exits 0 and relies on Docker to bring the app back (probed 2026-10-07).
+    restart: unless-stopped

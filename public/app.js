@@ -682,6 +682,256 @@ el('export-open').addEventListener('click', () => {
   window.location.href = `/api/history/export?format=${normalised}`;
 });
 
+// -- Settings: backup & restore (U6, FR-57…FR-59, FR-63) -------------------------------------------
+//
+// ⚠️ This file only RENDERS. Every label, disabled-reason, comparison row, warning and restart message comes
+// from the server (`view`), derived by src/ui/maintenancePanel.ts — because this file has no tests, and the
+// surface that can REPLACE the corpus must not be decided where nothing can check it (the U5 precedent).
+//
+// Every maintenance POST carries the ingest header (BR-46.3). The browser adds the Origin itself.
+
+const INGEST_HEADERS = { 'x-spotify-companion-ingest': '1' };
+let restoreToken = null;
+let confirmWord = 'RESTORE';
+
+function maintenanceMessage(text) {
+  const m = el('maintenance-message');
+  m.textContent = text ?? '';
+  m.hidden = !text;
+}
+
+function renderButton(button, view) {
+  button.textContent = view.label;
+  button.disabled = view.disabled;
+  // A disabled control always says why (BR-51.4) — in the tooltip and, via the message line, in words.
+  button.title = view.reason ?? '';
+}
+
+async function refreshMaintenance() {
+  let body;
+  try {
+    const r = await fetch('/api/maintenance');
+    body = await r.json();
+    if (!r.ok) {
+      maintenanceMessage(body.error ?? 'Backup and restore are unavailable.');
+      for (const id of ['backup-create', 'restore-open']) el(id).disabled = true;
+      return null;
+    }
+  } catch (error) {
+    maintenanceMessage(`Could not reach the app: ${error}`);
+    return null;
+  }
+  const v = body.view;
+  renderButton(el('backup-create'), v.backup);
+  renderButton(el('restore-open'), v.restore);
+  el('backup-note').textContent = v.backup.reason ?? v.backupNote;
+  el('restore-note').textContent = v.restore.reason ?? v.restoreNote;
+  el('undo-row').hidden = v.undo === null;
+  if (v.undo) {
+    renderButton(el('undo-open'), v.undo);
+    el('undo-note').textContent = v.undo.reason ?? v.undo.detail;
+  }
+  const last = el('backup-last');
+  last.hidden = v.lastRestore === null;
+  if (v.lastRestore) {
+    last.textContent = v.lastRestore.text;
+    last.dataset.tone = v.lastRestore.tone;
+  }
+  return v;
+}
+
+el('settings-open').addEventListener('click', () => {
+  maintenanceMessage(null);
+  el('settings').showModal();
+  void refreshMaintenance();
+});
+el('settings-close').addEventListener('click', () => el('settings').close());
+
+/**
+ * *Create backup*. Fetched rather than navigated to, because the request must carry the ingest header (a plain
+ * link cannot) — then handed to the browser as a download. The archive is small (~1.6 MB) and the server builds
+ * it in full before sending, so holding it as a Blob costs little.
+ */
+el('backup-create').addEventListener('click', async () => {
+  maintenanceMessage(null);
+  el('backup-create').disabled = true;
+  el('backup-create').textContent = 'Creating backup…';
+  try {
+    const r = await fetch('/api/maintenance/backup', { method: 'POST', headers: INGEST_HEADERS });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      maintenanceMessage(`Backup failed: ${body.error ?? r.statusText}`);
+      return;
+    }
+    const name = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') ?? '')?.[1] ?? 'spotify-backup.tar.gz';
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  } catch (error) {
+    maintenanceMessage(`Backup failed: ${error}`);
+  } finally {
+    void refreshMaintenance();
+  }
+});
+
+function showComparison(view) {
+  confirmWord = view.confirmWord;
+  el('restore-word').textContent = view.confirmWord;
+  const rows = el('restore-rows');
+  rows.replaceChildren(
+    ...view.rows.map((row) => {
+      const tr = document.createElement('tr');
+      for (const text of [row.label, row.backup, row.current]) {
+        const td = document.createElement(text === row.label ? 'th' : 'td');
+        td.textContent = text;
+        tr.append(td);
+      }
+      return tr;
+    }),
+  );
+  el('restore-rules').textContent = view.rulesNote;
+  el('restore-warning').replaceChildren(
+    ...view.warning.map((line) => {
+      const li = document.createElement('li');
+      li.textContent = line;
+      return li;
+    }),
+  );
+  el('restore-typed').value = '';
+  el('restore-go').disabled = true;
+  el('restore-confirm').hidden = false;
+  el('restore-typed').focus();
+}
+
+function hideComparison() {
+  el('restore-confirm').hidden = true;
+  restoreToken = null;
+}
+
+el('restore-open').addEventListener('click', () => {
+  maintenanceMessage(null);
+  el('restore-file').value = '';
+  el('restore-file').click();
+});
+
+/** Upload: the FILE is the request body (P-41) — never a multipart form. */
+el('restore-file').addEventListener('change', async () => {
+  const file = el('restore-file').files?.[0];
+  if (!file) return;
+  hideComparison();
+  el('restore-open').disabled = true;
+  el('restore-note').textContent = `Checking ${file.name}…`;
+  try {
+    const r = await fetch('/api/maintenance/restore', {
+      method: 'POST',
+      headers: { ...INGEST_HEADERS, 'content-type': 'application/gzip' },
+      body: file,
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      maintenanceMessage(`This file can’t be restored: ${body.error ?? r.statusText}`);
+      return;
+    }
+    restoreToken = body.token;
+    showComparison(body.view);
+  } catch (error) {
+    maintenanceMessage(`Upload failed: ${error}`);
+  } finally {
+    void refreshMaintenance();
+  }
+});
+
+el('undo-open').addEventListener('click', async () => {
+  maintenanceMessage(null);
+  hideComparison();
+  const r = await fetch('/api/maintenance/undo', { method: 'POST', headers: INGEST_HEADERS });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    maintenanceMessage(body.error ?? 'Nothing to undo.');
+    return;
+  }
+  restoreToken = body.token;
+  showComparison(body.view);
+});
+
+// The confirm button stays disabled until the word matches EXACTLY (BR-48.2).
+el('restore-typed').addEventListener('input', () => {
+  el('restore-go').disabled = el('restore-typed').value !== confirmWord;
+});
+
+el('restore-cancel').addEventListener('click', () => {
+  const token = restoreToken;
+  hideComparison();
+  if (token) {
+    void fetch('/api/maintenance/restore/cancel', {
+      method: 'POST',
+      headers: { ...INGEST_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+  }
+});
+
+el('restore-go').addEventListener('click', async () => {
+  if (!restoreToken) return;
+  el('restore-go').disabled = true;
+  // Read BEFORE confirming: the restart is recognised by `startedAt` CHANGING, not by seeing the server go
+  // down — the app is back in ~0.5 s, faster than any poll would notice it was gone.
+  const beforeConfirm = await fetch('/api/maintenance').then((x) => x.json()).catch(() => null);
+  const r = await fetch('/api/maintenance/restore/confirm', {
+    method: 'POST',
+    headers: { ...INGEST_HEADERS, 'content-type': 'application/json' },
+    body: JSON.stringify({ token: restoreToken, typed: el('restore-typed').value }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (r.status !== 202) {
+    maintenanceMessage(body.error ?? 'The restore could not be started. Nothing was changed.');
+    el('restore-go').disabled = false;
+    return;
+  }
+  hideComparison();
+  void waitForRestart(beforeConfirm?.view?.restart, beforeConfirm?.startedAt ?? null);
+});
+
+/**
+ * P-47 — wait for the app to come back, and SAY SO if it does not. Spinning for ever on "reconnecting…" reads
+ * as *Spotify is down* — the 2026-09-05 shape.
+ */
+async function waitForRestart(restart, startedBefore) {
+  const view = restart ?? {
+    restarting: 'Restarting to finish the restore…',
+    notBack: 'The app has not come back. Check that its container is running.',
+    timeoutMs: 60_000,
+    automatic: true,
+  };
+  maintenanceMessage(view.restarting);
+  for (const id of ['backup-create', 'restore-open', 'undo-open']) el(id).disabled = true;
+  if (!view.automatic) return; // under `npm start` nothing restarts the app; the message says so.
+
+  const started = Date.now();
+  while (Date.now() - started < view.timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    try {
+      const r = await fetch('/api/maintenance', { cache: 'no-store' });
+      if (r.ok) {
+        const body = await r.json();
+        if (body.startedAt !== startedBefore) {
+          maintenanceMessage(null);
+          await refreshMaintenance();
+          return;
+        }
+      }
+    } catch {
+      // Down, mid-restart. Keep waiting.
+    }
+  }
+  maintenanceMessage(view.notBack);
+}
+
 // -- Listening statistics ---------------------------------------------------
 
 /**

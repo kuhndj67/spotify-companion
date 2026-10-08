@@ -34,7 +34,7 @@ tractable units while still shipping as one runnable checkpoint.
 | **U3** | 3 | Rule Model & Evaluation | Pure core | **CI green** |
 | **U4** | 3 | Rule Observability | Feature | CI green **+ live** |
 | **U5** | 4 | Automated Skipping | Feature | CI green **+ live** |
-| **U6** | **5** | **User-Data Lifecycle** | Feature *(was Infrastructure until its FD, 2026-10-07)* | CI green **+ live + a VERIFIED CROSS-MACHINE ROUND TRIP** |
+| **U6** | **5** | **User-Data Lifecycle** | Feature *(was Infrastructure until its FD, 2026-10-07)* | CI green **+ live + a verified round trip into a second installation on this machine** *(cross-machine half → U9)* |
 | **U7** | 5 | Configuration Management | Feature | CI green **+ live** — rules and credentials changed in-app on a running deployment |
 | **U8** | 5 | Team Workflow & Onboarding | Process & docs | CI gating enforced **+ the install walked cold** by someone who did not write it |
 | **U9** | 5 | Off-machine Deployment | Deployment | Reachable and fully working from a second machine, **deployed by following U8's install routine** |
@@ -239,8 +239,9 @@ scripts/           db:backup / db:restore / db:verify-backups — developer-only
 **Stories**: **US-28**. **Requirements**: **FR-57…FR-64**. **Rules**: BR-44…BR-52.
 FD: `construction/u6-data-lifecycle/functional-design/`.
 
-**Exit criterion is an operation, not a screen**: a corpus backed up on one machine, restored on another,
-and the restored app runs.
+**Exit criterion is an operation, not a screen**: a corpus backed up from the live app, restored into a second
+installation **on this machine**, and the restored app runs. ⚠️ The **cross-machine** half belongs to **U9**
+(NFR Design Q10 = A, 2026-10-07): until U9 builds NFR-29, `localGuard` refuses a browser on another machine.
 
 ---
 
@@ -300,6 +301,9 @@ least privilege).
 
 **Depends on**: U6 (the corpus can move), U7 (an appliance needs in-app configuration), U8 (the deployment is
 performed **by following U8's install routine** — so the cold walk is this unit's verification).
+
+**Exit criterion inherited from U6** (NFR Design Q10 = A): the **real corpus** is backed up from this machine
+and restored on the NAS through *Restore backup*, and the NAS app runs with the same counts.
 
 **Carried into its design plan** (Units round, *Carried to U9's design plan*): **U9-a** NAS as *the* deployment
 or a throwaway second one · **U9-b** two deployments on one Spotify registration · probe **WAL on the NAS

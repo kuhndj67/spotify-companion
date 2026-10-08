@@ -274,7 +274,9 @@ A - and the fact that you need 'docker compose down' before taking a backup tell
 ### FQ3 — (from Q6 = A, *"follow the same process as prior units"*) Does that include a user story and every stage?
 
 Prior units each had **stories** and ran **FD → NFR Requirements → NFR Design → Infrastructure Design →
-Code Generation → Build & Test**. This plan recorded U6 as *"the first unit with NO user story"* —
+Code Generation → Build & Test**. ⚠️ **CORRECTED 2026-10-07: that was wrong.** The execution plan sets NFR
+Requirements to **SKIP** for every unit and U1–U5 all skipped it; their sequence was **FD → NFR Design →
+Infrastructure Design → Code Generation → Build & Test**. U6 follows the same (user, 2026-10-07). This plan recorded U6 as *"the first unit with NO user story"* —
 deliberately, so nobody invented one.
 
 | | Option |

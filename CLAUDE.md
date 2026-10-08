@@ -80,7 +80,9 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-07) — ✅ U6 FUNCTIONAL DESIGN APPROVED. Next: U6 NFR Requirements
+## ▶ Current state (2026-10-08 UTC) — ✅ U6 DEPLOYED AND VERIFIED. Build & Test complete (`construction/build-and-test/u6-build-and-test-summary.md`). Next unit: U7 Configuration Management. Open: BR-52 legacy-backup cleanup awaits confirmation
+
+⚠️ **U6 Build & Test lesson**: the destructive *Restore* button looked ENABLED while disabled — every test passed, because tests asserted the `disabled` STATE, which was right. Only a screenshot saw it. **Click-test and LOOK at destructive controls.**
 
 ⚠️ **PROCESS CORRECTED 2026-10-07: Phase 5 is back on the standard AI-DLC path.** Its questions had been put in
 a non-standard `phase-5-plan.md` (now a pointer). ▶ **Open now, in order**: Requirements Analysis
@@ -1138,6 +1140,18 @@ npm run db:verify-backups
 
 # Restore. Dry run by default; --apply backs up what is there now first.
 npm run db:restore -- <dir> --apply
+
+# ⚠️ U6 (2026-10-07): the db:* scripts above now run under `node --import tsx` — the verifier MOVED to
+# src/backup/ so the app and the scripts share one copy. They are the DEVELOPER path and still need
+# `docker compose down` (they are a second process). The USER path is in-app: Settings -> Create backup /
+# Restore backup, which needs no downtime (the app backs itself up on its own connection, and applies a
+# restore at startup before opening the database).
+
+# U6's verification installation: a second, throwaway copy on http://localhost:3011 for the exit test.
+# Refuses unless compose.verify.yaml resolves to project `spotify-verify`; `down` PROVES the live
+# deployment unchanged. Never run compose.verify.yaml together with compose.yaml.
+npm run verify:up
+npm run verify:down
 ```
 
 ⚠️ **`scripts/attribute-skips.mjs` was DELETED 2026-09-22** with `skip_attribution`. It carried its

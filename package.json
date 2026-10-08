@@ -24,10 +24,12 @@
     "check:rules-schema": "node --import tsx scripts/check-rules-schema.mjs",
     "reporting:build": "node --import tsx scripts/build-reporting-db.mjs",
     "reclassify": "node --import tsx scripts/reclassify-unobserved-tails.mjs",
-    "repair:skip-source": "node scripts/repair-skip-source.mjs",
-    "db:backup": "node scripts/backup-history.mjs",
-    "db:restore": "node scripts/restore-history.mjs",
-    "db:verify-backups": "node scripts/verify-all-backups.mjs",
+    "repair:skip-source": "node --import tsx scripts/repair-skip-source.mjs",
+    "db:backup": "node --import tsx scripts/backup-history.mjs",
+    "db:restore": "node --import tsx scripts/restore-history.mjs",
+    "db:verify-backups": "node --import tsx scripts/verify-all-backups.mjs",
+    "verify:up": "node scripts/verify-install.mjs up",
+    "verify:down": "node scripts/verify-install.mjs down",
     "reporting:credits": "node scripts/resolve-artist-credits.mjs",
     "reporting:metabase": "node scripts/metabase-setup.mjs",
     "reporting:refresh": "npm run reporting:credits && npm run reporting:build",
@@ -40,6 +42,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "express": "^5.1.0",
+    "tar": "7.5.22",
     "ws": "^8.18.0"
   },
   "devDependencies": {

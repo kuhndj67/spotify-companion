@@ -5,7 +5,7 @@ there is no parallel status, resume or progress file, and one should not be crea
 
 ---
 
-## ▶ CURRENT STATE (2026-10-07) — ✅ FUNCTIONAL DESIGN APPROVED. Next: NFR Requirements
+## ▶ CURRENT STATE (2026-10-08 UTC) — ✅ U6 COMPLETE (local half; Build & Test APPROVED). Build & Test — [`../build-and-test/u6-build-and-test-summary.md`](../build-and-test/u6-build-and-test-summary.md). BR-52 cleanup done (4 verified · 0 unverifiable · 1 CORRUPT). The cross-machine restore is U9's exit criterion.
 
 ✅ **All FD questions answered** across five rounds (Q1–Q6, FQ1–FQ3, M1–M4, S1–S5, T1–T4). **Read the
 settled reading, [plan §10](../plans/u6-functional-design-plan.md), not the raw answers** — several later
@@ -17,8 +17,7 @@ answers overrode earlier ones.
 
 **`src/` and `scripts/` are still untouched.**
 
-✅ **FR-57…FR-64 ratified 2026-10-07 (Requirements Question 12 = A).** ✅ **FD approved by the user 2026-10-07.** ▶ **Next: NFR Requirements → NFR Design → Infrastructure Design → Code
-Generation → Build & Test** (full process, FQ3 = A).
+✅ **FR-57…FR-64 ratified 2026-10-07 (Requirements Question 12 = A).** ✅ **FD approved by the user 2026-10-07.** ▶ **Next: NFR Design → Infrastructure Design → Code Generation → Build & Test.** NFR Requirements is SKIPPED, as for U1–U5 (execution plan; user, 2026-10-07).
 
 ### ⚠️ What changed from the original U6 framing below — read before the older sections
 
@@ -135,8 +134,10 @@ other's failure** — which is why verification is both plus a three-way verdict
 
 ## Exit criteria (proposed — the FD may sharpen these)
 
-- [ ] ⚠️ **A corpus is backed up on one machine and restored on another, and the restored app runs** —
-      the unit's whole point, and not provable by any test
+- [ ] ⚠️ **A corpus is backed up from the live app and restored into a SECOND INSTALLATION on this machine**
+      (own Compose project, own `data/`, own port), and the restored app runs with the same counts. ⚠️ **Split
+      2026-10-07 (NFR Design Q10 = A)**: the **cross-machine** half moves to **U9**, because a browser on another
+      machine is refused by `localGuard` until U9 builds NFR-29
 - [ ] ⚠️ **The guard refuses a cross-machine restore while the far-end container is running** —
       demonstrated, not asserted. A guard that has never been seen to refuse is decorative
 - [ ] Everything that should travel, travels; **`state/` does not**

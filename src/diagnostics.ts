@@ -15,6 +15,9 @@ import type { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import type { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import type { EnrichmentService } from './spotify/enrichment.js';
 
+import type { MaintenanceStatus } from './maintenance/MaintenanceService.js';
+import { maintenanceDiagnosticSteps } from './maintenance/maintenanceDiagnostics.js';
+
 export interface DiagnosticStep {
   name: string;
   status: 'ok' | 'fail' | 'skip';
@@ -325,6 +328,7 @@ export async function runDiagnostics(
   history?: HistoryDiagnosticsInput,
   labels?: LabelDiagnosticsInput,
   automation?: AutomationDiagnosticsInput,
+  maintenance?: MaintenanceStatus,
 ): Promise<DiagnosticsReport> {
   const steps: DiagnosticStep[] = [];
   let trackId: string | null = null;
@@ -544,6 +548,11 @@ export async function runDiagnostics(
   if (automation !== undefined) {
     steps.push(...(await automationDiagnosticSteps(automation)));
   }
+
+  // --- U6: backup and restore ---------------------------------------------
+  //
+  // ⚠️ Extracted and pure for the same reason as U5's: decided here, nothing could test it.
+  if (maintenance !== undefined) steps.push(...maintenanceDiagnosticSteps(maintenance));
 
   return {
     ranAt: new Date().toISOString(),

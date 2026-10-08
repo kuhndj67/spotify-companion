@@ -23,16 +23,21 @@ A gzip-compressed tar, `spotify-backup-<YYYYMMDDTHHMMSSZ>.tar.gz`.
 
 ```jsonc
 {
-  "formatVersion": 1,
-  "takenAt": "2026-10-07T18:22:04Z",       // UTC
+  "manifestSchema": 1,                      // the developer manifest's format number, unchanged
+  "source": "app",                          // U6: "app" | "script"
+  "takenAt": "2026-10-07T18:22:04Z",        // UTC
   "appVersion": "0.1.0",
   "schemaVersion": 7,
-  "historyDb": { "bytes": 3784704, "sha256": "…" },
-  "tableCounts": { "play": 977, "decision_log": 1214, "skip_attempt": 42, /* … */ },
-  "maxIds": { "play": 1051, /* … */ },
+  "sha256": { "history.db": "…" },
+  "counts": { "play": 977, "decision_log": 1214, "skip_attempt": 42 /* … */ },
+  "maxIds": { "play": 1051 /* … */ },
   "entries": ["manifest.json", "history.db", "rules.json"]
 }
 ```
+
+⚠️ **Corrected during Code Generation (2026-10-07)**: this example first used new field names
+(`formatVersion`, `historyDb.sha256`, `tableCounts`). The sentence below required the developer manifest's
+names, and the code follows the sentence — one verifier must read backups from both paths.
 
 ⚠️ **No hostname, machine id or user name** (Q3 = A). ⚠️ **Field names match the existing developer
 manifest** where they overlap, so one verifier reads both (BR-47.1).

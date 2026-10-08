@@ -99,6 +99,17 @@ const PURE_MODULES = [
   // corpus by a day (measured: 327 of 662) while every test still passed — so every function
   // takes its zone as an argument and there is no default.
   'reporting/timeBuckets.ts',
+  // ─── U6 ──────────────────────────────────────────────────────────────────────────────────────
+  // ⚠️ FR-64's admission core. These DECIDE whether a file from outside may be written, and under which
+  // name. A filesystem read or a clock here would make the decision depend on something other than the
+  // entry, and PBT-51/52/57 could no longer throw generated hostile archives at it.
+  'ingest/types.ts',
+  'ingest/entryPolicy.ts',
+  'ingest/admitIngest.ts',
+  // Diagnostics' Maintenance block. Extracted so it is testable at all; pure so it judges only what it is given.
+  'maintenance/maintenanceDiagnostics.ts',
+  // ⚠️ What the surface that can REPLACE the corpus says. app.js cannot be tested; this can, so it decides.
+  'ui/maintenancePanel.ts',
 ];
 
 /**

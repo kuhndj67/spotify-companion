@@ -265,8 +265,10 @@ and Units Generation **Questions 4–5** in [`unit-of-work-plan.md`](unit-of-wor
 
 **Exit criteria**
 
-- [ ] **U6 complete** — a corpus backed up on one machine through *Create backup*, restored on another through
-      *Restore backup*, and the restored app runs
+- [ ] **U6 complete** — *Create backup* from the live app, *Restore backup* into a second installation on this
+      machine, and the restored app runs
+- [ ] **U9** — the real corpus restored **on the NAS** through *Restore backup*, and the NAS app runs (the
+      cross-machine half of U6's criterion, moved 2026-10-07 because off-machine browsers are refused until U9)
 - [ ] The app is reachable and fully functional from a second machine, under the Question 11 posture
 - [ ] ⚠️ **WAL probed on the NAS volume** — not reasoned about. The existing proof covers a Rancher bind mount,
       and the standing advice is that WAL is unsafe on *network* filesystems

@@ -15,19 +15,17 @@
       <section id="card" class="card" data-state="loading">
         <header class="card-head">
           <p class="status" id="status">Connecting&hellip;</p>
+          <!--
+            U6 (FR-63): Export and Diagnostics moved INTO Settings, keeping their ids and data-testids.
+            ⚠️ Rules stays here: it holds the automation kill switch, which must be one click from where
+            the skip is heard (BR-51.2).
+          -->
           <button
-            id="export-open"
+            id="settings-open"
             class="ghost"
             type="button"
-            data-testid="history-export-button"
-            title="Download listening history"
-          >Export</button>
-          <button
-            id="diag-open"
-            class="ghost"
-            type="button"
-            data-testid="diagnostics-open-button"
-          >Diagnostics</button>
+            data-testid="settings-open-button"
+          >Settings</button>
           <button
             id="rules-open"
             class="ghost"
@@ -180,6 +178,74 @@
         </details>
       </section>
     </main>
+
+    <!--
+      U6 — Settings (FR-63, frontend-components.md §2). A pop-up like Diagnostics and Rules, so the live
+      now-playing view stays behind it. Every label and disabled-reason in the Backup & restore section is
+      DERIVED ON THE SERVER (src/ui/maintenancePanel.ts) — this file only renders it.
+    -->
+    <dialog id="settings" class="diag" data-testid="settings-dialog">
+      <header class="diag-head">
+        <h2>Settings</h2>
+        <button id="settings-close" class="ghost" type="button">Close</button>
+      </header>
+
+      <section class="diag-section" aria-labelledby="backup-heading">
+        <h3 id="backup-heading">Backup &amp; restore</h3>
+        <p id="backup-last" class="maintenance-last" role="status" hidden></p>
+        <div class="maintenance-row">
+          <button id="backup-create" class="primary" type="button" data-testid="backup-create-button">Create backup</button>
+          <p class="muted" id="backup-note"></p>
+        </div>
+        <div class="maintenance-row">
+          <button id="restore-open" class="ghost" type="button" data-testid="restore-open-button">Restore backup&hellip;</button>
+          <p class="muted" id="restore-note"></p>
+          <input id="restore-file" type="file" accept=".tar.gz,.tgz,application/gzip" hidden />
+        </div>
+        <div class="maintenance-row" id="undo-row" hidden>
+          <button id="undo-open" class="ghost" type="button" data-testid="undo-open-button">Undo last restore&hellip;</button>
+          <p class="muted" id="undo-note"></p>
+        </div>
+        <p id="maintenance-message" class="maintenance-message" role="alert" hidden></p>
+
+        <!-- The comparison and the typed confirmation (BR-47.6, BR-48.2). Shown only while a restore waits. -->
+        <div id="restore-confirm" class="restore-confirm" hidden data-testid="restore-confirm">
+          <table class="restore-compare">
+            <thead><tr><th></th><th>This backup</th><th>Your current history</th></tr></thead>
+            <tbody id="restore-rows"></tbody>
+          </table>
+          <p class="muted" id="restore-rules"></p>
+          <ul class="restore-warning" id="restore-warning"></ul>
+          <label for="restore-typed">Type <strong id="restore-word">RESTORE</strong> to continue</label>
+          <input id="restore-typed" type="text" autocomplete="off" spellcheck="false" />
+          <div class="restore-actions">
+            <button id="restore-cancel" class="ghost" type="button">Cancel</button>
+            <button id="restore-go" class="primary" type="button" disabled data-testid="restore-confirm-button">Restore</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="diag-section">
+        <h3>Export</h3>
+        <button
+          id="export-open"
+          class="ghost"
+          type="button"
+          data-testid="history-export-button"
+          title="Download listening history"
+        >Export history&hellip;</button>
+      </section>
+
+      <section class="diag-section">
+        <h3>Diagnostics</h3>
+        <button
+          id="diag-open"
+          class="ghost"
+          type="button"
+          data-testid="diagnostics-open-button"
+        >Run diagnostics&hellip;</button>
+      </section>
+    </dialog>
 
     <!-- Diagnostics: exercises the full connect / auth / query cycle on demand. -->
     <dialog id="diag" class="diag">

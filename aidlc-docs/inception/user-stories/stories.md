@@ -614,8 +614,9 @@ NAS, or a mistake — without re-arming anything or exposing my credentials.
 - [ ] After a restore, the automation switch is exactly as it was, and my credentials are untouched
 - [ ] I can undo the most recent restore once
 - [ ] Nothing accumulates on disk from backing up or restoring, beyond the one previous history
-- [ ] ⚠️ Performed for real: a corpus backed up on one machine, restored on another, and the restored app
-      runs (exit criterion — no test can prove it)
+- [ ] ⚠️ Performed for real: a corpus backed up from the live app and restored into a second installation, and
+      the restored app runs — **on this machine in U6, and across machines (the NAS) in U9** (split 2026-10-07,
+      because off-machine browsers are refused until U9)
 
 *Covers FR-57–FR-64 · Persona P3*
 

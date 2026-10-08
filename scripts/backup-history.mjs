@@ -41,16 +41,18 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// ⚠️ U6 (BR-47.1): the manifest helpers MOVED to src/backup/manifest.ts so the app's in-app backup and this
+// script compute a manifest the same way. Re-exported so restore-history.mjs's imports keep working.
+// This is why `db:backup` now runs under `node --import tsx`.
+import { MANIFEST_NAME, MANIFEST_SCHEMA, maxIds, schemaVersionOf, sha256, tableCounts } from '../src/backup/manifest.js';
+export { MANIFEST_NAME, MANIFEST_SCHEMA, maxIds, schemaVersionOf, sha256, tableCounts };
+
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB = process.env.HISTORY_DB_PATH ?? join(projectRoot, 'data', 'history.db');
-
-export const MANIFEST_NAME = 'manifest.json';
-export const MANIFEST_SCHEMA = 1;
 
 const argv = process.argv.slice(2);
 function flag(name, fallback) {
@@ -71,57 +73,6 @@ const OUT_DIR = flag('out', join(projectRoot, 'data'));
 // nobody will dare restore.
 function stamp(now) {
   return `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '')}Z`;
-}
-
-/**
- * Every table in the database, read from `sqlite_master` rather than from a hardcoded list.
- *
- * ⚠️ Deliberately introspected. Migration 007 adds `skip_attempt`, and a hardcoded list would
- * silently stop covering the newest table at exactly the migration this script exists to protect.
- * The manifest is a record of what was there, so it must be able to see something it was not
- * written knowing about.
- */
-export function tableCounts(db) {
-  const tables = db
-    .prepare(
-      `SELECT name FROM sqlite_master
-       WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-       ORDER BY name`,
-    )
-    .all()
-    .map((r) => r.name);
-
-  const counts = {};
-  for (const t of tables) {
-    // Identifiers cannot be bound, and these come from sqlite_master rather than from input.
-    counts[t] = db.prepare(`SELECT COUNT(*) AS c FROM "${t}"`).get().c;
-  }
-  return counts;
-}
-
-/** The highest id in each table that has one — a count alone cannot see a delete-plus-insert. */
-export function maxIds(db, counts) {
-  const out = {};
-  for (const t of Object.keys(counts)) {
-    const hasId = db
-      .prepare(`SELECT COUNT(*) AS c FROM pragma_table_info(?) WHERE name = 'id'`)
-      .get(t).c;
-    if (hasId) out[t] = db.prepare(`SELECT MAX(id) AS m FROM "${t}"`).get().m;
-  }
-  return out;
-}
-
-export function sha256(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
-export function schemaVersionOf(db) {
-  try {
-    return db.prepare('SELECT MAX(version) AS v FROM schema_version').get().v;
-  } catch {
-    // A database predating the table. `null` is unknown; it is never 0.
-    return null;
-  }
 }
 
 export const CONTAINER_NAME = process.env.SPOTIFY_CONTAINER_NAME ?? 'spotify-now-playing';
@@ -301,7 +252,7 @@ function main() {
   for (const [t, c] of Object.entries(counts)) console.log(`   ${String(c).padStart(7)}  ${t}`);
   console.log(
     `\n   ⚠️ NOT YET VERIFIED AS RESTORABLE. Verify it now, while you still have the original:\n` +
-      `      node scripts/restore-history.mjs ${dir} --verify-only\n`,
+      `      npm run db:restore -- ${dir} --verify-only\n`,
   );
 }
 

@@ -25,7 +25,7 @@
  * and reports whether it was clipped by the cap or by the start of the corpus — is untestable.
  */
 
-import express, { type Router } from 'express';
+import express, { type Response as ExpressResponse, type Router } from 'express';
 import type { Snapshot } from './nowPlayingService.js';
 import type { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import type { ExportService } from './export/ExportService.js';
@@ -50,6 +50,9 @@ import type { ReadResult as AutomationReadResult } from './playback/AutomationSt
 import type { SkipAttemptRepository } from './playback/SkipAttemptRepository.js';
 import type { AutomationState, WriteOutcome } from './playback/types.js';
 import { haltPanel, switchView } from './ui/automationPanel.js';
+import { ingestGuard } from './ingest/ingestGuard.js';
+import { CONFIRM_WORD, type MaintenanceService, type Refused } from './maintenance/MaintenanceService.js';
+import { comparisonView, statusView } from './ui/maintenancePanel.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
 import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { LABEL_CLASSIFIER_VERSION } from './musicbrainz/LabelEnrichmentService.js';
@@ -128,6 +131,13 @@ export interface ApiDeps {
 
   /** Attempt rows, for the queue depth and the last attempt. `null` when history is off. */
   skipAttempts: SkipAttemptRepository | null;
+
+  // -- U6: user-data lifecycle -------------------------------------------------
+  //
+  // ⚠️ **The first routes that accept a FILE from outside**, and the first that can REPLACE the corpus. Every
+  // one is behind `ingestGuard` (P-42) in addition to the app-wide `localGuard`, and none may be reachable from
+  // another machine until NFR-29 is built (U9). Optional so the U0–U5 test harnesses need not construct it.
+  maintenance?: MaintenanceService | null;
 }
 
 /**
@@ -771,6 +781,78 @@ export function createApi(deps: ApiDeps): Router {
       startedAt: play.startedAt,
     }));
     res.json({ plays: rows });
+  });
+
+  // ── U6: backup and restore (FR-57…FR-59, BR-44…BR-51) ─────────────────────────────────────────────
+
+  const refuse = (res: ExpressResponse, r: Refused) => res.status(r.status).json({ error: r.reason, rule: r.rule ?? null });
+  const maintenanceUnavailable = (res: ExpressResponse) =>
+    res.status(503).json({ error: 'Backup and restore are unavailable: history is not running.' });
+
+  /** Read-only: busy state, capability, last restore, previous database, sizes against caps. */
+  router.get('/api/maintenance', (_req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const status = deps.maintenance.status();
+    // ⭐ The DERIVED view rides along, because app.js cannot import from src/ (the U5 precedent).
+    res.json({ ...status, view: statusView(status) });
+  });
+
+  /**
+   * *Create backup* — streams one `.tar.gz` (BR-44.6). Behind `ingestGuard` too: it writes no file the user
+   * supplies, but a cross-site page must not be able to make the app do maintenance work on its behalf.
+   */
+  router.post('/api/maintenance/backup', ingestGuard, async (_req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const r = await deps.maintenance.backup();
+    if (!r.ok) return void refuse(res, r);
+    res.on('close', r.cleanup);
+    res.status(200);
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Length', String(r.bytes));
+    res.setHeader('Content-Disposition', `attachment; filename="${r.filename}"`);
+    res.setHeader('Cache-Control', 'no-store');
+    r.stream.pipe(res);
+  });
+
+  /**
+   * *Restore backup*, part 1 — the file IS the request body (P-41, `application/gzip`), streamed to a work dir
+   * with the cap counted as bytes arrive. ⚠️ `express.json` above does not consume it: it parses only JSON
+   * bodies. Responds with the comparison and a staging token; nothing outside `data/.work/` has changed.
+   */
+  router.post('/api/maintenance/restore', ingestGuard, async (req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const r = await deps.maintenance.receiveUpload(req);
+    if (!r.ok) return void refuse(res, r);
+    res.json({ token: r.token, comparison: r.comparison, view: comparisonView(r.comparison, CONFIRM_WORD, 'restore') });
+  });
+
+  /** *Undo last restore*, part 1 — stages `previous/` through the same verification (BR-49.2). */
+  router.post('/api/maintenance/undo', ingestGuard, (_req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const r = deps.maintenance.prepareUndo();
+    if (!r.ok) return void refuse(res, r);
+    res.json({ token: r.token, comparison: r.comparison, view: comparisonView(r.comparison, CONFIRM_WORD, 'undo') });
+  });
+
+  /** Part 2 for both — the typed confirmation (BR-48.2), then stage and restart. */
+  router.post('/api/maintenance/restore/confirm', ingestGuard, (req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const body = req.body as { token?: unknown; typed?: unknown } | undefined;
+    if (typeof body?.token !== 'string' || typeof body.typed !== 'string') {
+      res.status(400).json({ error: 'token and typed must be strings.' });
+      return;
+    }
+    const r = deps.maintenance.confirm(body.token, body.typed);
+    if (!r.ok) return void refuse(res, r);
+    // 202: accepted — the swap happens at the next startup, which the response cannot report on.
+    res.status(202).json({ restarting: r.restarting });
+  });
+
+  router.post('/api/maintenance/restore/cancel', ingestGuard, (req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const body = req.body as { token?: unknown } | undefined;
+    if (typeof body?.token === 'string') deps.maintenance.cancel(body.token);
+    res.status(204).end();
   });
 
   return router;

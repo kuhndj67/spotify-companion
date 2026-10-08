@@ -17,7 +17,9 @@ import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { verifyBackup } from './restore-history.mjs';
+// ⚠️ U6: the verdict comes from the ONE classifier in src/backup/verifier.ts — this file used to carry
+// its own copy, which disagreed with restore-history.mjs's about a manifest with no history.db.
+import { verdictOf, verifyBackup } from '../src/backup/verifier.js';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.argv[2] ?? join(projectRoot, 'data');
@@ -37,16 +39,8 @@ const rows = [];
 
 for (const name of dirs) {
   const r = verifyBackup(join(DATA, name));
-  const by = (n) => r.checks.find((c) => c.name === n);
-  const integrity = by('integrity_check ok')?.ok;
-  const hasManifest = by('manifest present and parses')?.ok;
-
-  let state;
-  if (integrity === false) state = 'corrupt';
-  else if (r.ok) state = 'verified';
-  else if (!hasManifest) state = 'unverifiable';
-  else state = 'mismatch';
-  tally[state]++;
+  const state = verdictOf(r);
+  tally[state] = (tally[state] ?? 0) + 1;
 
   rows.push({
     name,
@@ -57,7 +51,7 @@ for (const name of dirs) {
   });
 }
 
-const icon = { verified: '✅', unverifiable: '⚠️ ', mismatch: '✖ ', corrupt: '✖ ' };
+const icon = { verified: '✅', unverifiable: '⚠️ ', mismatch: '✖ ', corrupt: '✖ ', incomplete: '✖ ', 'refused-schema': '✖ ' };
 const w = Math.max(...rows.map((r) => r.name.length));
 console.log('');
 for (const r of rows) {

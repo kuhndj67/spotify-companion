@@ -744,6 +744,7 @@ el('settings-open').addEventListener('click', () => {
   maintenanceMessage(null);
   el('settings').showModal();
   void refreshMaintenance();
+  void refreshCredentials();
 });
 el('settings-close').addEventListener('click', () => el('settings').close());
 
@@ -795,6 +796,18 @@ function showComparison(view) {
     }),
   );
   el('restore-rules').textContent = view.rulesNote;
+  // U7 (BR-59.2): the opt-in. UNCHECKED every time the dialog opens; disabled with the reason when invalid.
+  const option = view.rulesOption ?? null;
+  el('restore-rules-option').hidden = option === null;
+  el('restore-apply-rules').checked = false;
+  el('restore-rules-panel').hidden = true;
+  if (option) {
+    el('restore-rules-label').textContent = option.label;
+    el('restore-apply-rules').disabled = option.disabled;
+    el('restore-rules-reason').hidden = option.reason === null;
+    el('restore-rules-reason').textContent = option.reason ?? '';
+    if (option.panel) renderComparisonPanel('restore-rules', option.panel);
+  }
   el('restore-warning').replaceChildren(
     ...view.warning.map((line) => {
       const li = document.createElement('li');
@@ -885,7 +898,8 @@ el('restore-go').addEventListener('click', async () => {
   const r = await fetch('/api/maintenance/restore/confirm', {
     method: 'POST',
     headers: { ...INGEST_HEADERS, 'content-type': 'application/json' },
-    body: JSON.stringify({ token: restoreToken, typed: el('restore-typed').value }),
+    // U7 (BR-59.2/59.3): the one typed RESTORE confirms both — the rules choice rides along, opt-in only.
+    body: JSON.stringify({ token: restoreToken, typed: el('restore-typed').value, applyRules: el('restore-apply-rules').checked === true }),
   });
   const body = await r.json().catch(() => ({}));
   if (r.status !== 202) {
@@ -2011,6 +2025,342 @@ async function postAutomation(path, payload) {
   }
 }
 
+// -- U7: the rules file (FR-66–FR-68) and credentials (FR-69, FR-70) --------
+//
+// ⚠️ This only RENDERS. Every label, disabled reason, comparison line, warning and guidance sentence comes from
+// the server (`view`), derived by src/ui/rulesFilePanel.ts and src/ui/credentialsPanel.ts — app.js has no tests.
+
+/** One rendering of a rules comparison, for the Rules pop-up (`rules`) and the restore dialog (`restore-rules`). */
+function renderComparisonPanel(prefix, panel) {
+  el(prefix === 'rules' ? 'rules-compare-heading' : 'restore-rules-heading').textContent = panel.heading;
+  const live = el(prefix === 'rules' ? 'rules-live-warning' : 'restore-rules-live');
+  live.replaceChildren(...panel.liveWarning.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
+  live.hidden = panel.liveWarning.length === 0;
+  const sections = el(prefix === 'rules' ? 'rules-compare-sections' : 'restore-rules-sections');
+  sections.replaceChildren(
+    ...panel.sections.map((section) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'rules-compare-section';
+      const h = document.createElement('p');
+      h.className = 'muted';
+      h.textContent = section.title;
+      const ul = document.createElement('ul');
+      ul.append(...section.items.map((item) => Object.assign(document.createElement('li'), { textContent: item })));
+      wrap.append(h, ul);
+      return wrap;
+    }),
+  );
+  if (prefix === 'restore-rules') el('restore-rules-panel').hidden = true;
+}
+
+el('restore-apply-rules').addEventListener('change', () => {
+  // The comparison is shown only once the user opts in — it is the consequence of ticking, stated beside the box.
+  el('restore-rules-panel').hidden = !el('restore-apply-rules').checked;
+});
+
+let rulesToken = null;
+let rulesWord = 'REPLACE';
+let rulesWordNeeded = false;
+/**
+ * BR-54.2's base: the hash of the version THIS PAGE last DOWNLOADED. ⚠️ Not the version merely displayed — an old
+ * file uploaded after just opening the pop-up would then pass as current. No download this session → unknown, and
+ * the server requires the typed word instead (BR-54.4).
+ */
+let rulesBaseHash = null;
+
+function rulesFileMessage(text) {
+  const m = el('rules-file-message');
+  m.textContent = text ?? '';
+  m.hidden = !text;
+}
+
+async function refreshRulesFile() {
+  try {
+    const r = await fetch('/api/rules/file/status');
+    const body = await r.json();
+    if (!r.ok) {
+      el('rules-file-section').hidden = true;
+      return;
+    }
+    const v = body.view;
+    renderButton(el('rules-download'), v.download);
+    renderButton(el('rules-upload-open'), v.upload);
+    renderButton(el('rules-undo-open'), v.undo);
+    el('rules-undo-reason').textContent = v.undo.reason ?? v.download.reason ?? '';
+    el('rules-file-note').textContent = v.note;
+    el('rules-file-last').hidden = v.lastWrite === null;
+    el('rules-file-last').textContent = v.lastWrite ?? '';
+    rulesWord = body.replaceWord;
+  } catch (error) {
+    rulesFileMessage(`Could not reach the app: ${error}`);
+  }
+}
+
+function hideRulesConfirm() {
+  el('rules-confirm').hidden = true;
+  rulesToken = null;
+}
+
+function showRulesConfirm(body) {
+  rulesToken = body.token;
+  renderComparisonPanel('rules', body.view.panel);
+  const confirm = body.view.confirm;
+  rulesWordNeeded = confirm.needsWord;
+  el('rules-word-row').hidden = !confirm.needsWord;
+  el('rules-word-reason').textContent = confirm.reason ?? '';
+  el('rules-word').textContent = confirm.word;
+  el('rules-typed').value = '';
+  el('rules-go').textContent = confirm.applyLabel;
+  el('rules-go').disabled = confirm.needsWord;
+  el('rules-confirm').hidden = false;
+  (confirm.needsWord ? el('rules-typed') : el('rules-go')).focus();
+}
+
+el('rules-download').addEventListener('click', async () => {
+  rulesFileMessage(null);
+  const r = await fetch('/api/rules/file');
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    rulesFileMessage(body.error ?? 'The rules file could not be downloaded.');
+    return;
+  }
+  rulesBaseHash = r.headers.get('x-rules-hash');
+  const name = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') ?? '')?.[1] ?? 'rules.json';
+  const url = URL.createObjectURL(await r.blob());
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+});
+
+el('rules-upload-open').addEventListener('click', () => {
+  rulesFileMessage(null);
+  el('rules-upload-file').value = '';
+  el('rules-upload-file').click();
+});
+
+/** The upload is the file's TEXT (text/plain), with the base hash in a header. Nothing is written until confirm. */
+el('rules-upload-file').addEventListener('change', async () => {
+  const file = el('rules-upload-file').files?.[0];
+  if (!file) return;
+  hideRulesConfirm();
+  const headers = { ...INGEST_HEADERS, 'content-type': 'text/plain' };
+  if (rulesBaseHash) headers['x-rules-base-hash'] = rulesBaseHash;
+  try {
+    const r = await fetch('/api/rules/upload', { method: 'POST', headers, body: await file.text() });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const detail = Array.isArray(body.errors) && body.errors.length > 0 ? ` — ${body.errors.slice(0, 3).join('; ')}` : '';
+      rulesFileMessage(`${body.error ?? 'The file was refused.'}${detail}`);
+      return;
+    }
+    showRulesConfirm(body);
+  } catch (error) {
+    rulesFileMessage(`Upload failed: ${error}`);
+  }
+});
+
+el('rules-undo-open').addEventListener('click', async () => {
+  rulesFileMessage(null);
+  hideRulesConfirm();
+  const r = await fetch('/api/rules/undo', { method: 'POST', headers: INGEST_HEADERS });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    rulesFileMessage(body.error ?? 'Nothing to undo yet.');
+    return;
+  }
+  showRulesConfirm(body);
+});
+
+// The Apply button stays disabled until the word matches EXACTLY (BR-54.1/54.4).
+el('rules-typed').addEventListener('input', () => {
+  el('rules-go').disabled = rulesWordNeeded && el('rules-typed').value !== rulesWord;
+});
+
+el('rules-cancel').addEventListener('click', hideRulesConfirm);
+
+el('rules-go').addEventListener('click', async () => {
+  if (!rulesToken) return;
+  el('rules-go').disabled = true;
+  const r = await fetch('/api/rules/confirm', {
+    method: 'POST',
+    headers: { ...INGEST_HEADERS, 'content-type': 'application/json' },
+    body: JSON.stringify({ token: rulesToken, typed: rulesWordNeeded ? el('rules-typed').value : null }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    rulesFileMessage(body.error ?? 'The change was not applied.');
+    if (body.reason !== 'confirmation-required') hideRulesConfirm();
+    el('rules-go').disabled = false;
+    return;
+  }
+  hideRulesConfirm();
+  // The file changed: a later upload must be based on a fresh download.
+  rulesBaseHash = null;
+  rulesFileMessage(body.view.message);
+  await refreshRulesFile();
+  await loadRules();
+});
+
+// -- Credentials --
+
+function credentialMessage(id, text) {
+  const m = el(id);
+  m.textContent = text ?? '';
+  m.hidden = !text;
+}
+
+const SPOTIFY_FIELDS = [
+  ['clientId', 'sp-client-id'],
+  ['clientSecret', 'sp-client-secret'],
+  ['redirectUri', 'sp-redirect'],
+  ['refreshToken', 'sp-refresh'],
+];
+
+function spotifyFormComplete() {
+  return SPOTIFY_FIELDS.every(([, id]) => el(id).value.trim() !== '');
+}
+
+function updateSpotifySave() {
+  const complete = spotifyFormComplete();
+  el('sp-save').disabled = !complete;
+  el('sp-save-reason').hidden = complete;
+}
+
+function clearSpotifyForm() {
+  for (const [, id] of SPOTIFY_FIELDS) {
+    el(id).value = '';
+    el(id).removeAttribute('aria-invalid');
+  }
+  updateSpotifySave();
+}
+
+async function refreshCredentials() {
+  try {
+    const r = await fetch('/api/settings/credentials');
+    const body = await r.json();
+    if (!r.ok) {
+      el('sp-status').textContent = body.error ?? 'Credential settings are unavailable.';
+      el('mb-status').textContent = body.error ?? 'Credential settings are unavailable.';
+      return;
+    }
+    const v = body.view;
+    el('sp-status').textContent = v.spotify.status;
+    el('sp-guidance').replaceChildren(...v.spotify.guidance.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
+    el('sp-warning').replaceChildren(...v.spotify.saveWarning.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
+    el('mb-status').textContent = v.musicbrainz.status;
+    el('mb-note').hidden = v.musicbrainz.note === null;
+    el('mb-note').textContent = v.musicbrainz.note ?? '';
+  } catch (error) {
+    el('sp-status').textContent = `Could not reach the app: ${error}`;
+  }
+}
+
+for (const [, id] of SPOTIFY_FIELDS) el(id).addEventListener('input', updateSpotifySave);
+
+el('sp-fill').addEventListener('click', () => {
+  credentialMessage('sp-message', null);
+  el('sp-file').value = '';
+  el('sp-file').click();
+});
+
+/**
+ * Reads the file IN THE BROWSER and fills the form (BR-56.1) — the server never receives the file, only the four
+ * fields on Save. Missing values are highlighted rather than guessed.
+ */
+el('sp-file').addEventListener('change', async () => {
+  const file = el('sp-file').files?.[0];
+  if (!file) return;
+  let parsed;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    credentialMessage('sp-message', 'That file is not valid JSON — is it the spotify-config.json that `npm run auth` wrote?');
+    return;
+  }
+  const missing = [];
+  for (const [key, id] of SPOTIFY_FIELDS) {
+    const value = typeof parsed?.[key] === 'string' ? parsed[key] : '';
+    el(id).value = value;
+    if (value === '') {
+      missing.push(key);
+      el(id).setAttribute('aria-invalid', 'true');
+    } else {
+      el(id).removeAttribute('aria-invalid');
+    }
+  }
+  updateSpotifySave();
+  credentialMessage('sp-message', missing.length > 0 ? `The file has no ${missing.join(', ')} — run \`npm run auth\` to produce a complete one.` : null);
+});
+
+// Save shows the BR-56.6 warning first; only "Replace credentials" sends anything.
+el('sp-save').addEventListener('click', () => {
+  if (!spotifyFormComplete()) return;
+  el('sp-confirm').hidden = false;
+  el('sp-go').focus();
+});
+el('sp-cancel').addEventListener('click', () => {
+  el('sp-confirm').hidden = true;
+});
+
+el('sp-go').addEventListener('click', async () => {
+  el('sp-go').disabled = true;
+  const payload = Object.fromEntries(SPOTIFY_FIELDS.map(([key, id]) => [key, el(id).value.trim()]));
+  try {
+    const r = await fetch('/api/settings/spotify', {
+      method: 'POST',
+      headers: { ...INGEST_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const body = await r.json().catch(() => ({}));
+    el('sp-confirm').hidden = true;
+    if (!r.ok) {
+      for (const field of body.fields ?? []) {
+        const id = SPOTIFY_FIELDS.find(([key]) => key === field)?.[1];
+        if (id) el(id).setAttribute('aria-invalid', 'true');
+      }
+      credentialMessage('sp-message', body.error ?? 'The credentials were not saved.');
+      return;
+    }
+    // ⚠️ Cleared on success: the secrets must not sit in the page after they have been sent.
+    clearSpotifyForm();
+    credentialMessage('sp-message', 'Saved. Checking with Spotify on the next poll — watch the Spotify indicator.');
+    await refreshCredentials();
+  } catch (error) {
+    credentialMessage('sp-message', `Save failed: ${error}`);
+  } finally {
+    el('sp-go').disabled = false;
+  }
+});
+
+el('mb-contact').addEventListener('input', () => {
+  el('mb-save').disabled = el('mb-contact').value.trim() === '';
+});
+
+el('mb-save').addEventListener('click', async () => {
+  el('mb-save').disabled = true;
+  try {
+    const r = await fetch('/api/settings/musicbrainz', {
+      method: 'POST',
+      headers: { ...INGEST_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify({ contact: el('mb-contact').value.trim() }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      credentialMessage('mb-message', body.error ?? 'The contact was not saved.');
+      el('mb-save').disabled = false;
+      return;
+    }
+    el('mb-contact').value = '';
+    credentialMessage('mb-message', body.restartNeeded ? 'Saved. Label lookups start after the next restart.' : 'Saved. The next MusicBrainz request uses it.');
+    await refreshCredentials();
+  } catch (error) {
+    credentialMessage('mb-message', `Save failed: ${error}`);
+    el('mb-save').disabled = false;
+  }
+});
+
 function wireRulesDialog() {
   const dialog = el('rules');
   const open = el('rules-open');
@@ -2022,13 +2372,14 @@ function wireRulesDialog() {
   open.addEventListener('click', () => {
     dialog.showModal();
     void loadAutomation();
+    void refreshRulesFile();
     void loadRules();
     void loadDecisions();
   });
   close?.addEventListener('click', () => dialog.close());
   matchedOnly?.addEventListener('change', () => void loadDecisions());
 
-  // Re-READS the file. Nothing in U4 writes rules; `./config` stays mounted read-only.
+  // Re-READS the file — for a hand edit. U7's uploads reload by themselves (the writer calls the same loader).
   reload?.addEventListener('click', async () => {
     reload.disabled = true;
     try {

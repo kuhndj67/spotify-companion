@@ -990,3 +990,32 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
 .restore-confirm input[type="text"] { display: block; margin: 0.35rem 0 0.75rem; padding: 0.4rem 0.5rem; width: 12rem; max-width: 100%;
   background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
 .restore-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+/* ─── U7: configuration management ─────────────────────────────────────────────────────────────────────────── */
+
+/* ⚠️ U6's lesson, extended: the Rules pop-up now holds destructive controls too (Apply, Undo), so a disabled one
+   must LOOK disabled there as well — the attribute alone once rendered as an enabled-looking button. */
+#rules button[disabled] { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.6); }
+
+.rules-compare-heading { margin: 0 0 0.5rem; }
+.rules-compare-section p { margin: 0.5rem 0 0.15rem; }
+.rules-compare-section ul { margin: 0; padding-left: 1.2rem; }
+.restore-rules-option { margin: 0.5rem 0; padding: 0.5rem 0.6rem; border-left: 3px solid var(--line); }
+.restore-rules-check { display: flex; gap: 0.5rem; align-items: center; }
+
+.credential-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.4rem 0.75rem; align-items: center; margin: 0.5rem 0; }
+.credential-fields input,
+#mb-contact,
+.restore-confirm #rules-typed { padding: 0.4rem 0.5rem; background: var(--surface); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; font: inherit; min-width: 0; }
+#mb-contact { flex: 1 1 14rem; }
+/* A field the server named in a refusal — marked by more than colour: the message line names it too. */
+.credential-fields input[aria-invalid="true"] { border-color: var(--danger); border-width: 2px; }
+.guidance { margin: 0.5rem 0; }
+.guidance summary { cursor: pointer; color: var(--muted); }
+.guidance ol { margin: 0.5rem 0; padding-left: 1.3rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 520px) {
+  .credential-fields { grid-template-columns: minmax(0, 1fr); }
+}

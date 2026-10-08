@@ -54,6 +54,8 @@ import { ingestGuard } from './ingest/ingestGuard.js';
 import { RULES_UPLOAD_CAP_BYTES } from './ingest/types.js';
 import { REPLACE_WORD, type RulesRefusal, type RulesWriter } from './configuration/RulesWriter.js';
 import type { CredentialsRefusal, CredentialsWriter } from './configuration/CredentialsWriter.js';
+import { appliedMessage, comparisonPanelView, rulesConfirmView, rulesFileStatusView } from './ui/rulesFilePanel.js';
+import { musicbrainzSectionView, spotifySectionView } from './ui/credentialsPanel.js';
 import { CONFIRM_WORD, type MaintenanceService, type Refused } from './maintenance/MaintenanceService.js';
 import { comparisonView, statusView } from './ui/maintenancePanel.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
@@ -921,12 +923,9 @@ export function createApi(deps: ApiDeps): Router {
   /** What the Rules pop-up needs for its *Rules file* section: the base hash, undo availability, the last write. */
   router.get('/api/rules/file/status', (_req, res) => {
     if (!deps.rulesWriter) return void rulesUnavailable(res);
-    res.json({
-      hash: deps.rulesWriter.download()?.hash ?? null,
-      hasPrevious: deps.rulesWriter.hasPrevious(),
-      lastWrite: deps.rulesWriter.lastWrite(),
-      replaceWord: REPLACE_WORD,
-    });
+    const status = { hash: deps.rulesWriter.download()?.hash ?? null, hasPrevious: deps.rulesWriter.hasPrevious(), lastWrite: deps.rulesWriter.lastWrite() };
+    // ⭐ The DERIVED view rides along (app.js cannot import src/ — the U5/U6 precedent).
+    res.json({ ...status, replaceWord: REPLACE_WORD, view: rulesFileStatusView(status) });
   });
 
   /** FR-66 part 1 — stage an upload: validate, compare, never write. Base hash in `X-Rules-Base-Hash` (optional). */
@@ -939,7 +938,7 @@ export function createApi(deps: ApiDeps): Router {
     const base = req.get('x-rules-base-hash');
     const r = deps.rulesWriter.stageUpload(req.body, base === undefined || base === '' ? null : base);
     if (!r.ok) return void rulesRefuse(res, r);
-    res.json(r);
+    res.json({ ...r, view: { panel: comparisonPanelView(r.comparison), confirm: rulesConfirmView(r, REPLACE_WORD) } });
   });
 
   /** BR-55 part 1 — stage *Undo last rules change*. Confirmed through the same route as an upload. */
@@ -947,7 +946,7 @@ export function createApi(deps: ApiDeps): Router {
     if (!deps.rulesWriter) return void rulesUnavailable(res);
     const r = deps.rulesWriter.stageUndo();
     if (!r.ok) return void rulesRefuse(res, r);
-    res.json(r);
+    res.json({ ...r, view: { panel: comparisonPanelView(r.comparison), confirm: rulesConfirmView(r, REPLACE_WORD) } });
   });
 
   /** FR-66/67 part 2 — confirm a staged upload or undo. The answer is the WATCHER's version, never the write's. */
@@ -960,17 +959,21 @@ export function createApi(deps: ApiDeps): Router {
     }
     const r = await deps.rulesWriter.confirm(body.token, typeof body.typed === 'string' ? body.typed : null);
     if (!r.ok) return void rulesRefuse(res, r);
-    res.json(r);
+    res.json({ ...r, view: { message: appliedMessage(r.version, r.comparison) } });
   });
 
   /** FR-69/70 — what Settings shows. ⚠️ Views only: no field of either can hold a secret (P-53). */
   router.get('/api/settings/credentials', (_req, res) => {
     if (!deps.credentials) return void credentialsUnavailable(res);
+    const spotify = deps.credentials.spotifyView();
+    const musicbrainz = deps.credentials.musicbrainzView();
+    const labelsActive = deps.labelsActive ?? false;
     res.json({
-      spotify: deps.credentials.spotifyView(),
-      musicbrainz: deps.credentials.musicbrainzView(),
-      labelsActive: deps.labelsActive ?? false,
+      spotify,
+      musicbrainz,
+      labelsActive,
       lastWrite: deps.credentials.lastWrite(),
+      view: { spotify: spotifySectionView(spotify), musicbrainz: musicbrainzSectionView(musicbrainz, labelsActive) },
     });
   });
 

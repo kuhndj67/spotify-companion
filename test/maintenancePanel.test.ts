@@ -96,7 +96,8 @@ describe('comparisonView (BR-47.6, BR-48.2)', () => {
     const v = comparisonView(c, 'RESTORE');
     assert.match(v.warning[0]!, /REPLACES.*does not merge/);
     assert.match(v.warning[1]!, /undo this once/);
-    assert.match(v.rulesNote, /not applied/);
+    // U7 (FR-72) changed the wording on purpose: rules that differ are still NOT applied — unless the user opts in.
+    assert.match(v.rulesNote, /stay as they are unless you tick/);
     assert.equal(v.confirmWord, 'RESTORE');
   });
 

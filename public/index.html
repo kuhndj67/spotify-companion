@@ -190,6 +190,57 @@
         <button id="settings-close" class="ghost" type="button">Close</button>
       </header>
 
+      <!--
+        U7 (FR-69, frontend-components §2). ⚠️ Fields are NEVER pre-filled and the secret and refresh token are
+        password fields: nothing the server returns can hold a secret (P-53), so there is nothing to pre-fill them
+        with. Save replaces the whole set — Q5 = B — after a warning that the old ones are not kept.
+      -->
+      <section class="diag-section" aria-labelledby="spotify-heading" data-testid="spotify-section">
+        <h3 id="spotify-heading">Spotify</h3>
+        <p class="maintenance-last" id="sp-status" role="status">Loading&hellip;</p>
+        <details class="guidance">
+          <summary>How do I get these?</summary>
+          <ol id="sp-guidance"></ol>
+        </details>
+        <div class="credential-fields">
+          <label for="sp-client-id">Client ID</label>
+          <input id="sp-client-id" type="text" spellcheck="false" autocomplete="off" />
+          <label for="sp-client-secret">Client secret</label>
+          <input id="sp-client-secret" type="password" autocomplete="new-password" />
+          <label for="sp-redirect">Redirect URI</label>
+          <input id="sp-redirect" type="text" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:8888/callback" />
+          <label for="sp-refresh">Refresh token</label>
+          <input id="sp-refresh" type="password" autocomplete="new-password" />
+        </div>
+        <div class="maintenance-row">
+          <button id="sp-fill" class="ghost" type="button" data-testid="spotify-fill-button">Fill from spotify-config.json&hellip;</button>
+          <input id="sp-file" type="file" accept=".json,application/json" hidden />
+          <button id="sp-save" class="primary" type="button" disabled data-testid="spotify-save-button">Save&hellip;</button>
+        </div>
+        <p class="muted" id="sp-save-reason">Fill in all four fields to save.</p>
+        <div id="sp-confirm" class="restore-confirm" hidden data-testid="spotify-confirm">
+          <ul class="restore-warning" id="sp-warning"></ul>
+          <div class="restore-actions">
+            <button id="sp-cancel" class="ghost" type="button">Cancel</button>
+            <button id="sp-go" class="primary" type="button" data-testid="spotify-replace-button">Replace credentials</button>
+          </div>
+        </div>
+        <p id="sp-message" class="maintenance-message" role="alert" hidden></p>
+      </section>
+
+      <!-- U7 (FR-70, frontend-components §3). -->
+      <section class="diag-section" aria-labelledby="mb-heading" data-testid="musicbrainz-section">
+        <h3 id="mb-heading">MusicBrainz</h3>
+        <p class="maintenance-last" id="mb-status" role="status">Loading&hellip;</p>
+        <p class="muted" id="mb-note" hidden></p>
+        <div class="maintenance-row">
+          <label for="mb-contact" class="visually-hidden">Contact address</label>
+          <input id="mb-contact" type="text" spellcheck="false" autocomplete="off" placeholder="your contact address" />
+          <button id="mb-save" class="ghost" type="button" disabled data-testid="musicbrainz-save-button">Save</button>
+        </div>
+        <p id="mb-message" class="maintenance-message" role="alert" hidden></p>
+      </section>
+
       <section class="diag-section" aria-labelledby="backup-heading">
         <h3 id="backup-heading">Backup &amp; restore</h3>
         <p id="backup-last" class="maintenance-last" role="status" hidden></p>
@@ -215,6 +266,19 @@
             <tbody id="restore-rows"></tbody>
           </table>
           <p class="muted" id="restore-rules"></p>
+          <!-- U7 (BR-59.2): opt-in, UNCHECKED by default; disabled with the validator's reason when invalid. -->
+          <div id="restore-rules-option" class="restore-rules-option" hidden data-testid="restore-rules-option">
+            <label class="restore-rules-check">
+              <input type="checkbox" id="restore-apply-rules" data-testid="restore-apply-rules" />
+              <span id="restore-rules-label"></span>
+            </label>
+            <p class="muted" id="restore-rules-reason" hidden></p>
+            <div id="restore-rules-panel" hidden>
+              <p class="rules-compare-heading"><strong id="restore-rules-heading"></strong></p>
+              <ul class="restore-warning" id="restore-rules-live"></ul>
+              <div id="restore-rules-sections"></div>
+            </div>
+          </div>
           <ul class="restore-warning" id="restore-warning"></ul>
           <label for="restore-typed">Type <strong id="restore-word">RESTORE</strong> to continue</label>
           <input id="restore-typed" type="text" autocomplete="off" spellcheck="false" />
@@ -319,7 +383,41 @@
         <div id="automation-body"><p class="muted">Loading&hellip;</p></div>
       </section>
 
-      <!-- FC-2. Read-only: rule editing is out of scope until U5. -->
+      <!--
+        U7 (FR-66–FR-68, frontend-components §1). Download, upload, undo. ⚠️ Every label, reason and comparison line
+        comes from the server (src/ui/rulesFilePanel.ts) — this file only renders. An upload never arms anything.
+      -->
+      <section class="diag-section" id="rules-file-section" data-testid="rules-file-section">
+        <h3>Rules file</h3>
+        <p class="muted" id="rules-file-note"></p>
+        <p class="maintenance-last" id="rules-file-last" role="status" hidden></p>
+        <div class="maintenance-row">
+          <button id="rules-download" class="ghost" type="button" data-testid="rules-download-button">Download rules</button>
+          <button id="rules-upload-open" class="ghost" type="button" data-testid="rules-upload-button">Upload rules&hellip;</button>
+          <input id="rules-upload-file" type="file" accept=".json,application/json,text/plain" hidden />
+          <button id="rules-undo-open" class="ghost" type="button" data-testid="rules-undo-button">Undo last rules change&hellip;</button>
+        </div>
+        <p class="muted" id="rules-undo-reason"></p>
+        <p id="rules-file-message" class="maintenance-message" role="alert" hidden></p>
+
+        <!-- The comparison and confirmation (BR-53.6, BR-54). Shown only while an upload or undo waits. -->
+        <div id="rules-confirm" class="restore-confirm" hidden data-testid="rules-confirm">
+          <p class="rules-compare-heading"><strong id="rules-compare-heading"></strong></p>
+          <ul class="restore-warning" id="rules-live-warning"></ul>
+          <div id="rules-compare-sections"></div>
+          <div id="rules-word-row" hidden>
+            <p class="muted" id="rules-word-reason"></p>
+            <label for="rules-typed">Type <strong id="rules-word">REPLACE</strong> to continue</label>
+            <input id="rules-typed" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="restore-actions">
+            <button id="rules-cancel" class="ghost" type="button">Cancel</button>
+            <button id="rules-go" class="primary" type="button" data-testid="rules-confirm-button">Apply</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- FC-2. The loaded set, read from the file above. -->
       <section class="diag-section">
         <h3>
           Loaded rule set

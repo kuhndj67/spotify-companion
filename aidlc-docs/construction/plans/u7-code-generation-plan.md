@@ -166,11 +166,16 @@ credential shows red. Steps that move existing code (2) run the existing tests *
 - ✅ Full suite **1540/1540**. `RulesWriter` is built right after `RULES_PATH`, before the watcher; `finishRestoreRules` runs there (the restored database has already opened — `openHistory` turns a fallback into `failed`); the watcher is attached once built. `CredentialsWriter` gets the poll loop, the MCP client and the Web API client as ports. The MusicBrainz client reads `labelUserAgent` through a getter.
 - ⚠️ **Found while wiring**: shutdown did `spotify.close().then(() => process.exit(0))`. With `close()` now awaiting the child's exit and rejecting past its bound, a child that would not die would have turned shutdown into a **hang**. Now exits regardless. ⚠️ It also adds ~2 s (P-U7-2) to every restart, including U6's restore restart — measure in Build & Test.
 
-### Step 11 — UI *(LC-48, frontend-components.md)*
-- [ ] Pure panel modules with tests (`rulesFilePanel.ts`, `credentialsPanel.ts`)
-- [ ] Rules pop-up *Rules file* section · Settings *Spotify* (with guidance) and *MusicBrainz* · restore dialog checkbox
-- [ ] ⚠️ The disabled-looking-enabled lesson: each destructive control's disabled state has a **visible** style, not
+### Step 11 — UI *(LC-48, frontend-components.md)* — ✅ DONE 2026-10-08 (not yet looked at — Build & Test)
+- [x] Pure panel modules with tests (`rulesFilePanel.ts`, `credentialsPanel.ts`)
+- [x] Rules pop-up *Rules file* section · Settings *Spotify* (with guidance) and *MusicBrainz* · restore dialog checkbox
+- [x] ⚠️ The disabled-looking-enabled lesson: each destructive control's disabled state has a **visible** style, not
       only the attribute
+- ✅ Suite **1561/1561**. Pure views `ui/rulesFilePanel.ts` (ONE comparison panel, used by the Rules pop-up AND the restore dialog) and `ui/credentialsPanel.ts`, attached to the route responses; `maintenancePanel.comparisonView` gains `rulesOption` and the after-restart message states the rules outcome separately (BR-59.7). HTML/app.js/CSS render them; every `el('id')` checked against the HTML.
+- ⚠️ **Deviation from BR-54.2 — the base hash is the last DOWNLOAD only**, never the version merely *displayed*: with "displayed", opening the pop-up and uploading a month-old file would pass as current. No download this session → unknown → `REPLACE` (BR-54.4).
+- ⚠️ **Found: the purity check's `imported.includes('config')` matched U7's `configuration/` folder.** Narrowed to the module NAME (`config(.js|.ts)`), with a self-test pinning both directions — `../config.js` still refused.
+- U6's panel test asserted the old *"not applied"* wording, which FR-72 changes on purpose; updated with a comment.
+- `#rules button[disabled]` gets U6's visibly-disabled style — the Rules pop-up now holds destructive controls too. ⚠️ **Not yet seen in a browser**: Build & Test must click and LOOK (U6's lesson).
 
 ### Step 12 — Infrastructure files *(IN-U7-1, IN-U7-2)*
 - [ ] `compose.yaml`: `./config` `:rw`, `musicbrainz.json` `:rw`, both comment blocks **rewritten** as IN-U7-1/2 specify

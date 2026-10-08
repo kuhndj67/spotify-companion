@@ -118,6 +118,9 @@ const PURE_MODULES = [
   'configuration/mcpErrorText.ts',
   // Diagnostics' Configuration block (IN-U7-6). Pure so a writability answer is judged only as given.
   'configuration/configurationDiagnostics.ts',
+  // U7's UI judgement — what a rules change and a credentials section SAY. Decided here because app.js has no tests.
+  'ui/rulesFilePanel.ts',
+  'ui/credentialsPanel.ts',
   // ⚠️ What the surface that can REPLACE the corpus says. app.js cannot be tested; this can, so it decides.
   'ui/maintenancePanel.ts',
 ];
@@ -169,6 +172,17 @@ function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 }
 
+/**
+ * Is this the environment module `config.ts`? Matched on the MODULE NAME, not on the substring "config".
+ *
+ * ⚠️ Changed in U7 (2026-10-08): this was `imported.includes('config')`, which also matched U7's new `configuration/`
+ * folder — a type-only import of `../configuration/rulesComparison.js` failed as "imports config". Narrowed to the
+ * name so `../config.js` is still refused; `the check itself works` below pins both directions.
+ */
+function importsConfig(imported: string): boolean {
+  return /(^|\/)config(\.[jt]s)?$/.test(imported);
+}
+
 function importedModules(source: string): string[] {
   const found: string[] = [];
   const patterns = [
@@ -195,7 +209,7 @@ describe('pure modules import nothing impure', () => {
             `see FR-20 and FR-42, which this would break silently.`,
         );
         assert.ok(
-          !imported.includes('config'),
+          !importsConfig(imported),
           `${relative} imports config. Parameters must be passed in, not read: reclassification ` +
             `must not depend on deployment state.`,
         );
@@ -217,6 +231,14 @@ describe('pure modules import nothing impure', () => {
 });
 
 describe('the check itself works', () => {
+  it('still refuses the environment module, and no longer mistakes configuration/ for it (U7)', () => {
+    assert.equal(importsConfig('../config.js'), true);
+    assert.equal(importsConfig('./config.js'), true);
+    assert.equal(importsConfig('../config'), true);
+    assert.equal(importsConfig('../configuration/rulesComparison.js'), false);
+    assert.equal(importsConfig('./configurationDiagnostics.js'), false);
+  });
+
   it('detects an impure import when one is present', async () => {
     // Guards against the check silently passing because its patterns stopped matching — a green
     // test that verifies nothing is worse than no test.

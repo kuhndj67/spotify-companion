@@ -7575,3 +7575,12 @@ Diagnostics gains a Configuration block (writability probed fresh each sweep, la
 rules writer before the watcher, restore's rules applied after the database opens, credentials writer on the poll
 loop / MCP / Web API ports. ⚠️ Found: shutdown would have **hung** on a child that would not exit, now that `close()`
 awaits the exit — fixed to exit regardless; restarts get ~2 s longer. Suite 1540/1540.
+
+---
+
+## 2026-10-08T19:50:34Z — U7 Code Generation Step 11 done: UI (rendered, not yet looked at)
+
+Rules pop-up *Rules file* section; Settings *Spotify* and *MusicBrainz*; restore dialog opt-in. All wording from pure
+server-side views. Deviation: the stale-check base is the last DOWNLOAD only (BR-54.2's "or displayed" would let an
+old file pass). Found: the purity test's `includes('config')` matched `configuration/` — narrowed to the module name
+with a two-way self-test. Suite 1561/1561. ⚠️ Not yet seen in a browser — Build & Test.

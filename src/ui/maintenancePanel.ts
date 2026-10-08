@@ -9,7 +9,9 @@
  * Colour is never the only channel (BR-51.4): every state carries words.
  */
 
+import { comparisonPanelView, type ComparisonPanelView } from './rulesFilePanel.js';
 import type { Comparison, MaintenanceStatus } from '../maintenance/MaintenanceService.js';
+import type { RulesRestoreResult } from '../maintenance/startupRestorer.js';
 
 export interface ButtonView {
   label: string;
@@ -90,7 +92,8 @@ export function statusView(s: MaintenanceStatus): StatusView {
       tone: 'ok',
       text:
         `Restored ${s.lastRestore.plays ?? 'an unknown number of'} plays from a backup taken ${formatWhen(s.lastRestore.takenAt)}. ` +
-        'Plays since that backup are re-imported from Spotify (as not-observed) when the app can reach it.',
+        'Plays since that backup are re-imported from Spotify (as not-observed) when the app can reach it.' +
+        rulesSentence(s.lastRestore.rulesResult),
     };
   } else if (s.lastRestore?.kind === 'failed') {
     lastRestore = { tone: 'fail', text: `Restore failed: ${s.lastRestore.reason}. Your history is unchanged.` };
@@ -110,6 +113,11 @@ export function statusView(s: MaintenanceStatus): StatusView {
 export interface ComparisonView {
   rows: { label: string; backup: string; current: string }[];
   rulesNote: string;
+  /**
+   * U7 (BR-59.2): the opt-in *"Also replace my rules with the backup's"*. `null` when there is nothing to offer
+   * (no rules, or identical). Unchecked by default — the checkbox's state is the user's, never pre-set.
+   */
+  rulesOption: { label: string; disabled: boolean; reason: string | null; panel: ComparisonPanelView | null } | null;
   /** The destructive warning, in full (BR-48.2). */
   warning: string[];
   confirmWord: string;
@@ -123,7 +131,19 @@ export function comparisonView(c: Comparison, confirmWord: string, kind: 'restor
       ? 'This backup includes no rules.'
       : c.rules === 'identical'
         ? 'This backup’s rules are identical to yours.'
-        : 'This backup’s rules differ from yours — they are not applied (rules cannot be restored yet).';
+        : 'This backup’s rules differ from yours. Your rules stay as they are unless you tick the box below.';
+  // U7 (BR-59.2): offered only when they differ. Invalid → shown DISABLED with the validator's reason, never hidden.
+  const rulesOption: ComparisonView['rulesOption'] =
+    c.rules !== 'differs'
+      ? null
+      : c.rulesComparison !== null
+        ? { label: 'Also replace my rules with the backup’s', disabled: false, reason: null, panel: comparisonPanelView(c.rulesComparison) }
+        : {
+            label: 'Also replace my rules with the backup’s',
+            disabled: true,
+            reason: `The backup’s rules are not valid in this version of the app: ${(c.rulesInvalid ?? ['unknown reason']).slice(0, 3).join('; ')}`,
+            panel: null,
+          };
   return {
     rows: [
       { label: kind === 'undo' ? 'Set aside' : 'Taken', backup: formatWhen(c.backup.takenAt), current: '—' },
@@ -132,6 +152,7 @@ export function comparisonView(c: Comparison, confirmWord: string, kind: 'restor
       { label: 'Schema', backup: v(c.backup.schemaVersion), current: v(c.current.schemaVersion) },
     ],
     rulesNote,
+    rulesOption,
     warning: [
       `${kind === 'undo' ? 'Undoing' : 'Restoring'} REPLACES your current history. It does not merge.`,
       'Your current history is kept as the previous history, so you can undo this once.',
@@ -139,6 +160,16 @@ export function comparisonView(c: Comparison, confirmWord: string, kind: 'restor
     ],
     confirmWord,
   };
+}
+
+/**
+ * U7 (BR-59.7, frontend-components §4): what became of the rules is a SEPARATE fact from the history, said separately —
+ * and *Undo last restore* does not revert rules, which have their own undo.
+ */
+function rulesSentence(r: RulesRestoreResult | undefined): string {
+  if (r === undefined || r === 'not-requested') return '';
+  if (r === 'applied') return ' The backup’s rules were applied too — Undo last restore does not change them; use Undo last rules change in the Rules pop-up.';
+  return ` The backup’s rules were NOT applied: ${r.skipped}. Your rules are unchanged.`;
 }
 
 /** `2026-10-02 21:14 UTC` — an absolute UTC time, never a host-zone one (the timeBuckets lesson). */

@@ -48,8 +48,11 @@ export function hashString(input: string): string {
  * byte-identical rules written with their fields in a different order would otherwise hash
  * differently — and every decision taken before a cosmetic reordering would look as though it
  * came from a different rule.
+ *
+ * Exported for U7's `rulesComparison` (LC-40), which must agree with this file about when two rules are
+ * the same — one canonicaliser, never two.
  */
-function canonicalise(value: unknown): string {
+export function canonicalise(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return `[${value.map(canonicalise).join(',')}]`;
   if (typeof value === 'object') {

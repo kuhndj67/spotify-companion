@@ -108,6 +108,14 @@ const PURE_MODULES = [
   'ingest/admitIngest.ts',
   // Diagnostics' Maintenance block. Extracted so it is testable at all; pure so it judges only what it is given.
   'maintenance/maintenanceDiagnostics.ts',
+  // ─── U7 ──────────────────────────────────────────────────────────────────────────────────────
+  // ⚠️ DECIDES what the user is warned about before a rules write — "becomes live", "mass removal". A file
+  // read here would make the comparison describe a different set from the one being confirmed.
+  'configuration/rulesComparison.ts',
+  // Never receives a secret; pure so PBT-62 can bound what it reveals for ANY input.
+  'configuration/masking.ts',
+  // Decides whether Spotify's answer is a failure (FR-71). Pure so PBT-66 can hold it against the server's source.
+  'configuration/mcpErrorText.ts',
   // ⚠️ What the surface that can REPLACE the corpus says. app.js cannot be tested; this can, so it decides.
   'ui/maintenancePanel.ts',
 ];

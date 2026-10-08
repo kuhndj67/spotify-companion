@@ -21,6 +21,8 @@
 | F5 | ⚠️ **The §2 defect, corrected.** A failed `getNowPlaying` returns `Error getting current track: …` as text. `parseNowPlaying` does **not** read it as *nothing playing* (`null`); it returns an object with **every field null** and `isPlaying: false`. The snapshot is `{ playing: true }` — so the card shows **PAUSED**, the status reads **ok**, and `recordPollMetrics` counts it as a **playing** poll and the MCP call as **ok**. The plan said *"counted as idle"* — **that was an inference, and wrong** | BR-58 |
 | F6 | ⚠️ **And a *thrown* MCP error is counted as IDLE by M4 today** — `recordPoll(playing)` with `playing = false` for an error snapshot (`server.ts` `recordPollMetrics`, `upstreamMetrics.ts:112`). So converting the text error into an error snapshot, alone, would move credential failures from *playing* to *idle* — **still wrong** | BR-58.3: polls become three-way |
 | F7 | The server reports errors as text in **20 places** across five tools, always `Error <verb>ing …: <message>` | BR-58.1 applies at the one MCP call site, for every tool |
+| F7′ | ⚠️ **CORRECTED 2026-10-08 by PBT-66's first run**: **25** templates — 19 `Error <verb>ing …:`, **6 single-quoted `Error: <message>`** (input validation), one with an interpolated verb. F7's grep matched only backtick templates. No non-error text starts with `Error`. BR-58.1's pattern is therefore `^Error[^
+]*:` | BR-58.1 widened |
 | F8 | `config/` is a **directory** mount `:ro`; `spotify-config.json` and `musicbrainz.json` are **single-file** mounts (`:rw` and `:ro`) | Rules write by temp-then-rename (BR-53.4); the two credential files **must** be written in place (BR-56.3, BR-57.3) |
 
 ---

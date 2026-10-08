@@ -7508,3 +7508,18 @@ refresh token yields `Error getting current track: Failed to refresh access toke
 fields null, counted as a **playing** poll, MCP errors 0 — **F5 confirmed live**; BR-58.1's pattern matches, negative
 controls do not. `verify:down` no-impact proof passed; the credential copy is gone; live `/api/health` ok.
 `scripts/verify-install.mjs` gained `--probe-credentials`. Record: `probes/p-u7-1-3-2026-10-08.md`.
+
+---
+
+## 2026-10-08T19:24:48Z — U7 Code Generation Steps 2–3 done; PBT-66 corrected F7 on its first run
+
+Step 2: `configuration/atomicWrite.ts` extracted from `AutomationStateStore` — its 19 tests pass **unchanged**.
+Step 3: `rulesComparison`, `masking`, `mcpErrorText` (pure), 28 tests, purity 80/80.
+
+⚠️ **PBT-66 failed on its first run, and the test was right.** FD fact F7 (*"20 error templates, all `Error
+<verb>ing …:`"*) was a grep over backtick templates only; the server has **25**, six of them single-quoted `Error: …`.
+A pattern built on F7 would have read those as data. Pattern widened to `^Error[^
+]*:` (no non-error text starts
+with `Error`); F7′ recorded. Same family as the plan's M4 claim this morning: **a count from a grep, recorded as
+though it were the population.** ⚠️ CI now fetches the MCP source at the Dockerfile's ref so PBT-66 can run there —
+and `MCP_SERVER_REF=main` floats, which is exactly why the scan earns its place.

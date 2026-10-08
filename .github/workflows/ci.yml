@@ -42,6 +42,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # U7 (PBT-66, P-54): a test scans the MCP server's SOURCE for every error template, because the image
+      # fetches it with a FLOATING ref and a reworded error would otherwise read as "Spotify: ok". Fetch the
+      # same ref the Dockerfile builds, read from the Dockerfile so there is one place to change it. Source
+      # only -- nothing is built or run. Without it the test FAILS with a reason rather than passing vacuously.
+      - name: Fetch the MCP server source (PBT-66 scans it)
+        run: |
+          REF=$(sed -n 's/^ARG MCP_SERVER_REF=//p' Dockerfile)
+          git init -q .mcp-server
+          git -C .mcp-server remote add origin https://github.com/marcelmarais/spotify-mcp-server.git
+          git -C .mcp-server fetch --depth 1 origin "$REF"
+          git -C .mcp-server checkout -q FETCH_HEAD
+
       - name: Typecheck (src and test)
         run: npm run typecheck
 

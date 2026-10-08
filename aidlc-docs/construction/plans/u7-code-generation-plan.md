@@ -86,16 +86,24 @@ credential shows red. Steps that move existing code (2) run the existing tests *
       to stop the writer — **stop and return to NFR Design**
 - ✅ **All three pass** — [`probes/p-u7-1-3-2026-10-08.md`](../u7-configuration-management/probes/p-u7-1-3-2026-10-08.md). P-U7-1: placeholder token refreshed on the first poll → **Q1's fallback not needed**. P-U7-2: child exits after `close()`, but **~2 s later** — `close()` must await the exit (bound ≥ 5 s). P-U7-3: both broken-credential texts match BR-58.1; F5 confirmed live. `verify:down` no-impact proof passed.
 
-### Step 2 — Extract the atomic write *(LC-42, P-51)*
-- [ ] `configuration/atomicWrite.ts` from `AutomationStateStore.write`; the store imports it
-- [ ] `automationStateStore.test.ts` passes **unchanged**; new tests for the helper (temp in same dir, no temp left on failure)
+### Step 2 — Extract the atomic write — ✅ DONE 2026-10-08 *(LC-42, P-51)*
+- [x] `configuration/atomicWrite.ts` from `AutomationStateStore.write`; the store imports it
+- [x] `automationStateStore.test.ts` passes **unchanged**; new tests for the helper (temp in same dir, no temp left on failure)
+- ✅ `automationStateStore.test.ts` **19/19 unchanged**; `atomicWrite.test.ts` 8 new. `probeWritable` extracted too (`probeDirectoryWritable`), for IN-U7-6. ⚠️ **Deviation**: the temp name is the fixed sibling `.rules.json.tmp`, as U5 already did, not `domain-entities.md`'s `.rules.<random>.tmp` — safe because every caller serialises (P-52), and a crash then leaves at most one stray file per target.
 
-### Step 3 — Pure cores ⚙️ *(LC-40, LC-41, LC-45 text)*
-- [ ] `rulesComparison.ts` — **PBT-59** (partition; `compare(a, a)` empty), **PBT-60** (mass-removal boundary)
-- [ ] `masking.ts` — **PBT-62**
-- [ ] `mcpErrorText.ts` — **PBT-66** scans `.mcp-server/src/**/*.ts`, every `Error …` template matches; nothing-playing
+### Step 3 — Pure cores ⚙️ — ✅ DONE 2026-10-08 *(LC-40, LC-41, LC-45 text)*
+- [x] `rulesComparison.ts` — **PBT-59** (partition; `compare(a, a)` empty), **PBT-60** (mass-removal boundary)
+- [x] `masking.ts` — **PBT-62**
+- [x] `mcpErrorText.ts` — **PBT-66** scans `.mcp-server/src/**/*.ts`, every `Error …` template matches; nothing-playing
       and now-playing texts do not; source absent → **fails with a reason**
-- [ ] `test/purity.test.ts` extended to all three
+- [x] `test/purity.test.ts` extended to all three
+- ✅ 28 tests (rulesComparison, masking, mcpErrorText); purity 80/80. Deviations, each recorded:
+  - ⚠️ **PBT-66 failed on its first run and was RIGHT.** F7 (*"20 templates, all `Error <verb>ing`"*) came from a grep that matched backtick templates only. The source has **25**: 19 `Error <verb>ing …:`, **6 single-quoted `Error: …`**, one with an interpolated verb. Pattern widened to `^Error[^
+]*:`; no non-error server text starts with `Error`. F7′ added to `business-rules.md`.
+  - ⚠️ **CI gained a step** fetching `.mcp-server/` at the Dockerfile's `MCP_SERVER_REF` (read from the Dockerfile) — without it PBT-66 fails in CI by design. `MCP_SERVER_REF=main` **floats**, so this checks what the next image build will get.
+  - `becomesLive` is wider than BR-53.6's *dryRun true → false*: any rule that **can act** after and could not before (an added live rule, a re-enabled rule). Narrower would miss an added live rule.
+  - `maskClientId` reveals 4+4 only from **16** characters (domain-entities said 9): 8 of 9 characters is not masking. Email reveals ≤ 2 of the local part.
+  - `ruleHash.canonicalise` is now exported — one canonicaliser, used by the comparison.
 
 ### Step 4 — FR-71: a Spotify failure is a failure *(LC-45, LC-47, P-55, BR-58)*
 - [ ] `SpotifyMcpClient.#callToolText` throws on a matching text result, as for `isError`

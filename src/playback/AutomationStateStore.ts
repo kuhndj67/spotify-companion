@@ -25,9 +25,9 @@
  * the container's view from the host file — so the switch would appear to work and not persist.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 
+import { probeDirectoryWritable, writeFileAtomic } from '../configuration/atomicWrite.js';
 import type { AutomationState, RunawayHalt, WriteOutcome } from './types.js';
 
 export const AUTOMATION_STATE_SCHEMA = 1;
@@ -115,22 +115,8 @@ export class AutomationStateStore {
    * reader sees either the old file or the new one.
    */
   write(next: AutomationState): WriteOutcome {
-    const temp = join(dirname(this.#path), `.${pathBase(this.#path)}.tmp`);
-    try {
-      mkdirSync(dirname(this.#path), { recursive: true });
-      writeFileSync(temp, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-      renameSync(temp, this.#path);
-      return { ok: true };
-    } catch (error) {
-      // Best effort: a stray temp file is harmless, but leaving one behind on every failed write
-      // would slowly fill the mount.
-      try {
-        rmSync(temp, { force: true });
-      } catch {
-        /* ignore */
-      }
-      return { ok: false, reason: describe(error) };
-    }
+    // U7 (LC-42): the mechanism now lives in ONE shared helper, so `RulesWriter` cannot grow a second copy.
+    return writeFileAtomic(this.#path, `${JSON.stringify(next, null, 2)}\n`);
   }
 
   /**
@@ -151,21 +137,8 @@ export class AutomationStateStore {
    * invisible.
    */
   probeWritable(): boolean {
-    const probe = join(dirname(this.#path), `.${pathBase(this.#path)}.probe`);
-    try {
-      mkdirSync(dirname(this.#path), { recursive: true });
-      writeFileSync(probe, 'probe', 'utf8');
-      rmSync(probe, { force: true });
-      return true;
-    } catch {
-      return false;
-    }
+    return probeDirectoryWritable(this.#path);
   }
-}
-
-function pathBase(path: string): string {
-  const parts = path.split(/[\\/]/);
-  return parts[parts.length - 1] ?? 'automation-state.json';
 }
 
 function describe(error: unknown): string {

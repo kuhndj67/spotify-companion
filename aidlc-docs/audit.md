@@ -7479,3 +7479,32 @@ no-credentials contract applies again for everything else. Awaiting approval.
 ## 2026-10-08T19:12:37Z — ✅ U7 Infrastructure Design APPROVED
 
 User: *"approve and continue"*. IN-U7-1…6. Next: U7 Code Generation plan.
+
+---
+
+## 2026-10-08T19:13:55Z — U7 Code Generation plan written (13 steps, 2 scoping questions)
+
+`construction/plans/u7-code-generation-plan.md`. Step 1 is the three probes on `:3011` (P-57), gated: if P-U7-2
+fails, return to NFR Design. FR-71 (Step 4) precedes FR-69 (Step 6). Q1: fallback if the placeholder token does not
+trigger a refresh (recommend: the app refreshes once immediately after writing). Q2: ship FR-71 early or with the rest
+(recommend: one deployment).
+
+---
+
+## 2026-10-08T19:15:58Z — ✅ U7 Code Generation plan APPROVED (Q1 = A, Q2 = A)
+
+User answered both scoping questions A in the plan, then *"continue"* — taken as approval. Q1: if P-U7-1 fails, the
+app refreshes once itself immediately after writing. Q2: one deployment at Build & Test. Starting Step 1 (probes).
+
+---
+
+## 2026-10-08T19:19:36Z — U7 Code Generation Step 1: probes P-U7-1…3 ALL PASS
+
+On the `:3011` copy (U6 image), with a reduced credential copy (`verify:up --probe-credentials`, IN-U7-3; no value
+printed). ✅ **P-U7-1**: four values + placeholder token → the MCP server refreshed on the first poll; real token,
+expiry +59.8 min, refresh token unchanged — BR-56.4 confirmed, Q1's fallback unneeded. ✅ **P-U7-2**: `close()` ends
+the child — **after ~2004 ms**, not instantly, so awaiting the exit is load-bearing. ✅ **P-U7-3**: a corrupted
+refresh token yields `Error getting current track: Failed to refresh access token…`; snapshot `playing: true`,
+fields null, counted as a **playing** poll, MCP errors 0 — **F5 confirmed live**; BR-58.1's pattern matches, negative
+controls do not. `verify:down` no-impact proof passed; the credential copy is gone; live `/api/health` ok.
+`scripts/verify-install.mjs` gained `--probe-credentials`. Record: `probes/p-u7-1-3-2026-10-08.md`.

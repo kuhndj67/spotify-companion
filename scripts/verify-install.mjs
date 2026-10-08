@@ -22,6 +22,14 @@
  *
  * Everything the installation owns lives in ONE gitignored directory, `verify-install/`, so removal is deleting
  * that directory. It is given a PLACEHOLDER Spotify config, never the live one.
+ *
+ * ## `up --probe-credentials` — U7's probes P-U7-1/2 ONLY (IN-U7-3, a written, probe-only amendment)
+ *
+ * Writes a REDUCED COPY of the real credentials instead of the placeholder: `clientId`, `clientSecret`,
+ * `redirectUri`, `refreshToken`, with `accessToken: "placeholder"` and `expiresAt: 0` — exactly the shape U7's
+ * BR-56.4 would write, which is the premise P-U7-1 tests. It is a COPY inside `verify-install/`: the live
+ * `secrets/` is read, never mounted and never written. `down` deletes it with the rest and says so.
+ * ⚠️ For every other use of the copy, the placeholder contract above still holds.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -39,6 +47,29 @@ const VERIFY_CONTAINER = 'spotify-now-playing-verify';
 const URL = 'http://localhost:3011';
 
 const mode = process.argv.includes('--plan') ? 'plan' : process.argv[2];
+const probeCredentials = process.argv.includes('--probe-credentials');
+const PROBE_FILE = join(INSTALL, 'secrets', 'spotify-config.json');
+
+/**
+ * The reduced copy (IN-U7-3). Values are copied, never printed. Refuses rather than writing a partial file — a
+ * probe built on a half-copied credential would test nothing.
+ */
+function writeReducedCredentials() {
+  const live = JSON.parse(readFileSync(join(root, 'secrets', 'spotify-config.json'), 'utf8'));
+  const missing = ['clientId', 'clientSecret', 'redirectUri', 'refreshToken'].filter((k) => typeof live[k] !== 'string' || live[k] === '');
+  if (missing.length > 0) fail(`secrets/spotify-config.json lacks ${missing.join(', ')} — cannot build the reduced copy.`);
+  const reduced = {
+    clientId: live.clientId,
+    clientSecret: live.clientSecret,
+    redirectUri: live.redirectUri,
+    refreshToken: live.refreshToken,
+    accessToken: 'placeholder',
+    expiresAt: 0,
+  };
+  writeFileSync(PROBE_FILE, JSON.stringify(reduced, null, 2));
+  console.log('⚠️ PROBE MODE (IN-U7-3): verify-install/secrets/spotify-config.json is a REDUCED COPY of the real');
+  console.log('   credentials (4 values + accessToken "placeholder", expiresAt 0). Removed by `npm run verify:down`.');
+}
 
 function run(cmd, args, { allowFail = false } = {}) {
   const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
@@ -93,7 +124,8 @@ function plan() {
   install dir    verify-install/ (gitignored) — ${existsSync(INSTALL) ? 'EXISTS (up would refuse)' : 'absent'}
 
   up:   refuse unless the project resolves to "${PROJECT}" · record the live baseline · create verify-install/
-        (data/, state/ empty, config/rules.json from the template, a PLACEHOLDER Spotify config) ·
+        (data/, state/ empty, config/rules.json from the template, a PLACEHOLDER Spotify config — or, with
+        --probe-credentials, a REDUCED COPY of the real one for U7's probes P-U7-1/2 only, IN-U7-3) ·
         docker compose -f compose.verify.yaml up -d · wait for health · ${URL}
   down: refuse unless the project resolves · docker compose -f compose.verify.yaml down (no --rmi) ·
         delete verify-install/ · prove the live container and git status unchanged, and nothing *verify* left`);
@@ -106,10 +138,11 @@ function up() {
   if (!live.present) console.warn(`⚠️ The live container "${LIVE_CONTAINER}" is not present; the no-impact proof will compare against its absence.`);
 
   for (const d of ['data', 'state', 'config', 'secrets']) mkdirSync(join(INSTALL, d), { recursive: true });
-  writeFileSync(BASELINE, JSON.stringify({ takenAt: new Date().toISOString(), live, git: gitStatus() }, null, 2));
+  writeFileSync(BASELINE, JSON.stringify({ takenAt: new Date().toISOString(), live, git: gitStatus(), probeCredentials }, null, 2));
   copyFileSync(join(root, 'config', 'rules.example.json'), join(INSTALL, 'config', 'rules.json'));
-  // ⚠️ The EXAMPLE, with placeholder values. Never secrets/spotify-config.json.
-  copyFileSync(join(root, 'secrets', 'spotify-config.example.json'), join(INSTALL, 'secrets', 'spotify-config.json'));
+  // ⚠️ The EXAMPLE, with placeholder values. Never secrets/spotify-config.json — except the reduced COPY in probe mode.
+  copyFileSync(join(root, 'secrets', 'spotify-config.example.json'), PROBE_FILE);
+  if (probeCredentials) writeReducedCredentials();
 
   run('docker', ['compose', '-f', COMPOSE_FILE, 'up', '-d']);
   const deadline = Date.now() + 60_000;
@@ -121,7 +154,9 @@ function up() {
     spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},2000)']);
   }
   console.log(`\n${health === 'healthy' ? '✅' : '⚠️ '} verification installation ${health} at ${URL}`);
-  console.log('   It has no Spotify credentials and cannot skip tracks. Remove it with `npm run verify:down`.\n');
+  console.log(probeCredentials
+    ? '   It holds a REDUCED COPY of the real credentials (probe mode) and cannot skip tracks. Remove it with `npm run verify:down`.\n'
+    : '   It has no Spotify credentials and cannot skip tracks. Remove it with `npm run verify:down`.\n');
 }
 
 function down() {
@@ -144,6 +179,7 @@ function down() {
   const leftNetworks = (run('docker', ['network', 'ls', '--filter', `name=${PROJECT}`, '--format', '{{.Name}}'], { allowFail: true }) ?? '').trim();
   if (leftNetworks) problems.push(`network still present: ${leftNetworks}`);
   if (existsSync(INSTALL)) problems.push('verify-install/ still exists');
+  if (baseline.probeCredentials && existsSync(PROBE_FILE)) problems.push('the reduced credential copy still exists');
   const git = gitStatus();
   if (git !== baseline.git) problems.push(`tracked files changed during the test:\n${git}`);
 
@@ -154,7 +190,7 @@ function down() {
   }
   console.log(`\n✅ Removed. The live deployment is unchanged — same container, start time, restart count, image and
    health as before the install — no *verify* container, network or directory remains, and no tracked file
-   changed.\n`);
+   changed.${baseline.probeCredentials ? '\n   The reduced credential copy (probe mode, IN-U7-3) is gone.' : ''}\n`);
 }
 
 try {

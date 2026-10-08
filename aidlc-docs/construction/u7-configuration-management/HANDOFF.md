@@ -2,7 +2,7 @@
 
 **Written 2026-10-08.** This is the only entry point for U7 — no parallel status or resume file.
 
-## ▶ CURRENT STATE — ✅ FUNCTIONAL DESIGN APPROVED (2026-10-08) · ✅ NFR DESIGN APPROVED · ▶ INFRASTRUCTURE DESIGN WRITTEN, AWAITING APPROVAL — [`infrastructure-design/`](infrastructure-design/) (IN-U7-1…6)
+## ▶ CURRENT STATE — ✅ FUNCTIONAL DESIGN APPROVED (2026-10-08) · ✅ NFR DESIGN APPROVED · ✅ INFRASTRUCTURE DESIGN APPROVED · ▶ CODE GENERATION PLAN OPEN — 2 scoping questions, then approval: [`../plans/u7-code-generation-plan.md`](../plans/u7-code-generation-plan.md)
 
 ✅ Requirements ratified (Question 19 = A, 19a = A): **FR-66…FR-72, US-29** in `requirements.md` §3.8.
 ▶ **Review [`functional-design/`](functional-design/)** — `business-rules.md` (**BR-53…BR-60**, facts F1–F8, probes

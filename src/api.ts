@@ -51,6 +51,9 @@ import type { SkipAttemptRepository } from './playback/SkipAttemptRepository.js'
 import type { AutomationState, WriteOutcome } from './playback/types.js';
 import { haltPanel, switchView } from './ui/automationPanel.js';
 import { ingestGuard } from './ingest/ingestGuard.js';
+import { RULES_UPLOAD_CAP_BYTES } from './ingest/types.js';
+import { REPLACE_WORD, type RulesRefusal, type RulesWriter } from './configuration/RulesWriter.js';
+import type { CredentialsRefusal, CredentialsWriter } from './configuration/CredentialsWriter.js';
 import { CONFIRM_WORD, type MaintenanceService, type Refused } from './maintenance/MaintenanceService.js';
 import { comparisonView, statusView } from './ui/maintenancePanel.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
@@ -138,6 +141,15 @@ export interface ApiDeps {
   // one is behind `ingestGuard` (P-42) in addition to the app-wide `localGuard`, and none may be reachable from
   // another machine until NFR-29 is built (U9). Optional so the U0–U5 test harnesses need not construct it.
   maintenance?: MaintenanceService | null;
+
+  // -- U7: configuration management --------------------------------------------
+  //
+  // ⚠️ The first routes that WRITE configuration — `rules.json` and the credential files. Every POST is behind
+  // `ingestGuard` after `localGuard`, and none is reachable off-machine until NFR-29 (U9). Optional, as U6's.
+  rulesWriter?: RulesWriter | null;
+  credentials?: CredentialsWriter | null;
+  /** Whether label enrichment is running — a contact saved while it is OFF needs a restart (Step 6's limit). */
+  labelsActive?: boolean;
 }
 
 /**
@@ -837,12 +849,13 @@ export function createApi(deps: ApiDeps): Router {
   /** Part 2 for both — the typed confirmation (BR-48.2), then stage and restart. */
   router.post('/api/maintenance/restore/confirm', ingestGuard, (req, res) => {
     if (!deps.maintenance) return void maintenanceUnavailable(res);
-    const body = req.body as { token?: unknown; typed?: unknown } | undefined;
+    const body = req.body as { token?: unknown; typed?: unknown; applyRules?: unknown } | undefined;
     if (typeof body?.token !== 'string' || typeof body.typed !== 'string') {
       res.status(400).json({ error: 'token and typed must be strings.' });
       return;
     }
-    const r = deps.maintenance.confirm(body.token, body.typed);
+    // U7 (BR-59.2): opt-in. Only a literal `true` opts in — anything else is the default, unticked.
+    const r = deps.maintenance.confirm(body.token, body.typed, body.applyRules === true);
     if (!r.ok) return void refuse(res, r);
     // 202: accepted — the swap happens at the next startup, which the response cannot report on.
     res.status(202).json({ restarting: r.restarting });
@@ -853,6 +866,142 @@ export function createApi(deps: ApiDeps): Router {
     const body = req.body as { token?: unknown } | undefined;
     if (typeof body?.token === 'string') deps.maintenance.cancel(body.token);
     res.status(204).end();
+  });
+
+  // ─── U7: configuration management (FR-66…FR-70) ───────────────────────────────────────────────────────────
+
+  const RULES_STATUS: Record<RulesRefusal['reason'], 400 | 409 | 413 | 422 | 503> = {
+    invalid: 422,
+    'too-large': 413,
+    'stale-base': 409,
+    'changed-since-staging': 409,
+    'confirmation-required': 400,
+    'staging-expired': 409,
+    'nothing-to-undo': 409,
+    'write-failed': 503,
+    'reload-rejected': 422,
+  };
+  const CREDENTIALS_STATUS: Record<CredentialsRefusal['reason'], 400 | 413 | 500 | 503> = {
+    invalid: 400,
+    'too-large': 413,
+    'mcp-did-not-stop': 503,
+    'write-failed': 503,
+    'read-back-mismatch': 500,
+  };
+  const rulesRefuse = (res: ExpressResponse, r: RulesRefusal) =>
+    res.status(RULES_STATUS[r.reason]).json({ error: r.message, reason: r.reason, errors: r.errors });
+  const credentialsRefuse = (res: ExpressResponse, r: CredentialsRefusal) =>
+    // ⚠️ FIELD NAMES only (P-53) — the writer never puts a value in a refusal, and nothing is added here.
+    res.status(CREDENTIALS_STATUS[r.reason]).json({ error: r.message, reason: r.reason, fields: r.fields });
+  const rulesUnavailable = (res: ExpressResponse) => res.status(503).json({ error: 'Rules editing is unavailable.' });
+  const credentialsUnavailable = (res: ExpressResponse) => res.status(503).json({ error: 'Credential settings are unavailable.' });
+
+  /**
+   * The rules upload body is the file's TEXT (`text/plain`), so the 64 KB JSON parser above never sees it; this
+   * parser takes it up to the rules cap (BR-60.2). An oversized body becomes a JSON 413 (the handler at the end).
+   */
+  const rulesText = express.text({ type: 'text/plain', limit: RULES_UPLOAD_CAP_BYTES });
+
+  /** BR-53.2 — the file as it is, with its hash, which the UI sends back as the upload's base. */
+  router.get('/api/rules/file', (_req, res) => {
+    if (!deps.rulesWriter) return void rulesUnavailable(res);
+    const file = deps.rulesWriter.download();
+    if (file === null) {
+      res.status(404).json({ error: 'No rules file yet — upload one, or run `npm run rules:init`.' });
+      return;
+    }
+    const stamp = deps.now().slice(0, 19).replace(/[-:]/g, '');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="rules-${stamp}Z.json"`);
+    res.setHeader('X-Rules-Hash', file.hash);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(file.content);
+  });
+
+  /** What the Rules pop-up needs for its *Rules file* section: the base hash, undo availability, the last write. */
+  router.get('/api/rules/file/status', (_req, res) => {
+    if (!deps.rulesWriter) return void rulesUnavailable(res);
+    res.json({
+      hash: deps.rulesWriter.download()?.hash ?? null,
+      hasPrevious: deps.rulesWriter.hasPrevious(),
+      lastWrite: deps.rulesWriter.lastWrite(),
+      replaceWord: REPLACE_WORD,
+    });
+  });
+
+  /** FR-66 part 1 — stage an upload: validate, compare, never write. Base hash in `X-Rules-Base-Hash` (optional). */
+  router.post('/api/rules/upload', ingestGuard, rulesText, (req, res) => {
+    if (!deps.rulesWriter) return void rulesUnavailable(res);
+    if (typeof req.body !== 'string') {
+      res.status(415).json({ error: 'Send the rules file as text/plain.' });
+      return;
+    }
+    const base = req.get('x-rules-base-hash');
+    const r = deps.rulesWriter.stageUpload(req.body, base === undefined || base === '' ? null : base);
+    if (!r.ok) return void rulesRefuse(res, r);
+    res.json(r);
+  });
+
+  /** BR-55 part 1 — stage *Undo last rules change*. Confirmed through the same route as an upload. */
+  router.post('/api/rules/undo', ingestGuard, (_req, res) => {
+    if (!deps.rulesWriter) return void rulesUnavailable(res);
+    const r = deps.rulesWriter.stageUndo();
+    if (!r.ok) return void rulesRefuse(res, r);
+    res.json(r);
+  });
+
+  /** FR-66/67 part 2 — confirm a staged upload or undo. The answer is the WATCHER's version, never the write's. */
+  router.post('/api/rules/confirm', ingestGuard, async (req, res) => {
+    if (!deps.rulesWriter) return void rulesUnavailable(res);
+    const body = req.body as { token?: unknown; typed?: unknown } | undefined;
+    if (typeof body?.token !== 'string') {
+      res.status(400).json({ error: 'token must be a string.' });
+      return;
+    }
+    const r = await deps.rulesWriter.confirm(body.token, typeof body.typed === 'string' ? body.typed : null);
+    if (!r.ok) return void rulesRefuse(res, r);
+    res.json(r);
+  });
+
+  /** FR-69/70 — what Settings shows. ⚠️ Views only: no field of either can hold a secret (P-53). */
+  router.get('/api/settings/credentials', (_req, res) => {
+    if (!deps.credentials) return void credentialsUnavailable(res);
+    res.json({
+      spotify: deps.credentials.spotifyView(),
+      musicbrainz: deps.credentials.musicbrainzView(),
+      labelsActive: deps.labelsActive ?? false,
+      lastWrite: deps.credentials.lastWrite(),
+    });
+  });
+
+  /** FR-69 — replace the Spotify credentials. Q5 = B: no check first; FR-71 shows a bad one red. */
+  router.post('/api/settings/spotify', ingestGuard, async (req, res) => {
+    if (!deps.credentials) return void credentialsUnavailable(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const r = await deps.credentials.saveSpotify(
+      { clientId: body['clientId'], clientSecret: body['clientSecret'], redirectUri: body['redirectUri'], refreshToken: body['refreshToken'] },
+      Number(req.get('content-length') ?? 0),
+    );
+    if ('ok' in r) return void credentialsRefuse(res, r);
+    res.json(r);
+  });
+
+  /** FR-70 — the MusicBrainz contact. A contact saved while labels are OFF takes effect after a restart. */
+  router.post('/api/settings/musicbrainz', ingestGuard, async (req, res) => {
+    if (!deps.credentials) return void credentialsUnavailable(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const r = await deps.credentials.saveMusicBrainzContact(body['contact'], Number(req.get('content-length') ?? 0));
+    if ('ok' in r) return void credentialsRefuse(res, r);
+    res.json({ ...r, restartNeeded: !(deps.labelsActive ?? false) });
+  });
+
+  /** An oversized body on a U7 route is a JSON 413 the UI can show — not Express's HTML error page. */
+  router.use((err: { type?: string }, req: express.Request, res: ExpressResponse, next: express.NextFunction) => {
+    if (err?.type === 'entity.too.large' && (req.path.startsWith('/api/rules/') || req.path.startsWith('/api/settings/'))) {
+      res.status(413).json({ error: 'That is too large. Nothing was changed.', reason: 'too-large' });
+      return;
+    }
+    next(err);
   });
 
   return router;

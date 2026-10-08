@@ -149,11 +149,12 @@ credential shows red. Steps that move existing code (2) run the existing tests *
 - Shape, recorded: the restorer **never writes `config/`** — before cleanup deletes `restore-pending/`, it carries an opted-in `rules.json` OUT in its outcome; `finishRestoreRules` (tested, in `startupRestorer.ts`) applies it via `RulesWriter.applyAtStartup` only when `server.ts` reports the restored database **opened** (BR-48.6's fallback → not applied). ⚠️ Consequence: a crash between cleanup and that call loses the rules choice — the current rules stay, which is the safe direction.
 - `MaintenanceService` gains `rulesCandidate` / `currentRulesHash` deps (→ `RulesWriter`, one comparison) and `confirm(token, word, applyRules = false)`; the archive's rules are kept in the work dir until confirm decides. U6's tests pass with one fixture gaining the two new `Comparison` fields.
 
-### Step 8 — Routes 🔌 *(BR-60)*
-- [ ] `GET /api/rules/file` · `POST /api/rules/upload` · `POST /api/rules/confirm` · `POST /api/rules/undo/stage` ·
+### Step 8 — Routes 🔌 — ✅ DONE 2026-10-08 *(BR-60)*
+- [x] `GET /api/rules/file` · `POST /api/rules/upload` · `POST /api/rules/confirm` · `POST /api/rules/undo/stage` ·
       `POST /api/rules/undo/confirm` · `GET`/`POST /api/settings/spotify` · `GET`/`POST /api/settings/musicbrainz` ·
       `POST /api/maintenance/restore/confirm` accepts `applyRules`
-- [ ] Every `POST` behind `ingestGuard`; body caps 256 KB / 16 KB; route tests; `localGuard.test.ts` **unchanged**
+- [x] Every `POST` behind `ingestGuard`; body caps 256 KB / 16 KB; route tests; `localGuard.test.ts` **unchanged**
+- ✅ 15 route tests + `localGuard.test.ts` **unchanged** (60 pass). `ingestGuard` asserted on all five new POSTs × U6's three refusals, each also proving nothing was written. Deviations: undo is `POST /api/rules/undo` and confirms through the **same** `/api/rules/confirm` (one confirm path, not `undo/stage` + `undo/confirm`); `GET /api/rules/file/status` added (base hash, `hasPrevious`, last write) and `GET /api/settings/credentials` returns both views. The rules upload travels as **`text/plain`** with the base in `X-Rules-Base-Hash`, because the router's JSON parser caps at 64 KB — under the 256 KB rules cap; an oversized body is a JSON 413, never Express's HTML page.
 
 ### Step 9 — Diagnostics *(IN-U7-6)*
 - [ ] *Configuration* block: `config/` and `musicbrainz.json` writable (probed at startup), last rules write, last

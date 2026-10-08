@@ -7557,3 +7557,12 @@ credentials — `forgetCredentials()` added. Same shape as F1 (the MCP server's 
 Restorer carries an opted-in rules file out of `restore-pending/` (never writes `config/`); `finishRestoreRules`
 applies it after the restored database opens and only if the current rules are unchanged since confirm. PBT-67 at
 every fault point. Suite 1508/1508.
+
+---
+
+## 2026-10-08T19:41:49Z — U7 Code Generation Step 8 done: routes
+
+Rules: `GET /api/rules/file`, `GET /api/rules/file/status`, `POST /api/rules/upload` (text/plain, base hash header),
+`POST /api/rules/undo`, `POST /api/rules/confirm`. Settings: `GET /api/settings/credentials`, `POST /api/settings/spotify`,
+`POST /api/settings/musicbrainz`. Restore confirm takes `applyRules` (literal `true` only). Every POST behind
+`ingestGuard`; `localGuard.test.ts` unchanged.

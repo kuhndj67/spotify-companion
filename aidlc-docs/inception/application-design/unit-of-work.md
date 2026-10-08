@@ -34,7 +34,13 @@ tractable units while still shipping as one runnable checkpoint.
 | **U3** | 3 | Rule Model & Evaluation | Pure core | **CI green** |
 | **U4** | 3 | Rule Observability | Feature | CI green **+ live** |
 | **U5** | 4 | Automated Skipping | Feature | CI green **+ live** |
-| **U6** | **5** | **User-Data Lifecycle** | **Infrastructure** | ⚠️ **CI green + a VERIFIED CROSS-MACHINE ROUND TRIP** |
+| **U6** | **5** | **User-Data Lifecycle** | Feature *(was Infrastructure until its FD, 2026-10-07)* | CI green **+ live + a VERIFIED CROSS-MACHINE ROUND TRIP** |
+| **U7** | 5 | Configuration Management | Feature | CI green **+ live** — rules and credentials changed in-app on a running deployment |
+| **U8** | 5 | Team Workflow & Onboarding | Process & docs | CI gating enforced **+ the install walked cold** by someone who did not write it |
+| **U9** | 5 | Off-machine Deployment | Deployment | Reachable and fully working from a second machine, **deployed by following U8's install routine** |
+
+⚠️ **Phase 5's units were renumbered on 2026-10-07** to match build order (Units Question 5a = A). Old → new:
+U8 → **U7**, U9 → **U8**, U7 → **U9**. `audit.md` entries written before that date use the old numbers.
 
 ---
 
@@ -179,34 +185,6 @@ read-only (Q2 = A from Application Design).
 
 ---
 
-## U6 — User-Data Lifecycle *(Phase 5)*
-
-**Purpose**: make the corpus **movable and recoverable**, so a deployment can exist somewhere other than
-the machine that created it.
-
-⚠️ **This unit adds no feature and changes no behaviour.** It is a prerequisite: U7's off-machine
-deployment cannot responsibly touch a corpus that cannot be moved back.
-
-**Modules**
-```
-scripts/   backup-history.mjs  restore-history.mjs  verify-all-backups.mjs   (EXTENDED, not replaced)
-scripts/   <migration tooling, shape TBD by the FD>
-```
-
-⚠️ **It EXTENDS a working pair rather than starting fresh.** `db:backup` / `db:restore` have existed
-since 2026-09-27 and a round trip is rehearsed — 850 plays → damaged to 0 → restored to 850,
-`integrity_check: ok`. **What is missing is everything that is not `history.db`, and a guard that works
-across machines.**
-
-**Stories**: none. ⚠️ **This is the first unit with no user story**, and that is accurate rather than an
-oversight — no user asked for it; U7 did. Recorded so nobody later invents a story to justify it.
-
-**Why it is `Infrastructure` and not `Feature`**: its output is a *property* of the system (the corpus can
-move) rather than something the user can see. Its exit criterion is therefore an operation performed, not a
-screen verified.
-
----
-
 ## U5 — Automated Skipping
 
 **Purpose**: arm it, with interlocks that make being wrong recoverable.
@@ -236,6 +214,97 @@ src/rules/     SkipExecutor  EnrichmentPrewarmer
 > lookahead proves unavailable during playback; FR-34/35's deadline fallback already covers that
 > case. Designing around unverified lookahead and discovering the problem afterwards is the
 > avoidable version of this risk.
+
+---
+
+## U6 — User-Data Lifecycle *(Phase 5)*
+
+**Purpose**: make the corpus **movable and recoverable** — *Create backup* / *Restore backup* in a
+Settings pop-up, without stopping the app.
+
+⚠️ **Amended 2026-10-07 by the Functional Design.** This entry first described U6 as *"adds no feature,
+EXTENDS the scripts, no user story"*. The FD answers changed all three: backup and restore are **in-app**
+(user-facing feature, FR-57…FR-64), they run **inside the app's own process** (which is what removes the
+cross-machine writer-guard problem), and the unit has **US-28**. The scripts remain as a developer facility.
+
+**Modules** (logical — names allocated in NFR Design)
+```
+src/maintenance/   backup (online, node:sqlite backup()), restore staging, startup swap, temp sweep
+src/ingest/        FR-64's ONE admission path — transport, archive extraction, content checks (reused by U7)
+src/backup/        the 8-check verifier, MOVED from scripts/restore-history.mjs and imported by both
+public/            Settings pop-up; Export and Diagnostics move into it
+scripts/           db:backup / db:restore / db:verify-backups — developer-only, now importing the verifier
+```
+
+**Stories**: **US-28**. **Requirements**: **FR-57…FR-64**. **Rules**: BR-44…BR-52.
+FD: `construction/u6-data-lifecycle/functional-design/`.
+
+**Exit criterion is an operation, not a screen**: a corpus backed up on one machine, restored on another,
+and the restored app runs.
+
+---
+
+## U7 — Configuration Management *(Phase 5)* — declared 2026-10-07, NOT YET DESIGNED
+
+**Purpose**: on an appliance the user cannot edit host files, so **rules and credentials must be
+manageable from inside the app**. Split out of U6 by FD T1 = A (2026-10-07).
+
+**Gates U9** alongside U6. **Reuses U6's FR-64 admission path** for every file it ingests — it does not get
+its own.
+
+**Scope as settled so far** (U6 FD §10): rules **download/upload now, a built-in editor later** (T2 = C),
+validated by U3's validator **before** any write · credentials via **write-only settings fields** for
+non-OAuth values plus **upload of the `spotify-config.json` produced by `npm run auth`** run where the
+browser is (T3 = A; in-app OAuth needs TLS → W-10) · offering to apply a backup's `rules.json` during a
+U6 restore.
+
+⚠️ **It reopens a settled posture decision**: Infrastructure Q1 made `config/` `:ro` so the app could never
+overwrite hand-authored rules. U7 makes the app write rules **by design**, so where they live is its first
+question — ⚠️ **never `state/`** (*"a kill switch stored in the same writable directory as the file an AI
+agent edits is a kill switch that agent can disable"*). ⚠️ And `secrets/spotify-config.json` is a
+**single-file `:rw` bind mount**, so writing it must be in place (inode hazard).
+
+---
+
+## U8 — Team Workflow & Onboarding *(Phase 5)* — declared 2026-10-07, NOT YET DESIGNED
+
+**Purpose**: a second person can review, install and contribute **without this project's tacit knowledge**.
+Added by Units Question 4 = A — this work was previously listed only as *"(later) team workflow + onboarding
+docs"*, with no unit, no design stage and no exit criteria.
+
+**Scope as settled by the Phase 5 requirements round** (`requirement-verification-questions.md`):
+`main` protected with PRs and required CI, owner may push directly (**Q13 = B**) · `smoke` and `knip` in CI,
+with the workflow saying `smoke` is a link check there (**Q14 = A**; closes the gap owed from U5's NFR Q9) ·
+short README + `docs/INSTALL.md` + `CONTRIBUTING.md` (**Q15 = A**) · `SECURITY.md` · licence **GPL-3.0**
+(**Q16 = C**; ⚠️ the bundled MCP server has **no licence** — no built image may be published until resolved) · an install routine written once for both a person and an AI agent, every step with its verification
+command and expected output (**Q17 = C**) · each user registers their own Spotify app (**Q17a = A**) ·
+credentials never in the repo, enforced in CI (**Q17b = B**) · rewrite `CLAUDE.md`'s single-developer assumption.
+
+**Requirements**: **FR-65**, **NFR-28, NFR-30–NFR-33**.
+
+**Depends on**: U6 and U7 — the install routine documents *Restore backup* and the in-app credential and rules
+steps. **Stories**: none yet — to be settled in its FD, not invented here.
+
+---
+
+## U9 — Off-machine Deployment *(Phase 5)* — NOT YET DESIGNED
+
+**Target**: the owner's Synology NAS, **`SYNNAS` (192.168.0.223)**, on a private, non-forwarding LAN.
+
+**Purpose**: the app runs on another machine on the user's LAN (a Synology NAS first), fully working, under
+the security posture chosen in Requirements **Question 11a = B**: **delegated authentication** (NFR-29) —
+an OIDC sign-in at a proxy that terminates TLS, and a signed-token check in the app. The user's NAS has its
+OAuth/SSO service installed but unconfigured — a candidate identity provider, **to be probed**. A Synology MCP
+server could let the agent do NAS configuration directly; ⚠️ that is an administrator credential (NFR-28,
+least privilege).
+
+**Depends on**: U6 (the corpus can move), U7 (an appliance needs in-app configuration), U8 (the deployment is
+performed **by following U8's install routine** — so the cold walk is this unit's verification).
+
+**Carried into its design plan** (Units round, *Carried to U9's design plan*): **U9-a** NAS as *the* deployment
+or a throwaway second one · **U9-b** two deployments on one Spotify registration · probe **WAL on the NAS
+volume** · verify the WebSocket handshake **both directions** off-machine. ⚠️ U6's upload routes must not be
+reachable off-machine before Question 11 is decided.
 
 ---
 

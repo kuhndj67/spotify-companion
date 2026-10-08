@@ -138,7 +138,10 @@ Consistency cross-check:
 | **U3** Rule Model & Evaluation | 3 | Catalogue, facts, predicate, validator, engine, store | US-14, 15, 16, 17 |
 | **U4** Rule Observability | 3 | Decision log, dry-run, back-testing | US-20, 23, 24 |
 | **U5** Automated Skipping | 4 | Playback control, safety interlocks, timing | US-18, 19, 21, 22, rest of 13 |
-| **U6** User-Data Lifecycle | **5** | Full backup, verified restore, cross-machine migration | ⚠️ **none — U7 is the consumer, not a user** |
+| **U6** User-Data Lifecycle | **5** | Full backup, verified restore, cross-machine migration | ~~none~~ **US-28** *(FD, 2026-10-07)* |
+| **U7** Configuration Management | **5** | Rules and credentials in-app | — |
+| **U8** Team Workflow & Onboarding | **5** | CI gating, docs, install routine | — |
+| **U9** Off-machine Deployment | **5** | The NAS target | — |
 | **U0** Existing (reference only) | 0 | Display, enrichment, guard, diagnostics | US-01–07, 26 |
 
 ---
@@ -158,3 +161,151 @@ Runs after approval.
 - [x] Verify each phase's units together deliver a runnable app
 - [x] Verify U3 can be built with no playback code path existing
 - [x] Update `aidlc-state.md`; log in `audit.md`
+
+
+---
+---
+
+# Phase 5 round — Units Generation re-entered (2026-10-07)
+
+> ⚠️ **Unit numbers were changed during this round (Question 5a = A, 2026-10-07).** Questions 4, 5 and 5a and
+> their answers below use the **old** numbers, because they are the record of what was asked. Old → new:
+> **U8 Configuration Management → U7** · **U9 Team Workflow & Onboarding → U8** · **U7 Off-machine
+> Deployment → U9**. Everything outside those questions uses the new numbers.
+
+**Why**: Phase 5's units were declared ad hoc — U6 and U7 on 2026-10-06 in a non-standard
+`phase-5-plan.md`, and **U8** on 2026-10-07 from the U6 Functional Design (T1 = A) — without passing
+through this stage. This round brings them in. **Inputs**: the Phase 5 round of
+[`../requirements/requirement-verification-questions.md`](../requirements/requirement-verification-questions.md)
+(Questions 11–17a) and the U6 FD settled reading
+([`../../construction/plans/u6-functional-design-plan.md`](../../construction/plans/u6-functional-design-plan.md) §10).
+
+### Settled already — not re-asked
+
+| | Status | Where settled |
+|---|---|---|
+| Units nest inside phases (hybrid) | Unchanged | Question 1 = C above |
+| **U6 User-Data Lifecycle** | Its scope is settled by its own FD | U6 FD §10 |
+| **U7 Configuration Management** (declared as *U8*) split out of U6 | Decided | U6 FD T1 = A |
+| **Deployment model** | Still one container — but now **one per user, on that user's machine**; one may live on a NAS | Phase 5 requirements round context |
+| **Team alignment** | ⚠️ **Changes**: no longer *"single developer"*. Others may review and contribute; ownership boundaries are still not needed | Phase 5 requirements round |
+
+---
+
+## Questions
+
+### Question 4 — Which units make up Phase 5?
+
+The work that Phase 5 requirements Questions 13–17 produce — CI gating, README/INSTALL/CONTRIBUTING,
+LICENCE/SECURITY, the install routine and its cold walk — is listed in the execution plan only as
+*"(later) team workflow + onboarding docs"*, with no unit.
+
+A) **Four units: U6, U8, U7, and a new U9 — Team Workflow & Onboarding** (CI gating, the documents, the install routine) ⭐ *recommended*
+
+B) Three units — fold the onboarding work into U7
+
+C) Three units — the onboarding work done as housekeeping outside any unit. ⚠️ Work with no unit has no design stage, no exit criteria and no build-and-test record: the non-standard path this round exists to remove
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+A
+---
+
+### Question 5 — In what order?
+
+Fixed: U6 first (the corpus must be movable before anything moves), and U8 before U7 (an appliance is
+unusable if rules and credentials cannot be managed in-app).
+
+A) **U6 → U8 → U9 → U7.** U7's NAS deployment is then performed **by following U9's install routine** — so the cold walk *is* U7's verification, rather than a second exercise ⭐ *recommended*
+
+B) U6 → U8 → U7 → U9. Deploy first, write the routine from what was learned. ⚠️ Writes it from memory — exactly what the cold walk is meant to prevent
+
+C) U9 in parallel with U6/U8 — documents and CI have no code dependency on them. ⚠️ The install routine's restore and credential steps would describe features not yet built
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+Is there a reason why we shouldn't just swap the unit numbers if we find that U8 needs to be build before U7? (just swap 7 and 8)?
+---
+
+## Carried to U9's design plan — NOT asked now
+
+These were Q2 and Q5 of the retired `phase-5-plan.md`. They are **U9 design** questions, so under the
+standard process they belong in U9's Functional/Infrastructure Design plan when U9 starts. Recorded here so
+they are not lost.
+
+**U9-a — Is the NAS deployment THE deployment, or a second, throwaway one?**
+A) Treat the NAS as *the* deployment; move the corpus there with U6 ·
+B) ⭐ A second, throwaway deployment with its own empty corpus first; this machine stays authoritative.
+⚠️ B's cost: two deployments on one Spotify registration (U9-b), and a second corpus that is **not** a
+backup of the first and must never be mistaken for one. ⚠️ `secrets/spotify-config.json` holds a refresh
+token the MCP server rewrites — on NAS storage it may be swept into DSM snapshots or cloud sync.
+
+**U9-b — Two deployments, one Spotify app registration.** The poll is ~1,200 requests/hour (98.4% of the
+footprint); two live deployments double it against a ceiling Spotify does not publish.
+A) ⭐ Only one deployment polls at a time · B) Both run; watch M2 for 429s · C) A second registration for
+the NAS. ⚠️ *Run both* forecloses going back — restore replaces, never merges (U6 Q3). ⚠️ Zero observed
+429s is not headroom.
+
+**Also carried to U9**: probe **WAL on the NAS volume** (the existing proof covers a Rancher bind mount; the
+standing advice is that WAL is unsafe on *network* filesystems) · verify the WebSocket handshake **in both
+directions** from off-machine (the `403` incident's signature is 200 on the page and 403 on the socket).
+
+---
+
+## Phase 5 Execution Checklist
+
+Runs after approval.
+
+- [x] Confirm answers; check consistency and ambiguity
+- [x] `application-design/unit-of-work.md` — add **U9** and (per Question 4) **U8** entries; U6 and U7 exist
+- [x] `application-design/unit-of-work-dependency.md` — ⚠️ **has no Phase 5 units at all**; add U6–U8
+- [x] `application-design/unit-of-work-story-map.md` — ⚠️ **has no Phase 5 units at all**; map US-28 → U6
+- [x] Correct the *Proposed units* table above: U6's *"none"* stories cell → **US-28**
+- [x] Verify no unit depends on a later unit, and that Phase 5's units together leave a runnable app
+- [x] Update `execution-plan.md`, `aidlc-state.md`; log in `audit.md`
+
+
+---
+
+## Phase 5 round — answer analysis and follow-ups (2026-10-07)
+
+**Settled**: Question 4 = **A** — four units: U6, U8, U7, and **U9 Team Workflow & Onboarding**.
+
+**Question 5** was answered with a question: *"Is there a reason why we shouldn't just swap the unit numbers
+if we find that U8 needs to be built before U7?"*
+
+**Answer: no strong reason.** Unit numbers here are names, not dates, but every earlier unit was numbered in
+build order, so keeping that convention is the less surprising choice. Renumbering is cheap **now** because
+**nothing has been designed for U7, U8 or U9 yet**: about 60 mentions across 12 documents, all of them
+declarations or cross-references.
+
+⚠️ **One thing it touches: `audit.md` is append-only**, so its earlier entries keep the old numbers. The
+renumbering is logged there with an explicit mapping, so old entries stay readable.
+
+⚠️ **And swapping only 7 and 8 is not quite enough**: under the recommended order (Question 5 A) U9 is also
+built before the deployment unit. Build order is U6 → configuration → onboarding → deployment, so matching it
+means renumbering all three.
+
+## Question 5a — Order, and whether the numbers follow it
+
+A) **Order U6 → configuration → onboarding → deployment, and renumber to match**: **U7 Configuration
+Management · U8 Team Workflow & Onboarding · U9 Off-machine Deployment**. Mapping logged in `audit.md` ⭐
+*recommended*
+
+B) Same order, **keep the current numbers** (U6 → U8 → U9 → U7); the execution plan carries the order
+
+C) Order U6 → configuration → deployment → onboarding (Question 5 B), renumbered to match (onboarding = U9)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: A — renumber to build order. *(Recorded from the user's reply in conversation, 2026-10-07: "go ahead and swap the numbers so the numbers stay sequential.")*
+
+### Answer analysis (Step 7)
+
+Q4 = A, Q5a = A. **Order: U6 → U7 Configuration Management → U8 Team Workflow & Onboarding → U9 Off-machine
+Deployment.** Consistency: U7 before U9 (an appliance needs in-app configuration); U8 before U9 (the
+deployment is performed by following U8's install routine, so the cold walk is U9's verification); U8 after U7
+(the routine documents U7's credential and rules steps). No unit depends on a later one.
+

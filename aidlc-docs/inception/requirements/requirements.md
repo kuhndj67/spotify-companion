@@ -407,6 +407,34 @@ Q4 answered "read-only now, designed for later control". CQ3 = C brings that lat
 the rules engine is inert without it. The scope (`user-modify-playback-state`) is already
 granted, so this is a code change only, with **no re-authentication required**.
 
+### 3.7 Operations — *new 2026-10-07; U6 (Phase 5)*
+
+Added when backlog **W-5** was promoted to unit **U6** (FD Q6 = A). ✅ **Ratified 2026-10-07** in Requirements Analysis (Phase 5 round, Question 12 = A) — they had been written during FD, skipping this step. ⚠️ **FR numbering has so far meant
+user-visible behaviour; these are too** — each is something the user does or sees in the Settings pop-up.
+Rules: `construction/u6-data-lifecycle/functional-design/business-rules.md` (BR-44…BR-52).
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-57 | **Create backup**: one action produces and downloads a single archive of the listening history (and the authored rules), taken from the running app **without stopping recording** | Must | ⬜ New |
+| FR-58 | **Restore backup**: upload an archive, see what it contains beside the current history, confirm, and have it **replace** the active history. An archive that fails verification is refused and **nothing changes** | Must | ⬜ New |
+| FR-59 | **Undo last restore**: the history replaced by the most recent restore is kept (exactly one) and can be restored the same way | Must | ⬜ New |
+| FR-60 | Credentials are **never** written into a backup, and restore **never** changes them | Must | ⬜ New |
+| FR-61 | The automation switch and halt latch are **never** written into a backup, and restore **never** changes them | Must | ⬜ New |
+| FR-62 | Backup and restore **leave no files behind** beyond the one previous history (FR-59), including after a failure or crash | Must | ⬜ New |
+| FR-63 | A **Settings** pop-up holds backup/restore, export and diagnostics; rules and the automation switch stay on the main screen | Should | ⬜ New |
+| FR-64 | **Every file the app accepts from outside** passes one shared admission path that validates it completely before it can affect anything | Must | ⬜ New |
+
+⚠️ **FR-64 is written once here and reused by U7** (rules and credentials ingest). It is a requirement
+rather than an NFR because the user asked for it as behaviour: *"use secure patterns… for ALL file ingest
+activities"* (FD T2, 2026-10-07).
+
+| FR-65 | **Install routine**: one step list that a person can follow **and** an AI agent can execute — every step carries its **verification command and expected output**. Each user registers **their own** Spotify developer app; nothing is shared between installs. It must be **walked cold** on a clean machine by someone who did not write it | Must | ⬜ New |
+
+**FR-65 added 2026-10-07** (Phase 5 requirements round, Q17 = C, Q17a = A). Owner: **U8**.
+
+⚠️ **FR-56** (*"a dated export snapshot on a schedule… so a backup exists"*) is **not** superseded: it writes
+CSV/JSON *exports*, and an export is not a restorable backup. Scheduled **backups** are W-9.
+
 ---
 
 ## 4. Non-Functional Requirements
@@ -427,6 +455,23 @@ Per Q9, security is scoped to *guaranteeing local-only access*. Production contr
 TLS, secret managers, audit logging) are deliberately out of scope. **NFR-07 depends entirely on
 NFR-01 to NFR-04**: if local-only enforcement is ever weakened, the no-auth decision collapses
 with it. A property test already covers this boundary — it caught a real IPv6 bypass.
+
+### 4.1a Phase 5 — sharing, deployment and the repository *(added 2026-10-07)*
+
+From the Phase 5 requirements round (`requirement-verification-questions.md`, Questions 11–17b).
+
+| ID | Requirement | Status |
+|---|---|---|
+| NFR-28 | **Credentials are never committed.** `secrets/` stays ignored except `*.example.json`; **CI runs a secret scanner on every push**, and a test fails if any tracked file under `secrets/` is not a `*.example.json` | ⬜ New (Q17b = B) |
+| NFR-29 | **Off-machine access uses delegated authentication.** The app never handles passwords. Behind a proxy or load balancer that signs the user in (OIDC) and terminates TLS, the app runs in a **trusted-proxy mode** that requires a **verified, signed identity token** on every request — HTTP **and** the WebSocket upgrade, through **one** policy function (`decideAccess`). Local-only stays the default mode | ⬜ New (Q11a = B) |
+| NFR-30 | `main` is protected: changes arrive by pull request with required CI checks (typecheck, tests, `smoke`, `knip`, the secret scan); the owner may push directly | ⬜ New (Q13 = B) |
+| NFR-31 | `npm run smoke` runs in CI, and the workflow states that there it proves scripts **load**, not that they behave | ⬜ New (Q14 = A) |
+| NFR-32 | The project is licensed **GPL-3.0** (`LICENSE` at the root). ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence | ⬜ New (Q16 = C) |
+| NFR-33 | A short `README` (what it is, status, where to read more), `docs/INSTALL.md`, `CONTRIBUTING.md` and `SECURITY.md` exist and are **accurate** | ⬜ New (Q15 = A) |
+
+⚠️ **NFR-29 amends NFR-07, it does not repeal it.** In local-only mode, *no authentication* is still justified
+by NFR-01…04. Off-machine, that justification is gone, and NFR-29 is what replaces it. ⚠️ **And NFR-28 is not
+covered by NFR-05**, which protects logs, the UI and the database — not the repository.
 
 ### 4.2 Data and persistence
 
@@ -959,6 +1004,35 @@ of the item — **it cannot be relaxed for convenience without becoming the co-g
 exists to break.**
 
 ---
+
+#### W-10 — TLS, so the Spotify sign-in can run inside the app on another machine
+
+**Raised 2026-10-07** in U6 FD (T3). ⚠️ **Accepted as later** (user, same day).
+
+The OAuth redirect is `http://127.0.0.1:8888/callback`, so the sign-in must run on the machine with the
+browser; on a NAS the callback lands on the wrong computer. Spotify's documentation says non-loopback
+redirect URIs must be **HTTPS** — ⚠️ **unprobed; this project has been wrong about Spotify's docs six
+times.** Until then, re-authenticating is *re-run `npm run auth` where the browser is, and put the resulting
+file in place* — under **U7**, by upload through FR-64's admission path. Not a reinstall.
+
+**Ties to Phase 5 Q1** (security posture): TLS on the app is a step toward the reverse-proxy option.
+
+#### W-9 — Scheduled backups with off-site upload
+
+**Raised 2026-10-07** in U6 Functional Design (M2). ⚠️ **Considered and deliberately NOT done now**
+(user decision, same day).
+
+**Why it is possible now when it was not before**: U6 moves backup **into the app's own process**
+(`node:sqlite` `backup()`, probed 2026-10-07 under concurrent writes), so a timer no longer means a second
+writer — the reason the U6 plan originally excluded scheduled backups is gone.
+
+**Why it is deferred**: a scheduled backup on the same disk is a copy, not protection against losing that
+disk. Its only value is **off-site**, which means building a share-drive or object-store interface — new
+credentials, new failure modes, a new outbound surface. U6 instead ships **zip-and-download** (M4): the
+user stores the backup wherever they choose.
+
+**Revisit when** the app is "in production" on a host where the user would not notice the disk failing
+(e.g. the NAS), or if a manual download is observed to be skipped in practice.
 
 #### W-8 — `confirmed()` compares progress across a track change
 

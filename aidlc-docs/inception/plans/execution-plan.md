@@ -245,18 +245,41 @@ and changing it is a **security-posture decision**, surfaced rather than decided
 
 | Unit | Delivers | Gates |
 |---|---|---|
-| **U6** User-Data Lifecycle | Full backup, verified restore, **cross-machine migration** | ⚠️ **Prerequisite for everything else in the phase** |
-| **U7** Off-machine deployment | The NAS target, under a chosen security posture | U6 |
-| *(later)* team workflow + onboarding docs | CI gating, README/INSTALL/CONTRIBUTING/LICENSE | — |
+| **U6** User-Data Lifecycle | *Create backup* / *Restore backup* in-app; the corpus can move between machines | ⚠️ **Prerequisite for everything else in the phase** |
+| **U7** Configuration Management | Rules and credentials manageable in-app (upload/download, write-only fields) via U6's admission path | U6 |
+| **U8** Team Workflow & Onboarding | CI gating, README/INSTALL/CONTRIBUTING/LICENSE/SECURITY, the install routine | U6, U7 |
+| **U9** Off-machine Deployment | The NAS target, under the chosen security posture, deployed by following U8's routine | U6, U7, U8 |
 
-⚠️ **U6 is the gate, and it is the first unit in the project with NO user story** — U7 is its consumer.
-The `db:backup` / `db:restore` pair already works, so the migration is feasible today; what makes it
-unsafe is that **the writer-guard goes blind across machines**, the backup covers `history.db` only, and
-**restore is one-way with no merge**.
+**Build order: U6 → U7 → U8 → U9** (Units Questions 4 and 5a, 2026-10-07). ⚠️ **Renumbered that day to match
+build order** — old U8 → U7, old U9 → U8, old U7 → U9; earlier `audit.md` entries keep the old numbers.
 
-▶ **Seven questions open**: [`phase-5-plan.md`](phase-5-plan.md), and six more in
-[`u6-functional-design-plan.md`](../../construction/plans/u6-functional-design-plan.md). Nothing is
-designed until they are answered.
+⚠️ **U6 is the gate.** ~~It is the first unit in the project with NO user story~~ — **amended 2026-10-07**: the
+FD made it first-class, with **US-28** and FR-57…FR-64. ~~What makes the migration unsafe is that the
+writer-guard goes blind across machines~~ — **dissolved by U6's FD**: backup and restore run inside the app's
+own process, so there is no second writer to guard against. Restore remains **one-way with no merge**.
+
+▶ **Open questions now sit in the standard stages** (moved 2026-10-07 from a retired, non-standard
+`phase-5-plan.md`): Requirements Analysis **Questions 11–17a** in
+[`../requirements/requirement-verification-questions.md`](../requirements/requirement-verification-questions.md),
+and Units Generation **Questions 4–5** in [`unit-of-work-plan.md`](unit-of-work-plan.md).
+
+**Exit criteria**
+
+- [ ] **U6 complete** — a corpus backed up on one machine through *Create backup*, restored on another through
+      *Restore backup*, and the restored app runs
+- [ ] The app is reachable and fully functional from a second machine, under the Question 11 posture
+- [ ] ⚠️ **WAL probed on the NAS volume** — not reasoned about. The existing proof covers a Rancher bind mount,
+      and the standing advice is that WAL is unsafe on *network* filesystems
+- [ ] WebSocket handshake verified **in both directions** from off-machine — the `403` incident's signature is
+      200 on the page and 403 on the socket
+- [ ] `smoke` and `knip` run in CI; `main` protected per Question 13
+- [ ] A contributor walks the install **cold** on a clean machine and records where they got stuck
+- [ ] `README`, `INSTALL`, `CONTRIBUTING`, `LICENSE`, `SECURITY` exist and are accurate
+- [ ] `CLAUDE.md`'s single-developer assumption rewritten
+- [ ] Backlog W-1…W-10 tracked wherever Question 13's workflow says
+
+**Not in this phase**: internet exposure · multi-tenancy or a user model · a shared corpus or cross-user
+analysis · W-6's wider programme (only its two shipped guards go into CI).
 
 ---
 

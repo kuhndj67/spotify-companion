@@ -5,14 +5,37 @@ there is no parallel status, resume or progress file, and one should not be crea
 
 ---
 
-## ▶ CURRENT STATE — NOT STARTED. Functional Design is the next step.
+## ▶ CURRENT STATE (2026-10-07) — ✅ FUNCTIONAL DESIGN APPROVED. Next: NFR Requirements
 
-**Nothing is built.** `src/` and `scripts/` are untouched by this unit. If `git status` shows otherwise,
-something was started that this file does not know about.
+✅ **All FD questions answered** across five rounds (Q1–Q6, FQ1–FQ3, M1–M4, S1–S5, T1–T4). **Read the
+settled reading, [plan §10](../plans/u6-functional-design-plan.md), not the raw answers** — several later
+answers overrode earlier ones.
 
-▶ **Next: answer the questions in
-[`../plans/u6-functional-design-plan.md`](../plans/u6-functional-design-plan.md).** Nothing is designed
-until they are.
+✅ **FD artifacts**: [`functional-design/`](functional-design/) — `business-rules.md` (**BR-44…BR-52**),
+`business-logic-model.md`, `domain-entities.md`, `frontend-components.md`. Requirements **FR-57…FR-64**
+(§3.7 *Operations*), story **US-28**, backlog **W-9** and **W-10**.
+
+**`src/` and `scripts/` are still untouched.**
+
+✅ **FR-57…FR-64 ratified 2026-10-07 (Requirements Question 12 = A).** ✅ **FD approved by the user 2026-10-07.** ▶ **Next: NFR Requirements → NFR Design → Infrastructure Design → Code
+Generation → Build & Test** (full process, FQ3 = A).
+
+### ⚠️ What changed from the original U6 framing below — read before the older sections
+
+- **Backup and restore moved INTO the app** (Settings pop-up: *Create backup* downloads, *Restore backup*
+  uploads and replaces). The running app snapshots itself with `node:sqlite` `backup()` — **probed under
+  281 concurrent writes, no downtime** — and applies a restore **at startup, before the database opens**.
+- ⚠️ **So gap 1 below (the cross-machine guard) is DISSOLVED, not solved**: with one writer doing both, there
+  is no second process to guard against. **A design change that reintroduces a second writer reintroduces
+  the problem.**
+- **A live quiesce was evaluated and NOT built** — six writer drivers, and since restore replaces, it would
+  protect nothing.
+- **Gap 2** is settled by an allowlist archive: `manifest.json` · `history.db` · `rules.json`. ⚠️ **Never**
+  `secrets/` or `state/`.
+- **Gap 3** stands: replace, never merge — plus **one previous database** for *Undo last restore*.
+- **Rules and credentials management became a separate unit, U7**, which also gates U9.
+- ⚠️ **FR-64: one secure admission path for every uploaded file** (user: *"ALL file ingest"*) — BR-46.
+  ⚠️ **The upload routes must not be reachable off-machine until Phase 5 Q1 is decided.**
 
 ---
 
@@ -22,7 +45,7 @@ until they are.
 required prerequisite? … we could backup the data on Rancher Desktop, start up the NAS hosted app and once
 connected restore the data to that environment?"*
 
-The answer is **yes, and the gap is narrower than it looks but sharper**. U7 cannot responsibly deploy
+The answer is **yes, and the gap is narrower than it looks but sharper**. U9 cannot responsibly deploy
 off-machine until a corpus can be moved and moved back.
 
 **This is W-5**, which has existed in the backlog since 2026-09-27 and is now the gating item for a phase.

@@ -124,7 +124,7 @@ US-14, US-15, US-17, US-18, US-20, US-21, US-22, US-23, US-24
   worthless to this persona.
 
 ### Stories
-US-10, US-11, US-12, US-13, US-24, US-25
+US-10, US-11, US-12, US-13, US-24, US-25, US-28
 
 ---
 
@@ -151,7 +151,7 @@ out in NFR-25 as a property test for exactly this reason.
 |---|---|---|
 | P1 Listener | 9 | Awareness, Understanding, Shaping (as beneficiary) |
 | P2 Curator | 9 | Shaping, Control |
-| P3 Analyst | 6 | Remembering, Hypothesis |
+| P3 Analyst | 7 | Remembering, Hypothesis, Operations |
 
 Every story maps to at least one persona. US-19 and US-24 serve two, and are marked as such in
 [`stories.md`](stories.md).

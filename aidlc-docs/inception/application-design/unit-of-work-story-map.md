@@ -34,6 +34,7 @@
 | **US-19** Track actually goes away | **U5** | 4 | P1, P2 | ⬜ |
 | **US-21** Stop everything | **U5** | 4 | P2 | ⬜ |
 | **US-22** Protected from my mistake | **U5** | 4 | P2 | ⬜ |
+| **US-28** Move my history to another machine | **U6** | 5 | P3 | ⬜ *(added 2026-10-07)* |
 | US-27 Live dashboard | — | — | P3 | ⏸ Deferred (W-1) |
 
 **26 in-scope stories assigned. US-27 is unassigned by design** — it is a wishlist item, not
@@ -110,6 +111,8 @@ consequence of putting risk containment ahead of gratification.
 | U4 | FR-37, FR-41, FR-42 | NFR-26 |
 | U5 | FR-34–36, FR-38–40, FR-46–48 | NFR-23 |
 | U0 | FR-01–11 | NFR-01–07, NFR-16–21, NFR-24 |
+| U6 | FR-57–64 | — *(its NFR Requirements stage follows FD approval)* |
+| U7, U8, U9 | — *(settled in their own stages; see the Phase 5 requirements round)* | — |
 
 **All in-scope functional requirements (FR-01 to FR-54) are assigned.** FR-55 is wishlisted
 (W-1) and correctly has no unit.
@@ -120,9 +123,9 @@ consequence of putting risk containment ahead of gratification.
 
 | Check | Result |
 |---|---|
-| Every in-scope story assigned | ✅ 26 of 26 |
+| Every in-scope story assigned | ✅ 27 of 27 *(US-28 → U6, 2026-10-07)* |
 | No story in two units without justification | ✅ US-13 only, justified above |
 | No unit depends on a later unit | ✅ Matrix is lower-triangular |
 | Each phase's units deliver a runnable app | ✅ Phase 3 = U3 + U4 together |
-| Every FR maps to a unit | ✅ FR-01–54; FR-55 wishlisted |
+| Every FR maps to a unit | ✅ FR-01–54 and FR-57–64; FR-55 wishlisted |
 | Every persona served by at least one unit | ✅ All three |

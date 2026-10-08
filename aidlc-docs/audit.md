@@ -6889,3 +6889,239 @@ with its units · U6 declared in `unit-of-work.md` and `unit-of-work-plan.md` ·
 `aidlc-state.md` updated.
 
 **Nothing is built. `src/` and `scripts/` are untouched by this unit.**
+
+---
+
+## 2026-10-06 (later) — Phase 5 / U6 questions teed up; U6 Q5a measured
+
+Re-verified the facts both plans rest on, same day: `localGuard.ts:141` still requires a loopback `Host` ·
+`ci.yml` still runs neither `smoke` nor `knip` · `README.md` still 463 lines opening on the walking
+skeleton · no `LICENSE`, `CONTRIBUTING` or `SECURITY`. All reproduce.
+
+✅ **U6 Q5a answered by measurement rather than asked.** Metabase's API reports 32 cards / 3 dashboards:
+6 + 2 are the Spotify reports, all built by `npm run reporting:report`; the rest is Metabase's sample
+content. **No hand-authored work lives only in the `metabase-app-db` volume.**
+
+⚠️ **And the question's premise was wrong**: it said the volume is *"recreated by `npm run
+reporting:metabase`"*, which only registers the database. Recreation is `reporting:metabase` **then**
+`reporting:report`. Recorded in the plan under Q5. No `[Answer]` filled — that remains the user's.
+
+---
+
+## 2026-10-06 (later) — U6 Q1–Q6 answered; three follow-ups raised; install routine added to Phase 5
+
+**Answers**: Q1 **A** (refuse cross-machine; stage the backup on the target, restore there) · Q2 **A**
+(tiered allowlist; `state/` never) · Q3 **A** — ⚠️ provenance **declined**: *a restore never merges, it
+replaces what is on the host, except credentials unless opted in* · Q4 **C** — ⚠️ **delete** the
+unverifiable legacy backups, overriding the recommendation (A) · Q5 **A** · Q6 **A** — *"a first-class
+unit of work… follow the same process as prior units."*
+
+**Follow-ups (U6 plan §6), per the FD rule to resolve ambiguity before designing:**
+- **FQ1** — Q1 = A needs the restore to run **on the target host**, which needs Node there (unchecked on a
+  NAS). Proposed alternative: **the app restores itself at startup** from `data/restore-pending/`, so the
+  one writer does it before it writes and the cross-machine guard question disappears. `config/` stays `:ro`,
+  so non-DB tiers become an operator file copy.
+- **FQ2** — Q4 = C's scope. ⚠️ `CORRUPT-snapshot-20260921-201444` is `--self-test`'s negative control,
+  not a backup. Sweep today: **3 verified · 10 unverifiable · 1 corrupt**; newest verified holds **901 of
+  977** plays. **Nothing deleted** — irreversible, awaits the confirmed list.
+- **FQ3** — does *"same process"* include a user story and every stage (NFR Req/Design, Infra Design)?
+
+**User direction**: no multiple Spotify accounts are needed; what is needed is an **install routine**
+(manual or AI-executed) every user follows to configure **their own** install on **their own** machine.
+Multiple users on one instance remains out of scope. Recorded as **Phase 5 Q8**, with the reading that each
+user brings their own developer app registration — which would make §2's Development Mode user-cap probe
+moot. Flagged for confirmation rather than assumed.
+
+---
+
+## 2026-10-07 — "Why take the whole app down?" — online backup probed; live quiesce not recommended
+
+FQ1/FQ2 came back with the user's counter-question: maintenance should not need `docker compose down`;
+is an app **quiesce** needed, and what would it cost? FQ3 = **A** (full unit process, with a story).
+
+✅ **Probed, scratch copy only**: `node:sqlite`'s `backup()` (Node 22.17) copied the 901-play verified
+backup **while the same connection made 281 interleaved writes** — 145 ms, `integrity_check: ok`, 901/901
+plays, clean point-in-time. **In-process backup needs no quiesce at all.**
+
+⚠️ **The real cause of `compose down` is that the scripts are a second process on the host** across a
+mount SQLite's locks do not cross — not anything about SQLite itself.
+
+⚠️ **A live quiesce is recommended AGAINST**: six independent writer drivers (poll/`PlayObserver` with an
+in-memory open play, backfill timer, label queue, decision log, skip drain, liked refresh), and since
+restore *replaces* (Q3), it would protect nothing a restore does not already discard. Proposed instead:
+**in-app online backup** + **staged restore applied at restart before the DB opens**. Restart duration
+**not measured** (live container deliberately not restarted). Four questions M1–M4 in plan §7.
+
+---
+
+## 2026-10-07 (later) — M1–M4 answered: maintenance becomes an in-app Settings surface
+
+**Answers**: M1 — backup/restore and user-facing maintenance are **app-integrated**, on a **Settings**
+surface linked from the main screen; **Diagnostics moves there**. M2 — **no scheduled backups**; recorded
+as backlog **W-9** (*considered, not now*: its only value is off-site upload). M3 — repair/reclassify stay
+**developer-only**. M4 — backups folder **+ zip-and-download**; the user chooses where they live.
+
+✅ **Probed**: a container under `restart: unless-stopped` that **exits 0** is restarted (5× in 20 s,
+throwaway alpine container). So the staged restore can **restart itself** — no user action under Docker;
+under `npm start` nothing restarts it.
+
+⚠️ **Two mount facts the in-app design runs into**: `config/` is `:ro` to the app, so **restore cannot
+write `rules.json`**; and `secrets/spotify-config.json` is a **single-file `:rw` mount**, so any restore
+of it must write in place (inode hazard). Five clarifying questions S1–S5 in plan §8 — Settings page vs
+pop-up, upload, rules on restore, credentials in a downloadable zip, pruning.
+
+---
+
+## 2026-10-07 (later) — S1–S5: backup/restore becomes two buttons; rules and credentials surface as a second subject
+
+**Settled**: Settings is a **pop-up** (S1). The user path is **"Create backup" (download) / "Restore
+backup" (upload + replace)** with **no user-visible backups folder** — `data/` backup dirs stay
+developer-only, the user path uses disk only as temp and removes it on completion (S2, S5). **Credentials
+are excluded from backup entirely** — each installation manages its own; Q3's opt-in clause is withdrawn
+(S4). Archive: Node has gzip but **no multi-file archive writer** (zip or tar), so a package is needed —
+proposed `tar` (.tar.gz), with untrusted-upload extraction rules.
+
+**New subject raised by S3/S4**: on an appliance the user cannot edit host files, so **rules and
+credentials need in-app management**. Four questions T1–T4 (plan §9): separate *Configuration management*
+unit vs fold into U6 · rules download/upload vs editor · credentials (⚠️ the OAuth redirect is
+`http://127.0.0.1:8888/callback`, which cannot work from a NAS; Spotify's docs say non-loopback redirects
+need HTTPS — **unprobed**) · a single bounded *previous database* as restore undo.
+
+---
+
+## 2026-10-07 (later) — T1–T4 answered; U6 Functional Design WRITTEN; U8 declared
+
+**Answers**: T1 = **A** — rules/credentials management becomes **U8 Configuration Management**, also gating
+U7. T2 = **C** (rules upload/download now, editor later) *"and use secure patterns for ALL file ingest
+activities"* → **FR-64 / BR-46**, one admission path. T3 = **A**, after asking what install-time-only
+means: **not a reinstall** — re-run the auth step where the browser is and put the file in place (U8: by
+upload); TLS for in-app OAuth → **W-10**, later. T4 = **A** — one previous database, *Undo last restore*.
+
+**Written**: `construction/u6-data-lifecycle/functional-design/` — BR-44…BR-52 · business-logic-model ·
+domain-entities · frontend-components. **FR-57…FR-64** (requirements §3.7 *Operations*), **US-28** (Epic 8,
+persona P3), **W-10**. U6 entry in `unit-of-work.md` rewritten (it said *no feature, no story, scripts
+only* — all three overturned); **U8** declared; execution plan updated. Plan §10 is the settled reading.
+
+**Measured for the design**: the app's schema holds **12 tables, 21 indexes, no triggers or views** — so
+BR-47.4 can refuse any uploaded database containing a trigger or view outright (a trigger in an untrusted
+SQLite file fires on the app's own later writes). `localGuard`'s `isAllowedOrigin` **admits a missing
+`Origin`**; BR-46.2 makes ingest routes stricter than the general policy on purpose.
+
+⚠️ **Not decided by this FD**: Phase 5 Q1 (off-machine access). The ingest routes are local-only until it is.
+
+---
+
+## 2026-10-07 (later) — PROCESS CORRECTION: Phase 5 returned to the standard AI-DLC stages
+
+The user asked whether Phase 5's questions belonged in the U6 FD and said: *"I don't want to introduce any
+non-standard processes."* Checked against the rules and the repo: **no earlier phase has a "phase plan"** —
+Phases 1–4 were planned in the original Inception. `inception/plans/phase-5-plan.md` (2026-10-06) was an
+invented document type.
+
+**Two deviations, both corrected:**
+1. **Phase 5's questions** moved to the standard stages — Requirements Analysis **Questions 11–17a**
+   (`requirement-verification-questions.md`, new dated round, with the old plan's context and facts) and Units
+   Generation **Questions 4–5** (`unit-of-work-plan.md`). Old Q2/Q5 were unit design questions: recorded there
+   as *carried to U7's design plan* (U7-a, U7-b), not asked now. Exit criteria moved to `execution-plan.md`;
+   the U6 exit criterion re-worded, since the guard it named was dissolved by the FD. `phase-5-plan.md` is a
+   pointer; none of its questions had been answered, so nothing was lost.
+2. ⚠️ **Mine**: when W-5 became U6 I wrote **FR-57…FR-64 and US-28 during Functional Design**, skipping
+   Requirements Analysis. Content stands (it comes from the user's FD answers), but it now goes through
+   **Question 12** for ratification **before** the U6 FD is approved. U8 was likewise declared without Units
+   Generation — Question 4 now covers it.
+
+Also found: `unit-of-work-dependency.md` and `unit-of-work-story-map.md` contain **no Phase 5 units at all** —
+listed in the Units round's checklist.
+
+---
+
+## 2026-10-07 (later) — Phase 5 requirements & units rounds: first answers, four follow-ups
+
+**Requirements round**: Q12 = **A — FR-57…FR-64 and US-28 ratified** (closing the skipped step; U6's FD is
+now approvable) · Q13 = B · Q14 = A · Q15 = A · Q17 = C · Q17a = **A** (each user registers their own Spotify
+app — the Development Mode per-registration limit needs no probe) *"and also we should insure credentials are
+never written to the repo."* Q16 (licence) left blank.
+
+**Q11 answered with a question**: long term the user wants industry-standard web security that allows AWS/cloud
+hosting — *what short-term pattern adds the least debt?* Answered in **Q11a**: delegated authentication (OIDC
+at a proxy or load balancer, TLS terminated there), with the app's half — a **trusted-proxy mode in
+`decideAccess` that verifies a signed identity token on HTTP and the WebSocket upgrade** — built now. In-app
+login is identified as the debt. Product details (ALB OIDC action, oauth2-proxy, etc.) recorded as documented,
+to be verified in the deployment unit's design.
+
+**Measured for Q17b**: `.gitignore` ignores `secrets/` except three `*.example.json`; a scan of **every commit**
+for credential values found **none** — the two matches were the templates' placeholders. ⚠️ Nothing enforces
+it; NFR-05 does not cover the repository. Q17b proposes NFR-28 with a CI secret scan.
+
+**Units round**: Q4 = **A** — **U9 Team Workflow & Onboarding** added. Q5 answered with *"why not just swap the
+numbers?"* — no strong reason, and nothing is designed for U7–U9 yet; Q5a offers renumbering to build order
+(U7 Configuration · U8 Onboarding · U9 Deployment) with this log keeping the mapping, since its earlier entries
+keep the old numbers.
+
+---
+
+## 2026-10-07 (later) — Phase 5 units RENUMBERED to build order; Units Generation complete
+
+User: *"go ahead and swap the numbers so the numbers stay sequential."* → Units **Question 5a = A**.
+
+**Mapping — entries ABOVE this one use the old numbers:**
+
+| Old | New | Unit |
+|---|---|---|
+| U8 | **U7** | Configuration Management |
+| U9 | **U8** | Team Workflow & Onboarding |
+| U7 | **U9** | Off-machine Deployment |
+
+**Build order: U6 → U7 → U8 → U9.** Renumbered everywhere except this log (append-only) and the units-round
+Questions 4/5/5a with their answers (kept as asked, with a note). Memory updated too.
+
+**Units Generation outputs completed** — the round's checklist: `unit-of-work.md` gains **U8** and **U9**
+entries, sections put in build order, and U6 re-typed *Feature* (its FD made it user-facing);
+`unit-of-work-dependency.md` and `unit-of-work-story-map.md` gain Phase 5 for the first time (**US-28 → U6**,
+FR-57–64 → U6; matrix still lower-triangular); `execution-plan.md` units table rewritten, and its stale
+*"the writer-guard goes blind"* sentence struck as dissolved by U6's FD.
+
+**Still open in the requirements round**: Q11a (security pattern), Q16 (licence), Q17b (enforce no credentials
+in the repo). **U6's FD is approvable now** (FR-57…64 ratified).
+
+---
+
+## 2026-10-07 (later) — Phase 5 Requirements round COMPLETE; the bundled MCP server has no licence
+
+**Answers**: Q11a = **B** (delegated authentication — OIDC at a proxy, TLS there, a **signed-token** check in
+`decideAccess` for HTTP and the WebSocket upgrade) · Q16 = **C (GPL-3.0)** · Q17b = **B** (CI secret scan + a
+test on tracked `secrets/` files). With the earlier answers the round is complete.
+
+**Written into `requirements.md`**: **FR-65** (install routine — one step list for a person and an agent, every
+step verifiable, own Spotify registration, walked cold) and a new **§4.1a**: **NFR-28** credentials never
+committed · **NFR-29** delegated authentication off-machine (amends NFR-07 rather than repealing it) ·
+**NFR-30** protected `main` · **NFR-31** smoke in CI as a link check · **NFR-32** GPL-3.0 · **NFR-33** the docs set.
+
+⚠️ **Found while checking Q16**: `marcelmarais/spotify-mcp-server` — cloned and built into our image by the
+`Dockerfile` — has **no LICENSE file and GitHub reports `license: null`**. This repo does not contain its code,
+and each user builds their own image, so the GPL-3.0 choice is unaffected; but **publishing a built image would
+redistribute unlicensed code**. NFR-32 forbids that until resolved; options recorded for U8. Our 95 runtime
+dependencies are MIT/ISC/BSD — all GPL-compatible. *(Plain-language reading, not legal advice.)*
+
+**From the Q11a answer, recorded for U9's design and not decided**: the user's Synology NAS has its OAuth/SSO
+service installed but unconfigured — a candidate identity provider, to be probed; and a Synology MCP server
+could let the agent configure the NAS directly — ⚠️ an administrator credential, so NFR-28 and least privilege
+apply. The NAS's hostname and address were **kept out of the repository** (it is about to be shared) and noted
+locally instead. ⚠️ The address as given, `192.160.0.223`, is in a **public** range; `192.168.x.x` is the
+private one — to confirm before use.
+
+**Correction (same day)**: the NAS address was a typo — it is `192.168.0.223`, a private LAN address. ⚠️ And
+*"kept out of the repository"* above was **wrong**: the hostname and address are in the user's own Q11a answer
+in `requirement-verification-questions.md`, and this log quotes the mistyped address. Neither is committed yet.
+
+**Decision (user, same day)**: the NAS hostname and address **stay in the repository**. The LAN is private and
+non-forwarding, anyone already on it could find the NAS with a scan, and a concrete hostname helps readers of
+the install documentation. Added to U9's entry in `unit-of-work.md`: target **`SYNNAS` (192.168.0.223)**.
+
+---
+
+## 2026-10-07 (later) — ✅ U6 Functional Design APPROVED
+
+User: *"Approved."* FR-57…FR-64 had been ratified first (Requirements Question 12), so the standard order holds.
+Artifacts: `construction/u6-data-lifecycle/functional-design/` (BR-44…BR-52). **Next: U6 NFR Requirements.**
+Committed with this session's Phase 5 work at the user's request.

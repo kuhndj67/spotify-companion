@@ -36,9 +36,9 @@ what was rejected.
 |---|---|
 | `aidlc-docs/aidlc-state.md` | **Current state. Start here.** |
 | `aidlc-docs/audit.md` | Append-only history of decisions and findings |
-| `aidlc-docs/inception/requirements/requirements.md` | 56 FRs, 27 NFRs, risks, wishlist |
+| `aidlc-docs/inception/requirements/requirements.md` | 65 FRs, 33 NFRs, risks, wishlist |
 | `aidlc-docs/inception/research/research-findings.md` | **Live API probe results — authoritative** |
-| `aidlc-docs/inception/user-stories/` | 27 stories, 3 personas |
+| `aidlc-docs/inception/user-stories/` | 28 stories, 3 personas |
 | `aidlc-docs/inception/plans/execution-plan.md` | The four delivery phases |
 | `aidlc-docs/inception/application-design/` | Components, methods, units |
 | `aidlc-docs/construction/` | Per-unit design, code summaries, build-and-test |
@@ -80,10 +80,47 @@ Credentials are at `secrets/spotify-config.json`; probe scripts follow the patte
 
 ---
 
-## ▶ Current state (2026-10-06) — PHASE 5 OPEN. U6 IS ITS GATE. Phases 0–4 delivered.
+## ▶ Current state (2026-10-07) — ✅ U6 FUNCTIONAL DESIGN APPROVED. Next: U6 NFR Requirements
+
+⚠️ **PROCESS CORRECTED 2026-10-07: Phase 5 is back on the standard AI-DLC path.** Its questions had been put in
+a non-standard `phase-5-plan.md` (now a pointer). ▶ **Open now, in order**: Requirements Analysis
+**Questions 11–17a** in [`requirement-verification-questions.md`](aidlc-docs/inception/requirements/requirement-verification-questions.md)
+— ⚠️ **Question 12 ratifies U6's FR-57…FR-64, which must happen before U6's FD is approved** — then Units
+Generation **Questions 4–5** in [`unit-of-work-plan.md`](aidlc-docs/inception/plans/unit-of-work-plan.md).
+✅ **Phase 5 Requirements and Units rounds are COMPLETE (2026-10-07).** Build order **U6 → U7 Configuration →
+U8 Team Workflow & Onboarding → U9 Off-machine Deployment** (renumbered that day; older `audit.md` entries use
+old numbers). New: **FR-65** install routine · **NFR-28** no credentials in the repo, CI-enforced · **NFR-29**
+off-machine access = delegated auth with a **signed-token** check in `decideAccess` · **NFR-30–33** branch
+protection, smoke in CI, **GPL-3.0**, docs. ⚠️ **The bundled `spotify-mcp-server` has NO licence** (checked
+2026-10-07) — **never publish a built image** until that is resolved.
+⚠️ **Do not invent new document types**: inception questions go in those two files; unit questions in
+`construction/plans/uN-*-plan.md`.
+
+▶ **Read [`construction/u6-data-lifecycle/HANDOFF.md`](aidlc-docs/construction/u6-data-lifecycle/HANDOFF.md) first.**
+The settled answers are [`u6-functional-design-plan.md` §10](aidlc-docs/construction/plans/u6-functional-design-plan.md).
+
+✅ **Backup and restore are IN-APP** — a Settings pop-up with *Create backup* (download) and *Restore
+backup* (upload → verify → typed confirm → replace). ✅ **No downtime for backup**: `node:sqlite` `backup()`
+on the app's own connection, **probed 2026-10-07 under 281 concurrent writes**. Restore is staged, the app
+`exit(0)`s, Docker restarts it (**probed**: `unless-stopped` restarts an exit 0), and the swap happens
+**before the database opens**. ⚠️ **One writer does both, so the cross-machine guard problem is DISSOLVED** —
+reintroduce a second writer and it comes back. A live quiesce was evaluated and **rejected**.
+
+⚠️ **FR-64 / BR-46: ONE admission path for every uploaded file** — allowlisted archive entries, regular
+files only, streaming size caps, magic-byte typing, and an **untrusted-SQLite schema allowlist** (no
+triggers or views; the app's schema has none). ⚠️ **The upload routes must not be reachable off-machine
+until Phase 5 Q1 is decided.**
+
+⚠️ **Never in a backup: `secrets/` or `state/`.** A restore can never arm automation or change credentials.
+
+**New unit U7 — Configuration Management** (rules + credentials in-app; reopens `config/` `:ro`), also
+gating U9. ⚠️ **The install routine** (user, 2026-10-06): each user installs on their own machine with their
+own Spotify account — Phase 5 **Q8**.
+
+### Earlier state (2026-10-06) — PHASE 5 OPEN. U6 IS ITS GATE. Phases 0–4 delivered.
 
 ▶ **Read [`construction/u6-data-lifecycle/HANDOFF.md`](aidlc-docs/construction/u6-data-lifecycle/HANDOFF.md) first** —
-U6's single entry point. Then [`phase-5-plan.md`](aidlc-docs/inception/plans/phase-5-plan.md) (7 questions)
+U6's single entry point. Then ~~`phase-5-plan.md`~~ (*retired 2026-10-07 — its questions are now Requirements Questions 11–17a and Units Questions 4–5*)
 and [`u6-functional-design-plan.md`](aidlc-docs/construction/plans/u6-functional-design-plan.md) (6
 questions). **Nothing in Phase 5 is designed until those are answered. `src/` and `scripts/` are untouched
 by U6.**

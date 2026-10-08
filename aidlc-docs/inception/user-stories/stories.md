@@ -599,6 +599,33 @@ oversight.
 
 ---
 
+## Epic 8 — Operations *(added 2026-10-07, Phase 5)*
+
+### US-28 — Move my listening history to another machine, and back ⬜
+**As** the Analyst, **I want** to take a backup of my listening history from the running app and restore
+it on another installation, **so that** the months of plays I cannot regenerate survive a new machine, a
+NAS, or a mistake — without re-arming anything or exposing my credentials.
+
+**Acceptance criteria**
+- [ ] *Create backup* downloads one file, and recording does not stop while it is made
+- [ ] *Restore backup* shows what the file contains beside my current history **before** I confirm, and
+      states that it replaces rather than merges
+- [ ] A file that is not a valid backup from this app is refused, and **nothing changes**
+- [ ] After a restore, the automation switch is exactly as it was, and my credentials are untouched
+- [ ] I can undo the most recent restore once
+- [ ] Nothing accumulates on disk from backing up or restoring, beyond the one previous history
+- [ ] ⚠️ Performed for real: a corpus backed up on one machine, restored on another, and the restored app
+      runs (exit criterion — no test can prove it)
+
+*Covers FR-57–FR-64 · Persona P3*
+
+> ⚠️ **Source, recorded so it is not mistaken for a story invented to justify a unit**: the user's own
+> question on 2026-10-06 — *"we could backup the data on Rancher Desktop, start up the NAS hosted app and
+> once connected restore the data to that environment?"* — and FD Q6 = A / FQ3 = A, which made U6 a
+> first-class unit with a story. Until then U6 was recorded as having none, deliberately.
+
+---
+
 ## INVEST Validation
 
 | Criterion | Finding |
@@ -632,6 +659,7 @@ oversight.
 | FR-22 | US-12 | FR-46, 47, 48 | US-19 |
 | FR-23 | US-13 | NFR-01–07 | US-26 |
 | FR-24, 26, 27, 28, 29 | US-14 | FR-49–54 | US-25 |
+| | | FR-57–64 | US-28 |
 
 **All in-scope functional requirements are covered.** FR-55 was withdrawn on 2026-08-25 and moved
 to the wishlist (§5.1, W-1); US-27 is retained as a **deferred** story documenting why, and is
@@ -662,13 +690,13 @@ the reasoning behind the deferral stays visible rather than being deleted and re
 
 | | Count |
 |---|---|
-| Epics | 7 |
-| Stories in scope | 26 |
+| Epics | 8 |
+| Stories in scope | 27 |
 | Delivered (✅) | 10 |
-| New (⬜) | 16 |
+| New (⬜) | 17 |
 | Deferred (⏸) | 1 (US-27) |
 | Given/When/Then criteria | 8 stories |
-| Checklist criteria | 18 stories |
+| Checklist criteria | 19 stories |
 | Personas | 3 (modes of one user) |
 
 **Open finding:**

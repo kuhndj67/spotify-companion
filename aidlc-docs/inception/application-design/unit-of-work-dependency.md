@@ -9,14 +9,20 @@
 `→` hard dependency (cannot build without) · `↝` soft dependency (better with, works without) ·
 `E` extends existing U0 code
 
-| | U0 | U1 | U2 | U3 | U4 | U5 |
-|---|---|---|---|---|---|---|
-| **U0** Existing | — | | | | | |
-| **U1** History & Export | E | — | | | | |
-| **U2** Label Enrichment | E | → | — | | | |
-| **U3** Rule Model | | ↝ | ↝ | — | | |
-| **U4** Rule Observability | E | → | | → | — | |
-| **U5** Automated Skipping | E | → | | → | → | — |
+| | U0 | U1 | U2 | U3 | U4 | U5 | U6 | U7 | U8 | U9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **U0** Existing | — | | | | | | | | | |
+| **U1** History & Export | E | — | | | | | | | | |
+| **U2** Label Enrichment | E | → | — | | | | | | | |
+| **U3** Rule Model | | ↝ | ↝ | — | | | | | | |
+| **U4** Rule Observability | E | → | | → | — | | | | | |
+| **U5** Automated Skipping | E | → | | → | → | — | | | | |
+| **U6** User-Data Lifecycle | E | → | | | | ↝ | — | | | |
+| **U7** Configuration Management | E | | | → | | ↝ | → | — | | |
+| **U8** Team Workflow & Onboarding | | | | | | | → | → | — | |
+| **U9** Off-machine Deployment | E | | | | | | → | → | → | — |
+
+*Phase 5 rows added 2026-10-07 (Units Generation, Phase 5 round).*
 
 **No unit depends on a later unit.** The matrix is strictly lower-triangular, which is the
 property that makes the phase ordering safe.
@@ -80,6 +86,20 @@ than chosen for convenience.
 only needs field *definitions* rather than working implementations. With a single developer this
 is of little practical value, but it is worth knowing that U3 is not blocked if U2 stalls — for
 example if MusicBrainz coverage turns out to be poor and the label work needs rethinking.
+
+---
+
+### Phase 5 (added 2026-10-07)
+
+- **U6 → U1 (hard)**: backs up and restores the database `HistoryRepository` owns, through the app's own
+  connection. **U6 ↝ U5 (soft)**: must never carry `state/` — the kill switch U5 owns.
+- **U7 → U6 (hard)**: every file it ingests goes through U6's FR-64 admission path. **U7 → U3 (hard)**: rules
+  are validated with U3's validator before any write.
+- **U8 → U6, U7 (hard)**: the install routine documents their steps; written before them, it would describe
+  features that do not exist.
+- **U9 → U6, U7, U8 (hard)**: the deployment is performed by following U8's routine.
+
+**Phase 5 build order: U6 → U7 → U8 → U9.**
 
 ---
 

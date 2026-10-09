@@ -7664,3 +7664,12 @@ design: the badge reads a cached set (`/me/tracks/contains` is 403 in Developmen
 `added_at` at each play's close (+30 s grace), so `liked-during` is captured (65 plays). Option offered: re-read page 1
 about once a minute while playing (~60 req/h, ~5%). User: *"Yes log it, no code changes at this time."* → **W-11**,
 weighed with W-7.
+
+---
+
+## 2026-10-09T14:47:19Z — Backlog W-12 logged: a proper Export dialog (no code change)
+
+User, during hands-on testing: *"the History Export pop-up should not use a text field to select between csv and json…
+use either a dropdown, radio buttons or similar. Add this to the backlog (no code changes while I'm testing)."* The
+export uses `window.prompt` (typed format) and `window.alert` — the app's only native browser dialogs. Logged as
+**W-12**, noting the route's unused `since` / `until` / `outcome` filters as a cheap addition.

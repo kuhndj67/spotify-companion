@@ -1033,6 +1033,23 @@ exists to break.**
 
 ---
 
+#### W-12 — A proper Export dialog instead of a typed format
+
+**Raised 2026-10-09** by the user during hands-on testing (U1-3). ⚠️ **Logged, not built** (user decision, same day —
+*"no code changes while I'm testing"*).
+
+**Today**: Settings → **Export history…** calls the browser's `window.prompt('Export format — csv or json?')`, so the
+format is **typed**; anything else gets a `window.alert`. It is also the only place in the app that uses the
+browser's native dialogs rather than the app's own pop-ups (`public/app.js`, the `export-open` handler).
+
+**Wanted**: choose the format with radio buttons or a dropdown (CSV / JSON) in an app-styled section or pop-up, then
+an **Export** button. While there, the route already accepts filters the UI never offers — `since`, `until`
+(dates) and `outcome` (`completed` / `skipped` / `unknown`), validated by `validateFilter` in
+`src/export/ExportService.ts` — so the dialog could expose them at little cost. ⚠️ Keep the decision text in a pure
+`src/ui/` view module, as U6/U7 did — `app.js` has no tests.
+
+**Revisit**: any UI pass; small and self-contained.
+
 #### W-11 — Show a mid-play like without a click
 
 **Raised 2026-10-09** by the user during hands-on testing: a track liked in Spotify **during playback** is not

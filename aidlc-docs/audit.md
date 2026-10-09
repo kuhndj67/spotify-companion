@@ -7673,3 +7673,14 @@ User, during hands-on testing: *"the History Export pop-up should not use a text
 use either a dropdown, radio buttons or similar. Add this to the backlog (no code changes while I'm testing)."* The
 export uses `window.prompt` (typed format) and `window.alert` — the app's only native browser dialogs. Logged as
 **W-12**, noting the route's unused `since` / `until` / `outcome` filters as a cheap addition.
+
+---
+
+## 2026-10-09T14:51:30Z — Backlog W-13 logged: a readable JSON export (+ a review of value typing)
+
+User: the JSON export did not open as formatted JSON in VS Code. Checked: **valid JSON**, but one 1.36 MB line with
+no line breaks — VS Code skips colouring on lines over 20,000 characters. User: *"I'm not sure we want to change the
+boolean as text format... if unknown is a valid value then the format should likely stay as text (so it's not a
+'must change' but rather a 'review to determine the best pattern' work item). But yes add a work item to format the
+json for easier readability."* → **W-13**: Part A *do* (readable JSON, keep streaming); Part B *review only* (value typing,
+must keep unknown ≠ false/0).

@@ -1033,6 +1033,28 @@ exists to break.**
 
 ---
 
+#### W-13 — A readable JSON export (and a review of how its values are typed)
+
+**Raised 2026-10-09** by the user during hands-on testing (U1-3). ⚠️ **Logged, not built** (no code changes while
+testing).
+
+**Part A — DO: make the JSON readable.** The JSON export is valid but written as **one line** (1.36 MB, 1,111 plays,
+zero line breaks): `ExportService.ts` streams `{"coverage":…,"plays":[` and then each play as `JSON.stringify(...)`
+with no separator. VS Code stops syntax colouring on lines over 20,000 characters (`editor.maxTokenizationLineLength`),
+so the file opens looking unrecognised; workaround today is *Format Document* (Shift+Alt+F). Options: indent each play
+(still one document, still streamed — write a newline and indentation between records), or **NDJSON** (one play per
+line — streams and diffs better, but a different file shape that downstream tools must expect). Size grows modestly.
+⚠️ Keep the streaming (memory stays constant regardless of history size) and the `coverage` header.
+
+**Part B — REVIEW, not a required change: are values typed the best way?** Booleans and ids are exported as strings
+(`"at_start":"false"`, `"artist_resolution_id":"167"`), because `null` renders as the literal token `unknown`
+(`UNKNOWN_TOKEN`, `src/export/serialisers.ts`) and a field must hold either. The user's view (2026-10-09): **if
+`unknown` is a valid value, text may well be the right format** — so this is *review to determine the best pattern*,
+not a defect. Options to weigh: keep strings (one rule for CSV and JSON, explicit `unknown`) · native types with
+`"unknown"` only where unknown (mixed types per field — awkward for typed readers) · native types with JSON `null` plus
+the coverage block explaining it (⚠️ conflicts with the project rule that unknown is shown explicitly, never blank).
+Whatever is chosen must keep **unknown distinguishable from false and 0** (CLAUDE.md, R2).
+
 #### W-12 — A proper Export dialog instead of a typed format
 
 **Raised 2026-10-09** by the user during hands-on testing (U1-3). ⚠️ **Logged, not built** (user decision, same day —

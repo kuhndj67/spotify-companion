@@ -7684,3 +7684,27 @@ boolean as text format... if unknown is a valid value then the format should lik
 'must change' but rather a 'review to determine the best pattern' work item). But yes add a work item to format the
 json for easier readability."* → **W-13**: Part A *do* (readable JSON, keep streaming); Part B *review only* (value typing,
 must keep unknown ≠ false/0).
+
+---
+
+## 2026-10-09T15:16:15Z — Hands-on tests: 17 run by automation (all PASS); 4 left for the user
+
+User: *"for items that YOU can fully test using browser automation go ahead and execute those and check them off using
+an 'A'"*. Run through Chrome DevTools MCP and the shell; marked `[A]` in `hands-on-test-instructions.md`.
+
+**All 17 pass**: U5-2 (off persisted, survived a restart, page reconnected itself; switched back ON as the user had it) ·
+U6-1…U6-4 (in-app backup verified restorable, 1121 plays; restore and undo on `:3011` via the page, `restore`
+refused / `RESTORE` accepted, back in 3.5 s) · U7-1…U7-9 (live rename → apply → undo, file md5 back to the original;
+empty upload → "2 removed" + both reasons, Apply dimmed, cancelled; enable → becomes-live warning, cancelled; `:3011`
+red with the fixed wording; restore with rules ticked/unticked; diagnostics' last rules write) · O-2…O-4.
+`verify:down` no-impact proof clean. Live left as found: automation ON, rules md5 `8b0d7d87…` unchanged.
+
+Left for the user: **U5-3, U5-4** (real skips, optional), **U7-6b** (optional credentials re-save), **O-1** (reboot).
+
+Coordination: the user had switched automation ON at 10:56 for their U5 tests while Claude was using the same Chrome;
+paused and asked before continuing (*"I turned the rules on so that wasn't an issue... I will not touch that interface
+going forward until you are finished."*).
+
+**Observations raised, not defects**: (1) with automation ON, arming a rule by upload is a single plain *Apply* — the
+typed `REPLACE` covers mass removal and unknown base only, not *becomes live*; (2) after an UNDO restore the message
+says *"from a backup"* — the source was the set-aside history (U6 wording).

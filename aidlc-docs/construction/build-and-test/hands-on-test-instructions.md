@@ -25,11 +25,11 @@ Useful while testing: `docker logs -f spotify-now-playing` in a terminal · Sett
 
 ## 0. Preflight — 5 minutes
 
-- [ ] **P-1** Open `http://localhost:3010` and press **Ctrl+F5** (load the current files). *Expect*: the card shows what
+- [X] **P-1** Open `http://localhost:3010` and press **Ctrl+F5** (load the current files). *Expect*: the card shows what
   is playing, or **PAUSED / nothing playing**, within a few seconds — never stuck on *Connecting…*.
-- [ ] **P-2** The status bar has **five** dots — Recording · Rules vN · Connection · Spotify · Automation — Spotify
+- [X] **P-2** The status bar has **five** dots — Recording · Rules vN · Connection · Spotify · Automation — Spotify
   **green**, Automation **off**.
-- [ ] **P-3** Settings → **Run diagnostics…** → *Expect* every step ✅ or ⏭. In the **Configuration** block: rules
+- [X] **P-3** Settings → **Run diagnostics…** → *Expect* every step ✅ or ⏭. In the **Configuration** block: rules
   directory, Spotify credentials and MusicBrainz contact all *writable*; *Now-playing polls* shows `playing / idle /
   error` with **error 0**.
 

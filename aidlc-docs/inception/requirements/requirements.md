@@ -1033,6 +1033,26 @@ exists to break.**
 
 ---
 
+#### W-11 — Show a mid-play like without a click
+
+**Raised 2026-10-09** by the user during hands-on testing: a track liked in Spotify **during playback** is not
+reflected by the companion's ♥ badge. ⚠️ **Logged, not built** (user decision, same day — *"no code changes at this
+time"*).
+
+**It is the display only — the recorded data is right.** `GET /me/tracks/contains` is **403** in Development Mode,
+so the badge reads a cached liked set, refreshed at startup and on the 6-hourly backfill tick; the badge is a
+**button** that re-reads it (`POST /api/liked/refresh`, hands-on test U0-2). Separately, at every play's close
+`captureAtClose` reads **page 1 of `GET /me/tracks`**, whose `added_at` attributes a like to the play window exactly,
+plus a 30 s grace for a like made just after the track (BR-9.4). So `liked_transition = liked-during` is recorded
+correctly — 65 plays carry it.
+
+**The option**: while a track is playing, re-read page 1 (one request, `limit=50`) about once a minute and update
+the badge. Cost ≈ **60 requests/hour**, ~5% on top of the measured ~1,220/hour (98% of which is the 3 s poll).
+⚠️ It changes the app's Spotify footprint, so weigh it with **W-7** (idle poll backoff), which reduces it; doing
+W-7 first would more than pay for this. Never a per-track `/contains` — that is the 403.
+
+**Revisit when** the badge's lag is observed to mislead in practice, or alongside W-7.
+
 #### W-10 — TLS, so the Spotify sign-in can run inside the app on another machine
 
 **Raised 2026-10-07** in U6 FD (T3). ⚠️ **Accepted as later** (user, same day).

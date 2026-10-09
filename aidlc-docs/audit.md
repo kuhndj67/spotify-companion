@@ -7653,3 +7653,14 @@ User, P-3: diagnostics all green, but *"Could not load the trace: TypeError: Can
 
 Verified in Chrome after redeploy: the list starts with the track playing now; the trace renders. 1566 tests.
 The plan's U2-3 step was renamed to the panel's real name.
+
+---
+
+## 2026-10-09T14:32:45Z — Backlog W-11 logged: show a mid-play like without a click (no code change)
+
+User, during hands-on testing: a like made in Spotify during playback is not reflected by the ♥ badge. Confirmed by
+design: the badge reads a cached set (`/me/tracks/contains` is 403 in Development Mode), refreshed at startup and every
+6 h, re-read on a badge click. **The recorded data is right** — `captureAtClose` reads page 1 of `/me/tracks` with
+`added_at` at each play's close (+30 s grace), so `liked-during` is captured (65 plays). Option offered: re-read page 1
+about once a minute while playing (~60 req/h, ~5%). User: *"Yes log it, no code changes at this time."* → **W-11**,
+weighed with W-7.

@@ -226,7 +226,12 @@ export function spotifyIndicator(state: SpotifyState): Indicator {
     return indicator('unknown', 'Spotify', 'No snapshot received yet.');
   }
   if (state.snapshotError !== null) {
-    return indicator('fail', 'Spotify', `Spotify is not answering: ${state.snapshotError}`);
+    // U7 (FR-71): a refusal from Spotify already names itself ("Spotify returned an error: …"). Prefixing it with
+    // "not answering" read twice and was wrong — Spotify DID answer, and said no. Found in U7 Build & Test.
+    const detail = state.snapshotError.startsWith('Spotify returned an error')
+      ? state.snapshotError
+      : `Spotify is not answering: ${state.snapshotError}`;
+    return indicator('fail', 'Spotify', detail);
   }
   return indicator('ok', 'Spotify', 'The last poll succeeded.');
 }

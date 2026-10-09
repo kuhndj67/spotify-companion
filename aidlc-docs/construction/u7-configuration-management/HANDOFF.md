@@ -2,14 +2,12 @@
 
 **Written 2026-10-08.** This is the only entry point for U7 — no parallel status or resume file.
 
-## ▶ CURRENT STATE — ✅ CODE GENERATION COMPLETE (2026-10-08), AWAITING REVIEW. NOTHING DEPLOYED.
+## ▶ CURRENT STATE — ✅ BUILD & TEST COMPLETE (2026-10-09 UTC) — DEPLOYED AND VERIFIED, AWAITING APPROVAL
 
-All 13 steps done — [`code/code-summary.md`](code/code-summary.md); deviations beside each step in the
-[plan](../plans/u7-code-generation-plan.md). `npm run verify` green, **1563 tests**. Probes P-U7-1…3 passed
-([record](probes/p-u7-1-3-2026-10-08.md)). ▶ Next: **Build & Test** — deploy per `infrastructure-design/`
-(IN-U7 deployment steps), then click and LOOK at every new control.
-
-⚠️ **The UI has not been seen in a browser yet.** ⚠️ Restarts are ~2 s longer (the MCP child's exit is awaited).
+Record: [`../build-and-test/u7-build-and-test-summary.md`](../build-and-test/u7-build-and-test-summary.md). Live on the U7
+image; rollback image `u6-rollback` verified against U7's leftovers. Every exit criterion met, UI clicked and looked at.
+1565 tests. ▶ After approval: **U8 Team Workflow & Onboarding** (Requirements Question 18 — app versioning — is open
+for it). ⚠️ U8's install routine must agree with the Spotify guidance text in Settings (`ui/credentialsPanel.ts`).
 
 ## Why this unit exists
 

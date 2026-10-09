@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 
 import type { RulesComparison } from '../src/configuration/rulesComparison.js';
 import { musicbrainzSectionView, spotifySectionView } from '../src/ui/credentialsPanel.js';
+import { spotifyIndicator } from '../src/ui/statusBar.js';
 import { comparisonView, statusView } from '../src/ui/maintenancePanel.js';
 import { appliedMessage, comparisonPanelView, rulesConfirmView, rulesFileStatusView } from '../src/ui/rulesFilePanel.js';
 
@@ -130,5 +131,18 @@ describe('after the restart, the rules outcome is said separately (BR-59.7)', ()
 
   it('not requested → no rules sentence at all', () => {
     assert.doesNotMatch(statusView(status('not-requested')).lastRestore?.text ?? '', /rules/);
+  });
+});
+
+describe('the Spotify indicator’s wording (U7 Build & Test defect)', () => {
+  it('a refusal from Spotify is stated once — never "not answering: Spotify returned an error"', () => {
+    const v = spotifyIndicator({ hasSnapshot: true, snapshotError: 'Spotify returned an error: Error getting current track: Failed to refresh access token.' });
+    assert.equal(v.level, 'fail');
+    assert.equal(v.detail, 'Spotify returned an error: Error getting current track: Failed to refresh access token.');
+  });
+
+  it('a transport failure still says the connection is not answering', () => {
+    const v = spotifyIndicator({ hasSnapshot: true, snapshotError: 'Could not reach the Spotify MCP server.' });
+    assert.match(v.detail, /^Spotify is not answering: Could not reach/);
   });
 });

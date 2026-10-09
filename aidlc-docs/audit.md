@@ -7594,3 +7594,23 @@ config `:rw`. Step 13: **`npm run verify` green — 1563 tests**, smoke, knip; P
 `u7-configuration-management/code/code-summary.md`. Seven things were found by building that the design did not
 contain (listed there) — notably PBT-66 correcting F7, the Web API client's whole-file credential cache, and a
 shutdown hang. ⚠️ Not yet seen in a browser; Build & Test next.
+
+---
+
+## 2026-10-09T01:27:57Z — U7 Code Generation APPROVED; Build & Test begins
+
+User: *"go ahead with build and test."* Following the IN-U7 deployment steps in order.
+
+---
+
+## 2026-10-09T01:37:00Z — ✅ U7 Build & Test COMPLETE — deployed and verified (awaiting approval)
+
+Record: `construction/build-and-test/u7-build-and-test-summary.md`. Rollback tag `u6-rollback`; safety backup verified
+(1093 plays); build exit 0; the BUILT image's MCP code has 30 error templates (local checkout 25) — all match. Every
+exit criterion met: broken credentials RED on `:3011` (the case U6 showed green); rules upload/undo/REPLACE/stale over
+the real `:rw` mount, host and container identical; credentials saved in place on the copy (fake → red) and **live**
+(own values re-saved → token refreshed in 1 s, `replacedAt` survived the MCP rewrite); MusicBrainz contact live;
+restore with rules opted in (byte-match) and out (own rules kept); rollback: U6 image ignores U7's leftovers and the
+rules opt-in. UI clicked and LOOKED at in Chrome. Two wording defects found only by looking (doubled "not answering",
+literal backticks) — fixed, 1565 tests, redeployed. Test-harness mistake recorded (a wrong file path gave "Failed to
+fetch"), not an app defect.

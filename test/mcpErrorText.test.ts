@@ -4,11 +4,11 @@
  *
  * ## ⚠️ Why the source scan, and why it fails rather than skips
  *
- * The server is fetched at image build with `MCP_SERVER_REF=main` — it floats — so its wording can change on any
- * rebuild. A rewording the pattern missed would silently put the display back to "Spotify: ok" over broken
+ * The server is fetched at image build at the ref `compose.yaml` PINS (R7), so its wording changes whenever the pin
+ * moves. A rewording the pattern missed would silently put the display back to "Spotify: ok" over broken
  * credentials. Scanning the source makes that a red test instead. If the source is not checked out, the test
  * FAILS with a reason (P-54): a scan of nothing passes vacuously, and that is the failure this exists to prevent.
- * CI fetches the same ref the Dockerfile does.
+ * CI fetches the pinned ref from `compose.yaml` — the version actually deployed.
  */
 
 import assert from 'node:assert/strict';

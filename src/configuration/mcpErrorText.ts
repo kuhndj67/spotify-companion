@@ -16,9 +16,11 @@
  * from a grep that matched only backtick templates. The source scan found the single-quoted `Error:` ones on its
  * first run — which is the case it exists for.
  *
- * ⚠️ **The upstream wording can change on any image build** (`MCP_SERVER_REF=main` floats). PBT-66 scans the
- * server's source for every error template and fails the test run if one stops matching — so a rewording breaks
- * the build, not the display.
+ * ⚠️ **The upstream wording changes whenever the server's version does.** `compose.yaml` PINS it (risk R7, 2026-08-25),
+ * so that happens when someone moves the pin. PBT-66 scans the server's source at the pinned ref for every error
+ * template and fails the test run if one stops matching — so a rewording breaks the build, not the display.
+ * (Corrected 2026-10-09: this said the ref "floats" on `main`; that is only the Dockerfile's default, which the
+ * deployment overrides.)
  */
 
 export const MCP_ERROR_TEXT = /^Error\b[^\n]*:/;

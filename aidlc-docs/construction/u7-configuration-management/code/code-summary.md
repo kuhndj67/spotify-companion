@@ -36,8 +36,9 @@
 5. **A static import in a test loaded `config.ts` before the test set its env**, silently making two change-detection
    tests see one poll. Dynamic import, commented.
 6. **BR-54.2's "or displayed" would defeat the stale check** — the base is the last DOWNLOAD only.
-7. **CI could not run PBT-66** (no MCP source) — CI now fetches it at the Dockerfile's ref. `MCP_SERVER_REF=main`
-   **floats**, which is exactly why the scan earns its place.
+7. **CI could not run PBT-66** (no MCP source) — CI now fetches it at the **pinned** ref from `compose.yaml`.
+   ⚠️ Corrected 2026-10-09: this first said the ref *"floats"* on `main` and CI read the Dockerfile's default — but
+   `compose.yaml` has PINNED the server since 2026-08-25 (R7). The scan guards the day the pin moves.
 
 ## ⚠️ Not yet verified — Build & Test
 

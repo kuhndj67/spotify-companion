@@ -7614,3 +7614,21 @@ restore with rules opted in (byte-match) and out (own rules kept); rollback: U6 
 rules opt-in. UI clicked and LOOKED at in Chrome. Two wording defects found only by looking (doubled "not answering",
 literal backticks) — fixed, 1565 tests, redeployed. Test-harness mistake recorded (a wrong file path gave "Failed to
 fetch"), not an app defect.
+
+---
+
+## 2026-10-09T14:07:49Z — Hands-on test instructions written; a wrong claim about the MCP ref corrected
+
+User: *"lets not worry about that initial issue unless I see it again. Please do write up a 'hands on testing plan'…"*
+(the stuck page was most likely a tab left on the removed `:3011` copy; a cache-bypassing reload of `:3010` worked).
+Written: `construction/build-and-test/hands-on-test-instructions.md` — preflight, U0–U7 and Ops, each with the
+control to use, what to expect, and which need music; ⚠️ it warns that automation is ARMABLE live (`SKIP_EXECUTOR_ENABLED`
+true, *Over 20 years old AND major* enabled and not dry-run).
+
+⚠️ **Correction, found while gathering facts for it**: tonight's notes said `MCP_SERVER_REF=main` *"floats"* and that
+the built image *"fetched `main` today"* with 30 error templates vs the checkout's 25. **Both wrong.** `compose.yaml`
+has PINNED the server to `7b5fde63` since 2026-08-25 (R7); the image and the local checkout are that commit; 30 vs 25
+was compiled JS vs TS source counted differently. And the CI step added in Step 3 read the **Dockerfile default**, so
+CI scanned `main`, not the deployed version — **fixed** to read the pin from `compose.yaml`. Same family as F7 and the
+M4 claim: **a plausible inference written down as a fact** — here, from one line of the Dockerfile without reading
+the compose file that overrides it.

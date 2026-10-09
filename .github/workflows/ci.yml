@@ -42,13 +42,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # U7 (PBT-66, P-54): a test scans the MCP server's SOURCE for every error template, because the image
-      # fetches it with a FLOATING ref and a reworded error would otherwise read as "Spotify: ok". Fetch the
-      # same ref the Dockerfile builds, read from the Dockerfile so there is one place to change it. Source
-      # only -- nothing is built or run. Without it the test FAILS with a reason rather than passing vacuously.
+      # U7 (PBT-66, P-54): a test scans the MCP server's SOURCE for every error template, so that moving the
+      # server to a version with reworded errors fails here instead of silently reading as "Spotify: ok". Fetch
+      # the ref the DEPLOYMENT builds: compose.yaml PINS it (R7, 2026-08-25) and overrides the Dockerfile's
+      # `main` default. ⚠️ Corrected 2026-10-09: this first read the Dockerfile default and so scanned `main`,
+      # not what is deployed. Source only -- nothing is built or run. Without it the test FAILS with a reason.
       - name: Fetch the MCP server source (PBT-66 scans it)
         run: |
-          REF=$(sed -n 's/^ARG MCP_SERVER_REF=//p' Dockerfile)
+          REF=$(sed -n 's/^ *MCP_SERVER_REF: *//p' compose.yaml | head -1)
+          if [ -z "$REF" ]; then REF=$(sed -n 's/^ARG MCP_SERVER_REF=//p' Dockerfile); fi
+          echo "MCP server ref: $REF"
           git init -q .mcp-server
           git -C .mcp-server remote add origin https://github.com/marcelmarais/spotify-mcp-server.git
           git -C .mcp-server fetch --depth 1 origin "$REF"

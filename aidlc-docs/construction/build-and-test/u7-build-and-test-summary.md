@@ -11,7 +11,7 @@
 | IN-U7-4 rollback tag | `spotify-now-playing:u6-rollback` = the U6 image (`9a2a8e287d84`) |
 | IN-U7-5 safety copies | In-app backup taken from the live app (2.0 MB; entries `manifest.json`, `history.db`, `rules.json`) — **verified restorable by the developer verifier: 1093 plays, all checks**. Host copies of `config/rules.json` and `secrets/musicbrainz.json` in `data/before-u7-20261009T012805Z/`. `spotify-config.json` deliberately not copied (FR-60) |
 | Build | exit **0**, checked directly |
-| ⭐ Extra: the BUILT image's MCP error texts | The image fetched `main` today: **30** error templates in its compiled code (the local checkout had 25) — **all 30 match** BR-58.1's pattern; no non-error text starts with `Error`. The drift PBT-66 exists for, seen and clean |
+| ⭐ Extra: the BUILT image's MCP error texts | **30** error templates in the image's compiled code — **all match** BR-58.1's pattern; no non-error text starts with `Error`. ⚠️ **Corrected 2026-10-09**: this first said the image *"fetched `main` today"* and that 30 vs the local 25 was upstream drift. **Wrong** — `compose.yaml` pins the server (`7b5fde63`, R7) and the local checkout is that same commit; 30 vs 25 is compiled JS vs TypeScript source counted by two different patterns |
 | Deploy | healthy ~10 s after `up`; `/api/health` ok; UI 200 |
 | Diagnostics (IN-U7-6) | `config/`, `spotify-config.json`, `musicbrainz.json` all **writable through the container**; polls three-way (`0 / 5 / 0`, idle share 100%) |
 | Guards | all four new POSTs **403** without the ingest header and cross-site; WebSocket **101** local, **403** cross-site |

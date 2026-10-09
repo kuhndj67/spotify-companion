@@ -123,6 +123,22 @@ describe('recordPlay', () => {
   });
 });
 
+describe('recentPlays — the NEWEST plays (fixed 2026-10-09)', () => {
+  it('returns the newest N, newest first — with MORE plays than the limit, the case the old route got wrong', () => {
+    // ⚠️ The fixture must exceed the limit: with fewer plays, "first N" and "newest N" are the same set, which is
+    // exactly how the oldest-first defect hid for six weeks.
+    const repo = makeRepo();
+    for (let i = 0; i < 80; i++) {
+      repo.recordPlay(samplePlay({ title: `t${i}`, startedAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString() }), []);
+    }
+    const recent = repo.recentPlays(50);
+    assert.equal(recent.length, 50);
+    assert.equal(recent[0]!.title, 't79', 'the newest play comes first');
+    assert.equal(recent[49]!.title, 't30', 'and the oldest of the 50 is the 30th play, not the 1st');
+    repo.close();
+  });
+});
+
 describe('listPlays', () => {
   it('streams every play, paging transparently', () => {
     const repo = makeRepo();

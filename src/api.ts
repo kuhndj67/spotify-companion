@@ -788,7 +788,8 @@ export function createApi(deps: ApiDeps): Router {
       res.status(503).json({ error: 'History is unavailable.' });
       return;
     }
-    const rows = [...deps.repository.listPlays({ limit: 50 })].map((play) => ({
+    // NEWEST first (2026-10-09 fix): `listPlays` streams oldest-first and returned the corpus's first 50 plays.
+    const rows = deps.repository.recentPlays(50).map((play) => ({
       id: play.id,
       title: play.title,
       artistName: play.artistName,

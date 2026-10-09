@@ -643,10 +643,12 @@ async function loadTrace() {
       body.replaceChildren(muted(trace.error));
       return;
     }
-    body.replaceChildren(
-      renderTraceLevel('Release level', trace.release),
-      renderTraceLevel('Artist level', trace.artist),
-    );
+    // ⚠️ RELEASE level only. The artist-level label verdict was removed on 2026-09-10 (43af45e — it read OTHER
+    // artists' record deals through guest credits), and /api/explain stopped returning `artist`. This line kept
+    // rendering it, threw on `undefined.classifierVersion`, and took the release level down with it — unnoticed for
+    // a month, because app.js has no tests. Found in the hands-on test P-3, 2026-10-09. A level the API does not
+    // send is skipped, never dereferenced.
+    body.replaceChildren(...(trace.release ? [renderTraceLevel('Release level', trace.release)] : [muted('No release-level trace for this play.')]));
   } catch (error) {
     body.replaceChildren(muted(`Could not load the trace: ${error}`));
   }

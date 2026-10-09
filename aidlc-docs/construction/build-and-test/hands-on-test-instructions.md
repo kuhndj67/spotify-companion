@@ -61,8 +61,10 @@ Useful while testing: `docker logs -f spotify-now-playing` in a terminal · Sett
   *Expect* **Label** shows a verdict and **Label detail** names the label(s) — or explains itself (*not yet resolved* /
   *MusicBrainz lists no label*), never a bare dash.
 - [ ] **U2-2 Coverage** Diagnostics → the coverage figures carry an *as of* time.
-- [ ] **U2-3 Explain a play** Diagnostics → enter a recent play id in **trace** → *Expect*: the resolution trace (ISRC →
-  release → label → verdict).
+- [ ] **U2-3 Why this label?** Settings → **Run diagnostics…** → scroll to **Why this label?** at the bottom → the
+  play list starts with your **most recent** play → *Expect*: a **Release level** trace (ISRC join, releases, rules
+  fired, verdict) — or a reason such as *noIsrc* for old backfilled plays. *(Fixed 2026-10-09: it crashed, and listed
+  the oldest plays.)*
 
 ## U3 / U4 — Rules and observability
 

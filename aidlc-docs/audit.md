@@ -7632,3 +7632,24 @@ was compiled JS vs TS source counted differently. And the CI step added in Step 
 CI scanned `main`, not the deployed version — **fixed** to read the pin from `compose.yaml`. Same family as F7 and the
 M4 claim: **a plausible inference written down as a fact** — here, from one line of the Dockerfile without reading
 the compose file that overrides it.
+
+---
+
+## 2026-10-09T14:24:02Z — Hands-on P-3: two LONG-STANDING defects in *Why this label?*, fixed and redeployed
+
+User, P-3: diagnostics all green, but *"Could not load the trace: TypeError: Cannot read properties of undefined (reading
+'classifierVersion')"* at the bottom of the pop-up. **Neither defect is U7's.**
+
+1. **Broken since 2026-09-10 (`43af45e`)**: that commit removed the artist-level label verdict and `/api/explain` stopped
+   returning `artist`, but `app.js` kept rendering *"Artist level"* from it — `undefined.classifierVersion` threw and took
+   the **release** level down with it. A month unnoticed: `app.js` has no tests, and the panel runs only when Diagnostics
+   is opened. Now renders the release level only; a level the API does not send is skipped, never dereferenced.
+2. **Wrong since 2026-08-31 (U2)**: `/api/history/recent` used `listPlays({ limit: 50 })`, which streams OLDEST-first —
+   so the panel offered the corpus's FIRST 50 plays, backfilled rows with no ISRC, each answering *noIsrc*: the feature
+   looked broken even where it worked. Invisible when written (the corpus held < 50 plays, so first-50 = all). Its only
+   test covered the 503 path. New `recentPlays(limit)` (newest first) with a test whose fixture EXCEEDS the limit — the
+   condition that hid it. ⚠️ **The fixture lesson again**: a fixture smaller than the limit makes "first N" and "newest N"
+   the same set.
+
+Verified in Chrome after redeploy: the list starts with the track playing now; the trace renders. 1566 tests.
+The plan's U2-3 step was renamed to the panel's real name.

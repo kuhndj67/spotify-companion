@@ -308,6 +308,21 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   }
 
   /**
+   * The NEWEST plays, newest first — what a "recent plays" list means.
+   *
+   * ⚠️ Not `listPlays({ limit })`: that walks OLDEST-first (it streams the export), so `/api/history/recent` used it
+   * from U2 (2026-08-31) and offered *Why this label?* the corpus's FIRST 50 plays — backfilled rows with no ISRC,
+   * every one answering "noIsrc". Invisible while the corpus held under 50 plays, which is when it was written. Found
+   * in the hands-on test P-3, 2026-10-09.
+   */
+  recentPlays(limit: number): PlayRecord[] {
+    const rows = this.#db
+      .prepare('SELECT * FROM play ORDER BY started_at DESC, id DESC LIMIT ?')
+      .all(limit) as unknown as PlayRow[];
+    return rows.map(rowToRecord);
+  }
+
+  /**
    * Generator, so callers iterate lazily and memory stays constant regardless of history size.
    *
    * `node:sqlite` has no cursor API, so this pages through in blocks by id rather than reading

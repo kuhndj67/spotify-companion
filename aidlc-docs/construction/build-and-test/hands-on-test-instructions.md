@@ -80,10 +80,10 @@ Useful while testing: `docker logs -f spotify-now-playing` in a terminal · Sett
 - [X] **U5-1 Off by default** Rules → *Automated skipping*: *Expect* **off**, and the status-bar Automation dot says off.
 - [A] **U5-2 The switch persists** Turn it **on**, then immediately **off**. Run `cat state/automation-state.json` —
   *Expect* `"globalAutomationEnabled": false`. Restart the container — still off.
-- [ ] **U5-3 A real skip** *(music — optional, deliberate)* Turn automation **on**. Play a track over 20 years old on a
+- [X] **U5-3 A real skip** *(music — optional, deliberate)* Turn automation **on**. Play a track over 20 years old on a
   major label (e.g. a classic-rock single). *Expect*: skipped within ~10 s; the decision log shows the match and the
   attempt. **Turn automation off.**
-- [ ] **U5-4 The runaway halt** *(optional)* With automation on, three matching tracks in a row → *Expect*: the third is
+- [X] **U5-4 The runaway halt** *(optional)* With automation on, three matching tracks in a row → *Expect*: the third is
   skipped, the fourth is **refused** with a halt shown in the Rules pop-up. Acknowledge it; **turn automation off**.
 
 ## U6 — Backup and restore
@@ -115,7 +115,7 @@ Useful while testing: `docker logs -f spotify-now-playing` in a terminal · Sett
   and the line *"Spotify returned an error: … Failed to get access token."* — never *ok* or *PAUSED*.
 - [A] **U7-6 Credentials section (live — read only)** Settings → **Spotify**: *Expect* *"Set · client xxxx…xxxx · …"*;
   **How do I get these?** lists five steps; **Save…** is greyed with *"Fill in all four fields to save."* Do not save.
-- [ ] **U7-6b Re-save your credentials (live — optional)** With your own copy kept: **Fill from spotify-config.json…** →
+- [X] **U7-6b Re-save your credentials (live — optional)** With your own copy kept: **Fill from spotify-config.json…** →
   pick `secrets/spotify-config.json` → **Save…** → read the warning → **Replace credentials**. *Expect*: *"Saved.
   Checking with Spotify…"*, the Spotify dot stays/turns **green** within a few seconds, playback keeps updating.
 - [A] **U7-7 Restore with rules (copy)** On `:3011`, upload a backup whose rules differ from the copy's (change the
@@ -131,7 +131,7 @@ Finish the copy: `npm run verify:down` → *Expect* **✅ Removed. The live depl
 
 ## Ops — the deployment itself
 
-- [ ] **O-1 Autostart after a reboot** Reboot, log in, wait 3 minutes, then `powershell -File scripts/post-boot-check.ps1`
+- [X] **O-1 Autostart after a reboot** Reboot, log in, wait 3 minutes, then `powershell -File scripts/post-boot-check.ps1`
   → read each **[PASS]** line (the overall verdict can say *INCONCLUSIVE* for reasons that are fine — see CLAUDE.md).
 - [A] **O-2 Docker CLI** `docker ps` from Windows works (it broke after the 26H2 update until a reboot).
 - [A] **O-3 Rancher log size** `ls -la %LOCALAPPDATA%\rancher-desktop\logs\docker.log` — *Expect* small (KB–MB), not
@@ -155,7 +155,7 @@ shell, 2026-10-09 — see `audit.md`. Still for a human: **U5-3, U5-4** (real sk
 | U3-1, U4-1 … U4-3 | | |
 | U5-1 … U5-4 | U5-2 **A** pass · U5-3/U5-4 open (human) | A: off → state file `false` → restart → still off; page reconnected by itself; switched back **on** (as left by the user) |
 | U6-1 … U6-4 | **A** pass | A: backup 2.06 MB to Downloads, verified restorable (1121 plays); restore on :3011 — `restore` refused, `RESTORE` accepted, back in 3.5 s; undo back in 3.5 s. Note: after an UNDO the message says "from a backup" — the source was the set-aside history |
-| U7-1 … U7-9 | **A** pass (U7-6b open — optional, human) | A: rename → "1 changed — name" → v2; undo → original (md5 identical); empty file → "2 removed" + both reasons, Apply dimmed, cancelled; enable → bold becomes-live warning, cancelled; :3011 red "Spotify returned an error" (fixed wording confirmed); restore ticked → rules byte-identical to backup, unticked → copy's own rules kept; diagnostics shows the rules write. U7-9 credentials half needs U7-6b |
+| U7-1 … U7-9 | **A** pass · U7-6b **X** pass (Edge, 2026-10-11) | A: rename → "1 changed — name" → v2; undo → original (md5 identical); empty file → "2 removed" + both reasons, Apply dimmed, cancelled; enable → bold becomes-live warning, cancelled; :3011 red "Spotify returned an error" (fixed wording confirmed); restore ticked → rules byte-identical to backup, unticked → copy's own rules kept; diagnostics shows the rules write. U7-9 credentials half needs U7-6b |
 | O-1 … O-4 | O-2…O-4 **A** pass · O-1 open (reboot) | A: `docker ps` works; docker.log 16 MB, +0.6 KB/s (normal k3s noise); `u6-rollback` present |
 
 **When something fails**: note the test id, the time, and what the screen said; run diagnostics and keep the output;

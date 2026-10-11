@@ -74,6 +74,11 @@ export interface RulesFileStatusView {
   readonly upload: ButtonView;
   /** Disabled with a reason — never hidden (BR-55.4: an empty state explains itself). */
   readonly undo: ButtonView;
+  /**
+   * The text beside each button, one button per row — the Backup & restore layout (user, 2026-10-11). A disabled
+   * button's row shows its REASON instead, so an empty state still explains itself (BR-55.4).
+   */
+  readonly rowNotes: { readonly download: string; readonly upload: string; readonly undo: string };
   readonly lastWrite: string | null;
   readonly note: string;
 }
@@ -87,10 +92,13 @@ export function rulesFileStatusView(s: { readonly hash: string | null; readonly 
     undo: s.hasPrevious
       ? { label: 'Undo last rules change…', disabled: false, reason: null }
       : { label: 'Undo last rules change…', disabled: true, reason: 'Nothing to undo yet.' },
+    rowNotes: {
+      download: s.hash === null ? 'There is no rules file yet — upload one to start.' : 'Saves your current rules file, to edit and upload back.',
+      upload: 'Shows what the file adds, removes and changes before anything is saved. Never turns automation on.',
+      undo: s.hasPrevious ? 'Puts the rules from before your last change back — the same comparison first.' : 'Nothing to undo yet.',
+    },
     lastWrite: s.lastWrite === null ? null : describeWrite(s.lastWrite),
-    note:
-      'Download your rules, edit the file, and upload it. You will see what it adds, removes and changes before anything is saved. ' +
-      'Uploading never turns automation on.',
+    note: 'Download your rules, edit the file, and upload it.',
   };
 }
 

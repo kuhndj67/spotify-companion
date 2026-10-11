@@ -7708,3 +7708,29 @@ going forward until you are finished."*).
 **Observations raised, not defects**: (1) with automation ON, arming a rule by upload is a single plain *Apply* — the
 typed `REPLACE` covers mass removal and unknown base only, not *becomes live*; (2) after an UNDO restore the message
 says *"from a backup"* — the source was the set-aside history (U6 wording).
+
+---
+
+## 2026-10-11T20:16:11Z — Hands-on: U7-6b passes in Edge; Settings/Rules layout fixed; a U6 hidden-row defect fixed
+
+**U7-6b** (user): in their first browser *Fill from spotify-config.json…* did nothing; in a **new Edge session** the
+file dialog opened, the fields filled, the save went through and Spotify reconnected green. In Claude's Chrome a real
+click reaches the hidden file input — the handler is wired; the first browser was most likely an embedded view or a
+stale page. Recorded as a pass.
+
+**The "skip unconfirmed" pop-up at the same time was NOT caused by the save**: no attempt after #46 (19:56:40 UTC, the
+user's U5 test); the save was 20:06:40. A fresh page shows the latest attempt with no time on it, so it reads as new.
+
+**U5-4 — the halt was not exercised today**: the user's manual skips broke every run (rule, user, user, rule, user,
+rule, rule), so at attempt #46 the run was 1 long and firing was correct. Last verified live 2026-10-06 (#41/#42
+refused `runaway-halted`). Recording asked of the user.
+
+**Layout (user, 2026-10-11)**: *"the buttons … are all on their own line … In the Spotify section the two buttons are next
+to each other… Also the Settings form has no margin on the left, right, or bottom."* Fixed: one button per row with its
+description, in Spotify **and** the Rules file section (same inconsistency); `.diag-section` gets the dialogs' 1.25rem
+inset and bottom room — all three pop-ups. Row text comes from the pure views (tests added).
+
+⚠️ **Found while looking at the result — a defect since U6**: `.maintenance-row { display: flex }` overrode the `hidden`
+attribute, so *Undo last restore…* showed on installs with nothing to undo (clicking it answered "There is no previous
+history"). Global `[hidden] { display: none !important }`; verified no element on the page now renders while hidden.
+1568 tests; redeployed. Automation found OFF afterwards — switched off by the user after their U5 tests, left as is.

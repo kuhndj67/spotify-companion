@@ -8,6 +8,12 @@
   --danger: #c0392b;
 }
 
+
+/* ⚠️ The `hidden` attribute must always win. Any author `display` rule beats the browser's own [hidden] default, so
+   `.maintenance-row { display: flex }` kept U6's *Undo last restore…* row on screen when there was nothing to undo
+   (found in hands-on testing, 2026-10-11 — it had been so since U6). One rule for every element, so it cannot recur. */
+[hidden] { display: none !important; }
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0e0f11;
@@ -372,8 +378,11 @@ dd { margin: 0.15rem 0 0; font-size: 0.9rem; overflow-wrap: anywhere; }
 .diag-section {
   border-top: 1px solid var(--line, #2a2f3a);
   margin-top: 1rem;
-  padding-top: 0.75rem;
+  /* 2026-10-11 (user): sections sat flush against the dialog's edges — buttons touched the border. The same
+     1.25rem inset as .diag-head / .diag-body, and room below the last section. */
+  padding: 0.75rem 1.25rem 0;
 }
+.diag > .diag-section:last-child { padding-bottom: 1.25rem; }
 .diag-section h3 { font-size: 0.9rem; margin: 0 0 0.5rem; }
 .diag-section select { margin: 0 0 0.5rem 0.5rem; max-width: 24rem; }
 

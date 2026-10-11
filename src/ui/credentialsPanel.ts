@@ -13,6 +13,9 @@ export interface SpotifySectionView {
   readonly saveWarning: readonly string[];
   /** BR-56.8 — collapsed by default. ⚠️ U8's install routine must agree with this text (it names `npm run auth`). */
   readonly guidance: readonly string[];
+  /** The text beside each button, one button per row (user, 2026-10-11). `save` depends on whether all four
+   *  fields are filled — a fact only the page knows — so both wordings are sent and the page picks. */
+  readonly rowNotes: { readonly fill: string; readonly saveReady: string; readonly saveIncomplete: string };
 }
 
 export function spotifySectionView(v: SpotifyCredentialsView): SpotifySectionView {
@@ -27,6 +30,11 @@ export function spotifySectionView(v: SpotifyCredentialsView): SpotifySectionVie
       'If the new ones are wrong, the Spotify indicator turns red and recording stops until working ones are entered.',
       'Keep your own copy if you might want the current ones back.',
     ],
+    rowNotes: {
+      fill: 'Fills the four fields from the file “npm run auth” wrote. Nothing is sent until you save.',
+      saveReady: 'Replaces your current credentials — you will see a warning first.',
+      saveIncomplete: 'Fill in all four fields to save.',
+    },
     guidance: [
       'Each person uses their own Spotify app — create one at developer.spotify.com (Dashboard → Create app).',
       'In the app’s settings, add the redirect URI http://127.0.0.1:8888/callback, and copy the Client ID and Client secret.',

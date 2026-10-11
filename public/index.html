@@ -212,12 +212,16 @@
           <label for="sp-refresh">Refresh token</label>
           <input id="sp-refresh" type="password" autocomplete="new-password" />
         </div>
+        <!-- One button per row, its description beside it — the Backup & restore layout (user, 2026-10-11). -->
         <div class="maintenance-row">
           <button id="sp-fill" class="ghost" type="button" data-testid="spotify-fill-button">Fill from spotify-config.json&hellip;</button>
+          <p class="muted" id="sp-fill-note"></p>
           <input id="sp-file" type="file" accept=".json,application/json" hidden />
-          <button id="sp-save" class="primary" type="button" disabled data-testid="spotify-save-button">Save&hellip;</button>
         </div>
-        <p class="muted" id="sp-save-reason">Fill in all four fields to save.</p>
+        <div class="maintenance-row">
+          <button id="sp-save" class="primary" type="button" disabled data-testid="spotify-save-button">Save&hellip;</button>
+          <p class="muted" id="sp-save-reason">Fill in all four fields to save.</p>
+        </div>
         <div id="sp-confirm" class="restore-confirm" hidden data-testid="spotify-confirm">
           <ul class="restore-warning" id="sp-warning"></ul>
           <div class="restore-actions">
@@ -391,13 +395,20 @@
         <h3>Rules file</h3>
         <p class="muted" id="rules-file-note"></p>
         <p class="maintenance-last" id="rules-file-last" role="status" hidden></p>
+        <!-- One button per row, its description beside it — the Backup & restore layout (user, 2026-10-11). -->
         <div class="maintenance-row">
           <button id="rules-download" class="ghost" type="button" data-testid="rules-download-button">Download rules</button>
-          <button id="rules-upload-open" class="ghost" type="button" data-testid="rules-upload-button">Upload rules&hellip;</button>
-          <input id="rules-upload-file" type="file" accept=".json,application/json,text/plain" hidden />
-          <button id="rules-undo-open" class="ghost" type="button" data-testid="rules-undo-button">Undo last rules change&hellip;</button>
+          <p class="muted" id="rules-download-note"></p>
         </div>
-        <p class="muted" id="rules-undo-reason"></p>
+        <div class="maintenance-row">
+          <button id="rules-upload-open" class="ghost" type="button" data-testid="rules-upload-button">Upload rules&hellip;</button>
+          <p class="muted" id="rules-upload-note"></p>
+          <input id="rules-upload-file" type="file" accept=".json,application/json,text/plain" hidden />
+        </div>
+        <div class="maintenance-row">
+          <button id="rules-undo-open" class="ghost" type="button" data-testid="rules-undo-button">Undo last rules change&hellip;</button>
+          <p class="muted" id="rules-undo-reason"></p>
+        </div>
         <p id="rules-file-message" class="maintenance-message" role="alert" hidden></p>
 
         <!-- The comparison and confirmation (BR-53.6, BR-54). Shown only while an upload or undo waits. -->

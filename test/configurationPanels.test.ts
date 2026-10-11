@@ -49,7 +49,8 @@ describe('rulesConfirmView and rulesFileStatusView', () => {
   it('BR-55.4: undo is DISABLED with a reason when there is nothing to undo — never hidden', () => {
     const v = rulesFileStatusView({ hash: 'h', hasPrevious: false, lastWrite: null });
     assert.deepEqual(v.undo, { label: 'Undo last rules change…', disabled: true, reason: 'Nothing to undo yet.' });
-    assert.match(v.note, /never turns automation on/);
+    // The assurance moved beside the Upload button when each button got its own row (2026-10-11) — still shown.
+    assert.match(v.rowNotes.upload, /Never turns automation on/);
   });
 
   it('no rules file yet: download is disabled and says why', () => {
@@ -144,5 +145,24 @@ describe('the Spotify indicator’s wording (U7 Build & Test defect)', () => {
   it('a transport failure still says the connection is not answering', () => {
     const v = spotifyIndicator({ hasSnapshot: true, snapshotError: 'Could not reach the Spotify MCP server.' });
     assert.match(v.detail, /^Spotify is not answering: Could not reach/);
+  });
+});
+
+describe('one button per row, with its description (user, 2026-10-11)', () => {
+  it('rules rows: a description each — and a disabled button’s row says WHY instead', () => {
+    const live = rulesFileStatusView({ hash: 'h', hasPrevious: true, lastWrite: null }).rowNotes;
+    assert.match(live.download, /Saves your current rules file/);
+    assert.match(live.upload, /before anything is saved/);
+    assert.match(live.undo, /Puts the rules from before/);
+    const empty = rulesFileStatusView({ hash: null, hasPrevious: false, lastWrite: null }).rowNotes;
+    assert.match(empty.download, /no rules file yet/);
+    assert.equal(empty.undo, 'Nothing to undo yet.');
+  });
+
+  it('Spotify rows: the fill row explains nothing is sent; save has a ready and an incomplete wording', () => {
+    const v = spotifySectionView({ set: true, clientIdMasked: 'abcd…wxyz', redirectUri: null, secretSet: true, refreshTokenSet: true, replacedAt: null, source: 'file' });
+    assert.match(v.rowNotes.fill, /Nothing is sent until you save/);
+    assert.match(v.rowNotes.saveReady, /warning first/);
+    assert.equal(v.rowNotes.saveIncomplete, 'Fill in all four fields to save.');
   });
 });

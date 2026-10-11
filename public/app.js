@@ -2088,7 +2088,10 @@ async function refreshRulesFile() {
     renderButton(el('rules-download'), v.download);
     renderButton(el('rules-upload-open'), v.upload);
     renderButton(el('rules-undo-open'), v.undo);
-    el('rules-undo-reason').textContent = v.undo.reason ?? v.download.reason ?? '';
+    // One description per row; a disabled button's row carries its reason (the view decides which).
+    el('rules-download-note').textContent = v.rowNotes.download;
+    el('rules-upload-note').textContent = v.rowNotes.upload;
+    el('rules-undo-reason').textContent = v.rowNotes.undo;
     el('rules-file-note').textContent = v.note;
     el('rules-file-last').hidden = v.lastWrite === null;
     el('rules-file-last').textContent = v.lastWrite ?? '';
@@ -2224,10 +2227,13 @@ function spotifyFormComplete() {
   return SPOTIFY_FIELDS.every(([, id]) => el(id).value.trim() !== '');
 }
 
+/** The Save row's text: set from the server's view once loaded; the defaults match it until then. */
+let spotifyRowNotes = { saveReady: 'Replaces your current credentials — you will see a warning first.', saveIncomplete: 'Fill in all four fields to save.' };
+
 function updateSpotifySave() {
   const complete = spotifyFormComplete();
   el('sp-save').disabled = !complete;
-  el('sp-save-reason').hidden = complete;
+  el('sp-save-reason').textContent = complete ? spotifyRowNotes.saveReady : spotifyRowNotes.saveIncomplete;
 }
 
 function clearSpotifyForm() {
@@ -2251,6 +2257,9 @@ async function refreshCredentials() {
     el('sp-status').textContent = v.spotify.status;
     el('sp-guidance').replaceChildren(...v.spotify.guidance.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
     el('sp-warning').replaceChildren(...v.spotify.saveWarning.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
+    el('sp-fill-note').textContent = v.spotify.rowNotes.fill;
+    spotifyRowNotes = v.spotify.rowNotes;
+    updateSpotifySave();
     el('mb-status').textContent = v.musicbrainz.status;
     el('mb-note').hidden = v.musicbrainz.note === null;
     el('mb-note').textContent = v.musicbrainz.note ?? '';

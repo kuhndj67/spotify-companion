@@ -14,7 +14,9 @@ import {
   recordingIndicator,
   rulesIndicator,
   spotifyIndicator,
+  freshUnconfirmedSkip,
   statusBar,
+  UNCONFIRMED_SKIP_VISIBLE_MS,
   type AutomationIndicatorState,
   type RecordingState,
   type RulesState,
@@ -238,7 +240,7 @@ function automation(
     halt: null,
     liveRules: 2,
     evaluation: null,
-    lastAttemptUnconfirmed: false,
+    unconfirmedSkipAt: null,
     ...overrides,
   };
 }
@@ -254,7 +256,7 @@ describe('FC-U5-1 — seven states, each with its own glyph', () => {
       automation({ evaluation: { decided: false, decidedOnPartialData: false, holding: true } }),
       automation({ evaluation: { decided: true, decidedOnPartialData: true, holding: false } }),
       automation({ evaluation: { decided: true, decidedOnPartialData: false, holding: false } }),
-      automation({ lastAttemptUnconfirmed: true }), // failed
+      automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }), // failed
       automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
     ];
 
@@ -273,7 +275,7 @@ describe('FC-U5-1 — seven states, each with its own glyph', () => {
     const states = [
       automation(),
       automation({ automationEnabled: false }),
-      automation({ lastAttemptUnconfirmed: true }),
+      automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }),
       automation({ halt: { trigger: 'hourly-rate', observedCount: 10, threshold: 10 } }),
       automation({ evaluation: { decided: false, decidedOnPartialData: false, holding: true } }),
       automation({ evaluation: { decided: true, decidedOnPartialData: true, holding: false } }),
@@ -322,7 +324,7 @@ describe('⭐ FC-U5-1 — the halt outranks the switch it turned off', () => {
     const halted = automationIndicator(
       automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
     );
-    const failed = automationIndicator(automation({ lastAttemptUnconfirmed: true }));
+    const failed = automationIndicator(automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }));
     assert.equal(halted.level, 'halted');
     assert.equal(failed.level, 'fail');
     assert.notEqual(halted.glyph, failed.glyph);
@@ -348,7 +350,7 @@ describe('⭐ FC-U5-1 — the `failed` state, which a test MUST be able to reach
   it('an unconfirmed attempt reads as fail, and says it is not retried', () => {
     // A state no test can enter is the `recordSuccessorLag` trap in UI form -- a method that was dead
     // for its whole life inside a live, heavily-executed file.
-    const i = automationIndicator(automation({ lastAttemptUnconfirmed: true }));
+    const i = automationIndicator(automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }));
     assert.equal(i.level, 'fail');
     assert.match(i.label, /unconfirmed/i);
     // P-30: re-sending it later would skip whatever is playing then, which is not the action decided.
@@ -357,22 +359,46 @@ describe('⭐ FC-U5-1 — the `failed` state, which a test MUST be able to reach
 
   it('⚠️ outranks disabled, because switching off is what someone does when it seems broken', () => {
     const i = automationIndicator(
-      automation({ automationEnabled: false, lastAttemptUnconfirmed: true }),
+      automation({ automationEnabled: false, unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }),
     );
     assert.equal(i.level, 'fail');
+  });
+
+  it('says WHEN the skip was, so a freshly opened page does not present an old event as new', () => {
+    const i = automationIndicator(automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }));
+    assert.match(i.detail, /A skip at 19:56 UTC/);
+    assert.match(i.detail, /clears after a few minutes/);
+  });
+
+  it('⭐ (2026-10-11) it EXPIRES: fresh for 3 minutes, then gone — and only the latest attempt counts', () => {
+    const fired = '2026-10-11T19:56:40.000Z';
+    const at = (ms: number) => Date.parse(fired) + ms;
+    const latest = { state: 'unconfirmed', firedAt: fired };
+    assert.equal(freshUnconfirmedSkip(latest, at(0)), fired);
+    assert.equal(freshUnconfirmedSkip(latest, at(UNCONFIRMED_SKIP_VISIBLE_MS - 1)), fired);
+    assert.equal(freshUnconfirmedSkip(latest, at(UNCONFIRMED_SKIP_VISIBLE_MS)), null, 'stale: off the bar');
+    assert.equal(freshUnconfirmedSkip({ state: 'confirmed', firedAt: fired }, at(0)), null, 'a later success clears it');
+    assert.equal(freshUnconfirmedSkip({ state: 'refused', firedAt: null }, at(0)), null);
+    assert.equal(freshUnconfirmedSkip(null, at(0)), null);
+  });
+
+  it('⭐ (2026-10-11) the automation dot NEVER takes the red message line — the dot and its detail suffice', () => {
+    const bar = statusBar({ recording: recording(), rules: rules(), connection: 'open', spotify: { snapshotError: null, hasSnapshot: true }, automation: automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }) });
+    assert.equal(bar.indicators.at(-1)!.level, 'fail', 'the dot still shows it');
+    assert.equal(bar.message, null, 'but no paragraph above the bar');
   });
 
   it('⚠️ is NOT sticky — a later confirmed attempt clears it', () => {
     // Unlike `recording.gaps`, which is sticky because a dropped play is a permanent hole in the
     // corpus. An unconfirmed skip is a question about the device that the next skip re-asks, and a
     // latch that never cleared would be red for ever after one flaky transition.
-    assert.equal(automationIndicator(automation({ lastAttemptUnconfirmed: false })).level, 'idle');
+    assert.equal(automationIndicator(automation({ unconfirmedSkipAt: null })).level, 'idle');
   });
 
   it('but the halt still outranks it', () => {
     const i = automationIndicator(
       automation({
-        lastAttemptUnconfirmed: true,
+        unconfirmedSkipAt: '2026-10-11T19:56:40.298Z',
         halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 },
       }),
     );

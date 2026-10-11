@@ -1582,7 +1582,8 @@ function renderStatusBar() {
   // ⚠️ `fail` outranks `halted` regardless of position: a halt is the system working as designed and
   // clears only on a deliberate acknowledgement, so it can stand for days. Accepting either in one
   // pass would let it permanently occupy the single message slot and hide every later fault.
-  const worst = MESSAGE_LEVELS.map((level) => indicators.find((i) => i.level === level)).find(
+  // ⚠️ `inMessage === false` (the automation dot) never takes the line — same rule as statusBar.ts (2026-10-11).
+  const worst = MESSAGE_LEVELS.map((level) => indicators.find((i) => i.level === level && i.inMessage !== false)).find(
     (i) => i !== undefined,
   );
   if (message) {

@@ -7734,3 +7734,24 @@ inset and bottom room — all three pop-ups. Row text comes from the pure views 
 attribute, so *Undo last restore…* showed on installs with nothing to undo (clicking it answered "There is no previous
 history"). Global `[hidden] { display: none !important }`; verified no element on the page now renders while hidden.
 1568 tests; redeployed. Automation found OFF afterwards — switched off by the user after their U5 tests, left as is.
+
+---
+
+## 2026-10-11T20:36:38Z — "Skip unconfirmed" no longer sticks: clears after 3 minutes or the next skip; no red line
+
+User: no way to clear *Skip unconfirmed* from the bar, plus the red paragraph above it, repeated in white on click.
+*"once the missed skip is stale the user is unlikely to know or remember the context… a message in the diagnostics log
+… but it should clear off the main screen pretty quickly (I'd say after a successful skip or after a few minutes). I
+also think the long red text above the status line is unnecessary. the Skip unconfirmed status text with the white
+pop-up text for more information is sufficient."*
+
+**Cause — a U5 design gap**: the flag reflected the latest attempt and was cleared only by a later confirmed skip
+(*"the next skip re-asks"*). With automation OFF there is no next skip, so attempt #46 stayed red indefinitely, ranked
+above *Automation off*.
+
+**Changed**: `freshUnconfirmedSkip(latest, nowMs)` (pure, tested) — shown only for **3 minutes** after it fired or until
+a later attempt; re-evaluated on every broadcast, so it clears without a reload. The detail now says **when** (*"A skip
+at 19:56 UTC…"*). The automation indicator is marked `inMessage: false` and never takes the red line (as the halt since
+2026-10-04) — server and `app.js` honour the same flag; other dots unchanged. The record stays in Diagnostics' *Last skip
+attempt* and the decision log. The U5 rule that an unconfirmed skip outranks *Automation off* is kept — inside the window.
+1571 tests; redeployed; checked in Chrome.

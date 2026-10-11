@@ -59,6 +59,13 @@ export interface Indicator {
   readonly glyph: string;
   /** Shown on click. Includes the age of the answer where there is one. */
   readonly detail: string;
+  /**
+   * `false` keeps this indicator OUT of the single message line above the bar. The automation dot sets it: its
+   * states are explained by the dot itself and its click-detail (user direction 2026-10-04 for the halt, and
+   * 2026-10-11 for an unconfirmed skip — *"the Skip unconfirmed status text with the white pop-up text for more
+   * information is sufficient"*). Absent means it may take the line.
+   */
+  readonly inMessage?: false;
 }
 
 /**
@@ -270,14 +277,34 @@ export interface AutomationIndicatorState {
    */
   readonly evaluation: EvaluationProgress | null;
   /**
-   * ⚠️ The MOST RECENT attempt reached the player and could not be confirmed (BR-43.3/43.5).
+   * When the MOST RECENT attempt fired, if it was unconfirmed (BR-43.3/43.5) AND is still fresh — else `null`.
+   * Computed by `freshUnconfirmedSkip`.
    *
-   * Reflects the latest attempt only, so a later confirmed skip clears it. **Not sticky like
-   * `recording.gaps`**, and the difference is real: a dropped play is a permanent hole in the corpus,
-   * while an unconfirmed skip is a question about the device that the next skip re-asks. A latch that
-   * never cleared would be red for ever after one flaky transition.
+   * ⚠️ **Changed 2026-10-11 (user, hands-on testing).** It used to be a boolean cleared only by a later confirmed
+   * skip — *"the next skip re-asks"*. With automation switched OFF there is no next skip, so one unconfirmed attempt
+   * stayed red indefinitely, above *Automation off*, with a red paragraph above the bar. The user: *"once the missed
+   * skip is stale the user is unlikely to know or remember the context… it should clear off the main screen pretty
+   * quickly (after a successful skip or after a few minutes)"*. The record stays in Diagnostics (*Last skip attempt*)
+   * and the decision log; the bar only shows it while it is news.
    */
-  readonly lastAttemptUnconfirmed: boolean;
+  readonly unconfirmedSkipAt: string | null;
+}
+
+/** How long an unconfirmed skip stays on the bar (user, 2026-10-11: "a few minutes"). */
+export const UNCONFIRMED_SKIP_VISIBLE_MS = 3 * 60_000;
+
+/**
+ * The unconfirmed skip worth showing, or `null`. ⚙️ Pure — `nowMs` is a parameter, so the expiry is testable.
+ * Only the LATEST attempt counts, so a later confirmed (or refused) attempt clears it at once.
+ */
+export function freshUnconfirmedSkip(
+  latest: { readonly state: string; readonly firedAt: string | null } | null,
+  nowMs: number,
+): string | null {
+  if (latest === null || latest.state !== 'unconfirmed' || latest.firedAt === null) return null;
+  const firedMs = Date.parse(latest.firedAt);
+  if (!Number.isFinite(firedMs)) return null;
+  return nowMs - firedMs < UNCONFIRMED_SKIP_VISIBLE_MS ? latest.firedAt : null;
 }
 
 /** What `EvaluationCoordinator.inProgress` exposes, projected onto what the dot needs. */
@@ -350,14 +377,15 @@ export function automationIndicator(state: AutomationIndicatorState): Indicator 
     return indicator('unknown', 'Automation', 'No automation status has been reported yet.');
   }
 
-  // 3. A skip that went out and was never confirmed.
-  if (state.lastAttemptUnconfirmed) {
+  // 3. A skip that went out and was never confirmed — shown only while fresh (`freshUnconfirmedSkip`).
+  if (state.unconfirmedSkipAt !== null) {
+    const at = state.unconfirmedSkipAt.slice(11, 16);
     return indicator(
       'fail',
       'Skip unconfirmed',
-      'A skip was sent to Spotify and the track did not change. It may or may not have landed — ' +
+      `A skip at ${at} UTC was sent to Spotify and the track did not change. It may or may not have landed — ` +
         'it is NOT retried, because re-sending it later would skip whatever is playing then. ' +
-        'See the decision log.',
+        'This clears after a few minutes or the next successful skip; Diagnostics keeps the record.',
     );
   }
 
@@ -454,7 +482,8 @@ export function statusBar(state: StatusBarState): StatusBar {
     spotifyIndicator(state.spotify),
     // ⚠️ LAST, and omitted entirely when U5 is absent. The order is read left to right as a
     // priority order, and automation is the only one of the five that cannot lose data.
-    ...(state.automation === null ? [] : [automationIndicator(state.automation)]),
+    // ⚠️ `inMessage: false` — the automation dot never takes the message line (see `Indicator.inMessage`).
+    ...(state.automation === null ? [] : [{ ...automationIndicator(state.automation), inMessage: false as const }]),
   ];
 
   /*
@@ -473,7 +502,7 @@ export function statusBar(state: StatusBarState): StatusBar {
    * stands until someone acknowledges it — so a halt here would park a paragraph indefinitely, which is
    * both noise and a hiding place for the next real fault.
    */
-  const worst = indicators.find((i) => i.level === 'fail') ?? null;
+  const worst = indicators.find((i) => i.level === 'fail' && i.inMessage !== false) ?? null;
 
   return {
     indicators,

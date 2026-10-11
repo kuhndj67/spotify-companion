@@ -32,6 +32,7 @@ import { SqliteDecisionLogRepository } from './rules/SqliteDecisionLogRepository
 import { DECISION_LOG_CAP } from './rules/types.js';
 import {
   automationIndicator,
+  freshUnconfirmedSkip,
   recordingIndicator,
   rulesIndicator,
   spotifyIndicator,
@@ -1243,7 +1244,9 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
       hasSnapshot: true,
       snapshotError: 'error' in snapshot ? String(snapshot.error) : null,
     }),
-    automation: automationIndicator(automationIndicatorState()),
+    // ⚠️ `inMessage: false` (2026-10-11): the automation dot never takes the red line above the bar — app.js assembles
+    // the bar from these, and honours the flag exactly as statusBar() does.
+    automation: { ...automationIndicator(automationIndicatorState()), inMessage: false as const },
   };
 }
 
@@ -1293,10 +1296,9 @@ function automationIndicatorState(): AutomationIndicatorState {
             decidedOnPartialData: play.decidedOnPartialData,
             holding: play.holding,
           },
-    // ⚠️ The LATEST attempt only, so a later confirmed skip clears the red light. Deliberately not
-    // sticky like `recording.gaps`: a dropped play is a permanent hole in the corpus, while an
-    // unconfirmed skip is a question about the device that the next skip re-asks.
-    lastAttemptUnconfirmed: latest?.state === 'unconfirmed',
+    // ⚠️ The LATEST attempt only, and only while FRESH (2026-10-11): a later skip clears it, and so do a few
+    // minutes — re-evaluated on every broadcast, so the dot clears without a reload.
+    unconfirmedSkipAt: freshUnconfirmedSkip(latest, Date.now()),
   };
 }
 

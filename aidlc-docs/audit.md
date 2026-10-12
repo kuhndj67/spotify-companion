@@ -7768,3 +7768,17 @@ result only — the 2026-09-30 resume-plus-WSL-update failure mode remains unexe
 
 Remaining from the hands-on list: U5-4 (runaway halt; last verified live 2026-10-06), and two small items (arming a rule
 while automation is on takes one plain Apply click; post-undo message says "from a backup").
+
+---
+
+## 2026-10-12T16:10:00Z — U5-4 (runaway halt): PASS
+
+User: *"completed U5-4 - works as expected."* Checked against the database and `state/automation-state.json`:
+rule `old-and-major` matched three tracks in a row; attempts **47, 48, 49** fired at 16:02:24 / :33 / :39Z, each
+**`confirmed`** (track id changed, progress reset to 3 s), plays 1202–1204 recorded `skipped` / `skip_source = 'rule'`.
+Halt latched **16:02:44Z**, `trigger: consecutive`, `observedCount: 3`, `threshold: 3`, `attemptIds [47,48,49]` —
+exactly the run that tripped it (the 2026-10-04 7-ids-for-3 defect stays fixed). "3 consecutive means 3" holds again.
+
+⚠️ **Partly exercised only**: the track after the halt did not match (`album.ageYears` 1), so this run did not show a
+fourth *matching* track being refused `runaway-halted`; that half was last seen live 2026-10-04. Its decision row was
+written `dry_run = 1` while halted.

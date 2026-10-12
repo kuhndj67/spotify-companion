@@ -144,7 +144,7 @@ Finish the copy: `npm run verify:down` → *Expect* **✅ Removed. The live depl
 
 **Legend**: `X` = run by the user · `A` = run by Claude through browser automation (Chrome DevTools MCP) and the
 shell, 2026-10-09 — see `audit.md`. Still for a human: **U5-3, U5-4** (real skips, optional), **U7-6b** (optional),
-**O-1** (reboot).
+**O-1** (reboot). ✅ All run and passed by 2026-10-12 — the hands-on list is complete.
 
 | Test | Pass / Fail / Skipped | Notes (time, track, what you saw) |
 |---|---|---|
@@ -153,7 +153,7 @@ shell, 2026-10-09 — see `audit.md`. Still for a human: **U5-3, U5-4** (real sk
 | U1-1 … U1-4 | | |
 | U2-1 … U2-3 | | |
 | U3-1, U4-1 … U4-3 | | |
-| U5-1 … U5-4 | U5-2 **A** pass · U5-4 **X** pass (2026-10-12) · U5-3 open (human) | A: off → state file `false` → restart → still off; page reconnected by itself; switched back **on** (as left by the user). U5-4: rule `old-and-major` skipped plays 1202–1204 (attempts 47–49, all `confirmed`, `skip_source = 'rule'`) within 15 s; halt latched 16:02:44Z `consecutive`, `observedCount 3`, `attemptIds [47,48,49]` — matches its trigger. The next track did **not** match (age 1 yr), so the *fourth-is-refused* half was not re-exercised (last seen live 2026-10-04) |
+| U5-1 … U5-4 | U5-2 **A** pass · U5-3, U5-4 **X** pass (2026-10-12) | A: off → state file `false` → restart → still off; page reconnected by itself; switched back **on** (as left by the user). U5-4: rule `old-and-major` skipped plays 1202–1204 (attempts 47–49, all `confirmed`, `skip_source = 'rule'`) within 15 s; halt latched 16:02:44Z `consecutive`, `observedCount 3`, `attemptIds [47,48,49]` — matches its trigger. The next track did **not** match (age 1 yr), so the *fourth-is-refused* half was not re-exercised (last seen live 2026-10-04). U5-3: accepted on U5-4's evidence (user, 2026-10-12) — attempts 47–49 are three real rule skips, confirmed at 12 s / 9 s / 6 s of progress (the first just over the ~10 s expectation) |
 | U6-1 … U6-4 | **A** pass | A: backup 2.06 MB to Downloads, verified restorable (1121 plays); restore on :3011 — `restore` refused, `RESTORE` accepted, back in 3.5 s; undo back in 3.5 s. Note: after an UNDO the message says "from a backup" — the source was the set-aside history |
 | U7-1 … U7-9 | **A** pass · U7-6b **X** pass (Edge, 2026-10-11) | A: rename → "1 changed — name" → v2; undo → original (md5 identical); empty file → "2 removed" + both reasons, Apply dimmed, cancelled; enable → bold becomes-live warning, cancelled; :3011 red "Spotify returned an error" (fixed wording confirmed); restore ticked → rules byte-identical to backup, unticked → copy's own rules kept; diagnostics shows the rules write. U7-9 credentials half needs U7-6b |
 | O-1 … O-4 | O-2…O-4 **A** pass · O-1 **X** pass (2026-10-12) | A: `docker ps` works; docker.log 16 MB, +0.6 KB/s (normal k3s noise); `u6-rollback` present. O-1: user rebooted (boot 11:28:28 EDT); script run by Claude at +13.7 min — all 13 checks **[PASS]**, verdict **CONFIRMED**; container started 68 s after boot by itself, schema v7, `integrity_check: ok`, HTTP 200 / WS 101 local, 403 cross-site on both, 1159 plays |

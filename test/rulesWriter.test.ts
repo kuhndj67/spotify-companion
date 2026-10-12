@@ -126,7 +126,7 @@ describe('stageUpload — refusals change nothing (BR-53.3, BR-54.2)', () => {
   });
 });
 
-describe('typed confirmation (BR-54.1, BR-54.4)', () => {
+describe('typed confirmation (BR-54.1, BR-54.4, BR-54.6)', () => {
   it('BR-54.4: an UNKNOWN base is not refused, but needs REPLACE, with the reason stated', () => {
     const r = f.writer.stageUpload(file(['a', 'b', 'c', 'd', 'e']), null);
     assert.ok(r.ok && r.typedConfirmationRequired);
@@ -149,6 +149,28 @@ describe('typed confirmation (BR-54.1, BR-54.4)', () => {
     const applied = await f.writer.confirm(r.ok ? r.token : '', REPLACE_WORD);
     assert.ok(applied.ok);
     assert.equal(f.watcher.current().rules.length, 0);
+  });
+
+  it('BR-54.6: a rule that BECOMES LIVE (dryRun true -> false) needs REPLACE, and without it nothing is written', async () => {
+    const before = readFileSync(f.path, 'utf8');
+    const armed = JSON.stringify({ version: 1, rules: [rule('a', { dryRun: false }), rule('b'), rule('c'), rule('d')] });
+    const r = f.writer.stageUpload(armed, f.writer.download()!.hash);
+    assert.ok(r.ok && r.typedConfirmationRequired);
+    assert.deepEqual(r.ok && r.comparison.becomesLive.map((x) => x.id), ['a']);
+    assert.match((r.ok && r.typedConfirmationReason) || '', /lets 1 rule skip tracks when automation is on/);
+
+    const plain = await f.writer.confirm(r.ok ? r.token : '', null);
+    assert.ok(!plain.ok && plain.reason === 'confirmation-required', 'arming is never one plain Apply click');
+    assert.equal(readFileSync(f.path, 'utf8'), before);
+    assert.ok((await f.writer.confirm(r.ok ? r.token : '', REPLACE_WORD)).ok);
+  });
+
+  it('BR-54.6: DISARMING (dryRun false -> true) needs no typed word — making the system safer is never gated', async () => {
+    const armed = JSON.stringify({ version: 1, rules: [rule('a', { dryRun: false })] });
+    const s1 = f.writer.stageUpload(armed, null);
+    assert.ok(s1.ok && (await f.writer.confirm(s1.token, REPLACE_WORD)).ok);
+    const r = f.writer.stageUpload(file(['a']), f.writer.download()!.hash);
+    assert.ok(r.ok && !r.typedConfirmationRequired && r.comparison.becomesLive.length === 0);
   });
 
   it('removing exactly half needs no typed word (the PBT-60 boundary, end to end)', () => {

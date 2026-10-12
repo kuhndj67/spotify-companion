@@ -7782,3 +7782,22 @@ exactly the run that tripped it (the 2026-10-04 7-ids-for-3 defect stays fixed).
 ⚠️ **Partly exercised only**: the track after the halt did not match (`album.ageYears` 1), so this run did not show a
 fourth *matching* track being refused `runaway-halted`; that half was last seen live 2026-10-04. Its decision row was
 written `dry_run = 1` while halted.
+
+---
+
+## 2026-10-12T16:40:00Z — The two small hands-on items fixed (user: "go ahead and fix the small items")
+
+**1. Arming a rule took one plain Apply click → new BR-54.6.** When an upload's comparison has a non-empty
+`becomesLive`, confirm now requires `REPLACE`, reason *"This lets N rule(s) skip tracks when automation is on — it/they
+could not before."* ⚠️ Asked **whether automation is on or off**, deliberately: BR-54.5 forbids `RulesWriter` from
+reading `state/` (an agent editing rules must not reach the kill switch), and the switch can be flipped a moment after
+the write anyway. Disarming is never gated; rules undo goes through the same `#stage` and gets the same check.
+Live-checked against the redeployed container: staging `major-label` enabled → `typedConfirmationRequired: true` with
+that reason; not confirmed; `rules.json` md5 `8b0d7d87…` unchanged. The confirm dialog renders it through the existing
+`needsWord` path (the one mass removal uses) — not re-screenshotted.
+
+**2. After an UNDO the message said "from a backup".** The startup restorer now carries `reason: 'undo'` from
+`stage.json` into the `applied` outcome; Settings says *"Went back to your previous history (N plays), set aside
+<when>"* and Diagnostics *"undo applied at startup … set aside …"*. A plain restore is unchanged.
+
+1573 tests · `npm run verify` exit 0 · redeployed, healthy.

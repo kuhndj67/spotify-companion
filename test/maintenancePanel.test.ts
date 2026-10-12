@@ -60,6 +60,9 @@ describe('statusView', () => {
     const ok = statusView({ ...base, lastRestore: { kind: 'applied', plays: 951, takenAt: '2026-10-02T21:14:00Z' } });
     assert.equal(ok.lastRestore?.tone, 'ok');
     assert.match(ok.lastRestore!.text, /Restored 951 plays from a backup taken 2026-10-02 21:14 UTC/);
+    const undo = statusView({ ...base, lastRestore: { kind: 'applied', reason: 'undo', plays: 951, takenAt: '2026-10-02T21:14:00Z' } });
+    assert.match(undo.lastRestore!.text, /Went back to your previous history \(951 plays\), set aside 2026-10-02 21:14 UTC/);
+    assert.doesNotMatch(undo.lastRestore!.text, /backup/, 'an undo restores the set-aside history, not a backup');
     const bad = statusView({ ...base, lastRestore: { kind: 'failed', reason: 'did not verify' } });
     assert.equal(bad.lastRestore?.tone, 'fail');
     assert.match(bad.lastRestore!.text, /unchanged/);

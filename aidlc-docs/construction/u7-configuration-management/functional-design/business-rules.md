@@ -48,6 +48,7 @@
 | **BR-54.3** | **Changed between comparison and confirm → refused.** The hash on disk is recorded at staging and re-checked at confirm; a mismatch refuses the confirm and discards the staging | Q2c |
 | **BR-54.4** | ⚠️ **Unknown base → typed confirmation, not refusal.** An upload with no `baseHash` (page reloaded, another browser, a file kept from last month) cannot be checked for staleness. It is **not** refused — that would make the feature unusable across sessions — but the comparison says *"This file was not downloaded in this session; check what it removes"* and confirm requires `REPLACE`, as BR-54.1. **This is the limit of FR-67's staleness check, stated rather than hidden** | design decision — for review |
 | **BR-54.5** | A rules write **never** reads or writes `state/` — the automation switch and halt latch are untouched. Pinned structurally: the rules-writing module imports nothing from `src/playback/` | Q2e, FR-61 |
+| **BR-54.6** | ⚠️ **Arming needs a typed confirmation** (added 2026-10-12, hands-on finding): when the comparison's `becomesLive` is non-empty — a rule that could not skip before can after this write — confirm requires `REPLACE`, with the reason *"This lets N rule(s) skip tracks when automation is on — it/they could not before."* Asked **regardless of whether automation is on**: BR-54.5 forbids this module reading `state/`, and the switch can be turned on a moment after the write. Disarming is never gated. Undo runs through the same check (BR-55.3) | user, 2026-10-12 |
 
 ## BR-55: Undo last rules change (FR-68)
 

@@ -35,7 +35,7 @@ import type { LoadedRule, LoadedRuleSet } from '../rules/types.js';
 import { writeFileAtomic } from './atomicWrite.js';
 import { compareRuleSets, type RulesComparison } from './rulesComparison.js';
 
-/** The word typed to confirm a write that would lose rules or whose base is unknown (BR-54.1, BR-54.4). */
+/** The word typed to confirm a write that would lose rules, arm a rule, or whose base is unknown (BR-54.1, 54.6, 54.4). */
 export const REPLACE_WORD = 'REPLACE';
 
 /** As U6's restore staging (BR-51.3): long enough to read a comparison, short enough not to linger. */
@@ -83,7 +83,7 @@ export interface RulesStaged {
   readonly token: string;
   readonly kind: 'upload' | 'undo' | 'restore';
   readonly comparison: RulesComparison;
-  /** True when confirm must carry `REPLACE` (BR-54.1 mass removal, or BR-54.4 unknown base). */
+  /** True when confirm must carry `REPLACE` (BR-54.1 mass removal, BR-54.6 a rule becomes live, or BR-54.4 unknown base). */
   readonly typedConfirmationRequired: boolean;
   /** Why it is required — shown beside the box. `null` when it is not. */
   readonly typedConfirmationReason: string | null;
@@ -280,6 +280,13 @@ export class RulesWriter {
     const reasons: string[] = [];
     if (comparison.massRemoval) {
       reasons.push(`This removes ${comparison.removed.length} of your ${comparison.currentCount} rules.`);
+    }
+    // BR-54.6: arming is the one change here that can act on the player, so it is not a plain click. Asked
+    // whether automation is on or off — this module may not read `state/` (BR-54.5), and the switch can be
+    // turned on a moment later anyway.
+    if (comparison.becomesLive.length > 0) {
+      const n = comparison.becomesLive.length;
+      reasons.push(`This lets ${n === 1 ? '1 rule' : `${n} rules`} skip tracks when automation is on — ${n === 1 ? 'it' : 'they'} could not before.`);
     }
     if (extra === 'unknown-base') {
       reasons.push("This file wasn't downloaded in this session, so changes made since cannot be detected — check what it removes.");

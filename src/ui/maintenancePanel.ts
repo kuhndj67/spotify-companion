@@ -91,8 +91,11 @@ export function statusView(s: MaintenanceStatus): StatusView {
     lastRestore = {
       tone: 'ok',
       text:
-        `Restored ${s.lastRestore.plays ?? 'an unknown number of'} plays from a backup taken ${formatWhen(s.lastRestore.takenAt)}. ` +
-        'Plays since that backup are re-imported from Spotify (as not-observed) when the app can reach it.' +
+        (s.lastRestore.reason === 'undo'
+          ? `Went back to your previous history (${s.lastRestore.plays ?? 'an unknown number of'} plays), set aside ${formatWhen(s.lastRestore.takenAt)}. ` +
+            'Plays since then are re-imported from Spotify (as not-observed) when the app can reach it.'
+          : `Restored ${s.lastRestore.plays ?? 'an unknown number of'} plays from a backup taken ${formatWhen(s.lastRestore.takenAt)}. ` +
+            'Plays since that backup are re-imported from Spotify (as not-observed) when the app can reach it.') +
         rulesSentence(s.lastRestore.rulesResult),
     };
   } else if (s.lastRestore?.kind === 'failed') {

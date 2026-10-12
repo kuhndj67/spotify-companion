@@ -142,6 +142,7 @@ describe('⭐ the round trip — A backs up, B restores it, B undoes it', () => 
     restart(b);
     assert.equal(gapsIn(b.repo), 7, 'B now holds A’s history');
     assert.equal(b.service.status().lastRestore?.kind, 'applied', 'the outcome is reported after the restart (BR-48.6)');
+    assert.equal((b.service.status().lastRestore as { reason?: string }).reason, undefined, 'a restore is not an undo');
     assert.deepEqual(readdirSync(join(b.dataDir, WORK_DIR_NAME)), [], 'nothing left behind (FR-62)');
 
     // Undo (BR-49.2) — the same path, from previous/.
@@ -152,6 +153,7 @@ describe('⭐ the round trip — A backs up, B restores it, B undoes it', () => 
     assert.equal(b.service.confirm(undo.token, CONFIRM_WORD).ok, true);
     restart(b);
     assert.equal(gapsIn(b.repo), 2, 'B’s own history is back');
+    assert.equal((b.service.status().lastRestore as { reason?: string }).reason, 'undo', 'the message must not say "from a backup"');
     // Undo is its own inverse (BR-49.3): A's history is now the previous one.
     assert.equal(b.service.prepareUndo().ok, true);
   });

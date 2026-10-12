@@ -75,7 +75,16 @@ export type RulesRestoreResult = 'applied' | 'not-requested' | { readonly skippe
 
 export type RestoreOutcome =
   | { kind: 'none' }
-  | { kind: 'applied'; takenAt: string | null; plays: number | null; rules?: PendingRules | null; rulesResult?: RulesRestoreResult }
+  | {
+      kind: 'applied';
+      /** For an undo, when the history was SET ASIDE (`moved.json`), not when a backup was taken. */
+      takenAt: string | null;
+      plays: number | null;
+      /** Present only for an undo, so the after-restart message does not say *"from a backup"*. */
+      reason?: 'undo';
+      rules?: PendingRules | null;
+      rulesResult?: RulesRestoreResult;
+    }
   | { kind: 'failed'; reason: string };
 
 /**
@@ -208,7 +217,13 @@ export function applyPendingRestore(dataDir: string, options: RestoreOptions = {
         : null;
     fault('rm:pending');
     rmSync(pending, { recursive: true, force: true });
-    return { kind: 'applied', takenAt: manifest?.takenAt ?? null, plays: manifest?.counts?.['play'] ?? null, ...(rules ? { rules } : {}) };
+    return {
+      kind: 'applied',
+      takenAt: manifest?.takenAt ?? null,
+      plays: manifest?.counts?.['play'] ?? null,
+      ...(stage?.reason === 'undo' ? { reason: 'undo' as const } : {}),
+      ...(rules ? { rules } : {}),
+    };
   } catch (e) {
     if (isSimulatedCrash(e)) throw e;
     const reason = e instanceof Error ? e.message : String(e);

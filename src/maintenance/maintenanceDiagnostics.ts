@@ -43,7 +43,15 @@ export function maintenanceDiagnosticSteps(m: MaintenanceStatus): DiagnosticStep
   const last = m.lastRestore;
   if (last === null) steps.push(s('Last restore', 'skip', 'no restore has been applied since this start'));
   else if (last.kind === 'applied')
-    steps.push(s('Last restore', 'ok', `applied at startup — ${last.plays ?? 'unknown'} plays, backup taken ${last.takenAt ?? 'at an unknown time'}`));
+    steps.push(
+      s(
+        'Last restore',
+        'ok',
+        last.reason === 'undo'
+          ? `undo applied at startup — ${last.plays ?? 'unknown'} plays, set aside ${last.takenAt ?? 'at an unknown time'}`
+          : `applied at startup — ${last.plays ?? 'unknown'} plays, backup taken ${last.takenAt ?? 'at an unknown time'}`,
+      ),
+    );
   else if (last.kind === 'failed') steps.push(s('Last restore', 'fail', `${last.reason}`));
 
   steps.push(

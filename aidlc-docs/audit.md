@@ -7810,3 +7810,16 @@ User: *"Yea lets mark it complete, push/commit and move to U8"*. U5-3 (a real sk
 attempts 47–49, each `confirmed`, at 12 s / 9 s / 6 s of progress (the first just over the ~10 s expectation), rather
 than a separate post-reboot run. Every item on the hands-on list has now been run and passed. Halt still latched and
 automation on at this entry — the user's to acknowledge.
+
+---
+
+## 2026-10-12T17:05:00Z — U7 APPROVED; Requirements Q18 = A (NFR-34); U8 Functional Design plan written
+
+User (asked via question prompt): **U7 — "Approve U7"**; **Q18 — "A: SemVer, pre-1.0 (Recommended)"**. Q18's answer
+is written into `requirement-verification-questions.md` and ratified as **NFR-34** in `requirements.md` (owner U8).
+
+U8 FD plan: `construction/plans/u8-functional-design-plan.md`, 10 questions. Measured for it:
+⚠️ **NFR-30 cannot be met as written** — `GET /repos/kuhndj67/spotify-companion/branches/main/protection` and
+`…/rulesets` both return **403 "Upgrade to GitHub Pro or make this repository public"** (private, free plan). Q1.
+Only the three `*.example.json` files have ever been added under `secrets/` across all 142 commits; no full-history
+scan for secrets *outside* `secrets/` has been run (Q4). CI has no `smoke`, `knip` or secret scan yet.

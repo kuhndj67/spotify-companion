@@ -502,7 +502,7 @@ pre-release labels. ⚠️ Tools that compare versions do not know that conventi
 C) Calendar versioning (`2026.10.0`). Says *when*, not *what changed*. ⚠️ Cannot express "this release breaks
 your rules file", which is the one thing a user installing it needs to know
 
-X) Other (please describe after [Answer]: tag below)
+X) Other (please describe after [Answer]: **A** (user, 2026-10-12) — ratified as **NFR-34** in `requirements.md`. Owner: U8. tag below)
 
 ⚠️ **Until U8, every backup's manifest records `0.1.0`** — U7's included. Accepted when the owner was chosen.
 

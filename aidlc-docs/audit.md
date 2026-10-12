@@ -7755,3 +7755,16 @@ at 19:56 UTC…"*). The automation indicator is marked `inMessage: false` and ne
 2026-10-04) — server and `app.js` honour the same flag; other dots unchanged. The record stays in Diagnostics' *Last skip
 attempt* and the decision log. The U5 rule that an unconfirmed skip outranks *Automation off* is kept — inside the window.
 1571 tests; redeployed; checked in Chrome.
+
+---
+
+## 2026-10-12T15:42:00Z — O-1 (autostart after a reboot): PASS
+
+User rebooted (host boot 2026-10-12 11:28:28 EDT = 15:28:28Z) and asked Claude to run the check. `scripts/post-boot-check.ps1`
+at +13.7 min: **all 13 checks [PASS], verdict CONFIRMED** — Rancher Desktop and dockerd up on their own; `spotify-now-playing`
+started **68 s after boot by itself** and healthy; schema v7 over the bind mount; `integrity_check: ok`; UI 200 and WebSocket
+101 locally, cross-site Origin 403 on both. 1159 plays. Consistent with the 2026-09-05 result (82 s). ⚠️ Still a **reboot**
+result only — the 2026-09-30 resume-plus-WSL-update failure mode remains unexercised by this test.
+
+Remaining from the hands-on list: U5-4 (runaway halt; last verified live 2026-10-06), and two small items (arming a rule
+while automation is on takes one plain Apply click; post-undo message says "from a backup").

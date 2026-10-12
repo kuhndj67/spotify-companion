@@ -38,6 +38,7 @@ tractable units while still shipping as one runnable checkpoint.
 | **U7** | 5 | Configuration Management | Feature | CI green **+ live** — rules and credentials changed in-app on a running deployment |
 | **U8** | 5 | Team Workflow & Onboarding | Process & docs | CI gating enforced **+ the install walked cold** by someone who did not write it |
 | **U9** | 5 | Off-machine Deployment | Deployment | Reachable and fully working from a second machine, **deployed by following U8's install routine** |
+| **U10** | 5 | Team Operations | Process | Two contributors work in parallel units through reviewed PRs **with no conflict in the AI-DLC records** (declared 2026-10-12) |
 
 ⚠️ **Phase 5's units were renumbered on 2026-10-07** to match build order (Units Question 5a = A). Old → new:
 U8 → **U7**, U9 → **U8**, U7 → **U9**. `audit.md` entries written before that date use the old numbers.
@@ -311,6 +312,23 @@ and restored on the NAS through *Restore backup*, and the NAS app runs with the 
 or a throwaway second one · **U9-b** two deployments on one Spotify registration · probe **WAL on the NAS
 volume** · verify the WebSocket handshake **both directions** off-machine. ⚠️ U6's upload routes must not be
 reachable off-machine before Question 11 is decided.
+
+---
+
+## U10 — Team Operations *(Phase 5)* — declared 2026-10-12, NOT YET DESIGNED
+
+**Purpose**: several developers can work **at the same time** — on issues, in parallel units, through reviewed PRs —
+without colliding in the project's records. U8 gets a second person to *install and open one PR*; U10 makes a team
+**work**. Added by Units **Question 6 = A** after the user found no issue tracking or multi-developer coordination in
+Phase 5 (2026-10-12).
+
+**Requirements**: **NFR-35** issues as the backlog · **NFR-36** AI-DLC records that merge cleanly (⚠️ the
+single-writer `audit.md` and *Current Stage* are the core problem) · **NFR-37** CODEOWNERS and gate approval ·
+**NFR-38** CHANGELOG · **NFR-39** templates, Dependabot, one agent-instruction source, Discussions.
+
+**Depends on**: U8 (CI gates, branch protection, CONTRIBUTING, versions). **Not** a dependency of U9.
+**Built after U9**, so its design can use what the cold walk and the NAS install showed. **Stories**: to be settled
+in its FD (P4 The Contributor exists since Requirements Question 20).
 
 ---
 

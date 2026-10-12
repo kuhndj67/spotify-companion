@@ -584,7 +584,8 @@ B) Ratify with amendments (describe after [Answer]: tag below)
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: **A** (user, 2026-10-12) — ratified as written. P4 added to `personas.md`; US-30, US-31 to `stories.md`.
+[Answer]: 
+**A** (user, 2026-10-12) — ratified as written. P4 added to `personas.md`; US-30, US-31 to `stories.md`.
 
 ---
 
@@ -613,7 +614,7 @@ C) As A, plus a **GitHub Projects board** for status (to do / in progress / done
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]:
-
+A
 ---
 
 ## Question 22 — ⚠️ The AI-DLC records are single-writer
@@ -635,7 +636,7 @@ C) Keep them as they are; conflicts resolved by hand
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]:
-
+A
 ---
 
 ## Question 23 — Who approves a pull request, and who approves an AI-DLC gate?
@@ -652,7 +653,7 @@ C) No required review — CI only
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]:
-
+A
 ---
 
 ## Question 24 — Releases with more than one contributor
@@ -667,7 +668,7 @@ C) Both
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]:
-
+A
 ---
 
 ## Question 25 — The smaller pieces (choose all that apply)
@@ -684,5 +685,11 @@ point to it, so a contributor's Copilot or other agent reads the same traps
 D) **A discussion space** (GitHub Discussions) for questions that are not work items
 
 [Answer]:
+I am not a GitHub dev so do not know what the best practices are when laying out a small team project, please recommend all that make sense given the intended scope of the work.
 
+C and D both seem prudent to me... A and B I'm not sure.
+
+*Follow-up (2026-10-12, question prompt)*: Claude recommended A and B too (templates: a checklist so reviews do not depend on the owner asking; Dependabot: weekly grouped update PRs that CI judges, MCP pin excluded). User: **"A, B, C, D (Recommended)"**.
+
+**Round result**: Q21 A · Q22 A · Q23 A · Q24 A · Q25 A+B+C+D → **NFR-35…NFR-39** in `requirements.md`, owner **U10** (Units Question 6 = A).
 ---

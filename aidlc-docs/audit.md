@@ -7865,3 +7865,17 @@ Written: Requirements **Questions 21–25** (issue tracking · ⚠️ the single
 approval · releases/changelog · templates, Dependabot, one agent-instruction source, Discussions) and Units
 **Question 6** (U10 after U9, or before U9 with renumbering). Measured: 145 commits, one author;
 `.github/copilot-instructions.md` beside `CLAUDE.md`. U8's FD approval is separate and still pending.
+
+---
+
+## 2026-10-12T18:40:00Z — Team-operations round complete: NFR-35…39; U10 Team Operations declared
+
+User answers (file): **Q21 A · Q22 A · Q23 A · Q24 A**; Q25: *"I am not a GitHub dev so do not know what the best
+practices are when laying out a small team project, please recommend all that make sense given the intended scope of
+the work. C and D both seem prudent to me... A and B I'm not sure."* Claude recommended A and B (question prompt);
+user: **"A, B, C, D (Recommended)"**. Units **Q6**: **"U10, after U9 (Recommended)"**.
+
+Written: **NFR-35** issues as the backlog · **NFR-36** AI-DLC records merge cleanly (`merge=union` on `audit.md`,
+to be probed; one section per unit in `aidlc-state.md`) · **NFR-37** CODEOWNERS + owner approves gates · **NFR-38**
+CHANGELOG · **NFR-39** templates, Dependabot (MCP pin excluded), one agent-instruction source, Discussions. **U10
+Team Operations** declared in `unit-of-work.md`; build order **U8 → U9 → U10**. U8's FD approval still pending.

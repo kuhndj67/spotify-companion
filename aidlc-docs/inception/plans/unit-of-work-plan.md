@@ -328,4 +328,4 @@ developer is joining before the NAS work
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12, question prompt: *"U10, after U9 (Recommended)"*). **U10 — Team Operations** declared in `unit-of-work.md`; build order **U8 → U9 → U10**.

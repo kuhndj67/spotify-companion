@@ -13,7 +13,7 @@ the order and what each step must establish. ⚠️ Every *expected* below is a 
 
 | Step | Purpose | Establishes |
 |---|---|---|
-| S1 | Prerequisites | Docker running (`docker version` reports a server), Node 22 on the host (`node --version`), git |
+| S1 | Prerequisites | Docker running (`docker version` reports a server — Rancher Desktop on Windows and macOS, Docker Engine on Linux), Node 22 on the host (`node --version`), git |
 | S2 | Get the code | a clone at a **release tag** `vX.Y.Z`, not an arbitrary `main` |
 | S3 | Register your own Spotify app | client id + secret + redirect URI from **your** developer dashboard (BR-61.4); Development Mode limits stated |
 | S4 | Spotify sign-in | `npm run auth` on the host (where the browser is) writes `secrets/spotify-config.json` with a refresh token |
@@ -41,8 +41,9 @@ INSTALL.md @ commit C ──► walker (agent | person), clean environment, only
       └─ any step failed ─► fix INSTALL.md (commit C') ─► walk the changed steps again on C'
 ```
 
-The agent walk is U8's exit criterion. Its environment is a **Windows Sandbox or VM** with no clone history, no
-`CLAUDE.md` and no `aidlc-docs/` given to it.
+The agent walk is U8's exit criterion. Its environment is the owner's **clean MacBook** with a **fresh Claude Code
+session** started in a folder holding only `INSTALL.md` — no clone history, no `CLAUDE.md`, no `aidlc-docs/`, no
+memory (BR-62.6). *(Amended 2026-10-12; was a Windows Sandbox or VM.)*
 
 ## 3. A contribution (US-31, BR-63, BR-64, BR-67.2)
 

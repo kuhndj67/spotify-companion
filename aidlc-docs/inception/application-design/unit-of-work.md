@@ -310,7 +310,11 @@ and restored on the NAS through *Restore backup*, and the NAS app runs with the 
 
 **Carried into its design plan** (Units round, *Carried to U9's design plan*): **U9-a** NAS as *the* deployment
 or a throwaway second one · **U9-b** two deployments on one Spotify registration · probe **WAL on the NAS
-volume** · verify the WebSocket handshake **both directions** off-machine. ⚠️ U6's upload routes must not be
+volume** · verify the WebSocket handshake **both directions** off-machine. **U9-c** *(2026-10-12, user + Claude)*: deploy to the NAS
+with **least authority** — no MCP server and no Docker-group account (Docker access is root-equivalent: a container
+can mount the host). Recommended: a dedicated NAS user whose single SSH key is locked by `command=` to an
+owner-controlled deploy script (`deploy <vX.Y.Z>` · `status` · `logs` · `rollback <tag>`), reaching Docker through a
+`sudo` rule for that script only, and fetching the tag with a **read-only** GitHub deploy key. ⚠️ U6's upload routes must not be
 reachable off-machine before Question 11 is decided.
 
 ---

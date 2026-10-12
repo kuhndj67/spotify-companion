@@ -7889,3 +7889,23 @@ User: *"functional design approved"*. NFR Requirements skipped, as for U1–U7. 
 ruleset as code with a ruleset-vs-workflow test · a docs-accuracy test · component layout · PBT for the release
 decision and version reader · what a history-scan finding stops). Allocates P-58…, LC-49…, PBT-68…. Flagged for
 Infrastructure Design: whether a sandboxed Windows can run Docker for the agent cold walk — to be probed.
+
+---
+
+## 2026-10-12T19:30:00Z — Where the cold walk runs; FD amended for the MacBook; U8 NFR Design written
+
+Discussion, in order: user asked to use the **Synology NAS's Docker** for the walk → Claude: viable for Linux, but SSH
+is closed (probed: ping ok, 5000/5001 open, **22 closed**) and needs an account. User asked about a **Synology MCP
+server** → Claude searched: several community servers (dsm-mcp, Synology Docker MCP, mcp-server-synology), none
+official; recommended against — **Docker access is root-equivalent** (a container can mount the host), and those
+servers would hold that credential as unreviewed code. User: *"even then we probably shouldn't configure an unknown
+app for full access... configure the container host so we can publish to it from here with 'least authority
+possible' credentials."* Claude: a forced-command SSH key to an owner-controlled deploy script — recorded as **U9-c**;
+but such a key cannot host a cold walk. User proposed the **MacBook**: *"not currently configured at all... I COULD
+install vscode and claude code then pull the repo... as the 'clean install' machine."* Question prompt: **"Yes,
+MacBook (Recommended)"**; NFR Q1–7: **"All A (Recommended)"**.
+
+**FD amended after approval** (user-directed): BR-61.3 (macOS supported, Rancher Desktop on both desktops), BR-62.2
+(agent walk on the MacBook; person on Windows; Linux in U9), new **BR-62.6** (Claude Code auto-loads `CLAUDE.md` — the
+cold session must not receive it; to be probed), new **BR-61.10** (arm64 build, WAL over the macOS bind mount, mount
+ownership — probed on the Mac first). NFR Design written: **P-58…P-64**, **LC-49…LC-57**, **PBT-68…PBT-72**.

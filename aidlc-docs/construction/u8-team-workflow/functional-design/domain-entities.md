@@ -35,7 +35,7 @@ Lifecycle: *verified* → *built* → *deployed* → *tagged*. A release missing
 ## 3. InstallRoutine and InstallStep
 
 **InstallRoutine** = `docs/INSTALL.md`: an ordered list of `InstallStep`, a list of supported platforms
-(`windows-rancher`, `linux-docker`; `macos` = untested), and its prerequisites.
+(`windows-rancher`, `macos-rancher`, `linux-docker` — amended 2026-10-12), and its prerequisites.
 
 | InstallStep field | Notes |
 |---|---|
@@ -50,8 +50,8 @@ Lifecycle: *verified* → *built* → *deployed* → *tagged*. A release missing
 
 | Field | Notes |
 |---|---|
-| `kind` | `agent` (walk ①, U8 exit, `1.0.0-beta.1`) · `person` (walk ②, `1.0.0`) |
-| `walker`, `date`, `platform`, `environment` | e.g. agent / Windows Sandbox |
+| `kind` | `agent` (walk ①, MacBook, U8 exit, `1.0.0-beta.1`) · `person` (walk ②, Windows, `1.0.0`) |
+| `walker`, `date`, `platform`, `environment` | e.g. agent / clean MacBook, fresh Claude Code session |
 | `steps[]` | per `InstallStep`: observed output · `passedAsWritten` (bool) · deviation note |
 | `verdict` | **pass only if every step `passedAsWritten`** (BR-62.3) |
 | `docRevision` | the commit of `INSTALL.md` walked — a fix changes it, and the changed steps are walked again |

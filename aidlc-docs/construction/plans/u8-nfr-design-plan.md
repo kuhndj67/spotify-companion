@@ -1,7 +1,7 @@
 # NFR Design Plan — U8: Team Workflow & Onboarding
 
 **Date**: 2026-10-12 · **Stage**: CONSTRUCTION — NFR Design, Unit U8
-**Status**: 📋 **PLAN — 7 questions open.**
+**Status**: ✅ **ALL 7 ANSWERED A (2026-10-12).** Deliverables: `nfr-design/nfr-design-patterns.md` (**P-58…P-64**) and `nfr-design/logical-components.md` (**LC-49…LC-57**, **PBT-68…PBT-72**).
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: U8 Functional Design (**approved 2026-10-12**) — `business-rules.md` **BR-61…BR-67**,
 `domain-entities.md`, `business-logic-model.md`, `frontend-components.md` · requirements **FR-65**, **NFR-28,
@@ -60,7 +60,7 @@ so the install routine gains a step that exists only to feed compose
 C) Compose uses an unversioned local tag; only `npm run release` applies the version tag. ⚠️ An installer's
 running image then carries no version in its tag at all
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
@@ -76,7 +76,7 @@ with repository read access
 
 C) The gitleaks container image in a step — like A, without the checksum step
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
@@ -91,7 +91,7 @@ B) Classic branch protection set in the web UI, documented in CONTRIBUTING. ⚠�
 
 C) As A, but with classic protection instead of a ruleset
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
@@ -107,7 +107,7 @@ B) As A without the INSTALL structure check
 
 C) No test; the cold walk and review only
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
@@ -123,7 +123,7 @@ B) Everything in one `scripts/u8.mjs`
 
 X) Other
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
@@ -138,7 +138,7 @@ increasing version is accepted — a `release` that refused everything would pas
 
 B) Example tests only
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
@@ -151,13 +151,13 @@ entry and its reason ⭐ *recommended*
 
 B) Record it and continue; rotation tracked as a backlog item
 
-[Answer]:
+[Answer]: **A** (user, 2026-10-12 — "All A (Recommended)")
 
 ---
 
 ## 5. Out of scope for U8 NFR Design
 
-- **Where the agent cold walk runs** (Windows Sandbox, a VM, a cloud runner) — that is **Infrastructure Design**.
-  ⚠️ Flagged now because it may not be simple: the walk needs Docker, and a sandboxed Windows may not run a nested
-  container engine. To be **probed** there, not assumed.
+- **Where the agent cold walk runs** — *settled 2026-10-12 (user)*: the owner's **clean MacBook** with a fresh Claude
+  Code session (FD amended: BR-61.3, BR-62.2, BR-62.6, BR-61.10). Its setup and probes belong to **Infrastructure
+  Design**. The NAS was considered and rejected for the walk (see `audit.md` 2026-10-12).
 - Team operations (issues, CODEOWNERS, CHANGELOG) — **U10**.

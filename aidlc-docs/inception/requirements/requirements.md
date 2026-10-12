@@ -1034,6 +1034,24 @@ exists to break.**
 
 ---
 
+#### W-14 — Make the repository public, then move vulnerability reports to GitHub
+
+**Raised 2026-10-12** by the user (U8 FD Q10: *"since the plan is to make the repo public we should have a work item
+to shift to GitHub reporting once we do"*). ⚠️ **Logged, not built.** U8 ships `SECURITY.md` with an email address
+(Q10 = B) and keeps the repository private on GitHub Pro (Q1 = B).
+
+**Before going public** — an **exposure** decision, and history cannot be un-published:
+1. A **full-history secret scan** passes (U8 runs one; re-run it on the day).
+2. A review of what the docs disclose: `audit.md` and the design records quote the owner's **listening history**
+   (track and artist names with dates), the NAS's **LAN address** (`192.168.0.223`), and the owner's identity. Decide
+   per item: accept, redact going forward, or rewrite history (⚠️ rewriting breaks every clone and commit reference).
+3. NFR-32 still holds: **no built image is published** while the bundled MCP server has no licence.
+
+**After going public**: enable **GitHub private vulnerability reporting**, point `SECURITY.md` at it, and keep the
+email only as a fallback (or remove it). Branch protection needs no change — public repositories have it free.
+
+---
+
 #### W-13 — A readable JSON export (and a review of how its values are typed)
 
 **Raised 2026-10-09** by the user during hands-on testing (U1-3). ⚠️ **Logged, not built** (no code changes while

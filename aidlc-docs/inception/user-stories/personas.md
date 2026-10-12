@@ -128,6 +128,33 @@ US-10, US-11, US-12, US-13, US-24, US-25, US-28
 
 ---
 
+## P4 — The Contributor *(added 2026-10-12, U8 — Requirements Question 20)*
+
+> *"I've never seen this project before. I want to run it, understand why it is built the way it is, and change
+> something without breaking what the owner learned the hard way."*
+
+⚠️ **The first persona who is not the app's user.** P1–P3 describe the one person whose listening is recorded;
+P4 works on the code, and may be an AI agent as well as a person.
+
+| | |
+|---|---|
+| **Frequency** | Occasional — a fix, a feature, a review |
+| **Attention** | Full, but **without the project's tacit knowledge** |
+| **Trigger** | A bug they hit, a feature they want, a review they were asked for |
+| **Success** | A change merged that CI judged, without needing the owner to explain anything the docs should have |
+| **Failure** | Re-learned one of the project's traps by shipping it — or committed a credential |
+
+### Constraints this persona imposes
+- **Tacit knowledge must be written down where they will read it** (`CONTRIBUTING.md`, a short `CLAUDE.md`), and
+  must stay accurate — a stale document is worse than none, because it is believed.
+- **The checks must be enforced, not remembered**: CI on every PR, `main` protected (NFR-30).
+- **Nothing secret may be reachable from a clone** (NFR-28).
+
+### Stories
+US-31
+
+---
+
 ## Where the personas conflict
 
 Recording these explicitly, because they are design decisions rather than oversights.

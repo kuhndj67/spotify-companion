@@ -647,6 +647,38 @@ rules or breaking recording.
 
 ---
 
+### US-30 — Install it on my own machine, and know each step worked ⬜
+**As** the Listener, **I want** to install the app on my own machine with my own Spotify account by following one
+document, **so that** I can run it without the person who wrote it — and know at every step that it worked.
+
+**Acceptance criteria**
+- [ ] Every step in `docs/INSTALL.md` has a command and the output to expect
+- [ ] I register my **own** Spotify app; nothing is shared with another install
+- [ ] It works on Windows + Rancher Desktop and on Docker Engine on Linux
+- [ ] I can move my history in with *Restore backup*
+- [ ] When I finish, the app is recording and its indicators are green
+- [ ] No step needs knowledge outside the document
+
+*Covers FR-65, NFR-33 · Persona P1 · Source: U8 FD Q9 = A, Requirements Question 20 (2026-10-12)*
+
+---
+
+### US-31 — Propose a change that CI judges before it reaches `main` ⬜
+**As** the Contributor, **I want** to clone the project, run its checks and propose a change through a pull
+request, **so that** what reaches `main` has been judged by CI rather than by trust.
+
+**Acceptance criteria**
+- [ ] `CONTRIBUTING.md` says how to set up, how to run `npm run verify`, and which path a change takes (a fix by
+      PR; a feature through AI-DLC)
+- [ ] CI runs typecheck, tests, `smoke` (stated as a load check), `knip` and the secret scan on my PR, and `main`
+      cannot take a change that fails them
+- [ ] A credential I commit by mistake fails CI
+- [ ] The licence (GPL-3.0) tells me what I may do
+
+*Covers NFR-28, NFR-30–NFR-33 · Persona P4 · Source: U8 FD Q9 = A, Requirements Question 20 (2026-10-12)*
+
+---
+
 ## INVEST Validation
 
 | Criterion | Finding |
@@ -682,6 +714,8 @@ rules or breaking recording.
 | FR-24, 26, 27, 28, 29 | US-14 | FR-49–54 | US-25 |
 | | | FR-57–64 | US-28 |
 | | | FR-66–72 | US-29 |
+| | | FR-65 | US-30 |
+| | | NFR-28, 30–33 | US-31 |
 
 **All in-scope functional requirements are covered.** FR-55 was withdrawn on 2026-08-25 and moved
 to the wishlist (§5.1, W-1); US-27 is retained as a **deferred** story documenting why, and is

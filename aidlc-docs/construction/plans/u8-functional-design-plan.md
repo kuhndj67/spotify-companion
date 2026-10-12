@@ -1,7 +1,7 @@
 # U8 Functional Design Plan — Team Workflow & Onboarding
 
 **Date**: 2026-10-12 · **Stage**: CONSTRUCTION — Functional Design, Unit **U8** (Phase 5)
-**Status**: 📋 **PLAN — Q1 answered (B); 9 questions open.**
+**Status**: ✅ **ALL ANSWERED 2026-10-12** — Q1 B · Q2 C · Q3 A · Q4 A · Q5 A · Q6 A · Q7 A · Q8 A · Q9 A (ratified, Requirements Q20) · Q10 B (`kuhndj67@hotmail.com`; W-14). ▶ FD artifacts written: `construction/u8-team-workflow/functional-design/`.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U8 · requirements **FR-65**, **NFR-28, NFR-30–NFR-34** · U6 and U7 as built (the
 install routine documents *Restore backup*, the in-app rules and credential steps)
@@ -53,6 +53,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 [Answer]: **B** (user, 2026-10-12) — upgraded to GitHub Pro. ✅ Re-probed the same day: `…/branches/main/protection` now returns **404 "Branch not protected"** and `…/rulesets` returns `[]` — available, nothing configured. ⚠️ GitHub's public pricing page lists only Free / Team / Enterprise; Pro is under the personal account's *Settings → Billing → Plans*.
 
 ---
+B - done
 
 ### Q2 — Who walks the install cold (FR-65's exit criterion, and NFR-34's `1.0.0` trigger)?
 
@@ -63,7 +64,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | ⭐ **Both, in order**: the agent walk is **U8's** exit criterion (`1.0.0-beta.1`); a person's walk is the **`1.0.0`** trigger, and U9's NAS install by the owner following the routine counts toward it only if no step needed knowledge outside the document |
 
 [Answer]:
-
+C
 ---
 
 ### Q3 — Which platforms does the install routine support?
@@ -75,7 +76,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | Windows, Linux and macOS, each walked |
 
 [Answer]:
-
+A
 ---
 
 ### Q4 — The secret scan (NFR-28)
@@ -87,7 +88,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | Only the tracked-file test. ⚠️ Blind to a token pasted into a doc or a script |
 
 [Answer]:
-
+A
 ---
 
 ### Q5 — The unlicensed MCP server (NFR-32)
@@ -101,7 +102,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 ⚠️ Opening an upstream issue is **outward-facing**; it is drafted for you to post, not posted by Claude.
 
 [Answer]:
-
+A
 ---
 
 ### Q6 — What happens to `CLAUDE.md` (the unit's *"rewrite the single-developer assumption"*)?
@@ -113,7 +114,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | Leave `CLAUDE.md` as the owner's; contributors get `CONTRIBUTING.md` only |
 
 [Answer]:
-
+A
 ---
 
 ### Q7 — Does a contributor follow AI-DLC?
@@ -125,7 +126,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | AI-DLC is the owner's process only; contributors send PRs |
 
 [Answer]:
-
+A
 ---
 
 ### Q8 — Applying NFR-34: the first numbered version
@@ -137,7 +138,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | Start at `0.1.0` and count from here |
 
 [Answer]:
-
+A
 ---
 
 ### Q9 — User stories for U8
@@ -149,7 +150,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | None — a process unit |
 
 [Answer]:
-
+A
 ---
 
 ### Q10 — Where does `SECURITY.md` send a vulnerability report?
@@ -161,7 +162,9 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **C** | Issues only. ⚠️ Discloses the vulnerability in public before it is fixed |
 
 [Answer]:
+B - but since the plan is to make the repo public we should have a work item to shift to GitHub reporting once we do.
 
+*Follow-up (2026-10-12)*: address **`kuhndj67@hotmail.com`** (user). Backlog **W-14** logged: go public, then move reports to GitHub private vulnerability reporting.
 ---
 
 ## 4. What this unit will NOT do

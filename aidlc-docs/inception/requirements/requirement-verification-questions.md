@@ -560,3 +560,28 @@ X) Other (please describe after [Answer]: tag below)
 [Answer]:
 A - the backup restore process can affect rules as part of it... but all other rules processes should be in the rules pop-up to keep it straightforward for users.
 ---
+
+---
+
+# U8 round — Requirements Analysis for Team Workflow & Onboarding (2026-10-12)
+
+Per U8 FD plan **Q9 = A**: U8's stories are ratified **here, before** its Functional Design is approved — the order
+U7 followed (Question 19). U8's requirements themselves (FR-65, NFR-28, NFR-30–NFR-34) are already ratified.
+
+## Question 20 — Ratify U8's stories and a fourth persona
+
+| ID | Proposed | From |
+|---|---|---|
+| **P4** | **The Contributor** — a developer who did not write this project and has none of its tacit knowledge: they read the repository, run the checks, and change code through a pull request. ⚠️ The first persona who is **not the app's user**; P1–P3 all describe the one person whose listening is recorded | Q9 |
+| **US-30** | Persona **P1 (Listener)** — *"Install the app on my own machine with my own Spotify account, following one document, and know at every step that it worked."* Acceptance: every step in `docs/INSTALL.md` has a command and the output to expect · I register my **own** Spotify app; nothing is shared with another install · it works on Windows + Rancher Desktop and on Docker Engine on Linux · I can move my history in with *Restore backup* · when finished, the app is recording and its indicators are green · no step needs knowledge outside the document. *Covers FR-65, NFR-33* | Q9, Q2, Q3 |
+| **US-31** | Persona **P4 (Contributor)** — *"Clone the project, run its checks, and propose a change that CI judges before it reaches `main`."* Acceptance: `CONTRIBUTING.md` says how to set up, run `npm run verify`, and which path a change takes (a fix by PR; a feature through AI-DLC) · CI runs typecheck, tests, `smoke` (stated as a load check), `knip` and the secret scan on my PR, and `main` cannot take a change that fails them · a credential I commit by mistake fails CI · the licence (GPL-3.0) tells me what I may do. *Covers NFR-28, NFR-30–NFR-33* | Q9, Q4, Q7 |
+
+Also logged (not a requirement): backlog **W-14** — going public, then GitHub vulnerability reporting (Q10).
+
+A) Ratify as written ⭐
+
+B) Ratify with amendments (describe after [Answer]: tag below)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (user, 2026-10-12) — ratified as written. P4 added to `personas.md`; US-30, US-31 to `stories.md`.

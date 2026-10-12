@@ -7833,3 +7833,21 @@ the public pricing page shows organisation plans only; Pro is under the personal
 Re-probed: `GET …/branches/main/protection` **403 → 404 "Branch not protected"**, `GET …/rulesets` **403 → `[]`**.
 NFR-30 is now achievable as written. Nothing configured yet — protection is applied in U8's code generation,
 with the owner's direct-push bypass (Q13 = B).
+
+---
+
+## 2026-10-12T18:00:00Z — U8 FD plan answered; Requirements Q20 ratified; U8 Functional Design written
+
+User answers in the plan file: **Q2 C · Q3 A · Q4 A · Q5 A · Q6 A · Q7 A · Q8 A · Q9 A · Q10 B** — *"B - but since
+the plan is to make the repo public we should have a work item to shift to GitHub reporting once we do."* Follow-ups
+by question prompt: **Q20 "Ratify as written"** (P4 The Contributor, US-30, US-31 → `personas.md`, `stories.md`);
+Q10 address **"kuhndj67@hotmail.com - but once we go public this should change to the GitHub path."** Backlog
+**W-14** logged (go public: history scan, exposure review of docs, then GitHub private vulnerability reporting).
+
+FD written: `construction/u8-team-workflow/functional-design/` — **BR-61** install routine · **BR-62** cold walk
+(agent → `1.0.0-beta.1`, person → `1.0.0`; a step needing outside knowledge fails even if the walker recovered) ·
+**BR-63** CI + protection with a positive-control PR · **BR-64** gitleaks + one-time history scan + tracked-secrets
+test · **BR-65** GPL-3.0, no published image · **BR-66** versions (`package.json` only; `appVersion` leaves
+`musicbrainz.json`; `0.8.0`; immutable image tags) · **BR-67** documents. Measured for it: the app still **refuses
+to start** without `secrets/musicbrainz.json` (`loadMusicBrainzIdentity`), so a fresh install creates it by hand
+before first start (BR-61.5). Single entry point: `construction/u8-team-workflow/HANDOFF.md`.

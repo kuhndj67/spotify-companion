@@ -7879,3 +7879,13 @@ Written: **NFR-35** issues as the backlog · **NFR-36** AI-DLC records merge cle
 to be probed; one section per unit in `aidlc-state.md`) · **NFR-37** CODEOWNERS + owner approves gates · **NFR-38**
 CHANGELOG · **NFR-39** templates, Dependabot (MCP pin excluded), one agent-instruction source, Discussions. **U10
 Team Operations** declared in `unit-of-work.md`; build order **U8 → U9 → U10**. U8's FD approval still pending.
+
+---
+
+## 2026-10-12T18:55:00Z — U8 Functional Design APPROVED; NFR Design plan written
+
+User: *"functional design approved"*. NFR Requirements skipped, as for U1–U7. NFR Design plan:
+`construction/plans/u8-nfr-design-plan.md`, 7 questions (image-tag derivation vs BR-66.1/66.7 · how gitleaks runs ·
+ruleset as code with a ruleset-vs-workflow test · a docs-accuracy test · component layout · PBT for the release
+decision and version reader · what a history-scan finding stops). Allocates P-58…, LC-49…, PBT-68…. Flagged for
+Infrastructure Design: whether a sandboxed Windows can run Docker for the agent cold walk — to be probed.

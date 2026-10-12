@@ -4,7 +4,7 @@
 
 ## ▶ Current state (2026-10-12)
 
-**Functional Design WRITTEN — awaiting approval.** `functional-design/` holds BR-61…BR-67, entities, logic model
+✅ **Functional Design APPROVED 2026-10-12.** ▶ **NFR Design plan open — 7 questions**: [`u8-nfr-design-plan.md`](../plans/u8-nfr-design-plan.md). Functional Design: `functional-design/` holds BR-61…BR-67, entities, logic model
 and the one UI change (version display). Settled answers: [`u8-functional-design-plan.md`](../plans/u8-functional-design-plan.md) §3.
 Requirements: FR-65, NFR-28, NFR-30–34 (NFR-34 = Q18, ratified 2026-10-12) · Stories US-30, US-31, persona P4
 (Requirements Question 20, ratified 2026-10-12).

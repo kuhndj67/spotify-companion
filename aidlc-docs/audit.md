@@ -7823,3 +7823,13 @@ U8 FD plan: `construction/plans/u8-functional-design-plan.md`, 10 questions. Mea
 `…/rulesets` both return **403 "Upgrade to GitHub Pro or make this repository public"** (private, free plan). Q1.
 Only the three `*.example.json` files have ever been added under `secrets/` across all 142 commits; no full-history
 scan for secrets *outside* `secrets/` has been run (Q4). CI has no `smoke`, `knip` or secret scan yet.
+
+---
+
+## 2026-10-12T17:30:00Z — U8 FD Q1 = B: GitHub Pro
+
+User: *"upgraded to github pro"* (after: *"GitHub doesn't have a 'Pro' option... only Free, Team and Enterprise"* —
+the public pricing page shows organisation plans only; Pro is under the personal account's billing settings).
+Re-probed: `GET …/branches/main/protection` **403 → 404 "Branch not protected"**, `GET …/rulesets` **403 → `[]`**.
+NFR-30 is now achievable as written. Nothing configured yet — protection is applied in U8's code generation,
+with the owner's direct-push bypass (Q13 = B).

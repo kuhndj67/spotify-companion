@@ -1,7 +1,7 @@
 # U8 Functional Design Plan — Team Workflow & Onboarding
 
 **Date**: 2026-10-12 · **Stage**: CONSTRUCTION — Functional Design, Unit **U8** (Phase 5)
-**Status**: 📋 **PLAN — 10 questions open.**
+**Status**: 📋 **PLAN — Q1 answered (B); 9 questions open.**
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U8 · requirements **FR-65**, **NFR-28, NFR-30–NFR-34** · U6 and U7 as built (the
 install routine documents *Restore backup*, the in-app rules and credential steps)
@@ -50,7 +50,7 @@ install routine documents *Restore backup*, the in-app rules and credential step
 | **B** | ⭐ **GitHub Pro** (paid, per month). NFR-30 met as written; the repository stays private; contributors are invited. Publishing stays a separate, later decision |
 | **C** | **Amend NFR-30**: required CI by convention plus a documented PR flow, no enforcement until A or B. ⚠️ An unenforced rule is what NFR-30 exists to replace — say so in `CONTRIBUTING.md` rather than imply protection |
 
-[Answer]:
+[Answer]: **B** (user, 2026-10-12) — upgraded to GitHub Pro. ✅ Re-probed the same day: `…/branches/main/protection` now returns **404 "Branch not protected"** and `…/rulesets` returns `[]` — available, nothing configured. ⚠️ GitHub's public pricing page lists only Free / Team / Enterprise; Pro is under the personal account's *Settings → Billing → Plans*.
 
 ---
 

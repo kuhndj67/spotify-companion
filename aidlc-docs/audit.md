@@ -7801,3 +7801,12 @@ that reason; not confirmed; `rules.json` md5 `8b0d7d87…` unchanged. The confir
 <when>"* and Diagnostics *"undo applied at startup … set aside …"*. A plain restore is unchanged.
 
 1573 tests · `npm run verify` exit 0 · redeployed, healthy.
+
+---
+
+## 2026-10-12T16:50:00Z — U5-3 accepted; hands-on list complete; moving to U8
+
+User: *"Yea lets mark it complete, push/commit and move to U8"*. U5-3 (a real skip) is accepted on U5-4's evidence —
+attempts 47–49, each `confirmed`, at 12 s / 9 s / 6 s of progress (the first just over the ~10 s expectation), rather
+than a separate post-reboot run. Every item on the hands-on list has now been run and passed. Halt still latched and
+automation on at this entry — the user's to acknowledge.

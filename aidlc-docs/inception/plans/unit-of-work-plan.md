@@ -309,3 +309,23 @@ Deployment.** Consistency: U7 before U9 (an appliance needs in-app configuration
 deployment is performed by following U8's install routine, so the cold walk is U9's verification); U8 after U7
 (the routine documents U7's credential and rules steps). No unit depends on a later one.
 
+
+---
+
+## Question 6 — A unit for team operations (added 2026-10-12)
+
+Reviewing U8's FD, the user found no issue tracking or multi-developer coordination in Phase 5 and chose to keep
+**U8 as groundwork** and add a **new unit** for team operations (Requirements Questions 21–25 set its scope).
+U9 (NAS deployment) **does not depend on it** — it needs U8's install routine, not issues or reviews.
+
+A) **U10 — Team Operations, built after U9**: U8 → U9 → U10. No renumbering; the NAS work is not held up, and
+team operations are designed once the first cold walk and the NAS install have shown what a second developer
+actually trips on ⭐ *recommended*
+
+B) **Built before U9, renumbered to match** (the Question 5a precedent: numbers follow build order) — team
+operations become **U9**, the NAS deployment **U10**. Mapping logged in `audit.md`. Choose this if a second
+developer is joining before the NAS work
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:

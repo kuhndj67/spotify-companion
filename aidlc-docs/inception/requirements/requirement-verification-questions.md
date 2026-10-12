@@ -585,3 +585,104 @@ B) Ratify with amendments (describe after [Answer]: tag below)
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]: **A** (user, 2026-10-12) — ratified as written. P4 added to `personas.md`; US-30, US-31 to `stories.md`.
+
+---
+
+# Team-operations round — Requirements Analysis for working as several developers (2026-10-12)
+
+**Why this round exists.** Reviewing U8's Functional Design, the user asked where **GitHub issues** and the other
+multi-developer activities were. They were nowhere: Phase 5's questions (13–17b) cover gating, the README, the
+licence and the install, and **none covers how several developers coordinate**. The user chose (2026-10-12) to keep
+**U8 as groundwork** — install, CI gates, versions, licence — and put team operations in a **new unit** (Units
+Question 6). Per the standard process, new scope re-enters Inception here before anything is designed.
+
+**Measured 2026-10-12**: 145 commits, **one author**. The backlog (W-1…W-14) and open items live in
+`requirements.md` and `CLAUDE.md`. `.github/` holds `copilot-instructions.md` (a Mermaid skill pointer only) beside
+`CLAUDE.md` — two agent-instruction sources already.
+
+## Question 21 — Issue tracking
+
+A) **GitHub Issues becomes the backlog.** Each open W-item and open item migrates to one issue; `requirements.md`
+§5.1 keeps a **pointer table** (W-id → issue) so old references still resolve, and new ideas start as issues. A
+**feature** issue still re-enters AI-DLC before design; the AI-DLC records cite the issue number ⭐ *recommended*
+
+B) Issues for **bugs and contributor requests only**; the backlog stays in `requirements.md`. ⚠️ Two places to look
+
+C) As A, plus a **GitHub Projects board** for status (to do / in progress / done)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+---
+
+## Question 22 — ⚠️ The AI-DLC records are single-writer
+
+`audit.md` is **one append-only file**, every entry added at its end; `aidlc-state.md` has **one** *Current Stage*.
+Two developers on two units would **conflict on every PR**, and *the current stage* stops meaning anything when two
+are open at once.
+
+A) **Keep the standard AI-DLC files, make them merge cleanly.** `audit.md` gets **`merge=union`** in
+`.gitattributes` — correct *because* it is append-only: both sides' new entries are kept, each timestamped (⚠️ to be
+**probed**, not assumed). `aidlc-state.md` is restructured to **one section per unit**, so concurrent work edits
+different lines. `CLAUDE.md` holds no current state (U8 BR-67.3 already removes it) ⭐ *recommended*
+
+B) One audit **file per entry** (`audit/<timestamp>.md`) — conflict-free by construction. ⚠️ Departs from the
+standard AI-DLC layout, which the project has chosen to keep
+
+C) Keep them as they are; conflicts resolved by hand
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+---
+
+## Question 23 — Who approves a pull request, and who approves an AI-DLC gate?
+
+A) **The owner approves every AI-DLC gate.** `CODEOWNERS` makes the owner a **required reviewer** on `aidlc-docs/`
+and the **security-sensitive paths** (the local-access guard, the upload admission path, configuration and
+credential writers, playback control); any other path needs **one approving review** from a maintainer. The owner's
+direct push stays (Q13 = B) ⭐ *recommended*
+
+B) The owner reviews everything
+
+C) No required review — CI only
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+---
+
+## Question 24 — Releases with more than one contributor
+
+A) A **`CHANGELOG.md`** (Keep a Changelog format): each PR adds its line under *Unreleased*; the **owner cuts a
+release** — moves *Unreleased* under the new version, bumps `package.json`, tags (NFR-34) ⭐ *recommended*
+
+B) **GitHub release notes generated from PR titles and labels**; no changelog file
+
+C) Both
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+---
+
+## Question 25 — The smaller pieces (choose all that apply)
+
+A) **PR and issue templates** — the PR template asks *which path* (fix / feature), *which requirement or BR*, and
+*`npm run verify` output*
+
+B) **Dependabot** for npm and GitHub Actions — weekly, grouped, so it does not flood one maintainer. ⚠️ An
+update to the pinned MCP server ref is **never** automatic (it changes the recording instrument)
+
+C) **One agent-instruction source**: `CLAUDE.md` is the source; `.github/copilot-instructions.md` and an `AGENTS.md`
+point to it, so a contributor's Copilot or other agent reads the same traps
+
+D) **A discussion space** (GitHub Discussions) for questions that are not work items
+
+[Answer]:
+
+---

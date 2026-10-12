@@ -7851,3 +7851,17 @@ test · **BR-65** GPL-3.0, no published image · **BR-66** versions (`package.js
 `musicbrainz.json`; `0.8.0`; immutable image tags) · **BR-67** documents. Measured for it: the app still **refuses
 to start** without `secrets/musicbrainz.json` (`loadMusicBrainzIdentity`), so a fresh install creates it by hand
 before first start (BR-61.5). Single entry point: `construction/u8-team-workflow/HANDOFF.md`.
+
+---
+
+## 2026-10-12T18:20:00Z — Team operations: new scope re-enters Inception (Requirements Q21–25, Units Q6)
+
+User, reviewing U8's FD: *"I don't see things like migrating to github issues for backlog and issue tracking... or
+other activities related to moving to multiple dev's, is that a follow-on unit?"* Checked: no Phase 5 question
+covers multi-developer coordination — a gap, not a deferral. Offered A (fold into U8) or B (new unit after U8,
+recommended). User: *"Agree with B... I think U8 being groundwork makes sense and keeps the unit tight."*
+
+Written: Requirements **Questions 21–25** (issue tracking · ⚠️ the single-writer AI-DLC records · review and gate
+approval · releases/changelog · templates, Dependabot, one agent-instruction source, Discussions) and Units
+**Question 6** (U10 after U9, or before U9 with renumbering). Measured: 145 commits, one author;
+`.github/copilot-instructions.md` beside `CLAUDE.md`. U8's FD approval is separate and still pending.

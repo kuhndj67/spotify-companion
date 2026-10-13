@@ -7909,3 +7909,35 @@ MacBook (Recommended)"**; NFR Q1–7: **"All A (Recommended)"**.
 (agent walk on the MacBook; person on Windows; Linux in U9), new **BR-62.6** (Claude Code auto-loads `CLAUDE.md` — the
 cold session must not receive it; to be probed), new **BR-61.10** (arm64 build, WAL over the macOS bind mount, mount
 ownership — probed on the Mac first). NFR Design written: **P-58…P-64**, **LC-49…LC-57**, **PBT-68…PBT-72**.
+
+---
+
+## 2026-10-13T14:15:00Z — Outage: WSL 3.0.3.0 installed during Modern Standby; Rancher never recovered. Guest-agent log loop measured
+
+**Outage (second of this shape, after 2026-09-30).** System log: 03:13:46 local the PC briefly woke from Modern
+Standby; 03:13:47 Windows Update began installing **Windows Subsystem for Linux 3.0.3.0**; 03:15:01 the WSL service was
+set to *disabled* and the WSL VM's vmswitch port deleted — Rancher's VM, dockerd and the app went with it. Rancher's
+`background.log` 07:18:08Z: `wsl.exe --list --quiet --running` failed `Wsl/CO_E_SERVER_EXEC_FAILURE` (WSL mid-update) →
+**UnhandledRejectionWarning, and Rancher never retried**; `host-switch.log` gave up 08:02. The window stayed open with
+nothing behind it (all three distros `Stopped`, Docker pipe absent), so `restart: unless-stopped` had no engine to act
+on. User quit and restarted Rancher ~09:34; container healthy. Last stored play 2026-10-12T16:08Z (1167 plays) —
+⚠️ **not** evidence that nothing was missed: no rows is indistinguishable from no listening. Rancher's window briefly
+showed *"timed out dialing Hyper-V socket"* during startup while the CLI worked (as 2026-10-08). Adds weight to U9 (an
+always-on host) and to an **external** positive heartbeat — the app cannot report its own absence.
+
+**Guest-agent log — and a diagnosis CORRECTED the same hour.** `rancher-desktop-guestagent.log` reached **244 MB** in
+~16 h. After the restart it grew **~33 MB/h** with eight containers running. Claude first attributed it to
+**healthchecks** (each `docker exec` followed by a full port-table dump at DEBUG) — the cut after the user stopped the
+other stacks (to ~7.7 MB/h) appeared to fit. The user approved lengthening both Spotify healthchecks 30 s → 60 s; the
+rate stayed at **~7.5 MB/h**. ⚠️ **The measurement refuted the mechanism**: the log is a **3-second `/proc/net` scanner
+retry loop** — for **every published port**, the scanner asks the host forwarder to expose it and gets `proxy already
+running`, logging ~6 lines per port per cycle (counts since restart: 3010 and 3020 ~545 each; 3000, 5173, 5432, 5678,
+8000 ~195 each until stopped). Stopping the stacks helped because it removed **ports**, not healthchecks. Possible
+cause, **unconfirmed**: Rancher runs with `adminAccess: false`, where the guest agent detects ports itself, so two paths
+may claim each port. No public report of this message found for Rancher Desktop **1.24.0**.
+
+**Decision (user)**: *"revert and just accept it."* Healthcheck edits reverted **uncommitted** (their comment stated the
+refuted reason) and redeployed at 30 s. Accepted cost ~7.5 MB/h (~180 MB/day) with two published ports; the file starts
+over when Rancher restarts. The other projects' stacks remain stopped by the user. ⚠️ **Same family as the classifier-v2
+mechanism and the WAL-size inference**: a plausible mechanism that fit one observation, stated before the second
+measurement — caught here because the change was measured before it was committed.

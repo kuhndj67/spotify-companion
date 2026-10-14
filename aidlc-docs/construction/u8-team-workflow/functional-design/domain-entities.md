@@ -50,8 +50,8 @@ Lifecycle: *verified* → *built* → *deployed* → *tagged*. A release missing
 
 | Field | Notes |
 |---|---|
-| `kind` | `agent` (walk ①, MacBook, U8 exit, `1.0.0-beta.1`) · `person` (walk ②, Windows, `1.0.0`) |
-| `walker`, `date`, `platform`, `environment` | e.g. agent / clean MacBook, fresh Claude Code session |
+| `kind` | `agent` (walk ①, `kuhndjwin11pro`, U8 exit, `1.0.0-beta.1`) · `person` (walk ②, platform recorded, `1.0.0`) |
+| `walker`, `date`, `platform`, `environment` | e.g. agent / `kuhndjwin11pro` from `clean`, fresh Claude Code session; plus the base inventory (IN-U8-2c) |
 | `steps[]` | per `InstallStep`: observed output · `passedAsWritten` (bool) · deviation note |
 | `verdict` | **pass only if every step `passedAsWritten`** (BR-62.3) |
 | `docRevision` | the commit of `INSTALL.md` walked — a fix changes it, and the changed steps are walked again |

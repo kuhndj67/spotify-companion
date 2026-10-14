@@ -1,7 +1,7 @@
 # Infrastructure Design Plan — U8: Team Workflow & Onboarding
 
 **Date**: 2026-10-13 · **Stage**: CONSTRUCTION — Infrastructure Design, Unit U8
-**Status**: 📋 **PLAN — 7 questions open.**
+**Status**: ✅ **All 7 answered 2026-10-14 (all A; Q2 and Q3 with additions)** → `u8-team-workflow/infrastructure-design/` written · ✅ **APPROVED 2026-10-14**.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: U8 FD (approved 2026-10-12, amended for the MacBook the same day) · U8 NFR Design (**approved
 2026-10-13**: P-58…P-64, LC-49…LC-57, PBT-68…PBT-72) · `audit.md` 2026-10-13 (walk machine probes)
@@ -49,7 +49,7 @@ B) As A, and also walk Linux in U8 inside a throwaway WSL distro on the same VM
 X) Other
 
 [Answer]:
-
+A
 ---
 
 ### Question 2 — ⭐ Shared infrastructure — Keeping it cold and repeatable: a checkpoint
@@ -61,7 +61,7 @@ Rancher from the last attempt. After U8, the checkpoint is kept for walk ② and
 B) No checkpoint; re-walks continue on the dirtied machine. ⚠️ A second walk would pass steps it never really ran
 
 [Answer]:
-
+A - always want to start with just a base install (right now that includes vscode with the claude extension but that's IT, if there are other items that should be included in the BASE configuration lets identify them and get them added prior to the checkpoint).
 ---
 
 ### Question 3 — Security — How the walker reads the private repository
@@ -76,7 +76,7 @@ B) `gh auth login` as the owner on the VM. ⚠️ Grants the walk session the ow
 C) A read-only SSH deploy key. Equivalent scope to A, but adds SSH key setup the routine would then have to document
 
 [Answer]:
-
+A - include GitHub guide for creating a limited expiring token in the test guide.
 ---
 
 ### Question 4 — ⚠️ Security — Keeping `CLAUDE.md` out of the cold session (BR-62.6)
@@ -95,7 +95,7 @@ B) Skip the probe; delete `CLAUDE.md` from the clone after S2 regardless. ⚠️
 take — the walk then differs from the routine
 
 [Answer]:
-
+A
 ---
 
 ### Question 5 — Deployment environment — Spotify for the walk
@@ -108,7 +108,7 @@ B) Reuse the existing app's credentials. ⚠️ S3 is then not walked, and two i
 question)
 
 [Answer]:
-
+A
 ---
 
 ### Question 6 — Monitoring — Coexisting with the live deployment while the walk runs
@@ -120,7 +120,7 @@ hours it runs; automation stays **off** there (BR-61.9); nothing from the walk m
 B) Stop the live deployment during the walk. ⚠️ Loses recording for no benefit — the two do not share anything
 
 [Answer]:
-
+A
 ---
 
 ### Question 7 — Monitoring — Getting the walk record back
@@ -134,7 +134,7 @@ B) Give the walker write access so it opens a PR with the record. ⚠️ A write
 file
 
 [Answer]:
-
+A
 ---
 
 ## 4. Already decided (recorded here, not re-asked)

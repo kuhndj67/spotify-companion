@@ -7979,3 +7979,58 @@ User: *"approve and continue"*. Plan: `construction/plans/u8-infrastructure-desi
 fine-grained read-only 7-day token for the private repo · a canary probe for `CLAUDE.md` loading from a subfolder
 (BR-62.6) · a new Spotify app for the walk · live deployment keeps running · the walk record copied back by the owner
 (walker cannot push). Storage, messaging and networking stated not applicable, with reasons.
+
+---
+
+## 2026-10-14T15:20:00Z — U8 Infrastructure Design plan answered; IN-U8-1…7 written; FD amended for `kuhndjwin11pro`
+
+User (after a reboot): *"I needed to answer the questions in infra design plan... which I've just done."* Answers in
+the plan file: **Q1 A · Q2 A** — *"always want to start with just a base install (right now that includes vscode with
+the claude extension but that's IT, if there are other items that should be included in the BASE configuration lets
+identify them and get them added prior to the checkpoint)"* · **Q3 A** — *"include GitHub guide for creating a limited
+expiring token in the test guide"* · **Q4 A · Q5 A · Q6 A · Q7 A**.
+
+Written: `construction/u8-team-workflow/infrastructure-design/infrastructure-design.md` (IN-U8-1…7) and
+`deployment-architecture.md`. **Q2's addition** → base B1–B7: fully updated, VS Code + extension, **Claude Code signed
+in**, **Windows Update paused** (the WSL-update outage shape; the pause ends on a calendar date that a revert does not
+reset), Edge first-run done with no sign-in, **Hyper-V automatic checkpoints off**, Enhanced Session clipboard with **no
+shared folder** to this PC. Deliberately excluded: Node, Rancher/WSL/Docker, `gh`, the repo, any GitHub/Spotify
+sign-in. **git is measured, not assumed**: Claude Code on Windows has needed Git for Windows, so it may already be
+present. `clean` is taken with the VM **off**, with a revert positive control (marker file gone). **Q3's addition** →
+the fine-grained token guide goes verbatim into U8's walk guide (Build & Test). The owner enters the token at Git
+Credential Manager's **Token** option, never *browser* (that is option B) and never in the chat; `git push` refused is
+the token's positive control.
+
+**One deliberate change to Q4's wording**: the canary is a **local folder** on the VM, not a public GitHub repo. The
+question is loading from a subfolder, not cloning, and a public repo is an unnecessary outward-facing step. Added a
+positive control (session started *inside* the canary must show it) and a command-run case (C3). Also recorded: the
+probe covers *loading*, not *reading*. `aidlc-docs/` is in the clone, so files read outside INSTALL.md are checked in
+the **session transcript**, which comes back for review only and is never committed (it holds the walk app's
+secret).
+
+**FD amended** (Q1 = A): BR-61.3 (macOS → untested), **BR-61.10 withdrawn** (Mac probes; principle carried to U9),
+BR-62.2 (walk ① on `kuhndjwin11pro`; walk ②'s platform recorded, not prescribed), BR-62.6, business-logic-model S1/§2,
+domain-entities §4. Awaiting approval.
+
+---
+
+## 2026-10-14T15:45:00Z — U8 Infrastructure Design APPROVED; Code Generation plan written
+
+User: *"continue"* (in reply to the Infrastructure Design review prompt), read as approval. Plan:
+`construction/plans/u8-code-generation-plan.md`, **12 steps** in the FD's order: secrets first (one-time full-history
+gitleaks scan, local, pinned and checksum-verified; P-64 stops the unit on a real finding) → tracked-secrets guard →
+CI (smoke labelled *LOAD check*, knip, a `Secret scan` job, weekly history workflow; **smoke probed first in a clean
+clone**, since CI has no `data/`/`secrets/`/`state/`) → ruleset as code + `protect` (read-only by default) → the
+one version reader → **`0.8.0`** → release decision (PBT-68…71) → version display → LICENSE/SECURITY/MCP-licence
+**draft** → CONTRIBUTING/README/CLAUDE.md ≤ 200 → INSTALL.md + docs test (with S4-after-S7, port-taken and Linux probes)
+→ verify. **Nothing outward-facing in this stage**: push, `protect --apply`, the refused PR, the 0.8.0 deploy and the
+walk are Build & Test. Measured while planning: version literal `0.1.0` in 7 places; `gitleaks` not installed here;
+`gh` logged in as the owner; 153 commits; `CLAUDE.md` 1198 lines. Noted: `0.8.0` is a **new** tag, so the existing
+`0.1.0` image is the rollback without a hand-made tag. **1 question**: GPL-3.0-or-later (recommended) vs -only.
+
+---
+
+## 2026-10-14T16:05:00Z — U8 Code Generation plan APPROVED (Q1 = A, GPL-3.0-or-later)
+
+User answered Question 1 in the plan file: **A** (`GPL-3.0-or-later`), and replied *"continue"* to the plan's review
+prompt, which is read as approval of the whole 12-step plan. Execution begins at Step 1 (history scan).

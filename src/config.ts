@@ -224,8 +224,14 @@ export interface MusicBrainzIdentity {
  *
  * Returns `null` only when labels are disabled outright, which is an explicit choice rather than
  * an accident.
+ *
+ * `appVersion` comes from `src/version.ts` (U8, BR-66.2). A legacy `appVersion` field in the file is **ignored**:
+ * a per-install copy is a version no release can reach.
  */
-export function loadMusicBrainzIdentity(readFileSync: (path: string) => string): MusicBrainzIdentity {
+export function loadMusicBrainzIdentity(
+  readFileSync: (path: string) => string,
+  appVersion: string,
+): MusicBrainzIdentity {
   let raw: string;
   try {
     raw = readFileSync(config.musicbrainzConfigPath);
@@ -253,7 +259,7 @@ export function loadMusicBrainzIdentity(readFileSync: (path: string) => string):
   return {
     contact: checked.contact,
     appName: typeof parsed.appName === 'string' ? parsed.appName : 'SpotifyNowPlaying',
-    appVersion: typeof parsed.appVersion === 'string' ? parsed.appVersion : '0.1.0',
+    appVersion,
   };
 }
 

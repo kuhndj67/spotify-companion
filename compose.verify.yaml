@@ -16,7 +16,9 @@ services:
   now-playing:
     # ⚠️ The live image, by tag. NO `build:` — this file can never rebuild or re-tag the live image. And removal
     # never uses `--rmi`, which would delete that shared tag.
-    image: spotify-now-playing:0.1.0
+    # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
+    # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
+    image: spotify-now-playing:0.8.0
     container_name: spotify-now-playing-verify
     ports:
       - "127.0.0.1:3011:3000"

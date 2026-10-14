@@ -15,7 +15,9 @@ services:
         # against `main` a failure was ambiguous, against a SHA it is unambiguously ours.
         #   7b5fde63 (2026-08-21) "fix: add offset param to getMyPlaylists (#72)"
         MCP_SERVER_REF: 7b5fde6309a52a7874768c63deda7880ee85935b
-    image: spotify-now-playing:0.1.0
+    # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
+    # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
+    image: spotify-now-playing:0.8.0
     container_name: spotify-now-playing
 
     ports:

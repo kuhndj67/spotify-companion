@@ -1,6 +1,6 @@
 {
   "name": "spotify-companion",
-  "version": "0.1.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "Local containerised web app that displays and enriches the currently playing Spotify track, via an MCP server and the Spotify Web API",
@@ -30,6 +30,8 @@
     "db:verify-backups": "node --import tsx scripts/verify-all-backups.mjs",
     "verify:up": "node scripts/verify-install.mjs up",
     "verify:down": "node scripts/verify-install.mjs down",
+    "protect": "node scripts/protect.mjs",
+    "release": "node --import tsx scripts/release.mjs",
     "reporting:credits": "node scripts/resolve-artist-credits.mjs",
     "reporting:metabase": "node scripts/metabase-setup.mjs",
     "reporting:refresh": "npm run reporting:credits && npm run reporting:build",

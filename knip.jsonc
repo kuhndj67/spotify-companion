@@ -14,7 +14,7 @@
   // something imports it. The tests are the real entry points for `src/`.
   "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js"],
 
-  "project": ["src/**/*.ts", "scripts/**/*.mjs", "test/**/*.ts"],
+  "project": ["src/**/*.ts", "scripts/**/*.mjs", "scripts/**/*.ts", "test/**/*.ts"],
 
   "ignore": [
     // A TOMBSTONE, kept on purpose. `skip_attribution` was retired by classifier v2 (2026-09-22) and

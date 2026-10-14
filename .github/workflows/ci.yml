@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   test:
-    name: Typecheck, test, build
+    name: Typecheck, test, smoke, knip, build
     runs-on: ubuntu-latest
 
     env:
@@ -66,6 +66,17 @@ jobs:
       - name: Build
         run: npm run build
 
+      # U8 (BR-63.2, NFR-31). ⚠️ A LOAD CHECK, NOT A BEHAVIOUR CHECK: it proves every script's modules load and
+      # that each script starts in its safe mode. A non-zero exit from a script that REFUSES (no data/, no
+      # container) is a pass. A green `smoke` never means "the scripts work" -- they are untested (W-6).
+      # Probed 2026-10-14 in a fresh clone with no data/, secrets/ or state/, which is what this runner has.
+      - name: Smoke — LOAD check only (scripts' behaviour is NOT tested)
+        run: npm run smoke
+
+      # Dead files, exports and dependencies over src/ AND scripts/ (knip.jsonc).
+      - name: Knip
+        run: npm run knip
+
       # PBT-08 requires the seed to be discoverable after the fact. Surfacing it in the run
       # summary means a failure can be replayed without digging through raw logs.
       - name: Report fast-check seed and coverage
@@ -107,3 +118,40 @@ jobs:
       # parser at runtime. Not pushed anywhere; the build succeeding is the whole test.
       - name: Build image
         run: docker build --tag spotify-companion:ci .
+
+  # U8 (BR-64.1, P-61): gitleaks over the commits this push or PR adds. The binary is PINNED by version AND
+  # SHA-256 (checked before it runs), not a third-party action -- no licence-key condition, no extra token scope.
+  # --redact always: a finding never prints the value. Allow-list: .gitleaks.toml, every entry with a reason.
+  # The whole history is scanned weekly by secret-history.yml.
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks (pinned, checksum-verified)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+
+      # The range: a PR's own commits, or a push's before..after. A new branch's first push (before = all zeros)
+      # and a manual run fall back to the whole history -- slower, never narrower.
+      - name: Scan the commits in this change
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "Scanning $BASE..$HEAD"
+            ./gitleaks git --redact --no-banner -c .gitleaks.toml --log-opts="$BASE..$HEAD" .
+          else
+            echo "No usable base -- scanning the whole history"
+            ./gitleaks git --redact --no-banner -c .gitleaks.toml .
+          fi

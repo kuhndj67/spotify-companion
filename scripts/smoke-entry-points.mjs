@@ -104,6 +104,11 @@ const ENTRY_POINTS = [
   { file: 'check-rules-schema.mjs', args: [], tsx: true },
   // U6: prints what verify:up/down would do and touches nothing — no Docker call in this mode.
   { file: 'verify-install.mjs', args: ['--plan'] },
+  // U8: prints the committed ruleset; no network. The default mode reads GitHub, and --apply WRITES it.
+  { file: 'protect.mjs', args: ['--plan'] },
+  // U8: --plan reads git tags and `docker image ls` and decides; verify is not run and nothing is built or tagged.
+  // With no Docker it refuses (exit 2), which is still a load.
+  { file: 'release.mjs', args: ['--plan'], tsx: true },
   { file: 'probe-p-u5-1-analyse.mjs', args: [] },
   { file: 'probe-p-u5-1-mark.mjs', args: [] },
   { file: 'probe-p-u5-1.mjs', args: ['--rehearse'] },

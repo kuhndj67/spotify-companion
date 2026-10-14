@@ -313,6 +313,9 @@
           data-testid="diagnostics-open-button"
         >Run diagnostics&hellip;</button>
       </section>
+
+      <!-- U8 (LC-57): the app version, from package.json via the server. Never blank: "Version unknown" if unreadable. -->
+      <p id="app-version" class="muted app-version" data-testid="app-version">Version &hellip;</p>
     </dialog>
 
     <!-- Diagnostics: exercises the full connect / auth / query cycle on demand. -->

@@ -12,6 +12,7 @@ import { config } from '../config.js';
 import { isMcpErrorText } from '../configuration/mcpErrorText.js';
 import { parseNowPlaying, type NowPlaying } from './parseNowPlaying.js';
 import { waitForProcessExit } from './processExit.js';
+import { readAppVersion } from '../version.js';
 
 /**
  * A tool that answered with an error **as text** (FR-71, BR-58.1).
@@ -49,7 +50,7 @@ export class SpotifyMcpClient {
     });
 
     const client = new Client(
-      { name: 'spotify-now-playing', version: '0.1.0' },
+      { name: 'spotify-now-playing', version: readAppVersion() },
       { capabilities: {} },
     );
 

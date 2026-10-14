@@ -54,6 +54,7 @@ import {
 import { LabelBackfillJob } from './musicbrainz/LabelBackfillJob.js';
 import { LikedSetCache } from './spotify/LikedSetCache.js';
 import { loadMusicBrainzIdentity, userAgentFrom, type MusicBrainzIdentity } from './config.js';
+import { readAppVersion } from './version.js';
 import { probeDirectoryWritable, probeFileWritable } from './configuration/atomicWrite.js';
 import type { ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
 import { CredentialsWriter } from './configuration/CredentialsWriter.js';
@@ -218,7 +219,7 @@ if (config.labelsEnabled && repository !== null) {
     // Fails closed: no anonymous User-Agent fallback. NFR-14 compliance is a choice this
     // project made, and unidentified traffic sent while believing we are compliant is worse
     // than refusing to start.
-    const identity = loadMusicBrainzIdentity((path) => readFileSync(path, 'utf8'));
+    const identity = loadMusicBrainzIdentity((path) => readFileSync(path, 'utf8'), readAppVersion());
     labelIdentity = identity;
     labelUserAgent = userAgentFrom(identity);
 
@@ -920,16 +921,6 @@ const credentials = new CredentialsWriter({
   now: () => Date.now(),
 });
 
-function readAppVersion(): string {
-  try {
-    // `src/server.ts` and `dist/server.js` both sit one level below the project root.
-    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-    return String((JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version?: unknown }).version ?? 'unknown');
-  } catch {
-    return 'unknown';
-  }
-}
-
 const app = express();
 app.disable('x-powered-by');
 app.use(localGuard);
@@ -983,6 +974,7 @@ app.use(
     rulesWriter,
     credentials,
     labelsActive: labelUserAgent !== null,
+    appVersion: readAppVersion(),
   }),
 );
 

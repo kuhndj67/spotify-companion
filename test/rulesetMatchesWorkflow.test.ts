@@ -1,0 +1,79 @@
+/**
+ * The `main` ruleset's required checks must be jobs CI actually runs (U8, P-62, BR-63.3 / BR-63.4).
+ *
+ * GitHub matches a required status check to a job by its display NAME. Rename a job in `ci.yml` without updating
+ * `.github/rulesets/main.json` and `main` waits for a check that never reports: every PR blocks for ever, and the
+ * obvious "fix" is to remove the requirement. This test makes the rename fail CI first.
+ *
+ * It also pins the owner bypass, because BR-63.3 states it as a rule. A ruleset that silently lost it would lock
+ * the owner out of direct pushes, and one that silently gained other actors would widen the exception.
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Job display names from a workflow file -- the `name:` four spaces under a two-space job key inside `jobs:`.
+ * A deliberately narrow reader of the project's own layout rather than a YAML dependency; the positive control
+ * below proves it finds what it should.
+ */
+function jobNames(workflowYaml: string): string[] {
+  const jobsAt = workflowYaml.search(/^jobs:\s*$/m);
+  assert.ok(jobsAt >= 0, 'no top-level jobs: key');
+  const names: string[] = [];
+  const re = /^ {2}[A-Za-z0-9_-]+:\s*\n {4}name:\s*(.+?)\s*$/gm;
+  re.lastIndex = jobsAt;
+  for (let m = re.exec(workflowYaml); m; m = re.exec(workflowYaml)) {
+    names.push((m[1] ?? '').replace(/^(['"])(.*)\1$/, '$2'));
+  }
+  return names;
+}
+
+interface Ruleset {
+  bypass_actors: { actor_id: number; actor_type: string; bypass_mode: string }[];
+  rules: { type: string; parameters?: { required_status_checks?: { context: string }[] } }[];
+}
+
+function requiredChecks(rs: Ruleset): string[] {
+  const rule = rs.rules.find((r) => r.type === 'required_status_checks');
+  return (rule?.parameters?.required_status_checks ?? []).map((c) => c.context);
+}
+
+function missingChecks(rs: Ruleset, workflowYaml: string): string[] {
+  const jobs = new Set(jobNames(workflowYaml));
+  return requiredChecks(rs).filter((c) => !jobs.has(c));
+}
+
+const ruleset = JSON.parse(readFileSync(join(root, '.github', 'rulesets', 'main.json'), 'utf8')) as Ruleset;
+const ci = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+describe('main ruleset ↔ ci.yml (BR-63.4)', () => {
+  it('every required check is a job name in ci.yml', () => {
+    assert.ok(requiredChecks(ruleset).length >= 3, 'expected the three CI jobs to be required');
+    assert.deepEqual(missingChecks(ruleset, ci), []);
+  });
+
+  it('every ci.yml job is required -- a job added later must be a deliberate choice either way', () => {
+    assert.deepEqual(jobNames(ci).sort(), requiredChecks(ruleset).sort());
+  });
+
+  it('a pull request is required on main', () => {
+    assert.ok(ruleset.rules.some((r) => r.type === 'pull_request'));
+  });
+
+  it('positive control: a renamed job is reported', () => {
+    const renamed = ci.replace('name: Secret scan', 'name: Secrets');
+    assert.deepEqual(missingChecks(ruleset, renamed), ['Secret scan']);
+  });
+});
+
+describe('the owner bypass is present and is the only one (BR-63.3)', () => {
+  it('exactly the repository-admin role, always', () => {
+    assert.deepEqual(ruleset.bypass_actors, [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }]);
+  });
+});

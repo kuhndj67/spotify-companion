@@ -221,12 +221,14 @@ describe('MusicBrainz contact (BR-57)', () => {
     assert.equal(JSON.parse(readFileSync(mbPath, 'utf8')).contact, 'old@mail.org');
   });
 
-  it('changes ONLY contact, preserves every other field, and tells the client (no restart)', async () => {
+  // U8 (BR-66.2): the one exception to "every other field" is the legacy `appVersion`, which is dropped -- the
+  // version comes from package.json now. The fixture still carries it, so this proves an OLD file is cleaned.
+  it('changes ONLY contact, preserves every other field except the legacy appVersion, and tells the client (no restart)', async () => {
     const events: string[] = [];
     const r = await writer({}, events).saveMusicBrainzContact('  kuhndj67@gmail.com ');
     assert.deepEqual(r, { set: true, masked: 'k…7@gmail.com' });
     assert.deepEqual(JSON.parse(readFileSync(mbPath, 'utf8')), {
-      _comment: 'keep me', contact: 'kuhndj67@gmail.com', appName: 'SpotifyNowPlaying', appVersion: '0.1.0',
+      _comment: 'keep me', contact: 'kuhndj67@gmail.com', appName: 'SpotifyNowPlaying',
     });
     assert.deepEqual(events, ['contact:kuhndj67@gmail.com']);
   });

@@ -48,7 +48,7 @@ interface Served {
   spotifyPath: string;
 }
 
-async function serve(): Promise<Served> {
+async function serve(overrides: Partial<ApiDeps> = {}): Promise<Served> {
   const root = mkdtempSync(join(tmpdir(), 'u7-routes-'));
   const rulesPath = join(root, 'rules.json');
   const spotifyPath = join(root, 'spotify-config.json');
@@ -100,6 +100,7 @@ async function serve(): Promise<Served> {
     rulesWriter,
     credentials,
     labelsActive: true,
+    ...overrides,
   } as unknown as ApiDeps;
   const app = express();
   app.use(createApi(deps));
@@ -238,5 +239,36 @@ describe('credentials over HTTP (FR-69, FR-70; P-53)', () => {
     const r = await fetch(`${s.base}/api/settings/musicbrainz`, { method: 'POST', headers: { ...GOOD, 'content-type': 'application/json' }, body: JSON.stringify({ contact: 'kuhndj67@gmail.com' }) });
     assert.equal(r.status, 200);
     assert.deepEqual(await r.json(), { set: true, masked: 'k…7@gmail.com', restartNeeded: false });
+  });
+});
+
+/**
+ * U8 (LC-57, frontend-components §1/§3): the version rides on the Settings payload -- no new route -- and is
+ * never blank. ⚠️ Including on the 503: Settings shows the version even when credential settings are unavailable.
+ */
+describe('app version on the Settings payload (LC-57)', () => {
+  it('200 carries the injected version', async () => {
+    const s = await serve({ appVersion: '0.8.0' });
+    const body = (await (await fetch(`${s.base}/api/settings/credentials`)).json()) as { appVersion: string };
+    assert.equal(body.appVersion, '0.8.0');
+  });
+
+  it('a pre-release is passed through whole', async () => {
+    const s = await serve({ appVersion: '1.0.0-beta.1' });
+    const body = (await (await fetch(`${s.base}/api/settings/credentials`)).json()) as { appVersion: string };
+    assert.equal(body.appVersion, '1.0.0-beta.1');
+  });
+
+  it('absent reads as `unknown`, never blank and never 0.1.0', async () => {
+    const s = await serve({ appVersion: undefined });
+    const body = (await (await fetch(`${s.base}/api/settings/credentials`)).json()) as { appVersion: string };
+    assert.equal(body.appVersion, 'unknown');
+  });
+
+  it('the 503 (credentials unavailable) still carries it', async () => {
+    const s = await serve({ credentials: null, appVersion: '0.8.0' });
+    const r = await fetch(`${s.base}/api/settings/credentials`);
+    assert.equal(r.status, 503);
+    assert.equal(((await r.json()) as { appVersion: string }).appVersion, '0.8.0');
   });
 });

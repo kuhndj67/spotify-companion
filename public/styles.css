@@ -261,6 +261,7 @@ dd[data-flag="no"] { color: var(--muted); }
 }
 
 .muted { color: var(--muted); font-size: 0.85rem; }
+.app-version { margin: 1rem 0 0; font-size: 0.75rem; text-align: right; }
 
 .warn {
   margin: 0.8rem 0 0;

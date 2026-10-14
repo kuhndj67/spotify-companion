@@ -18,6 +18,7 @@ import type { EnrichmentService } from './spotify/enrichment.js';
 import type { MaintenanceStatus } from './maintenance/MaintenanceService.js';
 import { maintenanceDiagnosticSteps } from './maintenance/maintenanceDiagnostics.js';
 import { configurationDiagnosticSteps, type ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
+import { readAppVersion } from './version.js';
 
 export interface DiagnosticStep {
   name: string;
@@ -342,6 +343,15 @@ export async function runDiagnostics(
     await step('Environment', async () =>
       `${config.inContainer ? 'Container' : 'Host'} · MCP: ${config.mcpServerEntrypoint}`,
     ),
+  );
+
+  // U8 (frontend-components §2, BR-66.6): BOTH versions, each labelled, so they cannot be confused. The app version
+  // says which code this is; the schema version says whether this database can be opened. Neither derives the other.
+  steps.push(
+    await step('Version', async () => {
+      const schema = history?.repository ? `v${history.repository.schemaVersion}` : 'unknown (history not running)';
+      return `App version ${readAppVersion()} · Database schema ${schema}`;
+    }),
   );
 
   // --- Credentials -------------------------------------------------------

@@ -188,7 +188,9 @@ export class CredentialsWriter {
     if (!checked.ok) return Promise.resolve(this.#refuse('musicbrainz', 'invalid', ['contact'], checked.message));
 
     return this.#withLock(async () => {
-      const existing = readJson(this.#deps.musicbrainzPath) ?? { appName: 'SpotifyNowPlaying', appVersion: '0.1.0' };
+      // U8 (BR-66.2): a legacy `appVersion` is DROPPED on rewrite -- the version comes from package.json, and a
+      // per-install copy is a version no release can reach. Every other field is preserved.
+      const { appVersion: _legacyVersion, ...existing } = readJson(this.#deps.musicbrainzPath) ?? { appName: 'SpotifyNowPlaying' };
       try {
         writeFileSync(this.#deps.musicbrainzPath, `${JSON.stringify({ ...existing, contact: checked.contact }, null, 2)}\n`, 'utf8');
       } catch {

@@ -2249,6 +2249,8 @@ async function refreshCredentials() {
   try {
     const r = await fetch('/api/settings/credentials');
     const body = await r.json();
+    // U8 (LC-57): rendered only -- the value comes from the server, which reads package.json. Never blank.
+    el('app-version').textContent = `Version ${body.appVersion ?? 'unknown'}`;
     if (!r.ok) {
       el('sp-status').textContent = body.error ?? 'Credential settings are unavailable.';
       el('mb-status').textContent = body.error ?? 'Credential settings are unavailable.';
@@ -2266,6 +2268,7 @@ async function refreshCredentials() {
     el('mb-note').textContent = v.musicbrainz.note ?? '';
   } catch (error) {
     el('sp-status').textContent = `Could not reach the app: ${error}`;
+    el('app-version').textContent = 'Version unknown';
   }
 }
 

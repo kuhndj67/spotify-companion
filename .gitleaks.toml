@@ -1,0 +1,19 @@
+# gitleaks configuration (U8, BR-64 / P-61).
+#
+# The default rule set, plus an allow-list. ⚠️ EVERY allow-list entry carries a `description` saying WHY the value
+# is not a secret -- a silent allow-list is a disabled scanner (BR-64.4), and test/secretsTracked.test.ts fails on
+# an entry without one. Entries allow an exact VALUE, never a path or a whole rule: a real credential pasted into
+# the same file later must still be found.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "RFC 6455's published sample Sec-WebSocket-Key (base64 of 'the sample nonce'), used by scripts/post-boot-check.ps1 to probe the WebSocket handshake. A protocol constant, not a credential. Found by the 2026-10-14 history scan."
+regexTarget = "secret"
+regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']
+
+[[allowlists]]
+description = "A git commit SHA of the upstream spotify-mcp-server (the R7 pin, 2026-08-21), quoted in aidlc-docs/audit.md next to the word 'API'. A public commit id, not a credential. Found by the 2026-10-14 history scan."
+regexTarget = "secret"
+regexes = ['''^7b5fde6309a52a7874768c63deda7880ee85935b$''']

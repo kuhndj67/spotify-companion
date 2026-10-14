@@ -61,6 +61,7 @@ import { comparisonView, statusView } from './ui/maintenancePanel.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
 import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { LABEL_CLASSIFIER_VERSION } from './musicbrainz/LabelEnrichmentService.js';
+import { UNKNOWN_VERSION } from './version.js';
 import {
   trendWindow,
   weeklyBuckets,
@@ -152,6 +153,11 @@ export interface ApiDeps {
   credentials?: CredentialsWriter | null;
   /** Whether label enrichment is running — a contact saved while it is OFF needs a restart (Step 6's limit). */
   labelsActive?: boolean;
+  /**
+   * U8 (LC-57, NFR-34) — the app version from `src/version.ts`, shown at the bottom of Settings. Injected like `now`
+   * so the route is testable; absent reads as `unknown`, which the UI shows as `Version unknown`, never blank.
+   */
+  appVersion?: string;
 }
 
 /**
@@ -897,7 +903,10 @@ export function createApi(deps: ApiDeps): Router {
     // ⚠️ FIELD NAMES only (P-53) — the writer never puts a value in a refusal, and nothing is added here.
     res.status(CREDENTIALS_STATUS[r.reason]).json({ error: r.message, reason: r.reason, fields: r.fields });
   const rulesUnavailable = (res: ExpressResponse) => res.status(503).json({ error: 'Rules editing is unavailable.' });
-  const credentialsUnavailable = (res: ExpressResponse) => res.status(503).json({ error: 'Credential settings are unavailable.' });
+  // U8: the version rides on this payload even when it is a 503, because Settings shows it either way.
+  const appVersion = deps.appVersion ?? UNKNOWN_VERSION;
+  const credentialsUnavailable = (res: ExpressResponse) =>
+    res.status(503).json({ error: 'Credential settings are unavailable.', appVersion });
 
   /**
    * The rules upload body is the file's TEXT (`text/plain`), so the 64 KB JSON parser above never sees it; this
@@ -970,6 +979,7 @@ export function createApi(deps: ApiDeps): Router {
     const musicbrainz = deps.credentials.musicbrainzView();
     const labelsActive = deps.labelsActive ?? false;
     res.json({
+      appVersion,
       spotify,
       musicbrainz,
       labelsActive,

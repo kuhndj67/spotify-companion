@@ -7969,3 +7969,13 @@ the release tag; a fine-grained, read-only, short-lived token for the private re
 Pending (Infrastructure Design, after NFR Design approval): amend BR-62.2 / BR-61.3 again — agent walk on
 `kuhndjwin11pro` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`
 from a subfolder (BR-62.6).
+
+---
+
+## 2026-10-13T15:30:00Z — U8 NFR Design APPROVED; Infrastructure Design plan written
+
+User: *"approve and continue"*. Plan: `construction/plans/u8-infrastructure-design-plan.md`, 7 questions — walk machine
+`kuhndjwin11pro` (replacing the MacBook amendment) · a `clean` Hyper-V checkpoint so re-walks are cold · a
+fine-grained read-only 7-day token for the private repo · a canary probe for `CLAUDE.md` loading from a subfolder
+(BR-62.6) · a new Spotify app for the walk · live deployment keeps running · the walk record copied back by the owner
+(walker cannot push). Storage, messaging and networking stated not applicable, with reasons.

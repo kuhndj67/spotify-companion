@@ -19,6 +19,14 @@ concurrency:
 permissions:
   contents: read
 
+# ⚠️ U8 (2026-10-14): `shell: bash` makes GitHub run every step as `bash -eo pipefail`. Without it the default is
+# `bash -e`, and `npm run test:coverage 2>&1 | tee test-output.txt` took TEE's exit code -- so a FAILING TEST NEVER
+# FAILED CI, from the day that step was written. Found by the BR-63.5 positive control (a PR with a deliberately
+# failing test went green). test/rulesetMatchesWorkflow.test.ts pins this line.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     name: Typecheck, test, smoke, knip, build

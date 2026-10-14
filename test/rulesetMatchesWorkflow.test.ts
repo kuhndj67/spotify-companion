@@ -77,3 +77,25 @@ describe('the owner bypass is present and is the only one (BR-63.3)', () => {
     assert.deepEqual(ruleset.bypass_actors, [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }]);
   });
 });
+
+/**
+ * ⚠️ A required check that cannot FAIL is not a check (found 2026-10-14 by the BR-63.5 positive control).
+ *
+ * GitHub's default shell is `bash -e` with no `pipefail`, so `npm run test:coverage | tee …` reported `tee`'s exit
+ * code and a failing test left the job green. `defaults.run.shell: bash` turns on `-eo pipefail` for every step.
+ */
+function pipefailDefault(workflowYaml: string): boolean {
+  return /^defaults:[ \t]*\r?\n {2}run:[ \t]*\r?\n {4}shell:[ \t]*bash[ \t]*$/m.test(workflowYaml);
+}
+
+describe('every workflow runs its steps with pipefail', () => {
+  for (const file of ['ci.yml', 'secret-history.yml']) {
+    it(`${file}: defaults.run.shell is bash (bash -eo pipefail)`, () => {
+      assert.ok(pipefailDefault(readFileSync(join(root, '.github', 'workflows', file), 'utf8')));
+    });
+  }
+  it('positive control: a workflow without it is reported', () => {
+    assert.equal(pipefailDefault('name: x\npermissions:\n  contents: read\njobs:\n'), false);
+    assert.equal(pipefailDefault('defaults:\n  run:\n    shell: bash\n'), true);
+  });
+});

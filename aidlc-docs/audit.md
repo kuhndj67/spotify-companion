@@ -8064,3 +8064,12 @@ write, no issue posted, nothing deployed.
   until U4/U5".
 - `CLAUDE.md` went from 1198 to 146 lines. Every date it held appears in `audit.md`, checked by mention (early
   audit headings carry no dates). The traps were condensed into `CONTRIBUTING.md`.
+
+---
+
+## 2026-10-14T19:45:00Z — U8 Code Generation APPROVED; Build & Test begins
+
+User: *"continue"* (in reply to the Code Generation review prompt), read as approval. Build & Test runs the local
+part first: safety backup, `npm run release` for 0.8.0 (deploys live), checks, click-test, and the walk guide
+(`e2e-test-instructions.md`). The outward-facing part (push, `protect --apply`, the refused-PR positive control,
+the first CI run) waits for the owner's explicit go-ahead.

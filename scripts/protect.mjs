@@ -47,18 +47,31 @@ function gh(ghArgs, input) {
   return r.stdout;
 }
 
-/** The fields this file controls, in a stable shape -- GitHub adds ids, links and timestamps. */
+/**
+ * Project a value onto the shape of `want`: only the keys the FILE sets, sorted. GitHub returns keys in its own
+ * order and adds defaults the file never mentions (`required_reviewers`, `allowed_merge_methods`, ids, links), and a
+ * comparison that counts those reports a difference for ever. ⚠️ First version did exactly that -- found on the
+ * first live apply, 2026-10-14. A diff that always differs teaches its reader to ignore it.
+ *
+ * Array elements BEYOND the file's are kept as they are, so a rule or a bypass actor added on GitHub still shows.
+ */
+function project(live, want) {
+  if (Array.isArray(want)) {
+    if (!Array.isArray(live)) return live;
+    return [...want.map((w, i) => project(live[i], w)), ...live.slice(want.length)];
+  }
+  if (want !== null && typeof want === 'object') {
+    if (live === null || typeof live !== 'object') return live;
+    return Object.fromEntries(Object.keys(want).sort().map((k) => [k, project(live[k], want[k])]));
+  }
+  return live;
+}
+
+const byType = (rs) => ({ ...rs, rules: [...(rs.rules ?? [])].sort((a, b) => String(a.type).localeCompare(String(b.type))) });
+
+/** The fields this file controls, in a stable shape, for `rs` (live or file) against the file. */
 function normalise(rs) {
-  return {
-    name: rs.name,
-    target: rs.target,
-    enforcement: rs.enforcement,
-    conditions: rs.conditions,
-    bypass_actors: (rs.bypass_actors ?? []).map(({ actor_id, actor_type, bypass_mode }) => ({ actor_id, actor_type, bypass_mode })),
-    rules: [...(rs.rules ?? [])]
-      .map((r) => (r.parameters ? { type: r.type, parameters: r.parameters } : { type: r.type }))
-      .sort((a, b) => a.type.localeCompare(b.type)),
-  };
+  return project(byType(rs), byType(desired));
 }
 
 function diffLines(a, b) {

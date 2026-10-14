@@ -261,7 +261,8 @@ dd[data-flag="no"] { color: var(--muted); }
 }
 
 .muted { color: var(--muted); font-size: 0.85rem; }
-.app-version { margin: 1rem 0 0; font-size: 0.75rem; text-align: right; }
+/* U8: the same 1.25rem inset as .diag-section -- first drawn flush to the edge and CLIPPED (seen in the click-test). */
+.app-version { margin: 0; padding: 0.5rem 1.25rem 1rem; font-size: 0.75rem; text-align: right; }
 
 .warn {
   margin: 0.8rem 0 0;

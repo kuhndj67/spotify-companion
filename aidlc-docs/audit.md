@@ -7961,7 +7961,10 @@ the release tag; a fine-grained, read-only, short-lived token for the private re
 - Guest: `systeminfo` → *"A hypervisor has been detected"*. ⚠️ **Claude first said this proved nested virtualization,
   and corrected it**: every Hyper-V guest reports that line. The discriminating check — Sysinternals `coreinfo64 -v`
   in the guest — reported the virtualization extensions **present** (user: *"it does support virtualization"*).
-- **Not yet checked**: the VM's dynamic memory / startup memory (Rancher + the app want ≥ 8 GB fixed).
+- Memory: was **dynamic, 16 GB startup**; dynamic memory is unsupported for a VM running its own hypervisor, so set
+  with the VM off: `Set-VMMemory -DynamicMemoryEnabled $false -StartupBytes 16GB` → user confirmed **`DynamicMemoryEnabled
+  : False`** (2026-10-13). *(Entry amended same day — append-only applies to decisions, and this line recorded a check
+  as pending.)* **The walk machine's prerequisites are complete.**
 
 Pending (Infrastructure Design, after NFR Design approval): amend BR-62.2 / BR-61.3 again — agent walk on
 `kuhndjwin11pro` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`

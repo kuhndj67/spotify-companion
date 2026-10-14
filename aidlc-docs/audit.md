@@ -7941,3 +7941,28 @@ refuted reason) and redeployed at 30 s. Accepted cost ~7.5 MB/h (~180 MB/day) wi
 over when Rancher restarts. The other projects' stacks remain stopped by the user. ⚠️ **Same family as the classifier-v2
 mechanism and the WAL-size inference**: a plausible mechanism that fit one observation, stated before the second
 measurement — caught here because the change was measured before it was committed.
+
+---
+
+## 2026-10-13T15:00:00Z — Cold-walk machine: the MacBook is out; `kuhndjwin11pro` (Hyper-V Windows 11 VM) probed
+
+User: the MacBook *"is too old to run vscode.app or claude.app"* — so it cannot host a cold Claude Code session, and is
+very likely too old for a container engine too (not measured: `sw_vers` was not run). User then offered
+**`kuhndjwin11pro`**, a Hyper-V Windows 11 Pro VM on another machine, *"100% clean"* — VS Code and Claude Code
+installed; no Docker, WSL2 or Rancher Desktop. Claude recommended **neither** of the user's two options (copy the whole
+project in / a scripted install): the first hands the walker `CLAUDE.md` and the history (BR-62.1/62.6), the second
+tests a script instead of `docs/INSTALL.md` (FR-65). Instead: a fresh session in an empty folder follows INSTALL.md from
+the release tag; a fine-grained, read-only, short-lived token for the private repo; the owner performs the browser steps.
+
+**Probe — nested virtualization (prerequisite for WSL2/Rancher inside the VM):**
+- Host: `Set-VMProcessor -ExposeVirtualizationExtensions $true` (silent on success); `Get-VMProcessor … | Format-List *`
+  → **`ExposeVirtualizationExtensions : True`**. (A first read returned nothing: the property name was typed with a
+  trailing "d", and `Select-Object` silently returns an empty column for an unknown property.)
+- Guest: `systeminfo` → *"A hypervisor has been detected"*. ⚠️ **Claude first said this proved nested virtualization,
+  and corrected it**: every Hyper-V guest reports that line. The discriminating check — Sysinternals `coreinfo64 -v`
+  in the guest — reported the virtualization extensions **present** (user: *"it does support virtualization"*).
+- **Not yet checked**: the VM's dynamic memory / startup memory (Rancher + the app want ≥ 8 GB fixed).
+
+Pending (Infrastructure Design, after NFR Design approval): amend BR-62.2 / BR-61.3 again — agent walk on
+`kuhndjwin11pro` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`
+from a subfolder (BR-62.6).

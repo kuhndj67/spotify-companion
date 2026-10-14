@@ -98,7 +98,9 @@ describe('documents link only to things that exist (P-63 ②)', () => {
       assert.deepEqual(relativeLinks(read(doc)).filter((t) => !existsSync(resolve(base, t))), []);
     });
     it(`${doc}: backticked repository paths resolve (gitignored ones skipped)`, () => {
-      const missing = backtickedPaths(read(doc)).filter((p) => !existsSync(join(root, p)) && !gitIgnored(p.replace(/\/$/, '')));
+      // ⚠️ The trailing slash is KEPT: `.gitignore`'s `data/` matches only what git knows is a directory, and in a
+      // fresh checkout (CI) `data/` does not exist. Stripping it passed here and failed on CI (2026-10-14).
+      const missing = backtickedPaths(read(doc)).filter((p) => !existsSync(join(root, p)) && !gitIgnored(p));
       assert.deepEqual(missing, []);
     });
   }
@@ -108,6 +110,7 @@ describe('documents link only to things that exist (P-63 ②)', () => {
     assert.deepEqual(backtickedPaths(text), ['src/nope.ts']);
     assert.equal(gitIgnored('secrets/spotify-config.json'), true);
     assert.equal(gitIgnored('src/version.ts'), false);
+    assert.equal(gitIgnored('data/'), true, 'a directory pattern must match whether or not data/ exists here');
   });
 });
 

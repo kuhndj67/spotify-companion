@@ -8073,3 +8073,17 @@ User: *"continue"* (in reply to the Code Generation review prompt), read as appr
 part first: safety backup, `npm run release` for 0.8.0 (deploys live), checks, click-test, and the walk guide
 (`e2e-test-instructions.md`). The outward-facing part (push, `protect --apply`, the refused-PR positive control,
 the first CI run) waits for the owner's explicit go-ahead.
+
+---
+
+## 2026-10-14T19:20:00Z — U8 Build & Test, local part: 0.8.0 → 0.8.1 released and deployed; version line was clipped
+
+Record: `construction/build-and-test/u8-build-and-test-summary.md`. In-app safety backup verified restorable (1225
+plays). `npm run release` first refused `tree-dirty` (correct), then released **0.8.0**; a repeat was refused
+`image-tag-exists`. The live User-Agent reads `0.8.0` while the live `musicbrainz.json` still holds the legacy
+`appVersion: 0.1.0`, which proves the *ignored if present* path on a real file. ⚠️ **The click-test found the Settings
+version line CLIPPED at the dialog's edge.** All tests passed because they assert the text. It was fixed and
+released as **0.8.1**: a new PATCH, because tags are never overwritten. Finding: two deploys in four minutes split
+one listen into three rows (two `unknown`/`app-shutdown`, one `completed` from 187 s). This is existing behaviour;
+the rows are untouched, and stitching is a backlog question for the owner. Walk guide written:
+`build-and-test/e2e-test-instructions.md`. Nothing pushed. The outward-facing part awaits the owner.

@@ -68,8 +68,7 @@ async function main() {
   console.log(`  ${target}`);
   console.log(``);
   console.log(`It contains no rules, which is a valid rule set — nothing will be skipped.`);
-  console.log(`Nothing evaluates rules yet in any case: U3 is the pure core, and the app`);
-  console.log(`does not consume its decisions until U4/U5.`);
+  console.log(`Automated skipping is also OFF until you turn it on in the app (docs/INSTALL.md S10).`);
 }
 
 main().catch((error) => {

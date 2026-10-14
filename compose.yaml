@@ -21,17 +21,18 @@ services:
     container_name: spotify-now-playing
 
     ports:
-      # 127.0.0.1 binding keeps this localhost-only (Question 7, option A).
-      # Drop the prefix to "3010:3000" to expose it on the LAN.
+      # 127.0.0.1 binding keeps this localhost-only (Question 7, option A). ⚠️ Do NOT drop the prefix: see below.
       #
       # ⚠️ This binding is now LOAD-BEARING, not just tidy. With TRUST_PUBLISHED_PORT enabled
       # below, the peer-address check no longer constrains reachability — this does. Removing
       # the 127.0.0.1 prefix would put an unauthenticated view of listening history and playback
       # control on the LAN.
       #
-      # Host port 3010, not 3000: 3000 is taken on this machine by another project
-      # (opencodetest-frontend). The container-internal port stays 3000.
-      - "127.0.0.1:3010:3000"
+      # Host port 3010 by default (3000 is taken on the owner's machine by another project). U8: if 3010 is taken on
+      # yours, set SPOTIFY_COMPANION_PORT in a `.env` file beside this one (gitignored) -- docs/INSTALL.md S7.
+      # Probed 2026-10-14: the variable is read from `.env` and from the shell. The access guard checks host NAMES,
+      # never the port, so any port works. The container-internal port stays 3000.
+      - "127.0.0.1:${SPOTIFY_COMPANION_PORT:-3010}:3000"
 
     environment:
       PORT: 3000

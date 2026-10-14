@@ -194,7 +194,7 @@ try {
 
   console.log('✓ Tokens written to secrets/spotify-config.json (gitignored)');
   console.log(`✓ Scopes granted include user-follow-read`);
-  console.log('\nNext:  npm run build && npm start     (or: docker compose up --build)');
+  console.log('\nNext: continue with docs/INSTALL.md (S5).');
 } catch (error) {
   console.error(`\n✗ Authentication failed: ${error.message}`);
   process.exit(1);

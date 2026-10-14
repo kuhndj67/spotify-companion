@@ -8034,3 +8034,33 @@ walk are Build & Test. Measured while planning: version literal `0.1.0` in 7 pla
 
 User answered Question 1 in the plan file: **A** (`GPL-3.0-or-later`), and replied *"continue"* to the plan's review
 prompt, which is read as approval of the whole 12-step plan. Execution begins at Step 1 (history scan).
+
+---
+
+## 2026-10-14T19:30:00Z — U8 Code Generation COMPLETE (12 steps); awaiting review
+
+All 12 steps of `construction/plans/u8-code-generation-plan.md` are done. `npm run verify` is green with **1631
+tests**. Record: `construction/u8-team-workflow/code/code-summary.md`. **Nothing outward-facing**: no push, no GitHub
+write, no issue posted, nothing deployed.
+
+**Findings worth keeping**:
+
+- **History scan** (gitleaks 8.30.1, checksum-verified): **154 commits, no credentials**. Two false positives were
+  allow-listed **by exact value** with reasons: the RFC 6455 sample WebSocket key in `post-boot-check.ps1`, and an
+  upstream commit SHA in `audit.md`. A positive control in a scratch folder (a planted generic key and a `ghp_`
+  token) was still caught.
+- **smoke and knip pass in a fresh clone** with no `data/`, `secrets/` or `state/` (probed before adding them to
+  CI).
+- ⚠️ **Probed: a missing single-file bind-mount source becomes a DIRECTORY on the host** (Rancher Desktop, throwaway
+  project `u8probe`). So both secrets files must exist before the first `compose up`; INSTALL S7 checks for it and
+  says how to recover.
+- `npm run auth` skips its prompts when `secrets/spotify-config.json` already holds an id and secret. That makes S4
+  agent-workable.
+- `compose.yaml`'s host port is now `${SPOTIFY_COMPANION_PORT:-3010}` (probed from `.env` and the shell). The guard
+  checks host names, not ports. The live config still resolves to 3010.
+- **Mutation check on the release decision**: removing *strictly greater* fails PBT-68/69. `<=` → `<` fails nothing,
+  and that is correct, not a gap: an equal version is the same string, which *tag exists* already refuses.
+- Two stale script messages fixed: `auth.mjs` "Next: npm start", and `rules-init.mjs` "nothing evaluates rules
+  until U4/U5".
+- `CLAUDE.md` went from 1198 to 146 lines. Every date it held appears in `audit.md`, checked by mention (early
+  audit headings carry no dates). The traps were condensed into `CONTRIBUTING.md`.

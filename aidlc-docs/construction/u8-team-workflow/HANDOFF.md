@@ -2,7 +2,11 @@
 
 **The single entry point for U8.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-14)
+## ▶ Current state (2026-10-14, later)
+
+✅ **Code Generation COMPLETE** — all 12 steps, `npm run verify` green, **1631 tests**. Read [`code/code-summary.md`](code/code-summary.md): files, deviations, and the **owed-to-Build-&-Test list** (release `0.8.0` · click-test the version line · push → `npm run protect -- --apply` → refused-PR positive control · first CI run of `Secret scan` · post the MCP licence issue · walk guide with the token guide · VM work · walk ①). ⚠️ **Nothing pushed or deployed yet.** ⚠️ `CLAUDE.md` is now a ≤ 200-line orientation; the traps moved to `CONTRIBUTING.md`. ▶ **Next: Build & Test** (awaiting approval of Code Generation).
+
+### Earlier (2026-10-14)
 
 ✅ **Infrastructure Design APPROVED 2026-10-14** — [`infrastructure-design/`](infrastructure-design/infrastructure-design.md) (IN-U8-1…7). ▶ **Code Generation plan open** — [`u8-code-generation-plan.md`](../plans/u8-code-generation-plan.md), 12 steps, **1 question** (GPL-3.0-only vs -or-later). Plan Q1–Q7 all **A**. FD amended: walk ① on **`kuhndjwin11pro`**, macOS **untested**, BR-61.10 withdrawn. ⚠️ **Owner work on the VM before the walk** (not code): base B1–B7, the inventory, the `clean` checkpoint with its revert control, then the **canary probe** C0–C3 — order at the end of `infrastructure-design.md`. These can run in parallel with Code Generation; walk ① needs both.
 

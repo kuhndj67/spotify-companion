@@ -1,6 +1,6 @@
 # U8 Build & Test Summary — Team Workflow & Onboarding
 
-**Date**: 2026-10-14 (UTC) · **Status**: 🟡 **local part done; outward-facing part awaiting the owner's go-ahead**
+**Date**: 2026-10-14 (UTC) · **Status**: ✅ **local and outward-facing parts done (owner: "go ahead with 1-3")**. Remaining: the MCP licence issue (owner) and the cold walk (needs the VM work). ⚠️ **§4a: CI could never fail on a test, until today**
 **Deployed**: `spotify-now-playing:0.8.1` (tagged `v0.8.1`, **not pushed**) · rollback `0.8.0`, then `0.1.0`
 `npm run verify` green inside both releases: **1631 tests**, typecheck, smoke, knip. Schema **v7** (unchanged).
 
@@ -23,8 +23,8 @@
 | Criterion | Status |
 |---|---|
 | BR-64.2 one-time history scan | ✅ 154 commits, no credentials (Code Generation, record in `u8-team-workflow/code/`) |
-| BR-63.1 CI runs smoke, knip, secret scan | ⏳ **first CI run needs a push** |
-| BR-63.3/63.5 `main` protected, **seen to refuse** | ⏳ **needs `npm run protect -- --apply` and the refused PR** |
+| BR-63.1 CI runs smoke, knip, secret scan | ✅ first run green: range scan **6 commits**, no leaks; smoke ran. Manual *Secret history scan*: **159 commits**, checksum OK, no leaks |
+| BR-63.3/63.5 `main` protected, **seen to refuse** | ✅ ruleset id `25110056` applied; owner bypass push accepted. PR #1: test job **red** → `BLOCKED` → `gh pr merge` without `--admin` **refused** (*"the base branch policy prohibits the merge"*) → closed, branch deleted. ⚠️ But only after §4a's fix: the first run of the control went **green** |
 | BR-66 versions and releases | ✅ `v0.8.0`, `v0.8.1` made by `npm run release`; repeat refused; version derived everywhere |
 | LC-57 version display | ✅ deployed, looked at, fixed, re-checked |
 | BR-65.3 MCP licence issue | ⏳ draft ready; **the owner posts it** |
@@ -44,7 +44,30 @@ only the last ~50 s. Verified by a read-only query **inside the container**.
   `track_id`, gap of a few seconds, resumed progress > 0) is a **backlog question for the owner**, not a fix made
   here.
 
-## 4. Owed: the outward-facing part, awaiting the owner's go-ahead
+## 4a. ⚠️ Finding: a failing test NEVER failed CI — found by the positive control
+
+The first run of the refused-PR control **went green and MERGEABLE**: the deliberately failing test ran and failed
+(`# fail 4` in the log), and the job passed. Cause: the step `npm run test:coverage 2>&1 | tee test-output.txt` ran
+under GitHub's default `bash -e {0}`, **without `pipefail`**, so it took **`tee`'s** exit code. **That has been
+true since the step was written.** Every green CI run before 2026-10-14 says only that the suite *ran*, not that it
+*passed*. Local `npm run verify` has always been the real gate, which is why nothing reached `main` broken. As far as
+can be told: today's first `pipefail` run found exactly one CI-only failure, and it was new (below).
+
+- **Fix**: `defaults: run: shell: bash` in both workflows (`bash --noprofile --norc -e -o pipefail`, confirmed in
+  the log). `test/rulesetMatchesWorkflow.test.ts` pins it, with a positive control.
+- **The first CI run that could fail, did**: the new docs test failed **only in CI**. It stripped the trailing slash
+  before `git check-ignore`, and `.gitignore`'s `data/` matches only what git knows is a directory; CI's fresh
+  checkout has no `data/`. Fixed (slash kept, probed in a clean clone without `data/`). The whole suite was then run
+  in that clean clone before pushing (all pass except PBT-66, which needs the MCP source that CI fetches itself).
+- **The project's own trap, one layer up**: *"check build exit codes directly — a piped build once read as
+  success"*. It was written about a local `docker compose build | tail`, and the same shape sat in CI.
+- Also fixed on the first live `protect --apply`: its read-back always said **DIFFERS** (GitHub reorders keys and
+  adds defaults). It now compares only the fields the file sets. Positive control: a fourth required check added to
+  the file is reported.
+
+The deployed image is unaffected (workflows, tests and `protect.mjs` are not in it), so `0.8.1` stands.
+
+## 4. The outward-facing part — ✅ done 2026-10-14 (owner: "go ahead with 1-3")
 
 1. `git push origin main --follow-tags` (5 commits, tags `v0.8.0` and `v0.8.1`).
 2. Watch CI: the three jobs green. Then trigger *Secret history scan* once (`gh workflow run secret-history.yml`) and

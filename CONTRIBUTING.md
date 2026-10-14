@@ -92,6 +92,9 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
 - **Pre-registered thresholds are constants, not parameters.** Change them by amending the pre-registration, never
   by editing a script. The hypothesis gate's single confirmatory run is **spent** (2026-09-10); any re-run is
   exploratory.
+- **A check that cannot fail is not a check.** CI's test step piped into `tee` without `pipefail`, so a failing
+  test **never failed CI**, until a PR built to fail went green (2026-10-14). Every workflow now runs
+  `shell: bash` (`-eo pipefail`), pinned by a test. Prove a new gate by watching it refuse something.
 - **`smoke` is a LOAD check.** It proves every script in `scripts/` starts in a safe mode. It does not prove the
   scripts work. A script once sat dead for a week with the suite green (2026-09-29).
 

@@ -8087,3 +8087,26 @@ released as **0.8.1**: a new PATCH, because tags are never overwritten. Finding:
 one listen into three rows (two `unknown`/`app-shutdown`, one `completed` from 187 s). This is existing behaviour;
 the rows are untouched, and stitching is a backlog question for the owner. Walk guide written:
 `build-and-test/e2e-test-instructions.md`. Nothing pushed. The outward-facing part awaits the owner.
+
+---
+
+## 2026-10-14T19:45:00Z — U8 Build & Test, outward-facing part done; ⚠️ CI could never fail on a test
+
+User: *"go ahead with 1-3"* (push + CI, protect, refused-PR positive control). Done:
+- **Push** of `main` and tags `v0.8.0`, `v0.8.1`. First CI run green: range scan 6 commits, no leaks; smoke ran.
+  Manual *Secret history scan*: 159 commits, checksum OK, no leaks.
+- **`npm run protect -- --apply`**: ruleset `25110056` created. Its read-back always said DIFFERS (GitHub reorders
+  keys and adds defaults). Fixed to compare only the file's fields; positive control: an extra required check is
+  reported. The owner bypass push was accepted.
+- ⚠️ **Positive control, first run: the PR with a deliberately failing test went GREEN and MERGEABLE.** The test
+  failed in the log, but `npm run test:coverage 2>&1 | tee test-output.txt` ran under the default `bash -e` without
+  `pipefail` and took `tee`'s exit code. **A failing test has never failed CI since that step was written.** Fixed
+  with `defaults.run.shell: bash` (`-eo pipefail`) in both workflows, pinned by a test. The first run that could
+  fail found a CI-only failure in the new docs test (`git check-ignore data` without the slash, and no `data/` in a
+  fresh checkout). Fixed, the full suite run in a clean clone first, then pushed: green.
+- **Positive control, second run**: test job red → `BLOCKED` → `gh pr merge 1 --merge` (no `--admin`) **refused**
+  (*"the base branch policy prohibits the merge"*). PR #1 closed, branch deleted, `main` unchanged. ⚠️ The owner holds
+  the bypass, so the refusal is gh honouring GitHub's `BLOCKED`; a raw API merge was deliberately NOT attempted (it
+  could have merged the failing test).
+- Deployed `0.8.1` unaffected (none of this is in the image). Remaining: the MCP licence issue (owner), and the
+  VM work → walk ① → `1.0.0-beta.1`.

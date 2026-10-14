@@ -2,7 +2,11 @@
 
 **The single entry point for U8.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-14, later)
+## ▶ Current state (2026-10-14, Build & Test)
+
+✅ **Build & Test: deployed `0.8.1`, pushed, `main` protected and SEEN to refuse** — [`u8-build-and-test-summary.md`](../build-and-test/u8-build-and-test-summary.md). ⚠️ **Read its §4a: CI's test step could never fail (`| tee` without `pipefail`) until 2026-10-14.** ▶ **Remaining for U8's exit**: owner posts the MCP licence issue; owner does the VM work (base, `clean`, canary) per [`e2e-test-instructions.md`](../build-and-test/e2e-test-instructions.md); then **walk ①** from tag `v0.8.1` → on a pass, release `1.0.0-beta.1`.
+
+### Earlier (2026-10-14, Code Generation)
 
 ✅ **Code Generation COMPLETE** — all 12 steps, `npm run verify` green, **1631 tests**. Read [`code/code-summary.md`](code/code-summary.md): files, deviations, and the **owed-to-Build-&-Test list** (release `0.8.0` · click-test the version line · push → `npm run protect -- --apply` → refused-PR positive control · first CI run of `Secret scan` · post the MCP licence issue · walk guide with the token guide · VM work · walk ①). ⚠️ **Nothing pushed or deployed yet.** ⚠️ `CLAUDE.md` is now a ≤ 200-line orientation; the traps moved to `CONTRIBUTING.md`. ▶ **Next: Build & Test** (awaiting approval of Code Generation).
 

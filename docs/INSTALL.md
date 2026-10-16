@@ -10,7 +10,7 @@ document, and worth reporting.
 
 Some steps can only be done by **a person**: an administrator window, a browser sign-in, playing music. Each of those
 is a box that starts with **👤 YOU DO THIS**. If you are installing this yourself, just do every step, boxes
-included.
+included. To have Claude Code do it with you, see [`claude-start.md`](claude-start.md).
 
 **Platforms.**
 

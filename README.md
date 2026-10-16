@@ -26,9 +26,25 @@ Analysis happens outside the app, on its exports.
 Pre-1.0. The running version is in **Settings** (and in `package.json`). Automated skipping ships **off** and stays
 off until you arm it.
 
+## Install
+
+Each install runs on your own machine, with your own Spotify account. Pick one way:
+
+- **From source, with VS Code and Claude Code** (Windows; recommended). You need VS Code with the Claude Code
+  extension, signed in, a Spotify account, and read access to this repository.
+  1. Create an empty folder, and copy [`docs/INSTALL.md`](docs/INSTALL.md) and
+     [`docs/claude-start.md`](docs/claude-start.md) into it, from the release you want to install.
+  2. Open the folder in VS Code and start a Claude Code session.
+  3. Type: *Read claude-start.md and follow it.* Claude does the steps it can, and shows you a **👤 YOU DO THIS** box
+     for each step that needs you.
+- **From source, by hand** (Windows with Rancher Desktop, or Docker Engine on Linux): follow
+  [`docs/INSTALL.md`](docs/INSTALL.md) yourself. It is the same routine.
+
+Other ways to install, such as a prebuilt image or another kind of host, will be listed here as they become
+available.
+
 ## Getting started
 
-- **Install**: [`docs/INSTALL.md`](docs/INSTALL.md): Windows with Rancher Desktop, or Docker Engine on Linux.
 - **Contribute**: [`CONTRIBUTING.md`](CONTRIBUTING.md): how a change gets in, and the traps worth knowing first.
 - **Security**: [`SECURITY.md`](SECURITY.md): report vulnerabilities privately.
 - **Design records**: [`aidlc-docs/`](aidlc-docs/), starting at

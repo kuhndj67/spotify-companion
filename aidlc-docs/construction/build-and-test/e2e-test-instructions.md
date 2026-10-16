@@ -153,32 +153,25 @@ The host is isolated, and a token created anywhere else would have to be retyped
 
 ## 4. The walk *(each walk)*
 
-**Before**: the **latest release tag** is pushed (today `v0.8.1`). That is what the walk clones: `1.0.0-beta.1` is
+**Before**: the **latest release tag** is pushed (today `v0.8.5`). That is what the walk clones: `1.0.0-beta.1` is
 released only **after** a pass, from the walked commit, with nothing changed but the version. You also need the
 token (§3). The live
 deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (UTC).
 
 1. **Revert** the VM to `clean`, then boot it.
 2. In Edge on the VM, **signed in to GitHub** (§3 step 0; the repository is private, so the download needs it):
-   create `C:\walk\` containing **only** `INSTALL.md`, taken **from the tag**
-   (`https://github.com/kuhndj67/spotify-companion/blob/<tag>/docs/INSTALL.md` → *Raw* → save as).
-   Then create the token (§3 steps 1–6) and **sign out of GitHub** (§3 step 7).
-3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and give it this **exactly as written**. There is
-   nothing to fill in: S2 tells the walker to use the newest release tag. (It used to hold a `<TAG>` placeholder,
-   which was pasted unfilled in attempts 2 and 3.)
+   create `C:\walk\` containing **only** `INSTALL.md` and `claude-start.md`, both taken **from the tag**
+   (`https://github.com/kuhndj67/spotify-companion/blob/<tag>/docs/INSTALL.md` and `…/docs/claude-start.md` →
+   *Raw* → save as). Then create the token (§3 steps 1–6) and **sign out of GitHub** (§3 step 7).
+3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and type exactly what a real user types (README →
+   *Install*):
 
-   > Install the app described in `INSTALL.md` by following that file exactly, step by step, from S1 to S10. Use
-   > **only** `INSTALL.md`. Do not read any other file in the downloaded repository to get past a step. If you
-   > have to, do it, and record it as a deviation. Do not change `INSTALL.md`.
-   >
-   > For S2, use the newest release tag. Follow the file's section *"If you are an AI agent following this file"*:
-   > when you reach a **👤 YOU DO THIS** box, show it to me word for word, then wait for me to say it is done.
-   >
-   > As you go, write `C:\walk\walk-record.md`. For **each step**, record: the commands you ran; the output you
-   > observed (trimmed, but keep anything that differs from *Expected*); whether it matched *Expected* **as
-   > written**; and any deviation: anything you had to work out, retry, or do that the step did not say. A step
-   > you got past only by working something out counts as **not** matching. Never write a secret, token or client
-   > secret into the record.
+   > Read claude-start.md and follow it.
+
+   `claude-start.md` is **shipped in the repository** (since 0.8.5), so the walk tests the user's own path. It
+   tells the agent to follow `INSTALL.md`, use the newest tag, show 👤 boxes word for word, and keep
+   **`install-log.md`**, which is this walk's record. *(It replaced a long instruction that lived only in this
+   guide, whose `<TAG>` placeholder was pasted unfilled in attempts 2 and 3.)*
 
 4. The owner does what the session asks and **nothing more**:
    - **S1**: if Windows must restart, restart and open a new session with the same instruction and *"continue from
@@ -206,10 +199,10 @@ walk **the changed steps** again from a revert, with a new tag if the fix ships.
 
 ## 5. Teardown and records *(each walk)*
 
-1. On the VM, copy `C:\walk\walk-record.md` and the session **transcript**
+1. On the VM, copy `C:\walk\install-log.md` (the walk record) and the session **transcript**
    (`%USERPROFILE%\.claude\projects\…\*.jsonl`) into `C:\walk-out\`. Then run **Procedure T** (§6), which brings
    both to `D:\walk-results\<date>\` on this dev PC, **outside the repository**.
-2. Run the secret scan on `walk-record.md`, then commit it as `aidlc-docs/construction/u8-team-workflow/walks/walk-1-agent-<date>.md`, adding at its top: the base
+2. Run the secret scan on `install-log.md`, then commit it as `aidlc-docs/construction/u8-team-workflow/walks/walk-1-agent-<date>.md`, adding at its top: the base
    inventory, the `INSTALL.md` commit walked, the start/end times (UTC), and the push-refused result.
 3. The **transcript** is for **review only**. ⚠️ **Never copy it into the repository**: it holds the walk app's client
    secret. Check it for files read outside `INSTALL.md` (IN-U8-4), then delete `D:\walk-results\<date>\*.jsonl`.

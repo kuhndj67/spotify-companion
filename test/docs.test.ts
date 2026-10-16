@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = ['README.md', 'docs/INSTALL.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
+const DOCS = ['README.md', 'docs/INSTALL.md', 'docs/claude-start.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
 const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
 
 const scripts = new Set(Object.keys((JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts));

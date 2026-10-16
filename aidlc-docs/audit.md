@@ -8404,3 +8404,28 @@ Docs test: a new check flags consecutive command lines inside a 👤 box outside
 control. ✅ It **catches the real `v0.8.3` file** (2 runs) and passes on the new one. The 👤 box minimum is now 8.
 Walk guide: the walker instruction has **nothing to fill in** (it says to use the newest release tag), because
 `<TAG>` was pasted unfilled twice.
+
+---
+
+## 2026-10-16T22:50:00Z — 0.8.5: README "Install" options + shipped `docs/claude-start.md`; the walk now tests the user's path
+
+Owner, before attempt 4: *"I don't see anywhere where we're telling the user what the expected machine configuration
+is (vscode with claude code for this particular script)… 'Install from source code using VSCode and Claude Code:' …
+create a project folder and copy install.md and claude-start.md into it · open project folder in VSCode · For manual
+install follow install.md, for semi-automatic install paste 'claude-start.md' text into claude session … (unless
+there's another way to do this that's more standard for github?)"*. Answer: an **Install** section listing options,
+one document per method, is the usual GitHub layout. Built as proposed, with one refinement: the user types *"Read
+claude-start.md and follow it."* rather than pasting its text.
+
+- **README**: new **Install** section. *From source, with VS Code and Claude Code* (Windows, recommended): what you
+  need (VS Code + the Claude Code extension, signed in; a Spotify account; read access), then copy both files into an
+  empty folder, open it, type the line. *From source, by hand*: INSTALL.md. Future options (prebuilt image, other
+  hosts) are added here.
+- **`docs/claude-start.md`**: a person section (how to use it), then the agent instructions. These are the former
+  walk-guide instruction, made the **shipped** path: follow INSTALL.md S1–S10 and its agent section, only those two
+  files, newest tag unless told, keep **`install-log.md`** (no secrets), report the steps that did not match.
+- **Why it matters for U8's exit**: the walk instruction lived only in the walk guide, so the walk was not testing
+  what a user gets. Its `<TAG>` was pasted unfilled twice. Attempt 4 types the same one line a user types, and
+  `install-log.md` is the walk record.
+- INSTALL.md links to `claude-start.md`. The docs test now covers `claude-start.md`. Walk guide §4/§5 updated
+  (download both files, the one-line prompt, copy back `install-log.md`).

@@ -34,6 +34,6 @@ is an **agent cold walk** of `docs/INSTALL.md` (→ `1.0.0-beta.1`); a person's 
   `[]`). Before Pro they returned 403.
 - ⚠️ CI has **no** `smoke`, `knip` or secret scan yet.
 - ⚠️ The app **refuses to start** without `secrets/musicbrainz.json` — a fresh install creates it by hand (BR-61.5).
-- ⚠️ The MCP server has **no licence** — never publish an image (NFR-32).
+- ⚠️ The MCP server became **MIT** upstream on 2026-10-16 (`6065ce5c`, issue #106), but **our pin `7b5fde63` predates it**. Never publish an image until the pin moves (**W-15**, not part of U8: the move needs probes, including an atomic config write that a single-file bind mount may break).
 - `SECURITY.md` channel: **kuhndj67@hotmail.com** until **W-14** (go public → GitHub reporting).
 - Version is `0.1.0` in four places today; U8 makes `package.json` the only one and starts at **`0.8.0`**.

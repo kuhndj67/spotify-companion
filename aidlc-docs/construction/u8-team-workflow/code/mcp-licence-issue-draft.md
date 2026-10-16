@@ -1,6 +1,6 @@
 # Draft — upstream issue asking `spotify-mcp-server` for a licence (BR-65.3)
 
-✅ **POSTED by the owner 2026-10-16**: <https://github.com/marcelmarais/spotify-mcp-server/issues/106>, *"More a request... could you add a license?"*, open. Until a licence lands, BR-65.2 stands: **no published image**.
+✅ **POSTED by the owner 2026-10-16**: <https://github.com/marcelmarais/spotify-mcp-server/issues/106>. ✅ **RESOLVED the same day**: the maintainer replied *"done"* and added **MIT** at `6065ce5c` (2026-10-16T16:35Z). ⚠️ Our pin `7b5fde63` predates it, so BR-65.2 holds until the pin moves (**W-15**).
 
 **For the owner to post. Claude does not post it**, because it is outward-facing. Target:
 <https://github.com/marcelmarais/spotify-mcp-server/issues/new>. Checked 2026-10-07: the repository has **no licence**

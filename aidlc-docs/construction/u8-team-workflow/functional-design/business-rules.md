@@ -62,7 +62,7 @@ give a document a test.
 | # | Rule | Source |
 |---|---|---|
 | **BR-65.1** | `LICENSE` at the root is the **GPL-3.0** text, unmodified; `package.json` says `GPL-3.0-only` (or `-or-later` — decided in Code Generation, recorded) | Q16 = C |
-| **BR-65.2** | ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence. The README and INSTALL say each user builds their own | NFR-32, Q5 = A |
+| **BR-65.2** | ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence. *(Status 2026-10-16: MIT upstream at `6065ce5c`; our pin predates it, so this holds until **W-15**.)* The README and INSTALL say each user builds their own | NFR-32, Q5 = A |
 | **BR-65.3** | An upstream issue asking for a licence is **drafted** for the owner to post; Claude does not post it (outward-facing) | Q5 = A |
 
 ## BR-66: Versions and releases (NFR-34)

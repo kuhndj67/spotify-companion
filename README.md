@@ -18,7 +18,8 @@ Analysis happens outside the app, on its exports.
   developer app** and account. Nothing is shared between installs.
 - **Not reachable from other machines.** The app answers only on `localhost`.
 - **No published image.** You build your own from this source (see [`docs/INSTALL.md`](docs/INSTALL.md)). The
-  bundled Spotify MCP server has no licence yet, so a built image may not be redistributed.
+  bundled Spotify MCP server became MIT-licensed on 2026-10-16, but this project still builds it from an earlier,
+  unlicensed commit, so for now no built image is published.
 
 ## Status
 

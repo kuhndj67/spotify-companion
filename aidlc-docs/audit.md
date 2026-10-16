@@ -8139,3 +8139,20 @@ gap in §4 step 2 that this exposed). The owner signs out of GitHub before the w
 in an unsaved Notepad window until S2, and clears the clipboard after pasting (the agent could `Get-Clipboard`).
 Amended: `e2e-test-instructions.md` (B7, step 8, step 10, §2 end, §3, §4 step 2, §5, new §6), and IN-U8-2 B7,
 IN-U8-3, IN-U8-7 and the deployment picture. The host OS is used only to manage the VM.
+
+---
+
+## 2026-10-16T17:00:00Z — Upstream MCP server is now MIT; our pin predates it → W-15 logged; the walk is unchanged
+
+User: *"the mcp developer has added a license so we can integrate that into our plans. Let me know if that changes the
+checklist."* Probed with read-only calls: issue #106 is closed (*"done"*), and GitHub reports **MIT** at `LICENSE`,
+added in `6065ce5c` (2026-10-16T16:35Z), now the head of `main`. ⚠️ **Our `compose.yaml` pins `7b5fde63`
+(2026-08-21), 17 commits earlier, with no LICENSE file.**
+
+**The walk checklist does not change.** The walk builds from source at the pin on the walker's own machine, and the
+licence matters only for **publishing** an image, which is not in U8. The pin is **not** moved now: the 17 commits
+include **`b56bb07` "write the config atomically"**, and that is a likely break, because our `spotify-config.json` is a
+**single-file bind mount** and U7 relies on the server's in-place rewrite. They also include "Migrate to MCP v2", and
+text-output changes that affect `parseNowPlaying` (R6) and PBT-66. Logged as backlog **W-15**, with those three probes
+and the separate publish decision. Facts updated: NFR-32 (status note), R8 (resolved upstream; pin pending), W-14's
+precondition, BR-65.2, the U8 HANDOFF, the README line (no longer "no licence"), and the issue draft record.

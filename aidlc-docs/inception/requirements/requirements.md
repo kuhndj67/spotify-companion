@@ -494,7 +494,7 @@ From the Phase 5 requirements round (`requirement-verification-questions.md`, Qu
 | NFR-29 | **Off-machine access uses delegated authentication.** The app never handles passwords. Behind a proxy or load balancer that signs the user in (OIDC) and terminates TLS, the app runs in a **trusted-proxy mode** that requires a **verified, signed identity token** on every request — HTTP **and** the WebSocket upgrade, through **one** policy function (`decideAccess`). Local-only stays the default mode | ⬜ New (Q11a = B) |
 | NFR-30 | `main` is protected: changes arrive by pull request with required CI checks (typecheck, tests, `smoke`, `knip`, the secret scan); the owner may push directly | ⬜ New (Q13 = B) |
 | NFR-31 | `npm run smoke` runs in CI, and the workflow states that there it proves scripts **load**, not that they behave | ⬜ New (Q14 = A) |
-| NFR-32 | The project is licensed **GPL-3.0** (`LICENSE` at the root). ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence | ⬜ New (Q16 = C) |
+| NFR-32 | The project is licensed **GPL-3.0** (`LICENSE` at the root). ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence. *Status 2026-10-16: upstream added **MIT** at `6065ce5c` (issue #106), but `compose.yaml` pins `7b5fde63`, 17 commits earlier and unlicensed. The condition therefore still holds until the pin moves (**W-15**); publishing is then a separate decision* | ⬜ New (Q16 = C) |
 | NFR-33 | A short `README` (what it is, status, where to read more), `docs/INSTALL.md`, `CONTRIBUTING.md` and `SECURITY.md` exist and are **accurate** | ⬜ New (Q15 = A) |
 | NFR-34 | **Application versions follow Semantic Versioning, pre-1.0 = development.** `0.MINOR.PATCH` — MINOR per delivered unit, PATCH per fix release; `1.0.0-beta.N` once someone else installs it; **`1.0.0` when FR-65's install routine has been walked cold**. After 1.0, MAJOR means *an existing user must act by hand* (an existing `rules.json` no longer loads, an older backup cannot be restored, or credential setup changes); the UI's own HTTP API is not a public interface. **One source of truth, `package.json`**: the image tag, the backup manifest's `appVersion` and the MusicBrainz User-Agent derive from it (`appVersion` leaves `musicbrainz.json`); each release gets a git tag `vX.Y.Z`; rollback uses the previous version's image rather than hand-made `uN-rollback` tags; the version is shown in the UI and `/api/diagnostics`. The **schema version stays separate** | ⬜ New (Q18 = A, 2026-10-12) |
 | NFR-35 | **GitHub Issues is the backlog.** Each open W-item and open item migrates to one issue; `requirements.md` §5.1 keeps a **pointer table** (W-id → issue) so old references resolve; new ideas start as issues. A **feature** issue still re-enters AI-DLC before design, and AI-DLC records cite the issue number | ⬜ New (Q21 = A) — U10 |
@@ -1039,6 +1039,29 @@ exists to break.**
 
 ---
 
+#### W-15 — Move the MCP server pin to the MIT-licensed commit
+
+**Raised 2026-10-16** after upstream added an **MIT** licence at `6065ce5c` (issue #106, opened by the owner). ⚠️
+**Logged, not built**, and deliberately **not** part of U8's cold walk, which walks `v0.8.1` at the old pin.
+
+**Why it is not a one-line bump**: `7b5fde63` → `6065ce5c` is **17 commits**, including:
+
+1. ⚠️ **`b56bb07` "write the config atomically"**. `compose.yaml` mounts `spotify-config.json` as a **single-file**
+   bind mount, and the U7 records rely on the server rewriting it **in place** every hour. A temp-then-rename write
+   through a single-file mount fails or **detaches the container's view** (CONTRIBUTING.md, *a single-file bind mount
+   binds an inode*). That would break token refresh, possibly silently. **Probe in the `:3011` verification install
+   first.** The likely fix is a directory mount for the Spotify config, which touches `CredentialsWriter`'s
+   in-place assumption too.
+2. **`d7445af` "Migrate to MCP v2"**: protocol and dependency changes against our `@modelcontextprotocol/sdk` client.
+3. **Output format** (`10e11f0` "show explicit flag and album name", `read.ts` +115/−83). The live path parses the
+   server's **text** (R6), so `parseNowPlaying` may break, and **PBT-66**'s error-template scan must be re-run against
+   the new source.
+
+**Then, separately**: whether to **publish** a built image. NFR-32's blocker is gone once the pin moves, but
+publishing is a distribution decision, and it touches U9 (could the NAS pull rather than build?) and W-14.
+
+---
+
 #### W-14 — Make the repository public, then move vulnerability reports to GitHub
 
 **Raised 2026-10-12** by the user (U8 FD Q10: *"since the plan is to make the repo public we should have a work item
@@ -1050,7 +1073,8 @@ to shift to GitHub reporting once we do"*). ⚠️ **Logged, not built.** U8 shi
 2. A review of what the docs disclose: `audit.md` and the design records quote the owner's **listening history**
    (track and artist names with dates), the NAS's **LAN address** (`192.168.0.223`), and the owner's identity. Decide
    per item: accept, redact going forward, or rewrite history (⚠️ rewriting breaks every clone and commit reference).
-3. NFR-32 still holds: **no built image is published** while the bundled MCP server has no licence.
+3. NFR-32 still holds: **no built image is published** while the bundled MCP server has no licence. *(2026-10-16: MIT
+   upstream since `6065ce5c`; our pin predates it. See **W-15**.)*
 
 **After going public**: enable **GitHub private vulnerability reporting**, point `SECURITY.md` at it, and keep the
 email only as a fallback (or remove it). Branch protection needs no change — public repositories have it free.
@@ -1244,7 +1268,7 @@ metrics that measure it.**
 | R12 | **A rule language over arbitrary fields invites `eval`** | Arbitrary code execution reachable from the rule store, collapsing the §4.1 posture | FR-43 structured predicate tree, FR-44 prohibits code evaluation, FR-45 validates at creation |
 | R6 | Upstream `getNowPlaying` returns **markdown**; a template change breaks parsing silently | Display and data collection both stop | NFR-19; raw text surfaced; parser property-tested |
 | ~~R7~~ | `MCP_SERVER_REF` was **unpinned** in `compose.yaml` | Silent upstream drift | ✅ **CLOSED 2026-08-25** — pinned to `7b5fde6309a52a7874768c63deda7880ee85935b` (2026-08-21) during U1 Infrastructure Design. The CI Docker-build job is now a genuine drift detector |
-| R8 | Upstream MCP server **declares no license** | Blocks open-sourcing later | Accepted for personal use (Q8 = A) |
+| R8 | Upstream MCP server **declares no license** | Blocks open-sourcing later | Accepted for personal use (Q8 = A). ✅ **Resolved upstream 2026-10-16**: **MIT** at `6065ce5c`, after the owner's request (marcelmarais/spotify-mcp-server#106). ⚠️ **Our pin `7b5fde63` predates it**, so the risk is discharged only when the pin moves (**W-15**) |
 | R9 | Development Mode restrictions are **permanent** — Extended Quota needs 250k MAU | No route to richer data | Accepted; external sources fill gaps |
 | R10 | `node:sqlite` is **experimental** in Node 22.17 | API may change | NFR-10 repository interface makes the engine swappable |
 

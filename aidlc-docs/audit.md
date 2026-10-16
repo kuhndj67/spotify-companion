@@ -8305,3 +8305,33 @@ Credential Manager's Token option. Measured: **Rancher Desktop takes about a min
 For the post-walk INSTALL fixes: S1 should say *"about a minute on first start; do not run the checks before its
 status bar shows it is running"*. S3: the owner registers the walk app as **`spotify-companion-installtest`** (any name
 works; a distinct one keeps it apart from the live app and easy to delete).
+
+---
+
+## 2026-10-16T21:00:00Z — Walk ① attempt 2 COMPLETE (v0.8.2): installs end to end, but does NOT pass as written
+
+Owner: *"we got through the whole install process with no additional hiccups and the app is running and connected to
+the spotify and musicbrainz."* Token check refused (*write access not granted*). Walk record, JSONL transcript and chat
+export pulled with Procedure T into `D:\walk-results\2026-10-16\`. The record is committed (gitleaks clean) as
+`construction/u8-team-workflow/walks/walk-1-agent-2026-10-16.md`. The transcripts are **not** committed (they hold the
+walk app's values).
+
+**Verdict (BR-62.3): does not pass.** Steps not as written: **S1** (WSL as admin; winget msstore prompt) · **S2** (the
+walk instruction's `<tag>` placeholder was never filled in, a guide gap; the example tag `v1.0.0-beta.1` does not
+exist; a private repo needs a person to sign in from an interactive terminal) · **S4** (⚠️ **code bug**: on Windows
+`scripts/auth.mjs` opens the browser via `cmd /c start` and the unquoted `&` cuts the authorize URL, so Spotify says
+*"response_type must be code"*; worked around by pasting the printed URL) · **S8** (*"note the time, then let a track
+finish"* fails when a track is already playing). Passed as written: S3, S5, S6, S7, S10 (API).
+
+**Transcript review**: Read/Glob/Grep touched only `INSTALL.md` (plus the agent's own task output); every shell command
+is an INSTALL step. **No phrase from the repo `CLAUDE.md` appears** in either transcript. ⚠️ The agent never used Read
+inside the clone, so the on-demand trigger was barely exercised, and C2′ remains the evidence for the exclusion.
+
+**npm audit** (reported by the build): 6 runtime vulnerabilities (1 critical `proxy-addr`, 2 high: the MCP SDK's OAuth
+client and `fast-uri`, 3 moderate), all with non-breaking fixes. Checked: neither the critical nor the MCP-SDK path is
+reachable here (no `trust proxy`, no `req.ip`; MCP over stdio with no OAuth). Fixed in 0.8.3 regardless.
+
+**Next: 0.8.3** = the agreed 👤 YOU DO THIS / agent-preamble rewrite of INSTALL.md (S1 entirely a person; S2 sign-in,
+S3, S4, S8 as 👤 blocks) + winget flags + real WSL text + Rancher's ~1 min first start + S2 tag guidance + S4 bug fix
+and *If it differs* entry + S8 wording + the harmless-message notes + the network dependency on the MCP repo +
+`npm audit fix`. The walk guide fills in the tag. Then walk ① attempt 3 from `clean`, S1–S10.

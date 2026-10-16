@@ -8204,3 +8204,24 @@ the wrong `Set-VM` was answering. Steps 9–12 in `e2e-test-instructions.md` now
 `Hyper-V\Get-VM`, `Hyper-V\Get-VMProcessor`, `Hyper-V\Checkpoint-VM` and `Hyper-V\Restore-VMCheckpoint`, and step 9
 gains a read-back (`AutomaticCheckpointsEnabled` must print `False`). Same family as *probe, don't reason*: a "not
 found" that names the wrong cause.
+
+---
+
+## 2026-10-16T18:30:00Z — Canary probe (IN-U8-4 / BR-62.6): subfolder CLAUDE.md DOES load; `claudeMdExcludes` stops it
+
+Owner on `kuhndjwin11pro`, VS Code extension. **C1** (session opened in `C:\walk\canary`): canary seen, so the
+method can detect loading. **C2** (session in `C:\walk`, asked to read `canary\README.md`): it saw `hello` **and loaded
+`canary\CLAUDE.md`**. A cold walk session would therefore pick up the clone's `CLAUDE.md` as soon as it reads any file
+in the clone. C3 was not run, because C2 decided it. `/memory` turned out to be useless here: in the extension it
+shows auto-memory settings (on; no memories), not loaded files. It was removed from the guide.
+
+Looked up in the **current** docs (code.claude.com/docs/en/memory), not from memory: subdirectory CLAUDE.md files load
+*"once Claude reads, writes, or edits another file in that subdirectory"*, and **`claudeMdExcludes`** takes globs
+*"matched against absolute file paths"* at any settings layer. Applied in **user** settings:
+`{"claudeMdExcludes": ["**/CLAUDE.md","**/CLAUDE.local.md","**/AGENTS.md","**/.claude/rules/**"]}`, written without a
+BOM. ⚠️ Whether a `**/` glob matches **Windows** paths was unknown, so it was probed: **C1′** showed no canary while
+the file was still present; **C2′** quoted `hello` (the subfolder really was read) and showed no canary. **Works at
+launch and on demand.** The setting goes into `clean` as walk harness (not routine), and the "delete CLAUDE.md after
+S2" fallback is dropped. ⚠️ It blocks auto-loading only, not a deliberate read; the walk instruction and the
+transcript review cover that. The repo tracks only the root `CLAUDE.md` (no rules, no AGENTS.md). Next (owner): write
+`canary.txt`, Procedure T, revert, recreate `settings.json`, re-take `clean`, revert check.

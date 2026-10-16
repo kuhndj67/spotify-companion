@@ -132,6 +132,18 @@ probe does not need.
 | C2 | Fresh session **in `C:\walk`**. Ask it to read `canary\README.md`, then ask the same question. Run `/memory` | records whether the canary appears |
 | C3 | Same session: ask it to **run a command inside** `canary\` (e.g. `Get-ChildItem`), as the walk will (`npm run auth`, `docker compose` from inside the clone). Ask again. Run `/memory` | records whether the canary appears |
 
+✅ **PROBE RESULT 2026-10-16 (owner, on `kuhndjwin11pro`)**: **C1 yes** (positive control: the method detects loading) · **C2 yes**: reading
+`canary\README.md` loaded `canary\CLAUDE.md` on demand, as the docs say (*"loads … once Claude reads, writes, or
+edits another file in that subdirectory"*) · C3 not run (C2 decided it). **Fix, probed**: user settings
+`%USERPROFILE%\.claude\settings.json` =
+`{ "claudeMdExcludes": ["**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/rules/**"] }`
+(written with `[IO.File]::WriteAllText`, UTF-8 **without** BOM). With it: **C1′** (session inside `canary`) shows
+**no** canary, while the file is still present (`Get-Content` printed it) · **C2′** quotes `hello` (it did read the
+subfolder) and shows **no** canary. So the Unix-style `**/` glob matches Windows paths, at launch and on demand.
+The setting is **part of `clean`** as **walk harness**, not routine, and every walk record says so. ⚠️ It stops
+automatic **loading** only. An agent that deliberately opens `CLAUDE.md` can still read it, which the walk
+instruction forbids and the §5 transcript review checks.
+
 - **Canary absent in C2 and C3**: nothing is needed. The walk record cites this probe.
 - **Canary present**: look in the **current** Claude Code documentation for a setting that excludes it, apply it
   in **user** settings, and **re-run C1–C3**. C1 must still show the canary with the setting removed, and C2/C3

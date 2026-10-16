@@ -96,6 +96,18 @@ On the VM, freshly reverted to `clean`:
 settings (*"Auto-memory: on · No memories saved for this project yet"*) and does not list loaded `CLAUDE.md` files,
 as the CLI's does. The canary question is the test. **C1 passed 2026-10-16**: the method detects loading.
 
+✅ **RESULT 2026-10-16**: **C1 yes** (positive control: the method detects loading) · **C2 yes**: reading
+`canary\README.md` loaded `canary\CLAUDE.md` on demand, as the docs say (*"loads … once Claude reads, writes, or
+edits another file in that subdirectory"*) · C3 not run (C2 decided it). **Fix, probed**: user settings
+`%USERPROFILE%\.claude\settings.json` =
+`{ "claudeMdExcludes": ["**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/rules/**"] }`
+(written with `[IO.File]::WriteAllText`, UTF-8 **without** BOM). With it: **C1′** (session inside `canary`) shows
+**no** canary, while the file is still present (`Get-Content` printed it) · **C2′** quotes `hello` (it did read the
+subfolder) and shows **no** canary. So the Unix-style `**/` glob matches Windows paths, at launch and on demand.
+The setting is **part of `clean`** as **walk harness**, not routine, and every walk record says so. ⚠️ It stops
+automatic **loading** only. An agent that deliberately opens `CLAUDE.md` can still read it, which the walk
+instruction forbids and the §5 transcript review checks.
+
 - **No canary in C2 or C3**: nothing more is needed. The walk record cites this result.
 - **Canary appears**: look in the **current** Claude Code documentation for a setting that excludes `CLAUDE.md`
   files. Apply it in **user** settings and re-run C1–C3 (C1 without the setting, C2/C3 with it). If it holds, re-take
@@ -172,7 +184,9 @@ deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (U
    - **S3**: register a **new** Spotify app, `spotify-companion-walk` (IN-U8-5). ⚠️ Never reuse the live app.
    - **S4**: approve in the browser.
    - **S8**: play music on the account.
-   - If the canary probe said so (§2): delete `C:\walk\spotify-companion\CLAUDE.md` right after S2.
+   - ~~If the canary probe said so (§2): delete `CLAUDE.md` right after S2.~~ **Not needed**: `claudeMdExcludes` is
+     in the base (§2 result). Confirm it is still there before the session starts:
+     `Get-Content $env:USERPROFILE\.claude\settings.json`.
 5. **Token positive control**, done by the owner after S10, in a terminal inside the clone:
    `git push origin HEAD:refs/heads/u8-push-probe` must be **refused** (`403` / *Permission denied*). ⚠️ If it
    succeeds, the token was not read-only: delete the `u8-push-probe` branch on GitHub and the token **at once**, and

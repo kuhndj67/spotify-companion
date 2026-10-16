@@ -8265,3 +8265,14 @@ Windows change prompt. New *Expected* (after the restart, `wsl --status` prints 
 texts are **shapes, not quotes**, because the real ones were not captured; attempt 2 confirms them. Walk guide §4 now
 says: **if a walk stops early, pull the record (§5 step 1 + Procedure T) BEFORE reverting.** Release **0.8.2** carries
 the fix, and attempt 2 restarts from S1 at `v0.8.2`.
+
+---
+
+## 2026-10-16T20:00:00Z — Walk ① attempt 2 (v0.8.2): S1 part 1 passes; real `wsl --status` text captured
+
+Owner (after one false start: the first download was still the `v0.8.1` INSTALL.md. GitHub was checked and
+`v0.8.2`/`main` do contain the fix): the administrator `wsl --install --no-distribution` **succeeded**, and after the
+restart `wsl --status` printed **"Default Version: 2"** and **"WSL1 is not supported with your current machine
+configuration"**. That matches S1's Expected (settings, not *not installed*). The WSL1 line is harmless: Rancher Desktop
+uses WSL 2. To fold in **after** the walk (not mid-walk, because the walker follows the `v0.8.2` copy): quote these
+lines in S1's Expected, and say the WSL1 line is normal.

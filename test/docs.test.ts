@@ -150,10 +150,40 @@ function personBoxesMissingParts(install: string): string[] {
   return problems;
 }
 
+/**
+ * Inside a 👤 box (a blockquote), consecutive lines that are each just a `command` are joined by Markdown into ONE
+ * paragraph, so every rendered view shows one unrunnable line. Attempt 3 of the U8 cold walk hit exactly this with
+ * the three `winget` lines. Several commands in a box must sit in a fenced block.
+ */
+function unfencedCommandRuns(install: string): string[] {
+  const lines = install.split(/\r?\n/);
+  const found: string[] = [];
+  let inFence = false;
+  const isCmd = (l: string) => /^\s*>\s+`[^`]+`\s*$/.test(l);
+  for (let i = 0; i < lines.length; i += 1) {
+    const l = lines[i] ?? '';
+    if (/^\s*>?\s*```/.test(l)) inFence = !inFence;
+    if (!inFence && isCmd(l) && isCmd(lines[i + 1] ?? '')) found.push(`line ${i + 1}: ${l.trim().slice(0, 50)}`);
+  }
+  return found;
+}
+
+describe('no 👤 box holds consecutive commands outside a code block', () => {
+  it('docs/INSTALL.md', () => {
+    assert.deepEqual(unfencedCommandRuns(read('docs/INSTALL.md')), []);
+  });
+  it('positive control: the attempt-3 shape is reported, the fenced shape is not', () => {
+    const bad = '> 4. install:\n>    `winget install a`\n>    `winget install b`\n';
+    const good = '> 4. install:\n>\n>    ```powershell\n>    winget install a\n>    winget install b\n>    ```\n';
+    assert.equal(unfencedCommandRuns(bad).length, 1);
+    assert.deepEqual(unfencedCommandRuns(good), []);
+  });
+});
+
 describe('every 👤 box in INSTALL says what to see and what to report', () => {
   it('docs/INSTALL.md', () => {
     const install = read('docs/INSTALL.md');
-    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 6, 'expected the S1–S8 person boxes');
+    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 8, 'expected the S1–S8 person boxes');
     assert.deepEqual(personBoxesMissingParts(install), []);
   });
   it('positive control: a box without its hand-back line is reported', () => {

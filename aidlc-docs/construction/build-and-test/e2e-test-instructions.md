@@ -163,14 +163,15 @@ deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (U
    create `C:\walk\` containing **only** `INSTALL.md`, taken **from the tag**
    (`https://github.com/kuhndj67/spotify-companion/blob/<tag>/docs/INSTALL.md` → *Raw* → save as).
    Then create the token (§3 steps 1–6) and **sign out of GitHub** (§3 step 7).
-3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and give it this. ⚠️ **First replace `<TAG>` with
-   the real tag**, e.g. `v0.8.3`. Attempt 2 pasted the placeholder as written, and the walker had to ask for it:
+3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and give it this **exactly as written**. There is
+   nothing to fill in: S2 tells the walker to use the newest release tag. (It used to hold a `<TAG>` placeholder,
+   which was pasted unfilled in attempts 2 and 3.)
 
    > Install the app described in `INSTALL.md` by following that file exactly, step by step, from S1 to S10. Use
    > **only** `INSTALL.md`. Do not read any other file in the downloaded repository to get past a step. If you
    > have to, do it, and record it as a deviation. Do not change `INSTALL.md`.
    >
-   > The release tag for S2 is `<TAG>`. Follow the file's section *"If you are an AI agent following this file"*:
+   > For S2, use the newest release tag. Follow the file's section *"If you are an AI agent following this file"*:
    > when you reach a **👤 YOU DO THIS** box, show it to me word for word, then wait for me to say it is done.
    >
    > As you go, write `C:\walk\walk-record.md`. For **each step**, record: the commands you ran; the output you

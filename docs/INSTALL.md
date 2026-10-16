@@ -31,9 +31,17 @@ is the same on both.
 3. When the person says it is done, run the step's own checks, under **Commands**, and compare what you see with
    **Expected**.
 4. Prompts that wait for typed input (*Do you agree…?*, *Username for…*) cannot be answered from your terminal. Every
-   command here that could ask one has flags to avoid it, or sits in a 👤 box.
+   command here that could ask one has flags to avoid it, or sits in a 👤 box. Before any `git` command, set
+   `$env:GIT_TERMINAL_PROMPT='0'; $env:GCM_INTERACTIVE='never'` (Linux: `export GIT_TERMINAL_PROMPT=0`), so a sign-in
+   prompt fails at once with a message this file lists, instead of hanging.
 5. Restarting Windows ends your session. The 👤 box says where to continue. The person starts a new session and tells
    you.
+6. Where a step says *open a new PowerShell window* so newly installed tools are found, you cannot. Instead, run this
+   at the start of each command (your shell keeps no state between commands):
+
+   ```powershell
+   $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+   ```
 
 ---
 
@@ -51,10 +59,13 @@ is the same on both.
 > 2. When it finishes, **restart Windows**.
 > 3. After the restart, in an **ordinary** PowerShell window, run `wsl --status`.
 > 4. In an ordinary PowerShell window, install whichever of these you do not have yet. Click **Yes** if Windows asks
->    to allow changes:
->    `winget install --id SUSE.RancherDesktop -e --source winget --accept-source-agreements --accept-package-agreements`
->    `winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-source-agreements --accept-package-agreements`
->    `winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements`
+>    to allow changes. Run them **one at a time**:
+>
+>    ```powershell
+>    winget install --id SUSE.RancherDesktop -e --source winget --accept-source-agreements --accept-package-agreements
+>    winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-source-agreements --accept-package-agreements
+>    winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
+>    ```
 > 5. Start **Rancher Desktop** from the Start menu. In its first-run dialog (or later under **Preferences**): set
 >    **Container Engine** to **dockerd (moby)**, and turn **Kubernetes off**.
 > 6. Wait until Rancher Desktop's status bar shows it is running. On first start this takes **about a minute**.
@@ -68,7 +79,8 @@ is the same on both.
 <https://docs.docker.com/engine/install/> for your distribution, and Node.js 22 or newer and git with your package
 manager. Then run the checks below, without `wsl --status`.
 
-**Commands** (the checks; an agent runs these itself, in a **new** PowerShell window so the new tools are on the PATH)
+**Commands** (the checks; an agent runs these itself). Use a **new** PowerShell window, so the new tools are on the
+PATH. An agent refreshes its PATH instead, as in rule 6 of the agent section.
 
 ```powershell
 wsl --status
@@ -93,12 +105,13 @@ git --version
 - `wsl --status` still says *not installed* after the restart: repeat the 👤 box from 1, restart, and re-check.
 - `winget` stops at *"Do you agree to all the source agreements terms?"* and does not accept typed input: the command
   was run without `--accept-source-agreements --accept-package-agreements`. Use the commands exactly as in the box.
-- `docker version` shows `Client:` but then an error such as *cannot connect to the Docker daemon* or *the system
-  cannot find the file specified*: Rancher Desktop is not running yet (wait for its first start), or the engine is
-  not dockerd. Check **Preferences → Container Engine = dockerd (moby)**, wait for it to finish starting, and run
+- `docker version` shows `Client:` but then an error such as *cannot connect to the Docker daemon*, *the system
+  cannot find the file specified*, or *failed to connect to the backend: timed out dialing Hyper-V socket*: Rancher
+  Desktop is not running yet (its first start takes about a minute), or the engine is not dockerd. Wait a minute and
+  run `docker version` again. Check **Preferences → Container Engine = dockerd (moby)**, wait for it to finish starting, and run
   `docker version` again.
 - `docker`, `node` or `git` is *not recognized*: open a **new** PowerShell window. A window opened before the install
-  does not see the new PATH.
+  does not see the new PATH. An agent refreshes its PATH instead, as in rule 6 of the agent section.
 - `node --version` prints `v20` or lower: install a newer Node.js (the `winget` line above), then re-check.
 
 ---
@@ -225,21 +238,24 @@ only (the file is gitignored).
    > **You should see:** the file still has its four lines, with your two values in place of the placeholders.
    > **When done, tell the agent:** "S4 values in".
 
-3. Start the sign-in. It opens a browser and **waits** until the person approves:
+3. Start the sign-in. It opens a browser and **waits** until the person approves. An agent shows this box **first**,
+   then runs the command:
 
-   ```powershell
-   npm run auth
-   ```
-
-   > 👤 **YOU DO THIS** — S4 approval · needs: the browser that just opened, and the same Spotify account as S3
+   > 👤 **YOU DO THIS** — S4 approval · needs: the browser that `npm run auth` opens, and the same Spotify account as S3
    >
-   > 1. On Spotify's page, sign in if asked, check it names your app, and click **Agree**.
+   > 1. When the browser opens on Spotify's page, sign in if asked, check it names your app, and click **Agree**.
    > 2. If the page shows an error instead of *Agree* (for example *"response_type must be code"*), or no page opened,
    >    copy the long `https://accounts.spotify.com/authorize?...` line the terminal printed into the browser's
    >    address bar, and approve there.
    >
    > **You should see:** a page saying **Authorised** and *You can close this tab and return to the terminal.*
-   > **When done, tell the agent:** "S4 approved".
+   > **When done, tell the agent:** "S4 approved", and whether the page said **Authorised**.
+
+   ```powershell
+   npm run auth
+   ```
+
+   `npm run auth` needs no `npm install` first: it uses only Node.js itself.
 
 **Expected** (in the terminal, after approving):
 
@@ -295,9 +311,22 @@ operator. **The app refuses to start without this file**, so it is created befor
    > **You should see:** `"contact"` holds your address, not `you@example.com`.
    > **When done, tell the agent:** "S5 contact in".
 
-**Expected**: `secrets/musicbrainz.json` exists, and its `"contact"` is no longer `you@example.com`.
+3. Check it, without printing the value:
 
-**If it differs**: if the copy fails with *cannot find path*, you are not in the `spotify-companion` folder (S2).
+   ```powershell
+   # Windows
+   (Get-Content secrets\musicbrainz.json -Raw | ConvertFrom-Json).contact -notin @('', 'you@example.com')
+   ```
+
+   ```bash
+   # Linux
+   grep -q '"contact": "you@example.com"' secrets/musicbrainz.json && echo False || echo True
+   ```
+
+**Expected**: the check prints `True`: `secrets/musicbrainz.json` exists, and its `"contact"` is set and no longer
+`you@example.com`.
+
+**If it differs**: it prints `False`, so do the *S5 contact* box again. If the copy fails with *cannot find path*, you are not in the `spotify-companion` folder (S2).
 
 ---
 
@@ -322,11 +351,17 @@ mkdir -p data
 id -u
 ```
 
+Check both folders exist:
+
+```powershell
+Test-Path data, state
+```
+
 **Expected**
 
 - `npm run rules:init` prints `Created config/rules.json from the example.` and says the file contains no rules
   and nothing will be skipped.
-- The folder `data` exists. (`state` already exists: it comes with the code.)
+- `Test-Path data, state` prints `True` twice. (`state` already exists: it comes with the code.)
 - *Linux*: `id -u` prints `1000`.
 
 **If it differs**
@@ -429,8 +464,21 @@ records a play. *No errors* is not evidence. (Port `3010`, or the port you chose
    ```
 
 4. A play is recorded. A play is recorded when a track **ends**, so the track that is playing **now** cannot prove
-   anything new: it may have started before this check. Note the current time (UTC), then **skip to the next track**
-   and let **that** one play to its end (or skip once more). Then:
+   anything new: it may have started before this check. Note the current time (UTC) first:
+
+   ```powershell
+   (Get-Date).ToUniversalTime().ToString('u')
+   ```
+
+   > 👤 **YOU DO THIS** — S8 next track · needs: the Spotify player you are listening on
+   >
+   > 1. **Skip to the next track.**
+   > 2. Let **that** track play **to its end**, then let the one after it start.
+   >
+   > **You should see:** the player moves on to another track by itself.
+   > **When done, tell the agent:** "S8 next track finished", and its title.
+
+   Then:
 
    ```powershell
    curl.exe -s http://localhost:3010/api/history/recent

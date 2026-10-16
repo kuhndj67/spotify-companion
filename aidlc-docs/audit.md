@@ -8385,3 +8385,22 @@ agent cannot follow *"open a new PowerShell window"* and rebuilt PATH from the r
 after `npm run auth` starts (the person had already approved); S8's "skip and let it finish" is a person action
 without a box; S5/S6 have no check commands. The walk guide's `<TAG>` was pasted unfilled a second time, so the guide
 should not need filling in at all. Proposed 0.8.4 + attempt 4; the owner decides (see chat).
+
+---
+
+## 2026-10-16T22:30:00Z — Owner chose "Fix as 0.8.4, walk again"; 0.8.4 built
+
+Owner's answer (question prompt): **"Fix as 0.8.4, walk again (Recommended)"**. This keeps BR-62.3 as approved.
+INSTALL.md changes:
+- S1 box: the winget commands are now in a fenced block, run one at a time.
+- Agent section rule 4: set `GIT_TERMINAL_PROMPT=0` / `GCM_INTERACTIVE=never` before git. New rule 6: a PATH refresh
+  from the registry, in place of "open a new PowerShell window".
+- S1 *If it differs*: adds the Hyper-V socket text and says to wait a minute.
+- S4: the approval box now comes **before** `npm run auth`, and the doc notes that no `npm install` is needed.
+- S5 and S6: check commands (read-only; S5 never prints the value).
+- S8 step 4: now a 👤 *S8 next track* box (eight boxes in all).
+
+Docs test: a new check flags consecutive command lines inside a 👤 box outside a code block, with a positive
+control. ✅ It **catches the real `v0.8.3` file** (2 runs) and passes on the new one. The 👤 box minimum is now 8.
+Walk guide: the walker instruction has **nothing to fill in** (it says to use the newest release tag), because
+`<TAG>` was pasted unfilled twice.

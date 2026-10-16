@@ -8225,3 +8225,22 @@ launch and on demand.** The setting goes into `clean` as walk harness (not routi
 S2" fallback is dropped. ⚠️ It blocks auto-loading only, not a deliberate read; the walk instruction and the
 transcript review cover that. The repo tracks only the root `CLAUDE.md` (no rules, no AGENTS.md). Next (owner): write
 `canary.txt`, Procedure T, revert, recreate `settings.json`, re-take `clean`, revert check.
+
+---
+
+## 2026-10-16T19:00:00Z — Walk VM base COMPLETE: `clean` re-taken with claudeMdExcludes; Procedure T works; revert verified
+
+Owner: *"1-7 now completed successfully"*. In order:
+1. **Procedure T practice run**: `base-inventory.txt` pulled from a read-only share on the VM to
+   `D:\walk-results\2026-10-16\` on the dev PC, verified intact here (17:30:08Z run; pause until 2026-10-25T17:12:47Z;
+   **8 vCPUs**). The transfer route works *before* a walk depends on it.
+2. Reverted, then recreated `%USERPROFILE%\.claude\settings.json` with `claudeMdExcludes`, and appended an UPDATE line
+   to `base-inventory.txt`. That line records that `settings.json` is now True on purpose (walk harness). `C:\walk`
+   confirmed absent.
+3. **`clean` deleted and re-taken** with the VM off (Hyper-V Manager).
+4. **Revert check against the new `clean`**: marker file gone, `settings.json` present. ✅
+
+The new `base-inventory.txt` (with the UPDATE line) is in `clean` and returns with the first walk's Procedure T. It was
+not copied separately. The walk guide's §2 no longer asks for `canary.txt`, since results were relayed in chat.
+**§1 and §2 are done.** Next: walk ① from `v0.8.1`. ⚠️ It must happen **before 2026-10-25**, or the pause must be
+extended first.

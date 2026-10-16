@@ -114,9 +114,10 @@ instruction forbids and the §5 transcript review checks.
   `clean` with the setting in place (§1 steps 11–12). If nothing holds, §4 deletes `CLAUDE.md` from the clone right
   after S2.
 
-Write C1–C3's results (yes/no, plus what the session said) into
-`C:\walk-out\canary.txt` on the VM. Then run **Procedure T** (§6), and only **after** the files are on this dev PC,
-**revert to `clean`**.
+Relay C1–C3's results (yes or no, plus what the session said) to the session that keeps the records, which writes
+them into `audit.md`. A file on the VM is not needed. Then **revert to `clean`**. *(Amended 2026-10-16: this used
+to say write `C:\walk-out\canary.txt` and run Procedure T. Relaying in chat proved simpler, and the results are in
+`audit.md`.)*
 
 ---
 

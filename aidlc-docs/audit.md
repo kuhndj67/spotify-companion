@@ -8299,3 +8299,9 @@ follows the `v0.8.2` copy):
 3. **S1 entirely 👤** (WSL as admin, the winget installs, Rancher first-run). The agent only runs S1's checks.
 4. The winget agreement flags, and the real `wsl --status` text.
 5. Still fully followable by a person alone. A docs-test check that every 👤 block has the fixed parts.
+
+*Walk ① attempt 2, continued (2026-10-16)*: **S2 passed**. The owner entered the fine-grained read-only token at Git
+Credential Manager's Token option. Measured: **Rancher Desktop takes about a minute to come fully up on first start.**
+For the post-walk INSTALL fixes: S1 should say *"about a minute on first start; do not run the checks before its
+status bar shows it is running"*. S3: the owner registers the walk app as **`spotify-companion-installtest`** (any name
+works; a distinct one keeps it apart from the live app and easy to delete).

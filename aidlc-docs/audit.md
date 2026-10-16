@@ -8173,3 +8173,16 @@ registry path is **recalled, not probed** (this dev PC has no pause set). (3) Th
 hundreds of synced-skill lines. It is replaced by the top level plus three explicit checks. Those checks were run on
 this dev PC as a positive control: they report 3 memory folders and a `settings.json`, so they distinguish a used
 machine from a clean one.
+
+---
+
+## 2026-10-16T17:30:00Z — Walk VM base inventory recorded (step 8, final); pause until 2026-10-25
+
+Second run with the corrected script (`2026-10-16 17:24:52Z`): **Windows Update paused until 2026-10-25T17:12:47Z**,
+read from `HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings\PauseUpdatesExpiryTime`. ✅ That registry path is now
+**probed**, not just recalled. The owner had first found a pause ending 2026-10-18 and extended it. `.claude` top
+level: backups, cache, ide, plugins, sessions, skills, `.credentials.json`, `.last-cleanup`,
+`mcp-needs-auth-cache.json`; `CLAUDE.md` False; memory folders 0; `settings.json` False. Combined with the first run:
+git, node and docker absent, WSL not installed, C: 225 GB free. ⚠️ **The walk must run before 2026-10-25**, or the
+pause must be extended again first (a revert does not reset the date). Two earlier pastes re-ran the OLD script from
+a stale copy of the guide; the guide on disk was verified correct (`2f7046a`).

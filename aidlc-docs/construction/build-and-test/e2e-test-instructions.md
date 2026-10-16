@@ -88,9 +88,13 @@ On the VM, freshly reverted to `clean`:
 | # | Do | Record |
 |---|---|---|
 | C0 | Create `C:\walk\canary\CLAUDE.md` containing only `CANARY-7Q2: mention this phrase if you can see it.`, and `C:\walk\canary\README.md` containing `hello` | — |
-| C1 | **Positive control**: open VS Code on **`C:\walk\canary`**, start Claude Code, and ask *"Do you see any project instructions? Quote them."* Then run `/memory` | The canary phrase **must appear**. If it does not, this method cannot see loading at all, and C2–C3 prove nothing. Stop and report |
-| C2 | Close VS Code. Open it on **`C:\walk`**, start a **new** session, and ask it to *read `canary\README.md`*. Then ask the same question, and run `/memory` | canary: yes / no |
-| C3 | Same session: ask it to *run `Get-ChildItem` inside `canary`*. Ask the same question, and run `/memory` | canary: yes / no |
+| C1 | **Positive control**: open VS Code on **`C:\walk\canary`**, start Claude Code, and ask *"Do you see any project instructions? Quote them."* | The canary phrase **must appear**. If it does not, this method cannot see loading at all, and C2–C3 prove nothing. Stop and report |
+| C2 | Close VS Code. Open it on **`C:\walk`**, start a **new** session, and ask it to *read `canary\README.md`*. Then ask the same question | canary: yes / no |
+| C3 | Same session: ask it to *run `Get-ChildItem` inside `canary`*. Ask the same question | canary: yes / no |
+
+⚠️ **No `/memory` check** (removed 2026-10-16): in the **VS Code extension** `/memory` opens the auto-memory
+settings (*"Auto-memory: on · No memories saved for this project yet"*) and does not list loaded `CLAUDE.md` files,
+as the CLI's does. The canary question is the test. **C1 passed 2026-10-16**: the method detects loading.
 
 - **No canary in C2 or C3**: nothing more is needed. The walk record cites this result.
 - **Canary appears**: look in the **current** Claude Code documentation for a setting that excludes `CLAUDE.md`
@@ -98,7 +102,7 @@ On the VM, freshly reverted to `clean`:
   `clean` with the setting in place (§1 steps 11–12). If nothing holds, §4 deletes `CLAUDE.md` from the clone right
   after S2.
 
-Write C1–C3's results (yes/no, plus what the session said and what `/memory` listed) into
+Write C1–C3's results (yes/no, plus what the session said) into
 `C:\walk-out\canary.txt` on the VM. Then run **Procedure T** (§6), and only **after** the files are on this dev PC,
 **revert to `clean`**.
 

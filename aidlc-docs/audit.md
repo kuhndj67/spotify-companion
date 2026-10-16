@@ -8276,3 +8276,26 @@ restart `wsl --status` printed **"Default Version: 2"** and **"WSL1 is not suppo
 configuration"**. That matches S1's Expected (settings, not *not installed*). The WSL1 line is harmless: Rancher Desktop
 uses WSL 2. To fold in **after** the walk (not mid-walk, because the walker follows the `v0.8.2` copy): quote these
 lines in S1's Expected, and say the WSL1 line is normal.
+
+---
+
+## 2026-10-16T20:20:00Z — Walk ① attempt 2: S1 winget stalled on an msstore agreement prompt; owner asks for explicit person-step handoffs
+
+**Finding (S1, fails as written)**: `winget install --id SUSE.RancherDesktop -e` stopped at *"the 'msstore' source
+requires that you view the following agreements … Do you agree to all the source agreements terms?"*. That prompt
+cannot be answered from the walker's non-interactive terminal (typed `y`/`yes` never reached it). Re-run with
+`--source winget --accept-source-agreements --accept-package-agreements`, after which all three installs succeeded.
+The walk **continues** to harvest gaps in S2–S10 in the same attempt; S1 is re-walked after the fixes.
+
+**Owner request**: *"when I run the script in claude it doesn't give clean instructions for S1 … some prompting we can
+include in the file that gives claude a clean prompt for s1 (which needs to be completely implemented by users). and
+then at future steps that require the user it again provide clear instructions. (and of course the document itself
+should allow users to do it all themselves if they want)."* Agreed design, applied **after** this walk (the walker
+follows the `v0.8.2` copy):
+1. A fixed **👤 YOU DO THIS** block for every person-only step (S1, S2 private-repo credential, S3, S4, S8): what,
+   where (admin PowerShell / browser), exact commands, *You should see*, *When done, tell the agent*.
+2. A top section **"If you are an AI agent following this file"**: present 👤 blocks verbatim, stop, wait for
+   "done", then run the step's own check; never attempt a 👤 step itself.
+3. **S1 entirely 👤** (WSL as admin, the winget installs, Rancher first-run). The agent only runs S1's checks.
+4. The winget agreement flags, and the real `wsl --status` text.
+5. Still fully followable by a person alone. A docs-test check that every 👤 block has the fixed parts.

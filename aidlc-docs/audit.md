@@ -8192,3 +8192,15 @@ script, at **`17:30:08Z`**, with the same results (pause until 2026-10-25T17:12:
 `CLAUDE.md` False, 0 memory folders, `settings.json` False; 225 GB free). The 17:24:52Z run had been saved to another
 file. Before the checkpoint, the owner clears `C:\temp`, so no copy of the guide or script ends up in `clean`, and
 appends the vCPU count.
+
+---
+
+## 2026-10-16T17:50:00Z — Hyper-V host has VMware PowerCLI: walk guide host commands now `Hyper-V\`-qualified
+
+At §1 step 9 the owner reported `-AutomaticCheckpointsEnabled` "not found". A `Format-List` attempt then failed on
+a mangled paste, and a bare `Get-VM` answered *"You are not currently connected to any servers"*. That is
+**VMware PowerCLI**: its `Get-VM`/`Set-VM` take precedence over Hyper-V's by name. The parameter was never missing;
+the wrong `Set-VM` was answering. Steps 9–12 in `e2e-test-instructions.md` now use `Hyper-V\Set-VM`,
+`Hyper-V\Get-VM`, `Hyper-V\Get-VMProcessor`, `Hyper-V\Checkpoint-VM` and `Hyper-V\Restore-VMCheckpoint`, and step 9
+gains a read-back (`AutomaticCheckpointsEnabled` must print `False`). Same family as *probe, don't reason*: a "not
+found" that names the wrong cause.

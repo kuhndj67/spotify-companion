@@ -64,15 +64,19 @@ X 6. ~~**B7**: confirm Enhanced Session works~~. **Replaced 2026-10-16**: the ho
    `False`, there are `0` memory folders, and `settings.json` is `False`. The *paused until* line shows a date. If it
    says NOT FOUND, edit the file and write the B4 date in by hand.
 
-On the **Hyper-V host**:
+On the **Hyper-V host** (PowerShell as Administrator). ⚠️ **Every command is written `Hyper-V\…`**: the host also
+has **VMware PowerCLI**, whose `Get-VM`/`Set-VM` win over Hyper-V's by name. A bare `Get-VM` answers *"You are not
+currently connected to any servers"*, and a bare `Set-VM` says `-AutomaticCheckpointsEnabled` is not found (found
+2026-10-16):
 
-9. **B6**: `Set-VM -Name kuhndjwin11pro -AutomaticCheckpointsEnabled $false`
-10. `Get-VMProcessor kuhndjwin11pro | Select-Object Count`. Note the vCPU count down by hand, and add it to
+9. **B6**: `Hyper-V\Set-VM -Name kuhndjwin11pro -AutomaticCheckpointsEnabled $false`, then check it with
+   `(Hyper-V\Get-VM kuhndjwin11pro).AutomaticCheckpointsEnabled`, which must print `False`
+10. `(Hyper-V\Get-VMProcessor kuhndjwin11pro).Count`. Note the vCPU count down by hand, and add it to
     `base-inventory.txt` on the VM before step 11.
-11. **Shut the VM down**, then: `Checkpoint-VM -Name kuhndjwin11pro -SnapshotName clean`
+11. **Shut the VM down**, then: `Hyper-V\Checkpoint-VM -Name kuhndjwin11pro -SnapshotName clean`
 12. **Positive control** (a revert never seen to revert anything is only a belief):
     - boot the VM, create `C:\canary-revert.txt`, and shut it down;
-    - `Restore-VMCheckpoint -VMName kuhndjwin11pro -Name clean -Confirm:$false`
+    - `Hyper-V\Restore-VMCheckpoint -VMName kuhndjwin11pro -Name clean -Confirm:$false`
     - boot the VM: `Test-Path C:\canary-revert.txt` must print **False**.
 
 ---

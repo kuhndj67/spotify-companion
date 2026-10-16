@@ -193,6 +193,10 @@ deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (U
    succeeds, the token was not read-only: delete the `u8-push-probe` branch on GitHub and the token **at once**, and
    record it.
 
+⚠️ **If the walk stops early, at any step, for any reason: do §5 step 1 (walk record and transcript into
+`C:\walk-out\`, then Procedure T) BEFORE reverting.** A revert destroys the only record of what failed. Learned
+2026-10-16: the first attempt stopped at S1 and was reverted first, so the exact command and error were lost.
+
 **The verdict** (BR-62.3): the walk **passes** only if **every** step matched *as written*. Any step that needed
 outside knowledge **fails**, even if the agent recovered. Fix `docs/INSTALL.md` on the owner's PC, commit it, and
 walk **the changed steps** again from a revert, with a new tag if the fix ships.

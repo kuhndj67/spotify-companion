@@ -29,7 +29,24 @@ is the same on both.
 
 **Commands**
 
-*Windows* (PowerShell). Install whichever of these you do not have yet:
+*Windows*, part 1: **WSL** (Windows Subsystem for Linux), which Rancher Desktop runs on. ⚠️ Installing it needs
+**administrator rights**, so **a person does this part**. A terminal started by an AI agent is not elevated and
+cannot elevate itself. Skip to part 2 if `wsl --status` already prints settings rather than *not installed*.
+
+1. Open **PowerShell as administrator**: Start menu → type `PowerShell` → right-click **Windows PowerShell** →
+   **Run as administrator** → **Yes**.
+2. In that window run:
+
+   ```powershell
+   wsl --install --no-distribution
+   ```
+
+3. When it finishes, **restart Windows**. *(An agent session ends with the restart. Start a new one and continue
+   from part 2.)*
+4. After the restart, in an ordinary PowerShell window, check: `wsl --status`
+
+*Windows*, part 2 (an ordinary PowerShell window). Install whichever of these you do not have yet. Each `winget
+install` may show a Windows prompt asking to allow changes: a person clicks **Yes**.
 
 ```powershell
 winget install --id SUSE.RancherDesktop -e
@@ -58,19 +75,25 @@ package manager. Then run the same three checks (`docker version`, `node --versi
 
 **Expected**
 
+- *Windows*: after the restart, `wsl --status` prints WSL's settings (for example a default version). It does **not**
+  say *Windows Subsystem for Linux is not installed*.
 - `docker version` prints a **`Client:`** section **and a `Server:`** section, with no error.
 - `node --version` prints `v22` or higher (for example `v22.12.0` or `v24.11.0`).
 - `git --version` prints `git version 2.` followed by more digits.
 
 **If it differs**
 
+- `wsl --install` refuses with a message about **elevation**, **administrator** or *access denied*: the PowerShell
+  window is not running as administrator. Close it, open one with **Run as administrator** (part 1, step 1), and
+  run it again.
+- `wsl --status` still says *not installed* after the restart: run part 1 again, restart, and re-check.
 - `docker version` shows `Client:` but then an error such as *cannot connect to the Docker daemon* or *the system
   cannot find the file specified*: the engine is not running, or the engine choice is not dockerd. Open Rancher
   Desktop, wait for it to finish starting, check **Preferences → Container Engine = dockerd (moby)**, and run
   `docker version` again.
-- The Rancher Desktop installer says Windows must restart (it may need to install WSL): restart, start Rancher
-  Desktop again, then repeat this step's checks. *(An agent session ends with the restart. Start a new one and
-  continue from these checks.)*
+- Rancher Desktop says WSL is missing, or that Windows must restart: part 1 was skipped or did not finish. Do part 1
+  (a person, as administrator), restart, start Rancher Desktop again, then repeat this step's checks. *(An agent
+  session ends with the restart. Start a new one and continue from these checks.)*
 - `docker`, `node` or `git` is *not recognized*: open a **new** PowerShell window. A window opened before the install
   does not see the new PATH.
 - `node --version` prints `v20` or lower: install a newer Node.js (the LTS installer above), then re-check.

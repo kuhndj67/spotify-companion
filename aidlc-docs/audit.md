@@ -8244,3 +8244,24 @@ The new `base-inventory.txt` (with the UPDATE line) is in `clean` and returns wi
 not copied separately. The walk guide's §2 no longer asks for `canary.txt`, since results were relayed in chat.
 **§1 and §2 are done.** Next: walk ① from `v0.8.1`. ⚠️ It must happen **before 2026-10-25**, or the pause must be
 extended first.
+
+---
+
+## 2026-10-16T19:30:00Z — Walk ① attempt 1 FAILED at S1: WSL needs an administrator PowerShell; record lost to the revert
+
+Owner: *"you stopped it at S1 because installing Rancher desktop requires WSL and that can only be installed from an
+elevated powershell prompt."* ⚠️ **Reported, not observed**: the owner reverted to `clean` before the walk record and
+transcript were pulled off the VM, so the exact command the agent ran and the exact error are **lost**. Under BR-62.3
+this is a **failed S1**: the step as written could not be completed. That is a genuine finding (a real Windows user
+hits the same wall), so the fix goes **into `INSTALL.md`**, not into a separate pre-walk script. The owner had
+offered *"a new set of instructions that includes a manual wsl install prior to running install.md"*; that was
+declined because it would make the walk pass while real users still fail.
+
+**Fix (`docs/INSTALL.md` S1)**: *Windows* part 1 is now WSL, done **by a person** in **PowerShell as administrator**:
+`wsl --install --no-distribution`, then restart, then `wsl --status`. It states that an agent's terminal is not
+elevated and cannot elevate itself. Part 2 is the `winget` installs, with a note that a person clicks Yes on the
+Windows change prompt. New *Expected* (after the restart, `wsl --status` prints settings, not *not installed*) and
+*If it differs* (elevation/access-denied → the window was not admin; still not installed → repeat part 1). ⚠️ Message
+texts are **shapes, not quotes**, because the real ones were not captured; attempt 2 confirms them. Walk guide §4 now
+says: **if a walk stops early, pull the record (§5 step 1 + Procedure T) BEFORE reverting.** Release **0.8.2** carries
+the fix, and attempt 2 restarts from S1 at `v0.8.2`.

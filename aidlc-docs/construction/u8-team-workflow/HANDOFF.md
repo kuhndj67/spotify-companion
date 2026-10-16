@@ -4,7 +4,7 @@
 
 ## ▶ Current state (2026-10-14, Build & Test)
 
-✅ **Build & Test: deployed `0.8.1`, pushed, `main` protected and SEEN to refuse** — [`u8-build-and-test-summary.md`](../build-and-test/u8-build-and-test-summary.md). ⚠️ **Read its §4a: CI's test step could never fail (`| tee` without `pipefail`) until 2026-10-14.** ▶ **Remaining for U8's exit**: owner posts the MCP licence issue; owner does the VM work (base, `clean`, canary) per [`e2e-test-instructions.md`](../build-and-test/e2e-test-instructions.md); then **walk ①** from tag `v0.8.1` → on a pass, release `1.0.0-beta.1`.
+✅ **Build & Test: deployed `0.8.1`, pushed, `main` protected and SEEN to refuse** — [`u8-build-and-test-summary.md`](../build-and-test/u8-build-and-test-summary.md). ⚠️ **Read its §4a: CI's test step could never fail (`| tee` without `pipefail`) until 2026-10-14.** ✅ MCP licence issue posted ([#106](https://github.com/marcelmarais/spotify-mcp-server/issues/106), 2026-10-16). ▶ **Remaining for U8's exit**: owner does the VM work (in progress 2026-10-16) (base, `clean`, canary) per [`e2e-test-instructions.md`](../build-and-test/e2e-test-instructions.md); then **walk ①** from tag `v0.8.1` → on a pass, release `1.0.0-beta.1`.
 
 ### Earlier (2026-10-14, Code Generation)
 

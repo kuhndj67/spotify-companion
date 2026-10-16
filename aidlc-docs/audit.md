@@ -8110,3 +8110,12 @@ User: *"go ahead with 1-3"* (push + CI, protect, refused-PR positive control). D
   could have merged the failing test).
 - Deployed `0.8.1` unaffected (none of this is in the image). Remaining: the MCP licence issue (owner), and the
   VM work → walk ① → `1.0.0-beta.1`.
+
+---
+
+## 2026-10-16T16:10:00Z — MCP licence request posted upstream (BR-65.3); VM work begun
+
+User: *"Posted request (https://github.com/marcelmarais/spotify-mcp-server/issues/106). Now working on the VM."*
+Confirmed read-only: issue #106 *"More a request... could you add a license?"*, opened by kuhndj67 at
+2026-10-16T16:03:52Z, open. NFR-32 / BR-65.2 is unchanged until a licence lands: no published image. The owner is now
+doing `e2e-test-instructions.md` §1 (base and `clean` checkpoint) and §2 (canary probe).

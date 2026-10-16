@@ -27,7 +27,7 @@
 | BR-63.3/63.5 `main` protected, **seen to refuse** | ✅ ruleset id `25110056` applied; owner bypass push accepted. PR #1: test job **red** → `BLOCKED` → `gh pr merge` without `--admin` **refused** (*"the base branch policy prohibits the merge"*) → closed, branch deleted. ⚠️ But only after §4a's fix: the first run of the control went **green** |
 | BR-66 versions and releases | ✅ `v0.8.0`, `v0.8.1` made by `npm run release`; repeat refused; version derived everywhere |
 | LC-57 version display | ✅ deployed, looked at, fixed, re-checked |
-| BR-65.3 MCP licence issue | ⏳ draft ready; **the owner posts it** |
+| BR-65.3 MCP licence issue | ✅ posted by the owner 2026-10-16: [marcelmarais/spotify-mcp-server#106](https://github.com/marcelmarais/spotify-mcp-server/issues/106), open |
 | FR-65 / BR-62 the cold walk → `1.0.0-beta.1` | ⏳ guide written: [`e2e-test-instructions.md`](e2e-test-instructions.md). Needs the VM work (§1–§2 there) and the pushed tag |
 
 ## 3. Finding: a deploy splits the play in progress

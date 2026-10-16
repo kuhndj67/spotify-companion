@@ -130,6 +130,38 @@ describe('CLAUDE.md is short (P-63 ④, BR-67.3)', () => {
   });
 });
 
+/**
+ * 👤 boxes (added after the U8 cold walk, 2026-10-16): a step only a person can do is a blockquote starting
+ * `👤 **YOU DO THIS**`, and an agent shows it word for word. So every box must say what the person should see and what
+ * to tell the agent, or the hand-back is improvised, which is what the walk found.
+ */
+function personBoxesMissingParts(install: string): string[] {
+  const lines = install.split(/\r?\n/);
+  const problems: string[] = [];
+  lines.forEach((line, i) => {
+    if (!line.includes('👤 **YOU DO THIS**')) return;
+    const box: string[] = [];
+    for (let j = i; j < lines.length && /^\s*>/.test(lines[j] ?? ''); j += 1) box.push(lines[j] ?? '');
+    const text = box.join('\n');
+    const title = (line.split('—')[1] ?? line).trim().slice(0, 40);
+    if (!text.includes('**You should see:**')) problems.push(`${title}: no "You should see"`);
+    if (!text.includes('**When done, tell the agent:**')) problems.push(`${title}: no "When done, tell the agent"`);
+  });
+  return problems;
+}
+
+describe('every 👤 box in INSTALL says what to see and what to report', () => {
+  it('docs/INSTALL.md', () => {
+    const install = read('docs/INSTALL.md');
+    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 6, 'expected the S1–S8 person boxes');
+    assert.deepEqual(personBoxesMissingParts(install), []);
+  });
+  it('positive control: a box without its hand-back line is reported', () => {
+    const doc = '> 👤 **YOU DO THIS** — S9 x · needs: y\n> 1. do it\n> **You should see:** z\n\ntext';
+    assert.deepEqual(personBoxesMissingParts(doc), ['S9 x · needs: y: no "When done, tell the agent"']);
+  });
+});
+
 describe('every INSTALL step has its four parts (P-63 ⑤, BR-61.1)', () => {
   it('docs/INSTALL.md', () => {
     const install = read('docs/INSTALL.md');

@@ -20,6 +20,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { browserCommand } from './lib/browserCommand.mjs';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const secretsDir = join(projectRoot, 'secrets');
@@ -53,13 +54,10 @@ const SCOPES = [
 ].join(' ');
 
 function openBrowser(url) {
-  const commands = {
-    win32: ['cmd', ['/c', 'start', '""', url]],
-    darwin: ['open', [url]],
-  };
-  const [command, args] = commands[process.platform] ?? ['xdg-open', [url]];
+  // ⚠️ See scripts/lib/browserCommand.mjs: on Windows an unquoted `&` cut the authorize URL short (U8 cold walk).
+  const { command, args, options } = browserCommand(process.platform, url);
   try {
-    spawn(command, args, { detached: true, stdio: 'ignore' }).unref();
+    spawn(command, args, { ...options, detached: true, stdio: 'ignore' }).unref();
   } catch {
     // Falls through to the printed URL below.
   }

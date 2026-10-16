@@ -8335,3 +8335,28 @@ reachable here (no `trust proxy`, no `req.ip`; MCP over stdio with no OAuth). Fi
 S3, S4, S8 as 👤 blocks) + winget flags + real WSL text + Rancher's ~1 min first start + S2 tag guidance + S4 bug fix
 and *If it differs* entry + S8 wording + the harmless-message notes + the network dependency on the MCP repo +
 `npm audit fix`. The walk guide fills in the tag. Then walk ① attempt 3 from `clean`, S1–S10.
+
+---
+
+## 2026-10-16T21:45:00Z — 0.8.3: INSTALL.md rewritten with 👤 boxes; auth.mjs Windows URL bug fixed; npm audit clean
+
+Owner: *"completed cleanup... continue to next build and hopefully we get a clean walkthrough."*
+
+- **`scripts/auth.mjs` bug, reproduced before fixing**: `cmd /c echo <url>` printed only `…?client_id=abc` and tried
+  to run `response_type=code` as a command. That is exactly what Spotify received. The fix is
+  `scripts/lib/browserCommand.mjs` (pure): on win32, `cmd /c start "" "<url>"` with `windowsVerbatimArguments`.
+  `test/browserCommand.test.ts` checks the shape on every OS, plus a **Windows-only behaviour test** through real
+  `cmd` (echo in place of start) whose **positive control** (the old unquoted form) is still cut at the first `&`.
+- **`npm audit fix`**: 6 → **0** vulnerabilities, lockfile only.
+- **`docs/INSTALL.md`** rewritten to the agreed design: an *"If you are an AI agent following this file"* section
+  (show 👤 boxes word for word, stop, wait; never attempt one; run the step's checks after), and **seven 👤 YOU DO THIS
+  boxes** (S1 all-person on Windows; S2 private-repo sign-in; S3; S4 values; S4 approval, with the pasted-URL fallback;
+  S5 contact; S8 music). Folded in from the walk: the winget agreement flags, the real `wsl --status` text (the WSL1
+  line is normal), Rancher's ~1 min first start, S2 tag discovery (the hard-coded nonexistent example is gone; `^{}`
+  lines ignored; *"is not a commit!"* is normal), S4's error entry, S8 *"skip to the next track and let that one
+  finish"*, S6 creating only `data` (`state` ships with the code), S7's network dependency on the MCP repo and its
+  normal build noise, S3's Development Mode genres message.
+- **`test/docs.test.ts`**: every 👤 box must contain *You should see* and *When done, tell the agent* (≥ 6 boxes),
+  with a positive control.
+- **Walk guide**: the walker instruction says to replace `<TAG>` first, and points at the agent section. The S2
+  owner line points at the 👤 box.

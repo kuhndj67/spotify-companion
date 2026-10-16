@@ -163,14 +163,15 @@ deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (U
    create `C:\walk\` containing **only** `INSTALL.md`, taken **from the tag**
    (`https://github.com/kuhndj67/spotify-companion/blob/<tag>/docs/INSTALL.md` → *Raw* → save as).
    Then create the token (§3 steps 1–6) and **sign out of GitHub** (§3 step 7).
-3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and give it this, verbatim:
+3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and give it this. ⚠️ **First replace `<TAG>` with
+   the real tag**, e.g. `v0.8.3`. Attempt 2 pasted the placeholder as written, and the walker had to ask for it:
 
    > Install the app described in `INSTALL.md` by following that file exactly, step by step, from S1 to S10. Use
    > **only** `INSTALL.md`. Do not read any other file in the downloaded repository to get past a step. If you
    > have to, do it, and record it as a deviation. Do not change `INSTALL.md`.
    >
-   > The release tag for S2 is `<tag>`. Some steps need a person in a browser or at a prompt: when you reach one,
-   > stop and tell me exactly what to do, then wait.
+   > The release tag for S2 is `<TAG>`. Follow the file's section *"If you are an AI agent following this file"*:
+   > when you reach a **👤 YOU DO THIS** box, show it to me word for word, then wait for me to say it is done.
    >
    > As you go, write `C:\walk\walk-record.md`. For **each step**, record: the commands you ran; the output you
    > observed (trimmed, but keep anything that differs from *Expected*); whether it matched *Expected* **as
@@ -181,7 +182,8 @@ deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (U
 4. The owner does what the session asks and **nothing more**:
    - **S1**: if Windows must restart, restart and open a new session with the same instruction and *"continue from
      S1's checks"*.
-   - **S2**: the token, at Git Credential Manager's **Token** option (§3 step 8).
+   - **S2**: the *S2 sign-in* 👤 box. Run its command in **your own** PowerShell window, and at Git Credential
+     Manager choose **Token** and paste the token (§3 step 8).
    - **S3**: register a **new** Spotify app, `spotify-companion-walk` (IN-U8-5). ⚠️ Never reuse the live app.
    - **S4**: approve in the browser.
    - **S8**: play music on the account.

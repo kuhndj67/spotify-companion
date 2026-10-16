@@ -8186,3 +8186,9 @@ level: backups, cache, ide, plugins, sessions, skills, `.credentials.json`, `.la
 git, node and docker absent, WSL not installed, C: 225 GB free. ⚠️ **The walk must run before 2026-10-25**, or the
 pause must be extended again first (a revert does not reset the date). Two earlier pastes re-ran the OLD script from
 a stale copy of the guide; the guide on disk was verified correct (`2f7046a`).
+
+*Addendum 2026-10-16T17:35Z*: the file actually in `C:\walk-out\base-inventory.txt` is a third run of the corrected
+script, at **`17:30:08Z`**, with the same results (pause until 2026-10-25T17:12:47Z; no git, node, docker or WSL;
+`CLAUDE.md` False, 0 memory folders, `settings.json` False; 225 GB free). The 17:24:52Z run had been saved to another
+file. Before the checkpoint, the owner clears `C:\temp`, so no copy of the guide or script ends up in `clean`, and
+appends the vCPU count.

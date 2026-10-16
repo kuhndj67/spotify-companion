@@ -50,7 +50,7 @@ the steps the walk tests.
 | B4 | ➕ **Windows Update paused** (the longest pause offered), taken **after** B1 | ⚠️ **the outage shape**: WSL updates installed during standby took Rancher down here twice (2026-09-30, 2026-10-13). An update in the middle of a walk would look like an `INSTALL.md` failure. ⚠️ The pause ends on a **calendar date**, and reverting the checkpoint does not reset that date. Once it lapses, take the base again |
 | B5 | ➕ **Edge first-run finished, no account signed in** | the owner does the browser steps (Spotify dashboard, OAuth consent). A first-run wizard in the middle of S3 is noise. No sign-in, so no synced passwords or extensions |
 | B6 | ➕ **Hyper-V automatic checkpoints OFF** (host: `Set-VM -Name kuhndjwin11pro -AutomaticCheckpointsEnabled $false`) | client Hyper-V takes one at every VM start by default. They pile up beside `clean`, and a revert can then land on the wrong one |
-| B7 | Enhanced Session (clipboard) **on** | how the token goes into Git's prompt and how the walk record comes back (IN-U8-7). ⚠️ **No shared folder or mapped drive to this PC**: that would give the walk machine a path to `data/` |
+| B7 | ~~Enhanced Session (clipboard) **on**~~ ⚠️ **Amended 2026-10-16 (owner)**: the Hyper-V host is on a corporate VPN, **completely isolated** from the VM (separate NIC on the owner's local network). **Nothing relies on the host OS**: it only manages the VM. Results go to `C:\walk-out\` on the VM and are **pulled by the dev PC** from a temporary read-only SMB share **on the VM** (*Procedure T*, `e2e-test-instructions.md` §6), which the next revert deletes. The token is made in the VM's Edge (IN-U8-3) | ⚠️ **Still no shared folder or mapped drive from the VM to the dev PC**: that would give the walk machine a path to `data/`. The share points the other way, and is read-only |
 
 ### 2b. Not in the base, on purpose
 
@@ -92,8 +92,11 @@ then, the session asks to sign in again. That is an expected cost, not a walk de
 
 ## IN-U8-3 · Repository access: a fine-grained, read-only, 7-day token *(Q3 = A, plus a guide)*
 
-The owner creates the token on **this PC** before the walk. The guide below goes **verbatim into U8's walk guide**
-(the Build & Test instructions, which are the "test guide"):
+~~The owner creates the token on **this PC** before the walk.~~ ⚠️ **Amended 2026-10-16**: the owner creates it **in the VM's
+Edge**, signed in to github.com only for that (and for downloading `INSTALL.md` from the private repo), then **signs
+out before the walk session starts**. The token waits in an unsaved Notepad window until S2, and the clipboard is
+cleared after pasting it. The guide below went into U8's walk guide (`e2e-test-instructions.md` §3) with those
+changes:
 
 1. GitHub → profile picture → **Settings** → **Developer settings** → **Personal access tokens** →
    **Fine-grained tokens** → **Generate new token**.
@@ -166,8 +169,8 @@ credentials.
 
 | Artefact | Comes back? | Where |
 |---|---|---|
-| `walk-record.md`, written by the walk session (BR-62.5: base inventory, `INSTALL.md` commit, each step's observed vs expected output, every deviation, the push-refused check) | ✅ copied by the owner (Enhanced Session clipboard) | committed under `construction/u8-team-workflow/walks/walk-1-agent-<date>.md`. ⚠️ **gitleaks runs on it before the commit**. It is the one file in U8 that travels from a machine holding credentials |
-| The Claude Code **session transcript** (`%USERPROFILE%\.claude\projects\…\*.jsonl` on the VM) | ✅ copied for **review only** | ⚠️ **Never committed**: it contains the throwaway app's client secret from S3. Used to check IN-U8-4's *files read outside `INSTALL.md`*, then deleted after review |
+| `walk-record.md`, written by the walk session (BR-62.5: base inventory, `INSTALL.md` commit, each step's observed vs expected output, every deviation, the push-refused check) | ✅ pulled by the dev PC with **Procedure T** into `D:\walk-results\` (amended 2026-10-16; was the clipboard) | committed under `construction/u8-team-workflow/walks/walk-1-agent-<date>.md`. ⚠️ **gitleaks runs on it before the commit**. It is the one file in U8 that travels from a machine holding credentials |
+| The Claude Code **session transcript** (`%USERPROFILE%\.claude\projects\…\*.jsonl` on the VM) | ✅ pulled by Procedure T into `D:\walk-results\` (outside the repo), for **review only** | ⚠️ **Never committed**: it contains the throwaway app's client secret from S3. Used to check IN-U8-4's *files read outside `INSTALL.md`*, then deleted after review |
 | The walk install's database, config and secrets | ❌ | destroyed by the revert |
 
 The walker's token is read-only, so **it cannot push**. That is deliberate, and IN-U8-3 checks it.

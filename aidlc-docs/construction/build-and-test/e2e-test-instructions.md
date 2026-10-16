@@ -9,29 +9,49 @@ person) uses the same guide from §4 on.
 The order: **§1 base and checkpoint → §2 canary probe → §3 token → §4 the walk → §5 teardown.** §1 and §2 are done
 once. §3–§5 are repeated for every walk and every re-walk.
 
+⚠️ **Nothing passes through the Hyper-V host OS** (amended 2026-10-16). The host sits on a corporate VPN, isolated
+from the VM, which has its own NIC on the owner's local network. The host is used **only to manage the VM**
+(checkpoint, revert, settings). There is no clipboard and no Enhanced Session between them:
+
+- **Results** (inventory, canary results, walk record, transcript) are written to **`C:\walk-out\`** on the VM.
+  Before every revert, **this dev PC pulls them** over the local network with **Procedure T** (§6).
+- **The GitHub token** is created **in the VM's Edge** (§3), and never travels between machines.
+
 ---
 
 ## 1. Base configuration and the `clean` checkpoint *(once; IN-U8-2)*
 
 On the **VM**:
 
-1. **B1**: run Windows Update until nothing is left to install, restarting when asked.
-2. **B2**: VS Code and the Claude Code extension are already installed. ✅
-3. **B3**: open VS Code, open Claude Code, and **sign in**. Close VS Code afterwards.
-4. **B4**: Settings → Windows Update → **Pause updates** for the longest period offered. ⚠️ Write the date the pause
-   ends in the walk record: after that date, take the base again.
-5. **B5**: open **Edge** once, finish its first-run screens, and **do not sign in**. Close it.
-6. **B7**: confirm **Enhanced Session** works (clipboard copy and paste between the host and the VM). **Do not add a
-   shared folder or map a drive** to the PC that runs the live app.
+✅ 1. **B1**: run Windows Update until nothing is left to install, restarting when asked.
+✅ 2. **B2**: VS Code and the Claude Code extension are already installed. 
+✅ 3. **B3**: open VS Code, open Claude Code, and **sign in**. Close VS Code afterwards.
+✅ 4. **B4**: Settings → Windows Update → **Pause updates** for the longest period offered. ⚠️ Write the date the pause ends in the walk record: after that date, take the base again.
+✅ 5. **B5**: open **Edge** once, finish its first-run screens, and **do not sign in**. Close it.
+X 6. ~~**B7**: confirm Enhanced Session works~~. **Replaced 2026-10-16**: the host is isolated (corporate VPN), so
+   nothing relies on it. Results leave the VM by **Procedure T** (§6): **this dev PC pulls** from a temporary
+   read-only share **on the VM**, created just before a revert and deleted by it. ⚠️ **Never the other direction**:
+   no share or mapped drive on the VM points at this dev PC, which runs the live app and holds `data/`.
 7. Delete the `coreinfo64` download from the 2026-10-13 probe.
-8. **Inventory** (PowerShell on the VM). Paste the whole output into `audit.md` and the first lines of every walk
-   record:
+8. **Inventory** (PowerShell on the VM). It is saved to `C:\walk-out\base-inventory.txt`, which becomes **part of
+   `clean`**. It holds no credentials and nothing about the project, so it is harmless there, and every later walk
+   finds it in place. It reaches this dev PC with the first Procedure T (end of §2), and goes into `audit.md` and
+   the top of every walk record:
 
    ```powershell
-   git --version; node --version; docker version; wsl --status
-   Get-ChildItem $env:USERPROFILE\.claude -Recurse -Force | Select-Object FullName
-   Get-PSDrive C | Select-Object Used,Free
+   New-Item -ItemType Directory -Force C:\walk-out | Out-Null
+   & {
+     "Recorded: $((Get-Date).ToUniversalTime().ToString('u'))"
+     "Windows Update paused until: <the date from B4>"
+     git --version; node --version; docker version; wsl --status
+     Get-ChildItem $env:USERPROFILE\.claude -Recurse -Force | Select-Object -ExpandProperty FullName
+     Get-PSDrive C | Select-Object Used,Free | Format-List | Out-String
+   } *>&1 | Out-File -Encoding utf8 C:\walk-out\base-inventory.txt
+   Get-Content C:\walk-out\base-inventory.txt
    ```
+
+   (Replace `<the date from B4>` before running. The `*>&1` keeps the *not recognized* errors in the file, and those
+   errors are the result.)
 
    Expected: `node` and `docker` are *not recognized*, and WSL is not installed. `git` may or may not be present (if it
    is, it stays). `.claude` holds no `CLAUDE.md` and no `projects\*\memory`.
@@ -39,7 +59,8 @@ On the **VM**:
 On the **Hyper-V host**:
 
 9. **B6**: `Set-VM -Name kuhndjwin11pro -AutomaticCheckpointsEnabled $false`
-10. `Get-VMProcessor kuhndjwin11pro | Select-Object Count` (record the vCPU count).
+10. `Get-VMProcessor kuhndjwin11pro | Select-Object Count`. Note the vCPU count down by hand, and add it to
+    `base-inventory.txt` on the VM before step 11.
 11. **Shut the VM down**, then: `Checkpoint-VM -Name kuhndjwin11pro -SnapshotName clean`
 12. **Positive control** (a revert never seen to revert anything is only a belief):
     - boot the VM, create `C:\canary-revert.txt`, and shut it down;
@@ -65,27 +86,39 @@ On the VM, freshly reverted to `clean`:
   `clean` with the setting in place (§1 steps 11–12). If nothing holds, §4 deletes `CLAUDE.md` from the clone right
   after S2.
 
-Record C1–C3 in `audit.md`, then **revert to `clean`**.
+Write C1–C3's results (yes/no, plus what the session said and what `/memory` listed) into
+`C:\walk-out\canary.txt` on the VM. Then run **Procedure T** (§6), and only **after** the files are on this dev PC,
+**revert to `clean`**.
 
 ---
 
 ## 3. A read-only token for the private repository *(each walk; IN-U8-3)*
 
-Done by the owner **on the owner's own PC**, in a browser:
+Done by the owner **in the VM's Edge**, at the start of §4 (after the revert, **before** the walk session starts).
+The host is isolated, and a token created anywhere else would have to be retyped. *(Amended 2026-10-16.)*
 
+0. Sign in to **github.com** in Edge on the VM. That is a website sign-in, not an Edge profile sign-in, so leave
+   Edge's own *Sign in* alone (B5).
 1. GitHub → profile picture → **Settings** → **Developer settings** → **Personal access tokens** →
    **Fine-grained tokens** → **Generate new token**.
 2. **Token name** `u8-cold-walk-<date>` · **Expiration**: custom, **7 days** · **Resource owner**: `kuhndj67`.
 3. **Repository access** → **Only select repositories** → `spotify-companion`.
 4. **Permissions** → **Repository permissions** → **Contents: Read-only**. GitHub adds **Metadata: Read-only** by
    itself. Leave **everything else** at *No access*.
-5. **Generate token**, then copy it. GitHub shows it **once**.
+5. **Generate token**, then copy it into a new, **unsaved** Notepad window on the VM. GitHub shows it **once**.
 6. **Check it before using it**: the token's page should list exactly one repository and the permissions
    *Contents: read* and *Metadata: read*. If anything else is listed, delete the token and start again.
-7. At S2, when **Git Credential Manager** asks how to sign in, the **owner** chooses **Token** and pastes the token.
-   ⚠️ **Not *Sign in with your browser***: that grants the owner's whole account.
+7. **Sign out of GitHub in Edge** (profile picture → *Sign out*) **before** starting the walk session. The agent
+   must not inherit a signed-in browser, and a signed-in session would make *Sign in with your browser* at S2 grant
+   the owner's whole account.
+8. At S2, when **Git Credential Manager** asks how to sign in, the **owner** chooses **Token** and pastes the token
+   from the Notepad window. Then **close Notepad without saving**, and clear the clipboard
+   (`Set-Clipboard -Value ' '` in PowerShell). The agent could otherwise read it with `Get-Clipboard`.
+   ⚠️ **Not *Sign in with your browser***.
    ⚠️ **The token is never pasted into the Claude Code session**, so it never appears in the transcript.
-8. **After the walk**: on the same page, **Delete** the token. The revert to `clean` removes the VM's stored copy.
+9. **After the walk**: delete the token from **any** browser signed in to GitHub (this dev PC is fine):
+   Settings → Developer settings → Fine-grained tokens → the token → **Delete**. The revert to `clean` removes the
+   VM's stored copy.
 
 ---
 
@@ -97,8 +130,10 @@ token (§3). The live
 deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (UTC).
 
 1. **Revert** the VM to `clean`, then boot it.
-2. Create `C:\walk\` containing **only** `INSTALL.md`, taken **from the tag**
+2. In Edge on the VM, **signed in to GitHub** (§3 step 0; the repository is private, so the download needs it):
+   create `C:\walk\` containing **only** `INSTALL.md`, taken **from the tag**
    (`https://github.com/kuhndj67/spotify-companion/blob/<tag>/docs/INSTALL.md` → *Raw* → save as).
+   Then create the token (§3 steps 1–6) and **sign out of GitHub** (§3 step 7).
 3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and give it this, verbatim:
 
    > Install the app described in `INSTALL.md` by following that file exactly, step by step, from S1 to S10. Use
@@ -117,7 +152,7 @@ deployment on the owner's PC **keeps running** (IN-U8-6). Note the start time (U
 4. The owner does what the session asks and **nothing more**:
    - **S1**: if Windows must restart, restart and open a new session with the same instruction and *"continue from
      S1's checks"*.
-   - **S2**: the token, at Git Credential Manager's **Token** option (§3 step 7).
+   - **S2**: the token, at Git Credential Manager's **Token** option (§3 step 8).
    - **S3**: register a **new** Spotify app, `spotify-companion-walk` (IN-U8-5). ⚠️ Never reuse the live app.
    - **S4**: approve in the browser.
    - **S8**: play music on the account.
@@ -133,14 +168,53 @@ walk **the changed steps** again from a revert, with a new tag if the fix ships.
 
 ## 5. Teardown and records *(each walk)*
 
-1. Copy `C:\walk\walk-record.md` to the owner's PC through the **clipboard**. Run the secret scan on it, then commit
-   it as `aidlc-docs/construction/u8-team-workflow/walks/walk-1-agent-<date>.md`, adding at its top: the base
+1. On the VM, copy `C:\walk\walk-record.md` and the session **transcript**
+   (`%USERPROFILE%\.claude\projects\…\*.jsonl`) into `C:\walk-out\`. Then run **Procedure T** (§6), which brings
+   both to `D:\walk-results\<date>\` on this dev PC, **outside the repository**.
+2. Run the secret scan on `walk-record.md`, then commit it as `aidlc-docs/construction/u8-team-workflow/walks/walk-1-agent-<date>.md`, adding at its top: the base
    inventory, the `INSTALL.md` commit walked, the start/end times (UTC), and the push-refused result.
-2. Copy the session **transcript** (`%USERPROFILE%\.claude\projects\…\*.jsonl` on the VM) for **review only**. ⚠️
-   **Never commit it**: it holds the walk app's client secret. Check it for files read outside `INSTALL.md` (IN-U8-4),
-   then delete it.
-3. **Delete** the token (§3 step 8) and the `spotify-companion-walk` Spotify app.
-4. **Revert** the VM to `clean`.
-5. Walk passed → bump `package.json` and both compose tags to `1.0.0-beta.1` in **one commit that changes nothing
+3. The **transcript** is for **review only**. ⚠️ **Never copy it into the repository**: it holds the walk app's client
+   secret. Check it for files read outside `INSTALL.md` (IN-U8-4), then delete `D:\walk-results\<date>\*.jsonl`.
+4. **Delete** the token (§3 step 9) and the `spotify-companion-walk` Spotify app.
+5. **Revert** the VM to `clean`, and only once step 1's files are confirmed on this dev PC.
+6. Walk passed → bump `package.json` and both compose tags to `1.0.0-beta.1` in **one commit that changes nothing
    else**, then run `npm run release -- --apply`. If `INSTALL.md` changed during the walk, the walked commit is the
    last one whose changed steps were re-walked.
+
+---
+
+## 6. Procedure T — moving results from the VM to this dev PC *(before every revert)*
+
+**Direction: this dev PC reads from the VM. Never the reverse.** The share lives **on the VM**, is read-only, and
+is deleted by the revert that follows. Nothing on this dev PC is shared. Files land in `D:\walk-results\`, outside
+the repository, so a transcript cannot be committed by accident.
+
+**On the VM** (PowerShell **as Administrator**):
+
+```powershell
+New-SmbShare -Name walk-out -Path C:\walk-out -ReadAccess "$env:USERDOMAIN\$env:USERNAME"
+Enable-NetFirewallRule -DisplayGroup "File and Printer Sharing"
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+  Select-Object InterfaceAlias, IPAddress
+```
+
+**On this dev PC** (PowerShell; `<vm-ip>` from above, `<date>` e.g. `2026-10-16`):
+
+```powershell
+New-Item -ItemType Directory -Force D:\walk-results\<date> | Out-Null
+net use \\<vm-ip>\walk-out /user:<vm-user>        # prompts for the VM account's password
+Copy-Item \\<vm-ip>\walk-out\* D:\walk-results\<date>\ -Recurse
+net use \\<vm-ip>\walk-out /delete
+Get-ChildItem D:\walk-results\<date>
+```
+
+**Expected**: the listing on this dev PC shows the same files as `C:\walk-out\` on the VM. **Only then** revert.
+
+**If it differs**
+
+- `net use` fails with *network path was not found*: from this dev PC, run `Test-NetConnection <vm-ip> -Port 445`.
+  `TcpTestSucceeded : False` means the firewall rule did not apply, or the two machines are not on the same
+  network. **Do not revert**: the files are still safe on the VM. Report it, and we choose another route.
+- *Access denied* or a rejected password: for a **Microsoft account** on the VM, `<vm-user>` is
+  `MicrosoftAccount\<email>` and the password is the **account password**, not the PIN. For a local account it is
+  `<vm-ip>\<username>`.

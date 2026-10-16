@@ -8119,3 +8119,23 @@ User: *"Posted request (https://github.com/marcelmarais/spotify-mcp-server/issue
 Confirmed read-only: issue #106 *"More a request... could you add a license?"*, opened by kuhndj67 at
 2026-10-16T16:03:52Z, open. NFR-32 / BR-65.2 is unchanged until a licence lands: no published image. The owner is now
 doing `e2e-test-instructions.md` §1 (base and `clean` checkpoint) and §2 (canary probe).
+
+---
+
+## 2026-10-16T16:40:00Z — Walk guide amended: the Hyper-V host is isolated; Procedure T replaces the clipboard
+
+User, at §1 step 6 (B7): *"that's not possible (the base OS is connected to a corporate network via vpn and is
+COMPLETELY isolated from the VM OS that is connected to my local network on a separate nic... can we use a local text
+file for that data and after the checklist is complete manually copy that to the repo or directly to this dev
+machine (don't rely on the base os for anything)?"*
+
+The clipboard carried two things, and both are replaced. **(1) Results**: written to `C:\walk-out\` on the VM.
+`base-inventory.txt` becomes part of `clean`, which is harmless since it holds no credentials and nothing about the
+project. Before every revert, **Procedure T** (`e2e-test-instructions.md` §6): the **dev PC pulls** from a temporary
+**read-only SMB share on the VM** into `D:\walk-results\`, outside the repository, and the revert deletes the share.
+The direction is deliberate: nothing on the dev PC (live app, `data/`) is shared with the VM, which is B7's original
+concern. **(2) The token**: created **in the VM's Edge**, which also downloads `INSTALL.md` from the private repo (a
+gap in §4 step 2 that this exposed). The owner signs out of GitHub before the walk session starts, keeps the token
+in an unsaved Notepad window until S2, and clears the clipboard after pasting (the agent could `Get-Clipboard`).
+Amended: `e2e-test-instructions.md` (B7, step 8, step 10, §2 end, §3, §4 step 2, §5, new §6), and IN-U8-2 B7,
+IN-U8-3, IN-U8-7 and the deployment picture. The host OS is used only to manage the VM.

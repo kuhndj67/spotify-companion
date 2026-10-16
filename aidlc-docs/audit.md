@@ -8371,3 +8371,17 @@ paragraph, so every **rendered** view (GitHub, preview, chat) shows one unrunnab
 cannot run it as written). Commands given one at a time; the walk **continues** to harvest S2–S10. Fix in the next
 release: a fenced ```powershell block inside the box. Also add a **docs-test check**: no 👤 box line holding a
 command may be followed by another command line without a fence (or simply: multi-command boxes must use a fence).
+
+---
+
+## 2026-10-16T22:05:00Z — Walk ① attempt 3 (v0.8.3) complete: installs cleanly; does NOT pass as written (S1); handoff gaps remain
+
+Owner: *"Second runthrough completed successfully - results in D:\walk-results\2026-10-16.Run2"*. Record committed as
+`walks/walk-1-agent-2026-10-16-attempt3.md` (gitleaks clean). Transcript reviewed: only `INSTALL.md` read, no repo
+`CLAUDE.md` content. The 👤 design worked: every box was shown word for word, and S2's private-repo path ran exactly
+as documented. **Strictly under BR-62.3, S1 is not as written**: (a) the winget lines render as one line; (b) the
+agent cannot follow *"open a new PowerShell window"* and rebuilt PATH from the registry itself; (c) the Docker
+*"timed out dialing Hyper-V socket"* text is not listed. Handoff gaps that did not stop it: the S4 approval box comes
+after `npm run auth` starts (the person had already approved); S8's "skip and let it finish" is a person action
+without a box; S5/S6 have no check commands. The walk guide's `<TAG>` was pasted unfilled a second time, so the guide
+should not need filling in at all. Proposed 0.8.4 + attempt 4; the owner decides (see chat).

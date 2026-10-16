@@ -38,23 +38,31 @@ X 6. ~~**B7**: confirm Enhanced Session works~~. **Replaced 2026-10-16**: the ho
    finds it in place. It reaches this dev PC with the first Procedure T (end of §2), and goes into `audit.md` and
    the top of every walk record:
 
+   Run the lines **inside** the box, not the ```` ``` ```` fence lines around it:
+
    ```powershell
    New-Item -ItemType Directory -Force C:\walk-out | Out-Null
    & {
      "Recorded: $((Get-Date).ToUniversalTime().ToString('u'))"
-     "Windows Update paused until: <the date from B4>"
+     $pause = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings' -ErrorAction SilentlyContinue).PauseUpdatesExpiryTime
+     "Windows Update paused until: $(if ($pause) { $pause } else { 'NOT FOUND in the registry -- write the B4 date here by hand' })"
      git --version; node --version; docker version; wsl --status
-     Get-ChildItem $env:USERPROFILE\.claude -Recurse -Force | Select-Object -ExpandProperty FullName
+     ".claude top level: $((Get-ChildItem $env:USERPROFILE\.claude -Force | Select-Object -ExpandProperty Name) -join ', ')"
+     "CLAUDE.md in .claude: $(Test-Path $env:USERPROFILE\.claude\CLAUDE.md)"
+     "memory folders under .claude\projects: $(@(Get-ChildItem $env:USERPROFILE\.claude\projects -Recurse -Directory -Filter memory -ErrorAction SilentlyContinue).Count)"
+     "settings.json in .claude: $(Test-Path $env:USERPROFILE\.claude\settings.json)"
      Get-PSDrive C | Select-Object Used,Free | Format-List | Out-String
    } *>&1 | Out-File -Encoding utf8 C:\walk-out\base-inventory.txt
    Get-Content C:\walk-out\base-inventory.txt
    ```
 
-   (Replace `<the date from B4>` before running. The `*>&1` keeps the *not recognized* errors in the file, and those
-   errors are the result.)
+   (The `*>&1` keeps the *not recognized* errors in the file, and those errors are the result. WSL's message prints
+   with spaces between the letters, which is just its UTF-16 output.)
 
-   Expected: `node` and `docker` are *not recognized*, and WSL is not installed. `git` may or may not be present (if it
-   is, it stays). `.claude` holds no `CLAUDE.md` and no `projects\*\memory`.
+   Expected: `git`, `node` and `docker` are *not recognized* (**measured 2026-10-16: git is NOT in the base**, so
+   Claude Code does not need it and S1's git install is walked for real), and WSL is not installed. `CLAUDE.md` is
+   `False`, there are `0` memory folders, and `settings.json` is `False`. The *paused until* line shows a date. If it
+   says NOT FOUND, edit the file and write the B4 date in by hand.
 
 On the **Hyper-V host**:
 

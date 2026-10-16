@@ -8156,3 +8156,20 @@ include **`b56bb07` "write the config atomically"**, and that is a likely break,
 text-output changes that affect `parseNowPlaying` (R6) and PBT-66. Logged as backlog **W-15**, with those three probes
 and the separate publish decision. Facts updated: NFR-32 (status note), R8 (resolved upstream; pin pending), W-14's
 precondition, BR-65.2, the U8 HANDOFF, the README line (no longer "no licence"), and the issue draft record.
+
+---
+
+## 2026-10-16T17:15:00Z — Walk VM base inventory, first run: git is NOT in the base; step 8 script fixed
+
+Owner ran §1 step 8 on `kuhndjwin11pro`, output pasted in chat (first run): `git`, `node` and `docker` are all *not
+recognized*; WSL is not installed; `.claude` holds no `CLAUDE.md` and no `projects\` folder (only sign-in, cache,
+synced skills and plugins); C: 48.6 GB used, 225 GB free. ⚠️ **git is absent**: Claude Code (VS Code extension) runs
+without it, so S1's `winget install Git.Git` is walked for real. That resolves the open question in IN-U8-2 §2b.
+
+The script's flaws, now fixed: (1) the markdown fence lines were pasted with it. They are harmless, and the guide now
+says to run only the lines inside the box. (2) The pause date was a placeholder. It is now read from
+`HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings\PauseUpdatesExpiryTime`, with a NOT FOUND fallback, because that
+registry path is **recalled, not probed** (this dev PC has no pause set). (3) The recursive `.claude` listing was
+hundreds of synced-skill lines. It is replaced by the top level plus three explicit checks. Those checks were run on
+this dev PC as a positive control: they report 3 memory folders and a `settings.json`, so they distinguish a used
+machine from a clean one.

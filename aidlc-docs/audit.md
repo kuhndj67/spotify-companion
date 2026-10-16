@@ -8360,3 +8360,14 @@ Owner: *"completed cleanup... continue to next build and hopefully we get a clea
   with a positive control.
 - **Walk guide**: the walker instruction says to replace `<TAG>` first, and points at the agent section. The S2
   owner line points at the 👤 box.
+
+---
+
+## 2026-10-16T22:00:00Z — Walk ① attempt 3 (v0.8.3): S1 👤 box renders the three winget commands as ONE line
+
+Owner: *"the winget install commands are all mushed onto one line and won't run in powershell like that."* In the raw
+file they are three separate lines, but inside a blockquote list item Markdown joins consecutive lines into one
+paragraph, so every **rendered** view (GitHub, preview, chat) shows one unrunnable line. A deviation at S1 (a person
+cannot run it as written). Commands given one at a time; the walk **continues** to harvest S2–S10. Fix in the next
+release: a fenced ```powershell block inside the box. Also add a **docs-test check**: no 👤 box line holding a
+command may be followed by another command line without a fence (or simply: multi-command boxes must use a fence).

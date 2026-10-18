@@ -22,10 +22,10 @@ printed), and every change in the copy's token is logged.
 |---|---|---|
 | BR-70.1 | A token refresh **lands in the host file** | ✅ 18:26:38Z: the placeholder replaced by a real token, expiry +59.8 min, written by rename through the `./verify-install/secrets` directory mount (the write that is `EBUSY` on a single-file mount). Second refresh: expected ≈ 19:21Z (below) |
 | BR-70.2 | **Negative control** | ✅ The patched connector's own `saveSpotifyConfig` in the candidate image: single-file mount → **`EBUSY`**, host file unchanged; directory mount → saved, host file changed. Fake credentials, throwaway containers |
-| BR-70.3 | Now-playing parses a playing track | ⏳ needs the owner to play a track. *Nothing playing* is already parsed and reported healthy (FR-71) |
+| BR-70.3 | Now-playing parses a playing track | ✅ 18:3xZ, owner playing: *"Voices In My Head"*, Falling In Reverse, *Popular Monster*, progress 95 s / 191 s, track id, device: every field parsed, and the same as the live install's. *Nothing playing* also parsed and reported healthy (FR-71) |
 | BR-70.4 | PBT-66 on the new source | ✅ Code Generation step 2 (≈31 `Error` literals in 5 files, all matching) |
 | BR-70.5 | P-U7-1 at the new pin | ✅ The probe credentials ARE P-U7-1's shape (four values, placeholder, `expiresAt: 0`): the first poll refreshed and stored a real token, by rename |
-| BR-70.6 | A play recorded end to end | ⏳ needs a played track |
+| BR-70.6 | A play recorded end to end | ✅ Recorded by **both** installs with provenance `live`: *"Rollin' (Air Raid Vehicle)"* `skipped` (starts 0.6 s apart, ends 2.3 s apart) and *"Voices In My Head"* `completed` (ends 0.6 s apart). `:3011` also backfilled the day's earlier plays from Spotify at start (provenance `backfilled`), as designed. ⚠️ A first read that "Voices" was missing was mine: it was still playing (plays are written when they end) |
 | — | Rotation | ✅ so far: the copy's `refreshToken` equals live's after the refresh |
 | — | MCP v2 | ✅ 31 tools; `getNowPlaying` answers through the v2 server on Node 22.23 |
 
@@ -44,10 +44,16 @@ showed the reason, diagnostics reported `fail — single-file`. ✅
 named the folder of the *configured* path, and an old compose file configures the old path. **Fixed**
 (`src/server.ts`): it names the expected mount point, `/app/secrets`. Seen in a rebuilt image: *"… at /app/secrets"*.
 
+## 4. Version — ✅
+
+`1.0.0-beta.3` in `package.json` and the three compose files (`versionSources` green), its own commit.
+
+**Seen in passing, not U9's**: the live (old-code) log shows `MaxListenersExceededWarning: 11 error listeners added to
+[ServerResponse]`. Not investigated here; noted for the backlog.
+
 ## Still to do (in order)
 
-4. Finish the acceptance (≥ 60 min, a played track), record it, add the entry to `scripts/connector-acceptance.json`.
-5. Version `1.0.0-beta.3`.
+4. Finish the acceptance (the second refresh ≈ 19:21Z; the watch ends ≈ 19:37Z), add the entry to `scripts/connector-acceptance.json`.
 6. Rehearse the crossing and the rollback on `:3011`; `verify:down`'s no-impact proof.
 7. **Live crossing** — owner present, owner's go-ahead.
 8. **First tag push** — owner's act → the `publish` job.

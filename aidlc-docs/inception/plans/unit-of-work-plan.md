@@ -347,3 +347,20 @@ match the build order
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]: **A** (owner, 2026-10-18, question prompt: *"A: new U9, renumber (Recommended)"*). **U9 — Connector Upgrade & Publishable Image** is built next; Off-machine Deployment **U9 → U10**, Team Operations **U10 → U11**. Questions 1–6 above keep the numbers they were asked with.
+
+---
+
+## Question 8 — Where the data-safety unit goes (added 2026-10-18)
+
+The owner chose a new unit **before the NAS** (question prompt, 2026-10-18), for Requirements Questions 29–33. It
+depends on U6 (in-app backup), U8 (release script) and U9 (the App-only image it updates); the NAS deployment is where
+a second running copy makes these risks real.
+
+A) **New unit U10 — Data Safety**, built after U9. Numbers follow build order (the Question 5a and 7 precedent):
+Off-machine Deployment **U10 → U11**, Team Operations **U11 → U12**. Mapping logged in `audit.md` ⭐ *recommended*
+
+B) Keep the numbers: the new unit is **U12**, built before U10
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (owner, 2026-10-18, in this file). **U10 — Data Safety** is built after U9; Off-machine Deployment **U10 → U11**, Team Operations **U11 → U12**. Questions above keep the numbers they were asked with.

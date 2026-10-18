@@ -112,7 +112,7 @@ consequence of putting risk containment ahead of gratification.
 | U5 | FR-34–36, FR-38–40, FR-46–48 | NFR-23 |
 | U0 | FR-01–11 | NFR-01–07, NFR-16–21, NFR-24 |
 | U6 | FR-57–64 | — *(its NFR Requirements stage follows FD approval)* |
-| U7…U11 | — *(settled in their own stages; see the Phase 5 requirements round)* | — |
+| U7…U12 | — *(settled in their own stages; see the Phase 5 requirements round)* | — |
 
 **All in-scope functional requirements (FR-01 to FR-54) are assigned.** FR-55 is wishlisted
 (W-1) and correctly has no unit.

@@ -1,7 +1,7 @@
 # U6 — the VERIFICATION INSTALLATION (IN-U6-3, deployment-architecture.md §2).
 #
 # A second, throwaway copy of the app for U6's exit test: back up the LIVE app, restore into THIS one, check it
-# runs. The cross-machine half of that test is U10's (the NAS; it was called U9 until the 2026-10-18 renumbering).
+# runs. The cross-machine half of that test is U11's (the NAS; renumbered twice on 2026-10-18).
 #
 # ⚠️ NEVER run this file together with compose.yaml (`-f compose.yaml -f compose.verify.yaml`): merging would pull
 # in the live service. Use `npm run verify:up` / `npm run verify:down`, which refuse unless the project name

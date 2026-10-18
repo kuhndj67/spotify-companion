@@ -249,13 +249,15 @@ and changing it is a **security-posture decision**, surfaced rather than decided
 | **U7** Configuration Management | Rules and credentials manageable in-app (upload/download, write-only fields) via U6's admission path | U6 |
 | **U8** Team Workflow & Onboarding | CI gating, README/INSTALL/CONTRIBUTING/LICENSE/SECURITY, the install routine | U6, U7 |
 | **U9** Connector Upgrade & Publishable Image | The connector on its MIT-licensed commit (FR-73), the image published on release tags (FR-74), README *App only* (FR-75) | U8 |
-| **U10** Off-machine Deployment | The NAS target, under the chosen security posture, deployed by following U8's routine | U6, U7, U8, U9 |
-| **U11** Team Operations | Parallel work through reviewed PRs without conflicts in the AI-DLC records (NFR-35…39) | U8 |
+| **U10** Data Safety | Automatic backups before migration and release, one writer per database, developer data apart, App-only `update`, truthful snapshots (FR-76…80) | U6, U8, U9 |
+| **U11** Off-machine Deployment | The NAS target, under the chosen security posture, deployed by following U8's routine | U6, U7, U8, U9, U10 |
+| **U12** Team Operations | Parallel work through reviewed PRs without conflicts in the AI-DLC records (NFR-35…39) | U8 |
 
 **Build order: U6 → U7 → U8 → U9** (Units Questions 4 and 5a, 2026-10-07). ⚠️ **Renumbered that day to match
 build order** — old U8 → U7, old U9 → U8, old U7 → U9; earlier `audit.md` entries keep the old numbers.
 **Amended 2026-10-18** (Units Question 7 = A): **U6 → U7 → U8 → U9 → U10 → U11**, the new U9 inserted before the
-NAS; old U9 → **U10**, old U10 → **U11**.
+NAS; old U9 → **U10**, old U10 → **U11**. **Amended again the same day** (Units Question 8 = A): **U6 → … → U9 → U10
+Data Safety → U11 NAS → U12 Team Operations**.
 
 ⚠️ **U6 is the gate.** ~~It is the first unit in the project with NO user story~~ — **amended 2026-10-07**: the
 FD made it first-class, with **US-28** and FR-57…FR-64. ~~What makes the migration unsafe is that the
@@ -271,14 +273,15 @@ and Units Generation **Questions 4–5** in [`unit-of-work-plan.md`](unit-of-wor
 
 - [ ] **U6 complete** — *Create backup* from the live app, *Restore backup* into a second installation on this
       machine, and the restored app runs
-- [ ] **U10** — the real corpus restored **on the NAS** through *Restore backup*, and the NAS app runs (the
-      cross-machine half of U6's criterion, moved 2026-10-07 because off-machine browsers are refused until U10)
+- [ ] **U11** — the real corpus restored **on the NAS** through *Restore backup*, and the NAS app runs (the
+      cross-machine half of U6's criterion, moved 2026-10-07 because off-machine browsers are refused until U11)
 - [ ] The app is reachable and fully functional from a second machine, under the Question 11 posture
 - [ ] ⚠️ **WAL probed on the NAS volume** — not reasoned about. The existing proof covers a Rancher bind mount,
       and the standing advice is that WAL is unsafe on *network* filesystems
 - [ ] WebSocket handshake verified **in both directions** from off-machine — the `403` incident's signature is
       200 on the page and 403 on the socket
 - [ ] **U9** — the connector on its MIT-licensed commit; a release tag publishes the image with both licence notices
+- [ ] **U10** — an update never loses a user's history; a second writer cannot open a database; snapshots run
 - [ ] `smoke` and `knip` run in CI; `main` protected per Question 13
 - [ ] A contributor walks the install **cold** on a clean machine and records where they got stuck
 - [ ] `README`, `INSTALL`, `CONTRIBUTING`, `LICENSE`, `SECURITY` exist and are accurate

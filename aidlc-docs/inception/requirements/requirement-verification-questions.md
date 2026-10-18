@@ -765,3 +765,106 @@ a second codebase to maintain
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]: **A** (owner, 2026-10-18, question prompt: *"A: keep pinning (Recommended)"*).
+
+---
+
+# Round 2026-10-18 (b): data safety for users and developers (new unit before the NAS)
+
+Raised by the owner while reviewing public readiness: *"we don't want new users accidentally getting my listening db
+in THEIR deployment … we also want people to be able to deploy updated versions without losing their own db (maybe
+part of the pipeline?) AND we want developers to be able to (as easily as possible) develop code without worrying
+about accidentally losing their own database during an update."* Placement and the sample database were answered at
+once (question prompt): **a new unit before the NAS**; **no sample database**.
+
+**Measured 2026-10-18 (not reasoned)**:
+- ✅ A new user cannot get the owner's database: no `.db` is tracked; `data/` is ignored by git and by the image build;
+  `scripts/check-image.sh` refuses `history.db` or `data/` content in a published image; *App only* `setup` creates an
+  empty `data/`.
+- ❌ **No automatic backup** before a schema migration or a release; every `backup-before-…` folder in `data/` was made
+  by hand.
+- ❌ **Automatic snapshots have not run since 2026-10-03**: the 24-hour timer starts at process start and never runs
+  at startup, so a container restarted at least daily (every release) never snapshots. Diagnostics shows **`ok`
+  "scheduled; none written yet"**: a false green.
+- ❌ **No single-writer guard**: host `npm start` defaults to the SAME `data/history.db` as the container
+  (`src/config.ts:112`); `busy_timeout` makes two writers take turns, it does not stop them. Only the rule in
+  `CLAUDE.md` prevents it. `git clean -xdf` deletes `data/` (gitignored).
+- ❌ ***App only* has no update path**: its `compose.yaml` names one version and `setup` refuses to overwrite it.
+
+## Question 29 — Automatic backup before a risky change
+
+A) **Both**: (1) at startup, before applying any schema migration, the app takes an in-app backup (U6's mechanism,
+the one writer) and refuses to migrate if the backup fails; (2) `npm run release -- --apply` asks the RUNNING app for
+a backup before it builds and deploys, and refuses to deploy if it cannot get one. A bounded number kept, outside the
+snapshot rotation ⭐ *recommended*
+
+B) Before a migration only (the app's own duty; the release relies on it)
+
+C) Before a release only (the pipeline's duty; a manual `docker compose up` after a pull is unprotected)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (owner, 2026-10-18, question prompt: *"A: both (Recommended)"*; the line in this file was left blank).
+
+---
+
+## Question 30 — Stopping a second writer
+
+A) **A lock file beside the database**, held by the running process with a heartbeat: a second process (container or
+`npm start`, through the same bind mount) that finds a fresh lock **refuses to open the database** and says which
+process holds it; a stale lock (no heartbeat for a set time, e.g. after a crash) is taken over and logged. ⚠️ Probed
+across the Rancher bind mount before it is relied on ⭐ *recommended*
+
+B) SQLite's own exclusive locking mode. ⚠️ Its behaviour across the Windows↔container bind mount is unknown and must be
+probed; WAL mode and backups interact with it
+
+C) Documentation only, as today
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (owner, 2026-10-18, in this file).
+---
+
+## Question 31 — Where a developer's data lives
+
+A) **Host runs default to a separate folder**, `data-dev/` (gitignored): `npm start` can then never touch the
+container's `data/history.db` unless the developer points `HISTORY_DB_PATH` at it on purpose. With Q30's lock that is
+two independent guards. The container keeps `data/` ⭐ *recommended*
+
+B) A host run **refuses to start** without an explicit `HISTORY_DB_PATH`
+
+C) Move **every** install's data outside the repository folder (e.g. under the user profile), which also survives
+`git clean -xdf`. ⚠️ Changes INSTALL, backups and every existing install's paths
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (owner, 2026-10-18, in this file).
+---
+
+## Question 32 — Updating an *App only* install
+
+A) **An `update` command in the image**: `docker run --rm -v "${PWD}:/work" ghcr.io/…:<new version> update` asks the
+running app for a backup (Q29), then rewrites **only the image line** of the folder's `compose.yaml` to its own
+version (the user's other edits kept), and prints `docker compose up -d` as the next step. It refuses to move to an
+older version ⭐ *recommended*
+
+B) Documentation only: "edit the version in `compose.yaml`, take a backup first, then `docker compose up -d`"
+
+C) A floating `latest` tag. ⚠️ Contradicts BR-72.4 (no floating tag) and gives no control over when an update happens
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (owner, 2026-10-18, in this file).
+---
+
+## Question 33 — Fixing automatic snapshots (the false green)
+
+A) **Schedule from the newest snapshot on disk, not from process start**: at startup, if the newest snapshot is older
+than the interval, take one (at most one per interval, so a restart loop still cannot rotate history out). And
+diagnostics shows **`warn`** when the newest snapshot is older than two intervals, **`fail`** when none exists after
+one interval of uptime, never `ok` for "none written" ⭐ *recommended*
+
+B) Fix the diagnostics only, so the gap is visible
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: **A** (owner, 2026-10-18, in this file).

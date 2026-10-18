@@ -8483,3 +8483,13 @@ second 'app only' with a 'coming soon'… along with any other polishing tasks."
   differs* for *unexpected EOF* and for missed step-5 settings · the S4 box says to ask the agent for the fallback URL ·
   the S8 box says to open the page in a web browser (a chat link opens inside VS Code) · the S8 next-track box says
   **why** to skip. Not re-walked, per the owner's 2026-10-18 ruling (the polish is outside the walk).
+
+---
+
+## 2026-10-18T15:30:00Z — ✅ U8 APPROVED; new scope: move the MCP connector to its licensed version before U9 (Inception re-entered)
+
+Owner: *"u8 is approved... but before we move to u9 let's insert a step to update to the mcp version that lets us
+build a container for easier deployment."* **U8 Team Workflow & Onboarding is APPROVED** (1.0.0-beta.2 live; walk ①
+passed on v0.8.5). The new scope is backlog **W-15** promoted to a unit. Under the standard process, new scope
+**re-enters Inception**: Requirements **Questions 26–28** (`requirement-verification-questions.md`) and Units
+**Question 7** (`unit-of-work-plan.md`), answered before any design.

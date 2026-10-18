@@ -329,3 +329,21 @@ developer is joining before the NAS work
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]: **A** (user, 2026-10-12, question prompt: *"U10, after U9 (Recommended)"*). **U10 — Team Operations** declared in `unit-of-work.md`; build order **U8 → U9 → U10**.
+
+---
+
+## Question 7 — Where the connector upgrade goes (added 2026-10-18)
+
+The owner wants it **before** the NAS deployment, because U9 is easier with a container (Requirements Questions 26–28
+set its scope). It depends on U8 (release, CI, docs) and nothing in U9 or U10.
+
+A) **New unit U9 — Connector Upgrade & Publishable Image**, built next. Numbers follow build order (the Question 5a
+precedent): Off-machine Deployment becomes **U10**, Team Operations **U11**. Mapping logged in `audit.md` ⭐
+*recommended*
+
+B) Keep the existing numbers: the new unit is **U11**, built **before** U9. No renumbering, but the numbers no longer
+match the build order
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:

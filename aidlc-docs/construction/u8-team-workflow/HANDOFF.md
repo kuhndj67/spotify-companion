@@ -2,7 +2,9 @@
 
 **The single entry point for U8.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-18) — ✅ U8 BUILD & TEST COMPLETE — awaiting U8 approval
+## ▶ Current state (2026-10-18) — ✅ U8 APPROVED (owner, 2026-10-18). Next: the connector-upgrade unit (Inception Q26–28, Units Q7), then U9
+
+### Build & Test (2026-10-18)
 
 ✅ **Walk ① PASSED** (attempt 4, `v0.8.5`, owner's ruling 2026-10-18) → **`1.0.0-beta.1` released** from the walked commit (version bump only). Records: `walks/` (attempts 2, 3, 4-PASS) and `audit.md` 2026-10-16…18. The install path users see: README → *Install* → `docs/INSTALL.md` (8 👤 boxes + agent section) + `docs/claude-start.md`. ⚠️ **Owed, not blocking**: the polish list in the PASS record (script messages say `docs/INSTALL.md`; S4 fallback-URL relay; S8 *why skip* and *open in a web browser*; S1 *unexpected EOF* / Kubernetes / `rdctl` check). ⚠️ **W-15** (move the MCP pin to the MIT commit) is logged and unstarted. Walk ② (a person) → `1.0.0`. Next unit: **U9** (off-machine deployment).
 

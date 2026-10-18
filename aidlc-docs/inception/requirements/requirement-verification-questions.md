@@ -693,3 +693,73 @@ C and D both seem prudent to me... A and B I'm not sure.
 
 **Round result**: Q21 A · Q22 A · Q23 A · Q24 A · Q25 A+B+C+D → **NFR-35…NFR-39** in `requirements.md`, owner **U10** (Units Question 6 = A).
 ---
+
+---
+
+# Round: the connector upgrade before U9 (opened 2026-10-18)
+
+Owner, approving U8: *"before we move to u9 let's insert a step to update to the mcp version that lets us build a
+container for easier deployment."* Background is in backlog **W-15** (`requirements.md`). Checked 2026-10-18: upstream
+`spotify-mcp-server` is **MIT** since commit `6065ce5c` (2026-10-16), which is still its newest commit, **17 commits**
+ahead of our pin `7b5fde63`. It publishes **no tags**, so we keep pinning by commit.
+
+## Question 26 — What the upgrade must prove before it ships
+
+The 17 commits include three changes that touch how this app works (W-15). Each is **probed on the `:3011`
+verification install first**, never on the live one:
+
+1. **`b56bb07` "write the config atomically"**: write-temp-then-rename onto our **single-file** bind mount of
+   `spotify-config.json` either fails or silently detaches the container's view, and token refresh breaks.
+2. **`d7445af` "Migrate to MCP v2"**: protocol and dependency changes against our MCP client.
+3. **Output-format changes** (`read.ts`, explicit flag, album name): the live path parses the server's **text**
+   (R6), and PBT-66 scans its error texts.
+
+A) **All three are acceptance criteria.** The upgrade ships only when the verification install shows: a token
+refresh **lands** and is seen by the container across a refresh cycle; now-playing parses the new output (property
+tests updated to the new shape); PBT-66 passes against the new source; and a play is recorded end to end. If (1)
+fails as predicted, `spotify-config.json` moves to a **directory mount** (the `config/` and `state/` pattern), and
+`CredentialsWriter` follows ⭐ *recommended*
+
+B) As A, but also adopt upstream's new features (HTTP transport, OAuth mode, `getFollowedArtists`). ⚠️ Scope creep:
+none of them is needed for the container, and each widens what the app exposes
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+---
+
+## Question 27 — What "a container for easier deployment" means here
+
+Once the pin is on the licensed commit, NFR-32's blocker is gone and a built image **may** be distributed. That leaves
+how it gets to another machine (U9's NAS) and to README's *App only (coming soon)*:
+
+A) **CI builds and publishes the image on every release tag** to **GitHub Container Registry**
+(`ghcr.io/kuhndj67/spotify-companion:<version>`). It stays **private while the repository is private**, so pulling
+needs a read token; this is the same least-authority model as the walk. The image carries the licence notices:
+GPL-3.0 for this app and **MIT for the bundled connector** (MIT requires its copyright notice to travel with copies).
+README *App only* gets real steps (pull, the two secrets, `docker compose up`), walked like INSTALL.md ⭐ *recommended*
+
+B) **No registry**: each release attaches a `docker save` tarball that the user loads by hand. No registry
+credential, but a large file per release, and every update is a manual copy
+
+C) **Make publishing possible, but don't publish yet**: the pin moves and the notices go in; the publishing route is
+decided in U9, which is the first consumer
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+---
+
+## Question 28 — How the connector is updated from now on
+
+A) **Keep pinning one upstream commit** (R7), and move it only as deliberate work with Q26's three probes. Dependabot
+stays **excluded** for it (NFR-39); CI's PBT-66 is the early warning ⭐ *recommended*
+
+B) **Fork** `spotify-mcp-server` under this account and pin the fork. That gives control over its changes, but it is
+a second codebase to maintain
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:

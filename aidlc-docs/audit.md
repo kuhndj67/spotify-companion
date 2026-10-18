@@ -56,3 +56,25 @@ dev/test process)"*.
 - PR flow explained to the owner (Azure DevOps background): PRs target `main`; drafts cannot be merged; Claude marks a
   PR *Ready for review* when it is the owner's to merge. PR #3 was merged before U9's Build & Test; harmless, since a
   merge deploys nothing and the release guard refuses an unaccepted pin.
+
+---
+
+## 2026-10-18T19:50:00Z — U9: acceptance PASSED, crossing rehearsed, ✅ 1.0.0-beta.3 LIVE
+
+Owner: *"Ok the pending merge is completed."* (PRs #4 and #5 merged; taken as the go-ahead for the live crossing that
+the previous message laid out step by step.)
+
+- **Acceptance on `:3011` PASSED** (18:26Z–19:37Z): refreshes landed in the host file through the directory mount at
+  18:26:38Z (forced) and 19:21:41Z (the 5-minute buffer, as predicted from upstream's source; the plan's "45-minute
+  timer" was wrong and is corrected in the record); `refreshToken` equal to live throughout; both installs recorded
+  the same 18 plays with identical outcomes; the `EBUSY` negative control seen with the real patched connector.
+  `scripts/connector-acceptance.json` gained the `pass` entry for `6065ce5c`.
+- **Found and fixed** in Build & Test: the startup check's message named `/opt/spotify-mcp` as the place to mount
+  `./secrets` under an old compose file; it names `/app/secrets` now.
+- **Crossing and rollback rehearsed** on the owner's verified backup: 1430 plays at every stage, live unchanged.
+- **Live**: the release refused while `spotify-now-playing` ran (`old-container-running`, the guard on the real
+  deployment); after `docker stop`, it deployed `spotify-companion:1.0.0-beta.3`, healthy, tagged `v1.0.0-beta.3`
+  locally (not pushed). Credentials directory `ok`, 1453 plays, first new play recorded.
+- Also: backlog **W-16** (the export's leaked `error` listener, seen as `MaxListenersExceededWarning`).
+
+Next: the owner's tag push (publishes the image), then the token probe and the App-only walk.

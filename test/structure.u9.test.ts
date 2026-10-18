@@ -117,3 +117,25 @@ describe("none of upstream's new features is switched on (BR-68.2)", () => {
     assert.deepEqual(featureVariablesIn('      MCP_TRANSPORT: http\n'), ['MCP_TRANSPORT']);
   });
 });
+
+/** Container paths a bind mount must never cover: system folders the container's own programs need. */
+const SYSTEM_DIRS = ['/lib', '/lib64', '/bin', '/sbin', '/usr', '/etc', '/var', '/proc', '/sys', '/dev'];
+function systemMounts(workflow: string): string[] {
+  return [...workflow.matchAll(/-v\s+"?[^\s"]+:(\/[^\s":]*)(?::r[ow])?"?/g)]
+    .map((m) => m[1] ?? '')
+    .filter((target) => SYSTEM_DIRS.some((d) => target === d || target.startsWith(`${d}/`)));
+}
+
+describe('no workflow mounts over a system folder (found by the first tag run, 2026-10-18)', () => {
+  for (const file of ['.github/workflows/ci.yml', '.github/workflows/secret-history.yml']) {
+    it(`${file}: no docker -v target is a system folder`, () => {
+      assert.deepEqual(systemMounts(read(file)), []);
+    });
+  }
+
+  it('positive control: the mount that broke the first tag run is caught; the fixed one is not', () => {
+    assert.deepEqual(systemMounts('docker run --rm -v "$PWD/scripts/lib:/lib:ro" "$NODE_IMAGE"'), ['/lib']);
+    assert.deepEqual(systemMounts('docker run --rm -v "$PWD/scripts/lib:/publish:ro" "$NODE_IMAGE"'), []);
+  });
+});
+

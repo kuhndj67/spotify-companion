@@ -1,6 +1,6 @@
 # U9 Build & Test — Connector Upgrade & Publishable Image
 
-**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.3` LIVE since 2026-10-18 19:45Z · Order: IN-U9-7, as listed in
+**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.4` LIVE and PUBLISHED (2026-10-18 20:04Z) · Order: IN-U9-7, as listed in
 [`code-summary.md`](../u9-connector-upgrade/code/code-summary.md) · Branch `u9-build-and-test`
 
 ✅ Live is `spotify-companion` `1.0.0-beta.3` at the MIT pin (from 19:45Z); `spotify-now-playing` `1.0.0-beta.2` stopped and kept for rollback.
@@ -116,7 +116,47 @@ runs. Removing `npm` from the runtime stage would drop those: a backlog idea, no
 **Version**: `v1.0.0-beta.3` is a pushed git tag and is never reused (BR-66.7, BR-72.3), so the fix ships as
 **`1.0.0-beta.4`**: the same app, a fixed workflow. Live will be redeployed to it by `npm run release`.
 
+## 8. `1.0.0-beta.4` released and ✅ PUBLISHED
+
+Owner merged PR #6. From `main` (`d8f2ce4`): `npm run release -- --apply` → pin `6065ce5c` (unchanged since the last
+release, so no acceptance asked), old container not running → `spotify-companion:1.0.0-beta.4` live and healthy,
+tagged `v1.0.0-beta.4`. Live after the restart: version `1.0.0-beta.4`, credentials directory `ok`, recording (1459
+plays).
+
+`git push origin v1.0.0-beta.4` → run `39161435957`: test ✅ · container ✅ · secret scan ✅ · **publish ✅** (its first
+full run). From the job log, all on the image that was pushed:
+
+| Step | Result |
+|---|---|
+| Decision (LC-64) | `publish 1.0.0-beta.4` (tag = version; the registry did not hold it) |
+| Licences (BR-73) | `/app/LICENSE` 35149 bytes (GPL-3.0) · `/opt/spotify-mcp/LICENSE` 1070 bytes (MIT) |
+| User data (NFR-28) | none: no credentials, history, rules or automation state |
+| Build facts (NFR Q4) | Node `v22.23.3`; base `node@sha256:c3de60bf…` in the labels |
+| Scan, report only | 64 in the Debian base (HIGH 60, CRITICAL 4); 11 HIGH in npm's own bundled dependencies |
+| Push | `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.4`; no floating tag |
+
+**Not yet checked**: pulling the image back (needs a `read:packages` token, which this PC's GitHub CLI token does not
+have, and the owner's broad token is not put into Docker's login store). Moved to the token probe (IN-U9-6), with the
+short-lived read token.
+
+## 9. Token probe (IN-U9-6) and the published image pulled back — ✅
+
+Run by the owner in their own PowerShell (the token never entered the conversation):
+
+| Token | `docker login ghcr.io` | `docker pull …:1.0.0-beta.4` |
+|---|---|---|
+| **Fine-grained**, repository `spotify-companion` only, read-only | `Login Succeeded` | ❌ **`403 Forbidden`** |
+| **Classic**, only `read:packages`, 7 days | `Login Succeeded` | ✅ pulled, digest `sha256:9cf5c083…` |
+
+So **a fine-grained token cannot pull this package**, and the walk and README *App only* use the classic
+`read:packages` token (⚠️ it reads every package the account can see; today that is this one). `Login Succeeded` proves
+nothing on its own: GHCR checks the permission at the pull. The fine-grained token is revoked.
+
+**The image as published**, checked after the pull with `scripts/check-image.sh`: both licences present (GPL 35149 B,
+MIT 1070 B), no user data, and the `revision` label is **`d8f2ce4`** = the commit tagged `v1.0.0-beta.4`. What is in the
+registry is what was released. README *App only* now names the classic token and its one scope.
+
 ## Still to do (in order)
 
-8. Merge, release `1.0.0-beta.4`, push its tag → `publish`; pull the image back and check both licences.
-9. Token probe → walk guide → agent walk of README *App only*.
+9. Live token refresh through the new mount (≈ 20:24Z).
+10. Walk guide → agent walk of README *App only* on Machine 1 (the classic token).

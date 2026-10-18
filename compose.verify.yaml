@@ -20,7 +20,7 @@ services:
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
     # U9: `npm run verify:up -- --candidate` sets VERIFY_IMAGE to an image built from the working tree
     # (`spotify-companion:candidate`, never a version tag), so a change can be accepted here BEFORE it is released.
-    image: ${VERIFY_IMAGE:-spotify-companion:1.0.0-beta.3}
+    image: ${VERIFY_IMAGE:-spotify-companion:1.0.0-beta.4}
     container_name: spotify-companion-verify
     ports:
       - "127.0.0.1:3011:3000"

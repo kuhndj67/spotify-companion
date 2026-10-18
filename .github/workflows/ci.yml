@@ -209,8 +209,11 @@ jobs:
           if out="$(docker manifest inspect "$IMAGE:$VERSION" 2>&1)"; then REGISTRY=present
           elif printf '%s' "$out" | grep -qiE 'manifest unknown|not found'; then REGISTRY=absent
           else REGISTRY=unknown; echo "registry answer: $out"; fi
-          docker run --rm -v "$PWD/scripts/lib:/lib:ro" "$NODE_IMAGE" \
-            node /lib/publishDecision.ts --tag "$GITHUB_REF_NAME" --version "$VERSION" --registry "$REGISTRY"
+          # ⚠️ NOT /lib: that is Debian's system library folder, and mounting over it breaks every program in the
+          # container ("exec … no such file or directory": the first tag run, 2026-10-18). Guarded by
+          # test/structure.u9.test.ts.
+          docker run --rm -v "$PWD/scripts/lib:/publish:ro" "$NODE_IMAGE" \
+            node /publish/publishDecision.ts --tag "$GITHUB_REF_NAME" --version "$VERSION" --registry "$REGISTRY"
 
       # NFR Design Q4 = A: the base image's patch floats; record exactly which one this image was built on.
       - name: Build (linux/amd64)

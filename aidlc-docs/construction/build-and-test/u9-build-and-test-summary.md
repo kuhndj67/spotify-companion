@@ -92,7 +92,31 @@ none written yet"*: the known false green, U10's FR-80.
 **Still to see on the live install**: its first token refresh through the new directory mount, due ≈ 20:24Z (the live
 file was last written 19:29:34Z by the old connector).
 
+## 7. First tag push — ❌ publish failed, nothing published; fixed → `1.0.0-beta.4`
+
+Owner: *"You go ahead and run."* `git push origin v1.0.0-beta.3` (tag → `2f626f7`, `main`). The tag run: **test,
+container, secret scan ✅; `publish` ❌ at its first step, *Decide***. Nothing was built for, or pushed to, the registry.
+
+**Cause (mine)**: the step mounted `scripts/lib` at **`/lib`** in the `node:22.23` container. `/lib` is Debian's
+system library folder; covering it removes the C library and the program loader, so the container cannot start any
+program: `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`. The local test of the decision had
+used a different mount point, so it could not see this. **Reproduced locally** (same message), **fixed** (`/publish`),
+and **guarded**: `test/structure.u9.test.ts` refuses any workflow `-v` onto a system folder, seen to catch the old
+`ci.yml`.
+
+**The rest of the job, exercised before the next tag** (so it does not take a third version): `check-image.sh` run
+**on Linux** (Debian container, Docker socket) against a local build: licences, no user data, build facts, **Trivy
+v0.75.0 downloaded, checksum verified, scan reported**, summary written, exit 0. Untested until the next tag: the
+registry login and push (they need the job's own token).
+
+**Scan, report only** (the owner's posture): 64 HIGH/CRITICAL findings in the Debian base, and a few in **npm's own
+bundled dependencies** (e.g. `picomatch`, `sigstore`), which come with the base image's `npm`, a tool the app never
+runs. Removing `npm` from the runtime stage would drop those: a backlog idea, not done.
+
+**Version**: `v1.0.0-beta.3` is a pushed git tag and is never reused (BR-66.7, BR-72.3), so the fix ships as
+**`1.0.0-beta.4`**: the same app, a fixed workflow. Live will be redeployed to it by `npm run release`.
+
 ## Still to do (in order)
 
-8. **First tag push** — owner's act → the `publish` job.
+8. Merge, release `1.0.0-beta.4`, push its tag → `publish`; pull the image back and check both licences.
 9. Token probe → walk guide → agent walk of README *App only*.

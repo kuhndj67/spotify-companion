@@ -28,7 +28,7 @@
 | BR-66 versions and releases | ✅ `v0.8.0`, `v0.8.1` made by `npm run release`; repeat refused; version derived everywhere |
 | LC-57 version display | ✅ deployed, looked at, fixed, re-checked |
 | BR-65.3 MCP licence issue | ✅ posted by the owner 2026-10-16: [marcelmarais/spotify-mcp-server#106](https://github.com/marcelmarais/spotify-mcp-server/issues/106), open |
-| FR-65 / BR-62 the cold walk → `1.0.0-beta.1` | ⏳ guide written: [`e2e-test-instructions.md`](e2e-test-instructions.md). Needs the VM work (§1–§2 there) and the pushed tag |
+| FR-65 / BR-62 the cold walk → `1.0.0-beta.1` | ✅ **PASSED 2026-10-18**, attempt 4 on `v0.8.5`, the user's own path (`claude-start.md`). Attempts 1–3 each found real gaps, fixed in 0.8.2–0.8.5, including the Windows `auth.mjs` `&` bug. **`1.0.0-beta.1` released** from the walked commit. Records in `u8-team-workflow/walks/` |
 
 ## 3. Finding: a deploy splits the play in progress
 

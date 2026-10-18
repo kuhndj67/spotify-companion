@@ -2,7 +2,11 @@
 
 **The single entry point for U8.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-14, Build & Test)
+## ▶ Current state (2026-10-18) — ✅ U8 BUILD & TEST COMPLETE — awaiting U8 approval
+
+✅ **Walk ① PASSED** (attempt 4, `v0.8.5`, owner's ruling 2026-10-18) → **`1.0.0-beta.1` released** from the walked commit (version bump only). Records: `walks/` (attempts 2, 3, 4-PASS) and `audit.md` 2026-10-16…18. The install path users see: README → *Install* → `docs/INSTALL.md` (8 👤 boxes + agent section) + `docs/claude-start.md`. ⚠️ **Owed, not blocking**: the polish list in the PASS record (script messages say `docs/INSTALL.md`; S4 fallback-URL relay; S8 *why skip* and *open in a web browser*; S1 *unexpected EOF* / Kubernetes / `rdctl` check). ⚠️ **W-15** (move the MCP pin to the MIT commit) is logged and unstarted. Walk ② (a person) → `1.0.0`. Next unit: **U9** (off-machine deployment).
+
+### Earlier (2026-10-14, Build & Test)
 
 ✅ **Build & Test: deployed `0.8.1`, pushed, `main` protected and SEEN to refuse** — [`u8-build-and-test-summary.md`](../build-and-test/u8-build-and-test-summary.md). ⚠️ **Read its §4a: CI's test step could never fail (`| tee` without `pipefail`) until 2026-10-14.** ✅ MCP licence issue posted ([#106](https://github.com/marcelmarais/spotify-mcp-server/issues/106), 2026-10-16). ▶ **Remaining for U8's exit**: owner does the VM work (in progress 2026-10-16) (base, `clean`, canary) per [`e2e-test-instructions.md`](../build-and-test/e2e-test-instructions.md); then **walk ①** from tag `v0.8.1` → on a pass, release `1.0.0-beta.1`.
 

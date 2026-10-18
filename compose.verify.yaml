@@ -29,7 +29,7 @@ services:
       TRUST_PUBLISHED_PORT: "true"
       # Effectively idle — and with no real credentials it cannot poll Spotify anyway.
       POLL_INTERVAL_MS: 3600000
-      SPOTIFY_CONFIG_PATH: /opt/spotify-mcp/spotify-config.json
+      SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
       HISTORY_DB_PATH: /data/history.db
       SNAPSHOTS_ENABLED: "false"
       # No MusicBrainz traffic, and so no need for the contact-address secret.
@@ -42,7 +42,8 @@ services:
     volumes:
       # ⚠️ A PLACEHOLDER copied from secrets/spotify-config.example.json — NEVER the live file. If Spotify
       # rotates refresh tokens, a second container refreshing a copy of the live token could invalidate it.
-      - ./verify-install/secrets/spotify-config.json:/opt/spotify-mcp/spotify-config.json:rw
+      # U9 (IN-U9-1): the secrets DIRECTORY, like live, so the rename-based writes are exercised as they run live.
+      - ./verify-install/secrets:/app/secrets:rw
       - ./verify-install/data:/data:rw
       # U7 (IN-U7-1): :rw like the live mount, so the exit test exercises the real mode — rules upload, undo, restore.
       - ./verify-install/config:/config:rw

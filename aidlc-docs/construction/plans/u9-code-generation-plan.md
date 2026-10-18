@@ -64,17 +64,17 @@ split.
 - [x] `.mcp-server` for host and CI (`npm run mcp:setup`, CI's PBT-66 fetch) follows the compose pin already; checked,
       not assumed.
 
-### Step 3 — Credentials directory *(BR-69.4, BR-69.5, P-67, LC-60, IN-U9-1)*
-- [ ] `src/config.ts`: one constant for the container credentials directory `/app/secrets`; `spotifyConfigPath` and
+### Step 3 — Credentials directory *(BR-69.4, BR-69.5, P-67, LC-60, IN-U9-1)* — ✅ DONE · `connectorSpawnParams` extracted so the explicit `env` is tested (`test/connectorSpawn.test.ts`, with a positive control) · `compose.yaml`'s `SPOTIFY_CONFIG_PATH` env (read before the default) moved to `/app/secrets/…` in both compose files · `verify-install.mjs` needed no change (it already writes `verify-install/secrets/spotify-config.json`) · owed to B&T: `:3011` polls hourly (`POLL_INTERVAL_MS: 3600000`), so BR-70's play and refresh need a shorter interval for the acceptance run
+- [x] `src/config.ts`: one constant for the container credentials directory `/app/secrets`; `spotifyConfigPath` and
       `musicbrainzConfigPath` derive from it in the container; host paths unchanged. The comment about the
       connector's `__dirname` path is rewritten.
-- [ ] `src/mcp/spotifyMcpClient.ts`: spawn with `env: { ...getDefaultEnvironment(), SPOTIFY_CONFIG_PATH }` in the
+- [x] `src/mcp/spotifyMcpClient.ts`: spawn with `env: { ...getDefaultEnvironment(), SPOTIFY_CONFIG_PATH }` in the
       container (BR-69.5); a test asserts the spawn parameters carry it.
-- [ ] `scripts/docker-entrypoint.sh`: `chown` the directory `/app/secrets` (not recursive); the per-file `chown`
+- [x] `scripts/docker-entrypoint.sh`: `chown` the directory `/app/secrets` (not recursive); the per-file `chown`
       goes.
-- [ ] `compose.yaml`, `compose.verify.yaml`: `./secrets/` (resp. `./verify-install/secrets/`) → `/app/secrets` as a
+- [x] `compose.yaml`, `compose.verify.yaml`: `./secrets/` (resp. `./verify-install/secrets/`) → `/app/secrets` as a
       directory; both single-file mounts removed. The `compose.verify.yaml` placeholder comment is updated.
-- [ ] `scripts/verify-install.mjs`: creates `verify-install/secrets/` with the placeholder (or, with
+- [x] `scripts/verify-install.mjs`: creates `verify-install/secrets/` with the placeholder (or, with
       `--probe-credentials`, the reduced copy) and the MusicBrainz file inside it.
 
 ### Step 4 — Credentials-directory check *(Q5 = A, P-68, LC-61, PBT-76)*

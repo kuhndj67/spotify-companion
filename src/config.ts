@@ -15,12 +15,15 @@ const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
  * Defaults differ between the container and a host `npm start`, and getting this wrong
  * produces confusing "credentials not found" errors, so it is detected rather than assumed.
  *
- * Note the MCP server resolves its own spotify-config.json relative to its *script location*
- * (`__dirname/../spotify-config.json`), not the working directory — so the file must sit at
- * the root of the MCP server's own directory. compose.yaml mounts it there; on the host,
- * `npm run mcp:setup` places a copy there.
+ * The MCP server resolves its own spotify-config.json relative to its *script location*
+ * (`__dirname/../spotify-config.json`). On the host, `npm run mcp:setup` places a copy there. In the container
+ * (U9, BR-69): the connector is PATCHED at build time to honour `SPOTIFY_CONFIG_PATH`, and the app passes it the
+ * path below, inside the `/app/secrets` DIRECTORY mount -- because the connector writes by temp + rename, which
+ * fails with EBUSY through the single-file mount used until 1.0.0-beta.2.
  */
 const CONTAINER_MCP_DIR = '/opt/spotify-mcp';
+/** U9 (LC-60): the ONE container path for credentials. Host `./secrets/` is mounted here as a directory. */
+export const CONTAINER_SECRETS_DIR = '/app/secrets';
 const inContainer = existsSync(CONTAINER_MCP_DIR);
 const mcpDir = inContainer ? CONTAINER_MCP_DIR : join(projectRoot, '.mcp-server');
 
@@ -64,7 +67,7 @@ export const config = {
   spotifyConfigPath:
     process.env.SPOTIFY_CONFIG_PATH ??
     (inContainer
-      ? join(CONTAINER_MCP_DIR, 'spotify-config.json')
+      ? `${CONTAINER_SECRETS_DIR}/spotify-config.json`
       : join(projectRoot, 'secrets', 'spotify-config.json')),
 
   /** True when running inside the container image. Surfaced in diagnostics. */
@@ -177,7 +180,7 @@ export const config = {
   musicbrainzConfigPath:
     process.env.MUSICBRAINZ_CONFIG_PATH ??
     (inContainer
-      ? '/app/secrets/musicbrainz.json'
+      ? `${CONTAINER_SECRETS_DIR}/musicbrainz.json`
       : join(projectRoot, 'secrets', 'musicbrainz.json')),
 
   /** Overridable so BR-1.2's regression test can point at a fixture stub. */

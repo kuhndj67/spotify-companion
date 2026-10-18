@@ -33,9 +33,12 @@ if [ "$(id -u)" = "0" ]; then
   # Only the mount points, never a recursive pass over application code.
   chown node:node "$DATA_DIR" "${SNAPSHOT_DIR:-/data/snapshots}" 2>/dev/null || true
 
-  # The MCP server rewrites this file when it refreshes an access token.
-  if [ -f "${SPOTIFY_CONFIG_PATH:-/opt/spotify-mcp/spotify-config.json}" ]; then
-    chown node:node "${SPOTIFY_CONFIG_PATH:-/opt/spotify-mcp/spotify-config.json}" 2>/dev/null || true
+  # U9 (IN-U9-1): the credentials DIRECTORY, not a file. The connector refreshes its token, and CredentialsWriter
+  # saves Settings, by writing a temp file IN THIS DIRECTORY and renaming it over the original, so `node` must be
+  # able to create files here. The directory only, never recursive; the files keep whatever owner they have.
+  SECRETS_DIR="$(dirname "${SPOTIFY_CONFIG_PATH:-/app/secrets/spotify-config.json}")"
+  if [ -d "$SECRETS_DIR" ]; then
+    chown node:node "$SECRETS_DIR" 2>/dev/null || true
   fi
 
   # setpriv rather than su/sudo: no extra package, no intermediate shell, and the app keeps

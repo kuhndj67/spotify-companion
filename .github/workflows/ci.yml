@@ -3,6 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    # U9 (BR-72.1, P-70): a pushed release tag runs the SAME jobs as main, then `publish`. Pushing the tag is the
+    # owner's act; `npm run release` tags locally and never pushes.
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -121,9 +124,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The Dockerfile clones the MCP server from an unpinned ref, so this job doubles as
-      # an early warning for upstream drift — the same drift that would break the markdown
-      # parser at runtime. Not pushed anywhere; the build succeeding is the whole test.
+      # The connector is built at the PINNED ref (the Dockerfile's default, a checked copy of compose.yaml's: U9), with
+      # the guarded patch and upstream's own test suite. A failure here is ours or the patch's, never upstream drift.
+      # Not pushed anywhere; the build succeeding is the whole test.
       - name: Build image
         run: docker build --tag spotify-companion:ci .
 
@@ -163,3 +166,66 @@ jobs:
             echo "No usable base -- scanning the whole history"
             ./gitleaks git --redact --no-banner -c .gitleaks.toml .
           fi
+
+  # U9 (BR-72, P-70/P-71/P-72, IN-U9-4): publish the image -- ONLY for a pushed `v*` tag, ONLY after the same three
+  # jobs that guard `main` pass. NOT a required check (a check that runs only on tags would block every PR):
+  # test/rulesetMatchesWorkflow.test.ts asserts that.
+  #
+  # ⚠️ This is the one job that can WRITE to the registry. So: `packages: write` is granted here and nowhere else;
+  # the only action is actions/checkout, pinned by full SHA (credentials not persisted); everything else is the
+  # runner's own docker CLI. The decision runs inside node:22.23 (no npm install beside the token).
+  publish:
+    name: Publish image (release tags only)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, container, secrets]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    # Serialise per tag, never cancel: "is this version already published?" and the push must not race.
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
+    env:
+      IMAGE: ghcr.io/kuhndj67/spotify-companion
+      NODE_IMAGE: node:22.23-bookworm-slim
+      TRIVY_VERSION: 0.75.0
+      TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Log in to GHCR (token on stdin, this job only)
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      # BR-72.2/72.3: tag == v + package.json, and the version is not already published. "Could not ask" refuses.
+      - name: Decide (LC-64)
+        run: |
+          VERSION="$(jq -r .version package.json)"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if out="$(docker manifest inspect "$IMAGE:$VERSION" 2>&1)"; then REGISTRY=present
+          elif printf '%s' "$out" | grep -qiE 'manifest unknown|not found'; then REGISTRY=absent
+          else REGISTRY=unknown; echo "registry answer: $out"; fi
+          docker run --rm -v "$PWD/scripts/lib:/lib:ro" "$NODE_IMAGE" \
+            node /lib/publishDecision.ts --tag "$GITHUB_REF_NAME" --version "$VERSION" --registry "$REGISTRY"
+
+      # NFR Design Q4 = A: the base image's patch floats; record exactly which one this image was built on.
+      - name: Build (linux/amd64)
+        run: |
+          docker pull --platform linux/amd64 "$NODE_IMAGE"
+          BASE_DIGEST="$(docker inspect -f '{{index .RepoDigests 0}}' "$NODE_IMAGE")"
+          docker build --platform linux/amd64 \
+            --build-arg APP_VERSION="$VERSION" \
+            --build-arg VCS_REF="$GITHUB_SHA" \
+            --build-arg BASE_DIGEST="$BASE_DIGEST" \
+            --tag "$IMAGE:$VERSION" .
+
+      - name: Check the image before it leaves (LC-66)
+        run: bash scripts/check-image.sh "$IMAGE:$VERSION"
+
+      # No floating tag (BR-72.4): only the version is pushed.
+      - name: Push
+        run: docker push "$IMAGE:$VERSION"

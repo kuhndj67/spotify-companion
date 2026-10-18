@@ -120,16 +120,16 @@ split.
       neither → not blocked), plus `pin-not-accepted` cases; existing PBT-68…71 still pass.
 - [x] The acceptance file's structural test: see **Question 2**.
 
-### Step 8 — Publishing *(BR-72, P-70–P-72, LC-64–LC-66, PBT-75, IN-U9-4)*
-- [ ] `scripts/lib/publishDecision.ts` + `test/publishDecision.property.test.ts` (PBT-75 with its positive control).
-- [ ] `scripts/check-image.sh` (run by CI against the built image): licences present and non-empty; no file under a
+### Step 8 — Publishing *(BR-72, P-70–P-72, LC-64–LC-66, PBT-75, IN-U9-4)* — ✅ DONE · ⚠️ `publishDecision.ts` imports **nothing**: Node 22.23 strips types but cannot resolve `../../src/version.js` to `.ts`, and installing `tsx` in the job would run third-party install scripts beside the write token; full SemVer validity is `versionSources`' job in the `test` job that `publish` needs. CLI seen on 22.23 (publish / already-published / tag-mismatch) · pins: `actions/checkout` v4.4.0 = `11d5960a…` (credentials not persisted), **Trivy v0.75.0** (2026-10-01; v0.76.0 is 4 days old) SHA-256 `c6e65abd…` matched a real download · `check-image.sh` exports the image **once** (the first version exported per check and was minutes slow) · **positive control seen**: an image with a planted `app/secrets/spotify-config.json` and the MIT `LICENSE` removed → both caught, exit 1 · ⚠️ the Trivy step's first real run is the first tag push (owed to B&T)
+- [x] `scripts/lib/publishDecision.ts` + `test/publishDecision.property.test.ts` (PBT-75 with its positive control).
+- [x] `scripts/check-image.sh` (run by CI against the built image): licences present and non-empty; no file under a
       `secrets` path except `*.example.json`; no `data/`, `config/`, `state/` content; writes base digest and Node
       version to the job summary; **Trivy** release binary, pinned version **and SHA-256**, report only.
-- [ ] `.github/workflows/ci.yml`: `push: tags: ['v*']`; workflow `permissions: contents: read`; job `publish`
+- [x] `.github/workflows/ci.yml`: `push: tags: ['v*']`; workflow `permissions: contents: read`; job `publish`
       (`needs: [test, container, secrets]`, tag-only `if`, `concurrency: publish-${{ github.ref }}`,
       `packages: write`, `actions/checkout@<full SHA>`, then `docker` CLI: login with `GITHUB_TOKEN` on stdin →
       LC-64 → build with labels and build args → `check-image.sh` → push). No floating tag; `linux/amd64`.
-- [ ] `test/rulesetMatchesWorkflow.test.ts`: extended, `publish` is **not** a required check.
+- [x] `test/rulesetMatchesWorkflow.test.ts`: extended, `publish` is **not** a required check.
 
 ### Step 9 — *App only* entry points *(BR-74, P-73, LC-68, PBT-78, IN-U9-5)*
 - [ ] `src/appOnly/setup.ts` (compiled into `dist/`, so it ships): a pure decision over the files already in the

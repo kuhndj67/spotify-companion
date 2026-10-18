@@ -76,7 +76,7 @@ owner pushes v<version> ──► CI: tag == v + package.json? ──no──►
    (BR-74.5). Automation is off (BR-74.7).
 
 Every step carries its expected output and what to do if it differs (BR-61.1); the whole is walked cold on
-`kuhndjwin11pro` before README's *coming soon* comes off (BR-74.6).
+`Machine 1` before README's *coming soon* comes off (BR-74.6).
 
 ## Error handling summary
 

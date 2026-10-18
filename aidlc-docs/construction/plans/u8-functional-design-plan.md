@@ -1,7 +1,7 @@
 # U8 Functional Design Plan — Team Workflow & Onboarding
 
 **Date**: 2026-10-12 · **Stage**: CONSTRUCTION — Functional Design, Unit **U8** (Phase 5)
-**Status**: ✅ **ALL ANSWERED 2026-10-12** — Q1 B · Q2 C · Q3 A · Q4 A · Q5 A · Q6 A · Q7 A · Q8 A · Q9 A (ratified, Requirements Q20) · Q10 B (`kuhndj67@hotmail.com`; W-14). ▶ FD artifacts written: `construction/u8-team-workflow/functional-design/`.
+**Status**: ✅ **ALL ANSWERED 2026-10-12** — Q1 B · Q2 C · Q3 A · Q4 A · Q5 A · Q6 A · Q7 A · Q8 A · Q9 A (ratified, Requirements Q20) · Q10 B (`<email address>`; W-14). ▶ FD artifacts written: `construction/u8-team-workflow/functional-design/`.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U8 · requirements **FR-65**, **NFR-28, NFR-30–NFR-34** · U6 and U7 as built (the
 install routine documents *Restore backup*, the in-app rules and credential steps)
@@ -164,7 +164,7 @@ A
 [Answer]:
 B - but since the plan is to make the repo public we should have a work item to shift to GitHub reporting once we do.
 
-*Follow-up (2026-10-12)*: address **`kuhndj67@hotmail.com`** (user). Backlog **W-14** logged: go public, then move reports to GitHub private vulnerability reporting.
+*Follow-up (2026-10-12)*: address **`<email address>`** (user). Backlog **W-14** logged: go public, then move reports to GitHub private vulnerability reporting.
 ---
 
 ## 4. What this unit will NOT do

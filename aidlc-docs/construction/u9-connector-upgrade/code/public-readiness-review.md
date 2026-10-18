@@ -31,9 +31,9 @@ touched.
 | **Raw listening sessions** with timestamps | 7 probe files in `aidlc-docs/construction/u5-automated-skipping/probes/` (`p-u5-1-marks-*.json` ×6, `p-u5-1-driven.json`), with titles, artists, **32 Spotify track ids**, times | **Highest**: when you listened to what, minute by minute, on 2026-09-27 |
 | **Tracks and artists in prose** | **25** design files name **73** distinct multi-word titles/artists (most in `audit.md`, `research-findings.md`, `r11-queue-lookahead-2026-09-22.md`, `requirements.md`); with single-word names, 72 titles and 54 artists | Medium: taste, sometimes with dates |
 | **Artist names as test fixtures** | ~20 files under `src/`, `test/`, `public/` use a few real artists as examples (e.g. Bad Bunny, Chris Webby, Eden Nash, Macklemore, Dolly Parton), **no dates** | Low |
-| **Email addresses** | `kuhndj67@gmail.com` (the MusicBrainz contact): 3 test files + U7 design docs + `audit.md`. `kuhndj67@hotmail.com`: `SECURITY.md` (intended) + U8 design docs | Medium (gmail): a personal address, findable by scrapers |
-| **Home network** | NAS address `192.168.0.223` (7 lines, 5 files), name `SYNNAS` (10 lines, 5 files) | Low–medium: a private LAN address and a device name; no exposure by itself, but useful reconnaissance |
-| **Machine names** | `kuhndjwin11pro` (43 lines, 19 files) | Low |
+| **Email addresses** | `<email address>` (the MusicBrainz contact): 3 test files + U7 design docs + `audit.md`. `<email address>`: `SECURITY.md` (intended) + U8 design docs | Medium (gmail): a personal address, findable by scrapers |
+| **Home network** | NAS address `192.168.0.223` (7 lines, 5 files), name `Machine 2` (10 lines, 5 files) | Low–medium: a private LAN address and a device name; no exposure by itself, but useful reconnaissance |
+| **Machine names** | `Machine 1` (43 lines, 19 files) | Low |
 | Spotify client id, Windows user paths | **none found** | — |
 
 **The options, per class** (from W-14):
@@ -52,6 +52,15 @@ touched.
 A reasonable middle path to consider (yours to choose): **C for the 7 raw probe files** (they are data, not
 design) **and the gmail address**; **A** for prose, fixtures, NAS and machine names. Or **D** if the AI-DLC record
 itself (`audit.md` quotes tracks with dates) should not be public.
+
+### Owner's choices (2026-10-18)
+
+| Class | Choice | Done |
+|---|---|---|
+| Email addresses | **Redact** → `<email address>` (tests use the obviously fake `listener@example.org`, since the code validates it) | ✅ 2026-10-18, current files. ⚠️ Still in **history**, and `<email address>` (the hotmail one) is the **author email of all 406 commit records**, which a public repository shows. Not changed by redacting files. `SECURITY.md` kept: it is the reporting channel. Both open |
+| Machine names | **Redact**: the walk VM → `Machine 1`, the NAS → `Machine 2` | ✅ 2026-10-18, current files (still in history) |
+| NAS IP address | **Accept**: a private network address | — |
+| Listening history (probe files, prose, fixtures) | Not yet decided | — |
 
 ## 3. Licence and image
 

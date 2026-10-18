@@ -17,7 +17,7 @@ PBT-73…78 · U7 IN-U7-3 (probe credentials) · U8 infrastructure (walk VM, ver
 | LC-63 structural tests | `npm test` locally and in CI's `test` job | NFR Design |
 | LC-64/65/66 publishing | `ci.yml` `publish` job on GitHub-hosted `ubuntu-latest`; registry **GHCR**, package `kuhndj67/spotify-companion`, private | Q27, NFR Q1–Q4 |
 | LC-67 release guards | `npm run release` on this PC | NFR Design |
-| LC-68 *App only* entry points | The image's entrypoint; walked on `kuhndjwin11pro` | FD Q8, Q10, Q11 |
+| LC-68 *App only* entry points | The image's entrypoint; walked on `Machine 1` | FD Q8, Q10, Q11 |
 | Acceptance (BR-70) | The `:3011` verification install (`compose.verify.yaml`, project `spotify-verify`) | FD |
 
 **Categories with nothing to decide** (rule Step 3 asks each to be justified):

@@ -324,7 +324,7 @@ how FR-75's walk is done · the code comments that still call the NAS "U9" (`src
 
 ## U10 — Off-machine Deployment *(Phase 5)* — NOT YET DESIGNED
 
-**Target**: the owner's Synology NAS, **`SYNNAS` (192.168.0.223)**, on a private, non-forwarding LAN.
+**Target**: the owner's Synology NAS, **`Machine 2` (192.168.0.223)**, on a private, non-forwarding LAN.
 
 **Purpose**: the app runs on another machine on the user's LAN (a Synology NAS first), fully working, under
 the security posture chosen in Requirements **Question 11a = B**: **delegated authentication** (NFR-29) —
@@ -341,7 +341,7 @@ and restored on the NAS through *Restore backup*, and the NAS app runs with the 
 
 **Carried into its design plan** (Units round, *Carried to U9's design plan*): **U9-a** NAS as *the* deployment
 or a throwaway second one · **U9-b** two deployments on one Spotify registration · probe **WAL on the NAS
-volume** · verify the WebSocket handshake **both directions** off-machine. **The NAS's CPU architecture** (added 2026-10-18, from U9 FD Q5): U9 publishes `linux/amd64` only; add `arm64` here if SYNNAS needs it. **U9-c** *(2026-10-12, user + Claude)*: deploy to the NAS
+volume** · verify the WebSocket handshake **both directions** off-machine. **The NAS's CPU architecture** (added 2026-10-18, from U9 FD Q5): U9 publishes `linux/amd64` only; add `arm64` here if Machine 2 needs it. **U9-c** *(2026-10-12, user + Claude)*: deploy to the NAS
 with **least authority** — no MCP server and no Docker-group account (Docker access is root-equivalent: a container
 can mount the host). Recommended: a dedicated NAS user whose single SSH key is locked by `command=` to an
 owner-controlled deploy script (`deploy <vX.Y.Z>` · `status` · `logs` · `rollback <tag>`), reaching Docker through a

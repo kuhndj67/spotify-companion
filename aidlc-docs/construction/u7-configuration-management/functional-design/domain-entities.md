@@ -41,7 +41,7 @@ a file the app (or an agent) edits.
 |---|---|
 | client id `3f2a…………91c0` (any length ≥ 9) | `3f2a…91c0` |
 | client id shorter than 9 | `set` |
-| email `kuhndj67@gmail.com` | `k…7@gmail.com` |
+| email `<email address>` | `<email address>` |
 | other contact (URL) | first 8 characters + `…` |
 
 Pure functions in their own module, listed in `test/purity.test.ts`; property-tested so that **no output ever

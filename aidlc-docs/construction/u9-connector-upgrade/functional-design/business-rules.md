@@ -113,7 +113,7 @@ observation; "no errors" passes nothing.
 | **BR-74.3** | **The image runs the Spotify sign-in.** One `docker run` command runs `auth.mjs`: its callback listener binds **inside** the container, and the port is published **only on the host's `127.0.0.1`** (the app's own pattern). The sign-in link is **printed**, since a container cannot open the host's browser. It writes `secrets/spotify-config.json` through the directory mount (BR-69.4) | Q10 = A |
 | **BR-74.4** | ⚠️ **The redirect URI does not change**: `http://127.0.0.1:<port>/callback`, so a Spotify app registered for the source install works unchanged. To be **probed** before it is written into the steps | Q10 = A |
 | **BR-74.5** | The *App only* steps follow BR-61.1's shape: purpose, command, **expected output**, what to do if it differs. They end with BR-61.6's positive check (UI responds, Spotify indicator **ok**, a play recorded) | BR-61 |
-| **BR-74.6** | **Walked before the label comes off**: an agent walk on `kuhndjwin11pro` from its `clean` checkpoint, given **only** README *App only* and a read token, under BR-62's rules (any step needing outside knowledge fails the walk; the walk is recorded). README's *coming soon* is removed only when that walk passes | Q8 = A |
+| **BR-74.6** | **Walked before the label comes off**: an agent walk on `Machine 1` from its `clean` checkpoint, given **only** README *App only* and a read token, under BR-62's rules (any step needing outside knowledge fails the walk; the walk is recorded). README's *coming soon* is removed only when that walk passes | Q8 = A |
 | **BR-74.7** | Automation is **off** at the end of an *App only* install (BR-61.9) | FR-47 |
 
 ## BR-75: Release and records

@@ -98,7 +98,7 @@ runs on tags would block every PR).
 5. **Live crossing**: owner present; release refuses while `spotify-now-playing` runs (seen) → owner stops it →
    release builds, deploys `spotify-companion:1.0.0-beta.N`, health-checks, tags → a play is seen recorded.
 6. Owner pushes the tag → `publish` runs → the image is in GHCR, private, with both licences (checked by pulling).
-7. Token probe (IN-U9-6) → walk guide → agent walk of *App only* on `kuhndjwin11pro` → on pass, README's
+7. Token probe (IN-U9-6) → walk guide → agent walk of *App only* on `Machine 1` → on pass, README's
    *coming soon* comes off (a docs-only release).
 
 Steps 5 and 6 are outward-facing or touch the live deployment: each waits for the owner's go-ahead.

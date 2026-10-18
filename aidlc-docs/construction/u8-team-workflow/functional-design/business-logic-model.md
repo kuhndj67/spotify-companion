@@ -41,9 +41,9 @@ INSTALL.md @ commit C ──► walker (agent | person), clean environment, only
       └─ any step failed ─► fix INSTALL.md (commit C') ─► walk the changed steps again on C'
 ```
 
-The agent walk is U8's exit criterion. Its environment is the Windows 11 VM **`kuhndjwin11pro`**, reverted to its `clean` checkpoint, with a **fresh Claude Code
+The agent walk is U8's exit criterion. Its environment is the Windows 11 VM **`Machine 1`**, reverted to its `clean` checkpoint, with a **fresh Claude Code
 session** started in a folder holding only `INSTALL.md` — no clone history, no `CLAUDE.md`, no `aidlc-docs/`, no
-memory (BR-62.6). *(Amended 2026-10-12 to the MacBook, and 2026-10-14 to `kuhndjwin11pro`, because the MacBook is too old — Infrastructure Q1 = A.)*
+memory (BR-62.6). *(Amended 2026-10-12 to the MacBook, and 2026-10-14 to `Machine 1`, because the MacBook is too old — Infrastructure Q1 = A.)*
 
 ## 3. A contribution (US-31, BR-63, BR-64, BR-67.2)
 

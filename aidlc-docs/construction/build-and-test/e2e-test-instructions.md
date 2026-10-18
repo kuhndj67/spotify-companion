@@ -4,7 +4,7 @@
 a clean machine. It is **U8's exit criterion** (FR-65, BR-62) and the trigger for **`1.0.0-beta.1`**. Walk ② (a
 person) uses the same guide from §4 on.
 **Design**: [`u8-team-workflow/infrastructure-design/infrastructure-design.md`](../u8-team-workflow/infrastructure-design/infrastructure-design.md)
-(IN-U8-1…7). **Walk machine**: `kuhndjwin11pro`.
+(IN-U8-1…7). **Walk machine**: `Machine 1`.
 
 The order: **§1 base and checkpoint → §2 canary probe → §3 token → §4 the walk → §5 teardown.** §1 and §2 are done
 once. §3–§5 are repeated for every walk and every re-walk.
@@ -69,14 +69,14 @@ has **VMware PowerCLI**, whose `Get-VM`/`Set-VM` win over Hyper-V's by name. A b
 currently connected to any servers"*, and a bare `Set-VM` says `-AutomaticCheckpointsEnabled` is not found (found
 2026-10-16):
 
-9. **B6**: `Hyper-V\Set-VM -Name kuhndjwin11pro -AutomaticCheckpointsEnabled $false`, then check it with
-   `(Hyper-V\Get-VM kuhndjwin11pro).AutomaticCheckpointsEnabled`, which must print `False`
-10. `(Hyper-V\Get-VMProcessor kuhndjwin11pro).Count`. Note the vCPU count down by hand, and add it to
+9. **B6**: `Hyper-V\Set-VM -Name Machine 1 -AutomaticCheckpointsEnabled $false`, then check it with
+   `(Hyper-V\Get-VM Machine 1).AutomaticCheckpointsEnabled`, which must print `False`
+10. `(Hyper-V\Get-VMProcessor Machine 1).Count`. Note the vCPU count down by hand, and add it to
     `base-inventory.txt` on the VM before step 11.
-11. **Shut the VM down**, then: `Hyper-V\Checkpoint-VM -Name kuhndjwin11pro -SnapshotName clean`
+11. **Shut the VM down**, then: `Hyper-V\Checkpoint-VM -Name Machine 1 -SnapshotName clean`
 12. **Positive control** (a revert never seen to revert anything is only a belief):
     - boot the VM, create `C:\canary-revert.txt`, and shut it down;
-    - `Hyper-V\Restore-VMCheckpoint -VMName kuhndjwin11pro -Name clean -Confirm:$false`
+    - `Hyper-V\Restore-VMCheckpoint -VMName Machine 1 -Name clean -Confirm:$false`
     - boot the VM: `Test-Path C:\canary-revert.txt` must print **False**.
 
 ---

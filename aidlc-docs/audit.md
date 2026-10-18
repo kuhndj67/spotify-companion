@@ -1676,7 +1676,7 @@ Awaiting approval. Next: Code Generation. Open item 1 deliberately still open
 ## U2 Build and Test Complete — Three Defects Found by Running, Not by Testing
 **Timestamp**: 2026-09-01
 **User Input**: "lets build and test" · authorised creating `secrets/musicbrainz.json` with
-kuhndj67@gmail.com, and attempting the container egress check
+<email address>, and attempting the container egress check
 **AI Response**: "Ran the stage against the real service rather than against fixtures, which is
 where all of its value turned out to be.
 
@@ -7116,7 +7116,7 @@ in `requirement-verification-questions.md`, and this log quotes the mistyped add
 
 **Decision (user, same day)**: the NAS hostname and address **stay in the repository**. The LAN is private and
 non-forwarding, anyone already on it could find the NAS with a scan, and a concrete hostname helps readers of
-the install documentation. Added to U9's entry in `unit-of-work.md`: target **`SYNNAS` (192.168.0.223)**.
+the install documentation. Added to U9's entry in `unit-of-work.md`: target **`Machine 2` (192.168.0.223)**.
 
 ---
 
@@ -7841,7 +7841,7 @@ with the owner's direct-push bypass (Q13 = B).
 User answers in the plan file: **Q2 C · Q3 A · Q4 A · Q5 A · Q6 A · Q7 A · Q8 A · Q9 A · Q10 B** — *"B - but since
 the plan is to make the repo public we should have a work item to shift to GitHub reporting once we do."* Follow-ups
 by question prompt: **Q20 "Ratify as written"** (P4 The Contributor, US-30, US-31 → `personas.md`, `stories.md`);
-Q10 address **"kuhndj67@hotmail.com - but once we go public this should change to the GitHub path."** Backlog
+Q10 address **"<email address> - but once we go public this should change to the GitHub path."** Backlog
 **W-14** logged (go public: history scan, exposure review of docs, then GitHub private vulnerability reporting).
 
 FD written: `construction/u8-team-workflow/functional-design/` — **BR-61** install routine · **BR-62** cold walk
@@ -7944,11 +7944,11 @@ measurement — caught here because the change was measured before it was commit
 
 ---
 
-## 2026-10-13T15:00:00Z — Cold-walk machine: the MacBook is out; `kuhndjwin11pro` (Hyper-V Windows 11 VM) probed
+## 2026-10-13T15:00:00Z — Cold-walk machine: the MacBook is out; `Machine 1` (Hyper-V Windows 11 VM) probed
 
 User: the MacBook *"is too old to run vscode.app or claude.app"* — so it cannot host a cold Claude Code session, and is
 very likely too old for a container engine too (not measured: `sw_vers` was not run). User then offered
-**`kuhndjwin11pro`**, a Hyper-V Windows 11 Pro VM on another machine, *"100% clean"* — VS Code and Claude Code
+**`Machine 1`**, a Hyper-V Windows 11 Pro VM on another machine, *"100% clean"* — VS Code and Claude Code
 installed; no Docker, WSL2 or Rancher Desktop. Claude recommended **neither** of the user's two options (copy the whole
 project in / a scripted install): the first hands the walker `CLAUDE.md` and the history (BR-62.1/62.6), the second
 tests a script instead of `docs/INSTALL.md` (FR-65). Instead: a fresh session in an empty folder follows INSTALL.md from
@@ -7967,7 +7967,7 @@ the release tag; a fine-grained, read-only, short-lived token for the private re
   as pending.)* **The walk machine's prerequisites are complete.**
 
 Pending (Infrastructure Design, after NFR Design approval): amend BR-62.2 / BR-61.3 again — agent walk on
-`kuhndjwin11pro` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`
+`Machine 1` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`
 from a subfolder (BR-62.6).
 
 ---
@@ -7975,14 +7975,14 @@ from a subfolder (BR-62.6).
 ## 2026-10-13T15:30:00Z — U8 NFR Design APPROVED; Infrastructure Design plan written
 
 User: *"approve and continue"*. Plan: `construction/plans/u8-infrastructure-design-plan.md`, 7 questions — walk machine
-`kuhndjwin11pro` (replacing the MacBook amendment) · a `clean` Hyper-V checkpoint so re-walks are cold · a
+`Machine 1` (replacing the MacBook amendment) · a `clean` Hyper-V checkpoint so re-walks are cold · a
 fine-grained read-only 7-day token for the private repo · a canary probe for `CLAUDE.md` loading from a subfolder
 (BR-62.6) · a new Spotify app for the walk · live deployment keeps running · the walk record copied back by the owner
 (walker cannot push). Storage, messaging and networking stated not applicable, with reasons.
 
 ---
 
-## 2026-10-14T15:20:00Z — U8 Infrastructure Design plan answered; IN-U8-1…7 written; FD amended for `kuhndjwin11pro`
+## 2026-10-14T15:20:00Z — U8 Infrastructure Design plan answered; IN-U8-1…7 written; FD amended for `Machine 1`
 
 User (after a reboot): *"I needed to answer the questions in infra design plan... which I've just done."* Answers in
 the plan file: **Q1 A · Q2 A** — *"always want to start with just a base install (right now that includes vscode with
@@ -8009,7 +8009,7 @@ the **session transcript**, which comes back for review only and is never commit
 secret).
 
 **FD amended** (Q1 = A): BR-61.3 (macOS → untested), **BR-61.10 withdrawn** (Mac probes; principle carried to U9),
-BR-62.2 (walk ① on `kuhndjwin11pro`; walk ②'s platform recorded, not prescribed), BR-62.6, business-logic-model S1/§2,
+BR-62.2 (walk ① on `Machine 1`; walk ②'s platform recorded, not prescribed), BR-62.6, business-logic-model S1/§2,
 domain-entities §4. Awaiting approval.
 
 ---
@@ -8161,7 +8161,7 @@ precondition, BR-65.2, the U8 HANDOFF, the README line (no longer "no licence"),
 
 ## 2026-10-16T17:15:00Z — Walk VM base inventory, first run: git is NOT in the base; step 8 script fixed
 
-Owner ran §1 step 8 on `kuhndjwin11pro`, output pasted in chat (first run): `git`, `node` and `docker` are all *not
+Owner ran §1 step 8 on `Machine 1`, output pasted in chat (first run): `git`, `node` and `docker` are all *not
 recognized*; WSL is not installed; `.claude` holds no `CLAUDE.md` and no `projects\` folder (only sign-in, cache,
 synced skills and plugins); C: 48.6 GB used, 225 GB free. ⚠️ **git is absent**: Claude Code (VS Code extension) runs
 without it, so S1's `winget install Git.Git` is walked for real. That resolves the open question in IN-U8-2 §2b.
@@ -8209,7 +8209,7 @@ found" that names the wrong cause.
 
 ## 2026-10-16T18:30:00Z — Canary probe (IN-U8-4 / BR-62.6): subfolder CLAUDE.md DOES load; `claudeMdExcludes` stops it
 
-Owner on `kuhndjwin11pro`, VS Code extension. **C1** (session opened in `C:\walk\canary`): canary seen, so the
+Owner on `Machine 1`, VS Code extension. **C1** (session opened in `C:\walk\canary`): canary seen, so the
 method can detect loading. **C2** (session in `C:\walk`, asked to read `canary\README.md`): it saw `hello` **and loaded
 `canary\CLAUDE.md`**. A cold walk session would therefore pick up the clone's `CLAUDE.md` as soon as it reads any file
 in the clone. C3 was not run, because C2 decided it. `/memory` turned out to be useless here: in the extension it
@@ -8553,7 +8553,7 @@ construction records left on old numbers): *"Looks good... lets go!"* **Requirem
 - The runtime stage does **not** copy the connector's `LICENSE`; CI pushes no image and no workflow reacts to tags.
 
 Plan: `construction/plans/u9-functional-design-plan.md`, Q1 Node version · Q2 config-write fix · Q3 host location
-of credentials · Q4 rename scope and crossing · Q5 architectures (SYNNAS's CPU unrecorded) · Q6 who publishes · Q7
+of credentials · Q4 rename scope and crossing · Q5 architectures (Machine 2's CPU unrecorded) · Q6 who publishes · Q7
 licence notices · Q8 FR-75 walk · Q9 story US-32. Entry point `construction/u9-connector-upgrade/HANDOFF.md` created.
 
 ---
@@ -8563,7 +8563,7 @@ licence notices · Q8 FR-75 walk · Q9 story US-32. Entry point `construction/u9
 Owner (in the plan file): Q1 A · Q2 A · Q3 A · Q4 A · Q6 A · Q7 A · Q8 A · Q9 A. **Q5**: *"This is for U10 so should
 not be in this unit... please check to make sure U9 and U10 have been kept separate."* Checked: FR-73…75 and NFR-40
 never mention the NAS; U9's other U10 mentions are context (U10 depends on U9). Q5 was the one leak (reading
-SYNNAS's CPU), plus Q8's option text describing U10's walk. **Resolved**: U9 publishes `linux/amd64` only (the
+Machine 2's CPU), plus Q8's option text describing U10's walk. **Resolved**: U9 publishes `linux/amd64` only (the
 platform of U9's own consumers: this PC, CI, the walk VM); the NAS's architecture is carried to U10 in
 `unit-of-work.md`.
 
@@ -8732,3 +8732,18 @@ found); **not ready** until the owner chooses, per class, accept / redact / rewr
 personal gmail address, NAS address and names. Record: `construction/u9-connector-upgrade/code/public-readiness-review.md`.
 
 Nothing deployed or released. Awaiting the owner's approval of Code Generation → Build & Test.
+
+---
+
+## 2026-10-18T23:00:00Z — Redaction for going public: email addresses and machine names
+
+Owner: *"redact email addresses and machine names (replace with generic text \"<email address>\" and \"Machine 1\",
+\"Machine 2\". No worries about ip addresses (private network)."*
+
+Done across **33 tracked files** (this log included, as a redaction, not a change of record): both personal email
+addresses → `<email address>` (tests → `listener@example.org` / `l…r@example.org`, valid for the code's checks); the
+walk VM → `Machine 1`; the NAS → `Machine 2`. IP address kept (owner). `npm run verify` green, 1701 tests.
+
+**Not done, and why** (asked of the owner): `SECURITY.md` keeps its address, because it is the vulnerability-reporting
+channel; and the author email on **all 406 commit records** is the hotmail address, which file edits cannot change
+and a public repository displays. The redaction also does not remove anything from **history** (W-14 option B).

@@ -41,7 +41,7 @@ describe('maskClientId — PBT-62', () => {
 
 describe('maskContact — PBT-62', () => {
   it('an email shows first and last of the local part, and the domain', () => {
-    assert.equal(maskContact('kuhndj67@gmail.com'), 'k…7@gmail.com');
+    assert.equal(maskContact('listener@example.org'), 'l…r@example.org');
   });
 
   it('a very short local part reveals nothing of it', () => {

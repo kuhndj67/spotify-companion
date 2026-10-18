@@ -25,7 +25,7 @@ npm run release ── guards: old container running? ──┐             │
                                                                     │
 :3011 verification (during Build & Test only)                       │ docker pull (read token, 7 days)
   spotify-companion-verify, own ./verify-install/secrets/           ▼
-  reduced credential copy, ≥ 50 min, rotation watch          VM kuhndjwin11pro (walk of README App only)
+  reduced credential copy, ≥ 50 min, rotation watch          VM Machine 1 (walk of README App only)
                                                                docker run … setup   → compose.yaml, secrets/, …
 SPOTIFY  one account                                           docker run -p 127.0.0.1:8888:8888 … auth
   live app ◄── polls ── live and (briefly) :3011               docker compose up -d → play recorded

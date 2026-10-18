@@ -14,7 +14,7 @@ and the walk install binds `127.0.0.1` like every other install. *Compute scalin
 
 ---
 
-## IN-U8-1 · The walk machine is `kuhndjwin11pro` *(Q1 = A, which amends the FD)*
+## IN-U8-1 · The walk machine is `Machine 1` *(Q1 = A, which amends the FD)*
 
 | | |
 |---|---|
@@ -30,9 +30,9 @@ and the walk install binds `127.0.0.1` like every other install. *Compute scalin
   *untested*.**
 - **BR-61.10**: **withdrawn.** It existed only to probe the Mac before the walk. Its principle still applies to
   Linux in U9: *a platform is not supported on the strength of another platform's probe.*
-- **BR-62.2**: walk ① runs on `kuhndjwin11pro`; walk ②'s platform is recorded, not prescribed.
+- **BR-62.2**: walk ① runs on `Machine 1`; walk ②'s platform is recorded, not prescribed.
 - **BR-62.6**: *"on the Mac"* → *"on the walk VM"*.
-- `business-logic-model.md` S1 and §2, `domain-entities.md` §4: MacBook → `kuhndjwin11pro`.
+- `business-logic-model.md` S1 and §2, `domain-entities.md` §4: MacBook → `Machine 1`.
 
 ## IN-U8-2 · Base configuration and the `clean` checkpoint *(Q2 = A, plus the user's addition)*
 
@@ -49,7 +49,7 @@ the steps the walk tests.
 | B3 | ➕ **Claude Code signed in** | so the walk does not start with a login. Signing in is not an `INSTALL.md` step |
 | B4 | ➕ **Windows Update paused** (the longest pause offered), taken **after** B1 | ⚠️ **the outage shape**: WSL updates installed during standby took Rancher down here twice (2026-09-30, 2026-10-13). An update in the middle of a walk would look like an `INSTALL.md` failure. ⚠️ The pause ends on a **calendar date**, and reverting the checkpoint does not reset that date. Once it lapses, take the base again |
 | B5 | ➕ **Edge first-run finished, no account signed in** | the owner does the browser steps (Spotify dashboard, OAuth consent). A first-run wizard in the middle of S3 is noise. No sign-in, so no synced passwords or extensions |
-| B6 | ➕ **Hyper-V automatic checkpoints OFF** (host: `Set-VM -Name kuhndjwin11pro -AutomaticCheckpointsEnabled $false`) | client Hyper-V takes one at every VM start by default. They pile up beside `clean`, and a revert can then land on the wrong one |
+| B6 | ➕ **Hyper-V automatic checkpoints OFF** (host: `Set-VM -Name Machine 1 -AutomaticCheckpointsEnabled $false`) | client Hyper-V takes one at every VM start by default. They pile up beside `clean`, and a revert can then land on the wrong one |
 | B7 | ~~Enhanced Session (clipboard) **on**~~ ⚠️ **Amended 2026-10-16 (owner)**: the Hyper-V host is on a corporate VPN, **completely isolated** from the VM (separate NIC on the owner's local network). **Nothing relies on the host OS**: it only manages the VM. Results go to `C:\walk-out\` on the VM and are **pulled by the dev PC** from a temporary read-only SMB share **on the VM** (*Procedure T*, `e2e-test-instructions.md` §6), which the next revert deletes. The token is made in the VM's Edge (IN-U8-3) | ⚠️ **Still no shared folder or mapped drive from the VM to the dev PC**: that would give the walk machine a path to `data/`. The share points the other way, and is read-only |
 
 ### 2b. Not in the base, on purpose
@@ -70,18 +70,18 @@ Get-ChildItem $env:USERPROFILE\.claude -Recurse -Force | Select-Object FullName 
 Get-PSDrive C | Select-Object Used,Free
 ```
 
-On the host: `Get-VMProcessor kuhndjwin11pro | Select-Object Count` (the vCPU count; not measured yet).
+On the host: `Get-VMProcessor Machine 1 | Select-Object Count` (the vCPU count; not measured yet).
 
 Also delete the `coreinfo64` download left by the 2026-10-13 probe. These results are the **base inventory**. They
 go into `audit.md` and the first lines of every walk record.
 
 ### 2d. Taking `clean`, and its positive control
 
-1. Shut the VM **down**. Then, on the host: `Checkpoint-VM -Name kuhndjwin11pro -SnapshotName clean`.
+1. Shut the VM **down**. Then, on the host: `Checkpoint-VM -Name Machine 1 -SnapshotName clean`.
    ⚠️ Take it while the VM is **off**. Hyper-V restricts saving the state of a VM that exposes virtualization
    extensions, and a powered-off checkpoint avoids that question. *(Restriction recalled from Microsoft's
    documentation, not probed. Taking it with the VM off makes the probe unnecessary.)*
-2. **Positive control**: boot, create `C:\canary-revert.txt`, shut down, `Restore-VMCheckpoint -VMName kuhndjwin11pro -Name clean -Confirm:$false`,
+2. **Positive control**: boot, create `C:\canary-revert.txt`, shut down, `Restore-VMCheckpoint -VMName Machine 1 -Name clean -Confirm:$false`,
    boot, and confirm the file is **gone**. *A revert never seen to revert anything is only a belief about a
    checkpoint.*
 3. Every walk, and every re-walk after an `INSTALL.md` fix (BR-62.3), **starts with that revert**. After U8 the
@@ -132,7 +132,7 @@ probe does not need.
 | C2 | Fresh session **in `C:\walk`**. Ask it to read `canary\README.md`, then ask the same question. Run `/memory` | records whether the canary appears |
 | C3 | Same session: ask it to **run a command inside** `canary\` (e.g. `Get-ChildItem`), as the walk will (`npm run auth`, `docker compose` from inside the clone). Ask again. Run `/memory` | records whether the canary appears |
 
-✅ **PROBE RESULT 2026-10-16 (owner, on `kuhndjwin11pro`)**: **C1 yes** (positive control: the method detects loading) · **C2 yes**: reading
+✅ **PROBE RESULT 2026-10-16 (owner, on `Machine 1`)**: **C1 yes** (positive control: the method detects loading) · **C2 yes**: reading
 `canary\README.md` loaded `canary\CLAUDE.md` on demand, as the docs say (*"loads … once Claude reads, writes, or
 edits another file in that subdirectory"*) · C3 not run (C2 decided it). **Fix, probed**: user settings
 `%USERPROFILE%\.claude\settings.json` =

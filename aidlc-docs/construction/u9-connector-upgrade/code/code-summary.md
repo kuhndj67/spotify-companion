@@ -77,6 +77,6 @@ reason. Both were redone with the failure *reason* asserted, not just the exit c
 7. **First tag push** (owner's act) → `publish` runs: its first real run of the Trivy step, the registry check, and
    the push; then pull it back and check both licences.
 8. **Token probe** (IN-U9-6): does a fine-grained token pull from GHCR? Then the walk guide, and the **agent walk** of
-   README *App only* on `kuhndjwin11pro` (incl. the real sign-in success path, BR-74.4) → on a pass, *coming soon*
+   README *App only* on `Machine 1` (incl. the real sign-in success path, BR-74.4) → on a pass, *coming soon*
    comes off.
 9. Mark NFR-32 and R8 discharged (BR-73.5) once 3 and 7 are done.

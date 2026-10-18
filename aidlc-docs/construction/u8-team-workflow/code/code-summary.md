@@ -68,4 +68,4 @@
 5. **Post the MCP licence issue** (owner) — see the draft's note about the private-repo link.
 6. **The walk guide** (Build & Test instructions), including IN-U8-3's token guide verbatim.
 7. **VM work** (owner): base B1–B7, inventory, `clean` + revert control, then the canary probe C0–C3.
-8. **Walk ①** on `kuhndjwin11pro` from tag `v1.0.0-beta.1` → if it passes, release `1.0.0-beta.1`.
+8. **Walk ①** on `Machine 1` from tag `v1.0.0-beta.1` → if it passes, release `1.0.0-beta.1`.

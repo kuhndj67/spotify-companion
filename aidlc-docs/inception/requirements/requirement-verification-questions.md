@@ -397,7 +397,7 @@ X) Other (please describe after [Answer]: tag below)
 reopen multi-tenancy.
 
 [Answer]:
-B - and fyi the synology nas has an OAuth service (installed but not configured to support any apps currently) if that is of any use. As we work through this it may be beneficial to find an mcp server for synology products to allow you to automate configuration tasks as needed (faster than walking me through them). The Nas hostname is SYNNAS (192.168.0.223).
+B - and fyi the synology nas has an OAuth service (installed but not configured to support any apps currently) if that is of any use. As we work through this it may be beneficial to find an mcp server for synology products to allow you to automate configuration tasks as needed (faster than walking me through them). The Nas hostname is Machine 2 (192.168.0.223).
 
 ## Question 17b — Enforce "credentials are never written to the repo"
 
@@ -525,7 +525,7 @@ below is in `requirements.md` yet**; it is written there only once ratified.
 | FR-67 | **A rules write can never silently lose rules.** An upload that removes **every** rule, or **more than half**, needs a typed confirmation. An upload based on an **older version** than the file now on disk (changed by hand or in another tab since it was downloaded) is **refused**. A rules write **never** changes the automation switch or halt latch | Q2b, c, e |
 | FR-68 | **Undo last rules change**: exactly one previous rules file is kept and can be put back | Q1, Q2d |
 | FR-69 | **Spotify credentials in Settings**: fields for client id, client secret, redirect URI and refresh token, plus *Upload spotify-config.json* that fills the same form. Saving **requires every field** and **replaces the whole set** — nothing is carried over and **no previous copy is kept**, which the UI states before saving. The secret and refresh token are **never shown back** (only *set · replaced &lt;when&gt;*); the client id is shown partly, the redirect URI in full. **Guidance text** in the section explains how to obtain each value (registering a Spotify app, running `npm run auth`) | Q4, Q4a, Q5 |
-| FR-70 | **MusicBrainz contact in Settings**: one field, shown masked (`k…7@gmail.com`), refused if empty or a placeholder — the same rule the app applies at startup (NFR-14) | Q4b |
+| FR-70 | **MusicBrainz contact in Settings**: one field, shown masked (`<email address>`), refused if empty or a placeholder — the same rule the app applies at startup (NFR-14) | Q4b |
 | FR-71 | **A Spotify failure is never reported as "nothing playing".** When the Spotify connection returns an error, the poll is a **failure**: the Spotify indicator shows it with the reason, and it is not counted as an idle poll (M4). A genuine *nothing playing* still reads as healthy | Q6 |
 | FR-72 | **Restore can also restore rules — only if asked.** When a backup holds rules, the restore dialog says whether they are identical to or differ from the current ones and offers an **opt-in, unchecked** *"also replace my rules"*, with FR-66's comparison and FR-67's guards. The rules are applied **only if the database restore succeeds**; otherwise, and when not ticked, the current rules are untouched. **Amends BR-48.7 / FR-58** | Q7, Q7a |
 | US-29 | Persona **P2 (Curator)**: *"Change my rules and my credentials from inside the app, on any machine it runs on, without ever silently losing rules or breaking recording."* | Q8 |

@@ -236,9 +236,9 @@ describe('credentials over HTTP (FR-69, FR-70; P-53)', () => {
 
   it('the MusicBrainz contact saves and returns the masked view', async () => {
     const s = await serve();
-    const r = await fetch(`${s.base}/api/settings/musicbrainz`, { method: 'POST', headers: { ...GOOD, 'content-type': 'application/json' }, body: JSON.stringify({ contact: 'kuhndj67@gmail.com' }) });
+    const r = await fetch(`${s.base}/api/settings/musicbrainz`, { method: 'POST', headers: { ...GOOD, 'content-type': 'application/json' }, body: JSON.stringify({ contact: 'listener@example.org' }) });
     assert.equal(r.status, 200);
-    assert.deepEqual(await r.json(), { set: true, masked: 'k…7@gmail.com', restartNeeded: false });
+    assert.deepEqual(await r.json(), { set: true, masked: 'l…r@example.org', restartNeeded: false });
   });
 });
 

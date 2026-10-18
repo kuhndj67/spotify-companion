@@ -100,17 +100,17 @@ A
 
 ### Q5 — Which architectures the published image is built for
 
-U10's NAS is `SYNNAS`; **its CPU architecture is not yet recorded** (Synology sells both x86-64 and ARM models).
+U10's NAS is `Machine 2`; **its CPU architecture is not yet recorded** (Synology sells both x86-64 and ARM models).
 
 | | Option |
 |---|---|
-| **A** | ⭐ **Probe first**: read SYNNAS's architecture (one read-only check by the owner, e.g. the model in DSM's *Info Center*), then build **`linux/amd64`**, adding `linux/arm64` only if the NAS needs it |
+| **A** | ⭐ **Probe first**: read Machine 2's architecture (one read-only check by the owner, e.g. the model in DSM's *Info Center*), then build **`linux/amd64`**, adding `linux/arm64` only if the NAS needs it |
 | **B** | **Always `amd64` + `arm64`** (Buildx with QEMU). Covers any NAS and Apple-silicon Macs; CI is slower, and the arm64 image is built but never run here unless the NAS is ARM |
 
 [Answer]:
 This is for U10 so should not be in this unit... please check to make sure U9 and U10 have been kept separate.
 
-*Resolution (2026-10-18)*: **out of U9's scope; Q5 withdrawn.** Checked: FR-73…75 and NFR-40 never mention the NAS; the other U10 mentions in U9's documents are context (U10 depends on U9, never the reverse). Q5 was the one place that put U10 work (reading SYNNAS's CPU) into U9. U9 publishes **`linux/amd64`**, the platform of every consumer U9 itself has (this PC, CI, the walk VM). The NAS's architecture, and adding `arm64` if it needs it, is **carried to U10's design plan**. Also corrected: Q8's option text described how U10 would walk; that is U10's to decide.
+*Resolution (2026-10-18)*: **out of U9's scope; Q5 withdrawn.** Checked: FR-73…75 and NFR-40 never mention the NAS; the other U10 mentions in U9's documents are context (U10 depends on U9, never the reverse). Q5 was the one place that put U10 work (reading Machine 2's CPU) into U9. U9 publishes **`linux/amd64`**, the platform of every consumer U9 itself has (this PC, CI, the walk VM). The NAS's architecture, and adding `arm64` if it needs it, is **carried to U10's design plan**. Also corrected: Q8's option text described how U10 would walk; that is U10's to decide.
 ---
 
 ### Q6 — Who builds the published image, and from what
@@ -139,7 +139,7 @@ A
 
 | | Option |
 |---|---|
-| **A** | ⭐ **An agent walk on the walk VM** (`kuhndjwin11pro`, the walk ① method and checkpoint), given only README *App only* and a read token. It ships when that walk passes. ~~U10's NAS install then walks the same steps on Linux~~ *(U10's to decide, 2026-10-18)* |
+| **A** | ⭐ **An agent walk on the walk VM** (`Machine 1`, the walk ① method and checkpoint), given only README *App only* and a read token. It ships when that walk passes. ~~U10's NAS install then walks the same steps on Linux~~ *(U10's to decide, 2026-10-18)* |
 | **B** | **U10's NAS install is the walk.** No separate walk in U9; *coming soon* stays on README until U10 |
 | **C** | The owner follows the steps on this machine. Fastest, but not cold |
 

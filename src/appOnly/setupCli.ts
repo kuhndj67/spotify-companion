@@ -11,4 +11,4 @@ if (!outcome.ok) {
   process.exit(1);
 }
 console.log(`✓ setup wrote: ${outcome.written.join(', ')} (and empty data/, state/)`);
-console.log('Next: put your contact address in secrets/musicbrainz.json, then run the sign-in (README, App only).');
+console.log('Next: put your contact address in secrets/app/musicbrainz.json, then run the sign-in (README, App only).');

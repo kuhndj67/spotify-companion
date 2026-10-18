@@ -11,7 +11,7 @@
  * outcome the design was trying to avoid, reached from the other direction.
  *
  * So the file is created here, on the host, the same shape as `npm run auth` creating
- * `secrets/spotify-config.json`.
+ * `secrets/app/spotify-config.json`.
  *
  * ## ⚠️ Creating the directory is the real reason this script exists
  *

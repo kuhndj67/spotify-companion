@@ -58,7 +58,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG =
-  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'spotify-config.json');
+  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'app', 'spotify-config.json');
 const OUT_DIR = join(projectRoot, 'aidlc-docs', 'construction', 'u5-automated-skipping', 'probes');
 const RECORD = join(OUT_DIR, 'p-u5-1-driven.json');
 

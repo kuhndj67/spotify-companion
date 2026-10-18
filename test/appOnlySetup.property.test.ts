@@ -43,7 +43,7 @@ describe('runSetup against a real folder', () => {
     return t;
   };
 
-  it('writes compose.yaml, secrets/musicbrainz.json, config/rules.json and empty data/, state/', () => {
+  it('writes compose.yaml, secrets/app/musicbrainz.json, config/rules.json and empty data/, state/', () => {
     const dir = mkdtempSync(join(tmpdir(), 'app-only-'));
     try {
       const folder = join(dir, 'folder');
@@ -51,7 +51,7 @@ describe('runSetup against a real folder', () => {
       const outcome = runSetup(folder, templatesFrom(dir));
       assert.ok(outcome.ok, outcome.ok ? '' : outcome.message);
       assert.match(readFileSync(join(folder, 'compose.yaml'), 'utf8'), /image: ghcr\.io\/kuhndj67\/spotify-companion:/);
-      assert.ok(existsSync(join(folder, 'secrets', 'musicbrainz.json')));
+      assert.ok(existsSync(join(folder, 'secrets', 'app', 'musicbrainz.json')));
       assert.ok(existsSync(join(folder, 'config', 'rules.json')));
       assert.deepEqual(readdirSync(join(folder, 'data')), []);
       assert.deepEqual(readdirSync(join(folder, 'state')), []);
@@ -64,12 +64,12 @@ describe('runSetup against a real folder', () => {
     const dir = mkdtempSync(join(tmpdir(), 'app-only-'));
     try {
       const folder = join(dir, 'folder');
-      mkdirSync(join(folder, 'secrets'), { recursive: true });
-      writeFileSync(join(folder, 'secrets', 'musicbrainz.json'), '{"contact":"mine@example.org"}');
+      mkdirSync(join(folder, 'secrets', 'app'), { recursive: true });
+      writeFileSync(join(folder, 'secrets', 'app', 'musicbrainz.json'), '{"contact":"mine@example.org"}');
       const outcome = runSetup(folder, templatesFrom(dir));
-      assert.ok(!outcome.ok && outcome.message.includes('secrets/musicbrainz.json'));
+      assert.ok(!outcome.ok && outcome.message.includes('secrets/app/musicbrainz.json'));
       assert.equal(existsSync(join(folder, 'compose.yaml')), false, 'nothing written');
-      assert.equal(readFileSync(join(folder, 'secrets', 'musicbrainz.json'), 'utf8'), '{"contact":"mine@example.org"}');
+      assert.equal(readFileSync(join(folder, 'secrets', 'app', 'musicbrainz.json'), 'utf8'), '{"contact":"mine@example.org"}');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

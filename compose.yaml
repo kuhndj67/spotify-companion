@@ -22,7 +22,7 @@ services:
     # U9 (BR-71.1): one name everywhere -- image, container, service. ⚠️ Until 1.0.0-beta.2 the service was `now-playing`
     # and the container `spotify-now-playing`: Compose treats that old container as an ORPHAN that `up` and `down` leave
     # RUNNING, so stop it first (docs/INSTALL.md, Upgrading). `npm run release -- --apply` refuses while it runs.
-    image: spotify-companion:1.0.0-beta.4
+    image: spotify-companion:1.0.0-beta.5
     container_name: spotify-companion
 
     ports:
@@ -61,7 +61,7 @@ services:
       TRUST_PUBLISHED_PORT: "true"
       POLL_INTERVAL_MS: 3000
       # Shared with the MCP server: `npm run auth` writes it, the MCP server refreshes it, the app reads it (and
-      # writes it only from Settings, through CredentialsWriter). U9 (BR-69.4): inside the ./secrets DIRECTORY mount,
+      # writes it only from Settings, through CredentialsWriter). U9 (BR-69.4): inside the ./secrets/app DIRECTORY mount,
       # where a temp-then-rename write works. The app passes this same path to the connector when it spawns it.
       SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
 
@@ -182,7 +182,7 @@ services:
       #
       # The NFR-14 contact address is NOT here either: this file is TRACKED IN GIT,
       # and a personal contact address is the user's data rather than project
-      # configuration. It lives in secrets/musicbrainz.json, mounted below, and the
+      # configuration. It lives in secrets/app/musicbrainz.json, mounted below, and the
       # app fails to start without it rather than sending anonymous traffic.
       #
       # NOTE: this used to say "and the repository is public". That was WRONG -- the
@@ -194,9 +194,10 @@ services:
       # Credentials (Question 6, option A: authenticate once on the host). U9 (BR-69.4, IN-U9-1): the DIRECTORY is
       # mounted, read-write. Both writers -- the connector refreshing its token, CredentialsWriter saving Settings --
       # write by temp file + rename, which needs the directory: through the single-file mounts used until 1.0.0-beta.2
-      # a rename fails with EBUSY (probed 2026-10-18). Host paths are unchanged: secrets/spotify-config.json and
-      # secrets/musicbrainz.json. The *.example.json files become visible inside the container too (no secrets).
-      - ./secrets:/app/secrets:rw
+      # a rename fails with EBUSY (probed 2026-10-18). Only the app's own SUBFOLDER is mounted (1.0.0-beta.5): host
+      # secrets/app/spotify-config.json and secrets/app/musicbrainz.json. The rest of secrets/ (templates, other tools'
+      # credentials such as Metabase's) stays out of the container: least privilege.
+      - ./secrets/app:/app/secrets:rw
 
       # Listening history (NFR-11): survives `compose up --build`.
       #
@@ -205,7 +206,7 @@ services:
       # above would be a subtle and hard-to-diagnose mistake.
       - ./data:/data:rw
 
-      # NFR-14 contact address (U2): secrets/musicbrainz.json arrives through the ./secrets directory mount above.
+      # NFR-14 contact address (U2): secrets/app/musicbrainz.json arrives through the ./secrets/app directory mount above.
       # The app writes only its `contact` field, from Settings (FR-70, U7), now by temp + rename (U9, BR-69.6).
 
       # Rule definitions (U3) — WRITABLE BY THE APP since U7 (IN-U7-1, FD Q1 = A).

@@ -86,7 +86,7 @@ const credentialsDirectoryClass = classifyCredentialsDirectory(
   probeCredentialsDirectory(config.spotifyConfigPath, config.inContainer),
 );
 // The message names WHERE the directory belongs, not where the (possibly stale) configuration points: under a
-// 1.0.0-beta.2 compose file the configured path is /opt/spotify-mcp/…, and telling the user to mount ./secrets
+// 1.0.0-beta.2 compose file the configured path is /opt/spotify-mcp/…, and telling the user to mount ./secrets/app
 // there would be wrong (found in U9 Build & Test, 2026-10-18).
 const credentialsDirectoryText = credentialsDirectoryMessage(
   credentialsDirectoryClass,
@@ -1043,7 +1043,7 @@ function configurationDiagnostics(): ConfigurationDiagnosticsInput {
   return {
     configWritable: probeDirectoryWritable(RULES_PATH),
     rulesPath: RULES_PATH,
-    // U9: both files are written by temp + rename in the ./secrets directory, so the question is the DIRECTORY's.
+    // U9: both files are written by temp + rename in the ./secrets/app directory, so the question is the DIRECTORY's.
     musicbrainzWritable: probeDirectoryWritable(config.musicbrainzConfigPath),
     musicbrainzPath: config.musicbrainzConfigPath,
     spotifyWritable: probeDirectoryWritable(config.spotifyConfigPath),

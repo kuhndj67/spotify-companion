@@ -86,7 +86,7 @@ import { stdin, stdout } from 'node:process';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG =
-  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'spotify-config.json');
+  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'app', 'spotify-config.json');
 const OUT_DIR = join(projectRoot, 'aidlc-docs', 'construction', 'u5-automated-skipping', 'probes');
 
 const argOf = (flag, fallback) => {

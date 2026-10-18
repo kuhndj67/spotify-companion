@@ -4,7 +4,7 @@
  * `docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup` writes, into the folder:
  *
  *   compose.yaml                image-only (no `build:`), pinned to THIS image's version
- *   secrets/musicbrainz.json    from the example; the user puts their contact address in it
+ *   secrets/app/musicbrainz.json  from the example; the user puts their contact address in it
  *   config/rules.json           from the rules example (what `npm run rules:init` does for a source install)
  *   data/  state/               empty
  *
@@ -23,10 +23,10 @@ import { dirname, join } from 'node:path';
 /** What setup writes: target path (relative to the folder) ← template file name (in the image's templates dir). */
 export const SETUP_FILES: ReadonlyArray<readonly [target: string, template: string]> = [
   ['compose.yaml', 'compose.app.yaml'],
-  ['secrets/musicbrainz.json', 'musicbrainz.example.json'],
+  ['secrets/app/musicbrainz.json', 'musicbrainz.example.json'],
   ['config/rules.json', 'rules.example.json'],
 ];
-export const SETUP_DIRECTORIES: readonly string[] = ['secrets', 'config', 'data', 'state'];
+export const SETUP_DIRECTORIES: readonly string[] = ['secrets/app', 'config', 'data', 'state'];
 
 export type SetupDecision =
   | { readonly write: true; readonly files: readonly string[] }

@@ -22,7 +22,8 @@ const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
  * fails with EBUSY through the single-file mount used until 1.0.0-beta.2.
  */
 const CONTAINER_MCP_DIR = '/opt/spotify-mcp';
-/** U9 (LC-60): the ONE container path for credentials. Host `./secrets/` is mounted here as a directory. */
+/** U9 (LC-60): the ONE container path for credentials. Host `./secrets/app/` is mounted here as a directory: only the
+ * app's own two files, never the rest of `secrets/` (e.g. Metabase's credentials). */
 export const CONTAINER_SECRETS_DIR = '/app/secrets';
 const inContainer = existsSync(CONTAINER_MCP_DIR);
 const mcpDir = inContainer ? CONTAINER_MCP_DIR : join(projectRoot, '.mcp-server');
@@ -58,7 +59,7 @@ export const config = {
 
   /**
    * The credential file this app reads. In the container it is the same file the MCP server
-   * uses (mounted). On the host it is `secrets/spotify-config.json`, the canonical output of
+   * uses (mounted). On the host it is `secrets/app/spotify-config.json`, the canonical output of
    * `npm run auth`, while the MCP server gets its own copy under `.mcp-server/`.
    *
    * Divergence between the two copies is harmless: this app only ever reads clientId,
@@ -68,7 +69,7 @@ export const config = {
     process.env.SPOTIFY_CONFIG_PATH ??
     (inContainer
       ? `${CONTAINER_SECRETS_DIR}/spotify-config.json`
-      : join(projectRoot, 'secrets', 'spotify-config.json')),
+      : join(projectRoot, 'secrets', 'app', 'spotify-config.json')),
 
   /** True when running inside the container image. Surfaced in diagnostics. */
   inContainer,
@@ -181,7 +182,7 @@ export const config = {
     process.env.MUSICBRAINZ_CONFIG_PATH ??
     (inContainer
       ? `${CONTAINER_SECRETS_DIR}/musicbrainz.json`
-      : join(projectRoot, 'secrets', 'musicbrainz.json')),
+      : join(projectRoot, 'secrets', 'app', 'musicbrainz.json')),
 
   /** Overridable so BR-1.2's regression test can point at a fixture stub. */
   musicbrainzBaseUrl: process.env.MUSICBRAINZ_BASE_URL ?? 'https://musicbrainz.org/ws/2',

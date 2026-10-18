@@ -51,7 +51,7 @@ misname itself (`400 "Invalid limit"`).
 case whose answer you know. The same goes for a recorded claim in this repo's own notes: **re-probe before building
 on it**, whether it says "the API doesn't return X" or "this guard is safe".
 
-Credentials are in `secrets/spotify-config.json` (gitignored). Probe scripts follow the pattern in
+Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts follow the pattern in
 `research-findings.md`.
 
 ## Working style
@@ -86,7 +86,7 @@ Credentials are in `secrets/spotify-config.json` (gitignored). Probe scripts fol
 - **`data/` cannot be regenerated** (months of plays). It is gitignored, which makes it *more* exposed to `git clean
   -xdf`. Never delete play rows to tidy anything.
 - Mounts: `./data` (history), `./state` (automation kill switch: **never** in `data/` or `config/`), `./config` (rules,
-  written only by `RulesWriter`), `./secrets` (credentials, a **directory** mount at `/app/secrets` since U9; never in
+  written only by `RulesWriter`), `./secrets/app` (credentials, a **directory** mount at `/app/secrets` since U9, the app's subfolder only; never in
   a backup, never in a response).
 - **The connector** (`spotify-mcp-server`, MIT) is pinned by SHA in `compose.yaml` and patched in one line at build
   (CONTRIBUTING.md *Operations*). Moving the pin needs an acceptance `pass` first, or `npm run release` refuses.

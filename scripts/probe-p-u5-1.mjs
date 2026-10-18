@@ -61,7 +61,7 @@
  * contamination of the entire evidence base** a rule is validated against (BR-40). That is the
  * exact defect class classifier v2 just spent a day removing.
  *
- * The probe needs no container: it reads `secrets/spotify-config.json` and holds its access token
+ * The probe needs no container: it reads `secrets/app/spotify-config.json` and holds its access token
  * in memory. `webApiClient.ts` documents why that cannot race the MCP server — token handling
  * deliberately never writes back, and Spotify's refresh tokens are long-lived and reusable.
  *
@@ -90,7 +90,7 @@ import { stdin, stdout } from 'node:process';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG =
-  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'spotify-config.json');
+  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'app', 'spotify-config.json');
 const OUT_DIR = join(
   projectRoot,
   'aidlc-docs',

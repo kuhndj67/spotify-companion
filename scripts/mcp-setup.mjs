@@ -8,7 +8,7 @@
  *
  * On the credential copy: the MCP server resolves its config relative to its own script
  * location (`__dirname/../spotify-config.json`), not the working directory, so the file must
- * live at `.mcp-server/spotify-config.json`. `secrets/spotify-config.json` remains the
+ * live at `.mcp-server/spotify-config.json`. `secrets/app/spotify-config.json` remains the
  * canonical copy — it is what `npm run auth` writes and what compose.yaml mounts.
  *
  * U9 (NFR-40): the checkout follows compose.yaml's MCP_SERVER_REF, the ONE pin. Until 2026-10-18 this cloned
@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const mcpDir = join(projectRoot, '.mcp-server');
-const canonicalConfig = join(projectRoot, 'secrets', 'spotify-config.json');
+const canonicalConfig = join(projectRoot, 'secrets', 'app', 'spotify-config.json');
 const mcpConfig = join(mcpDir, 'spotify-config.json');
 
 const REPO = 'https://github.com/marcelmarais/spotify-mcp-server.git';
@@ -71,7 +71,7 @@ try {
   }
 
   if (!existsSync(canonicalConfig)) {
-    console.error('\n✗ secrets/spotify-config.json not found. Run `npm run auth` first.');
+    console.error('\n✗ secrets/app/spotify-config.json not found. Run `npm run auth` first.');
     process.exit(1);
   }
 

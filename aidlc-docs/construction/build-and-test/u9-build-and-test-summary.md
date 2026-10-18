@@ -55,9 +55,24 @@ now accepts the moved pin (P-74).
 **Seen in passing, not U9's**: the live (old-code) log shows `MaxListenersExceededWarning: 11 error listeners added to
 [ServerResponse]`. Not investigated here; noted for the backlog.
 
+## 5. Crossing and rollback rehearsed (BR-71.3/71.4) — ✅
+
+After `npm run verify:down` (no-impact proof ✅: same live container, start time, restart count, image, health; no
+`*verify*` left; the credential copy gone). In a throwaway folder on the verification project and port, with the
+owner's **verified backup** (2026-10-18) as the database:
+
+| Stage | Health | Plays | Credentials directory |
+|---|---|---|---|
+| 1. Old layout: `v1.0.0-beta.2` compose, image `spotify-now-playing:1.0.0-beta.2`, single-file mounts | healthy | 1430 | (pre-U9 code has no such check) |
+| 2. Crossing as INSTALL says: `down` with the OLD file, then `up` with the new (candidate image, `./secrets` directory) | healthy | 1430 | `ok` |
+| 3. Rollback: `down` with the new file, `up` with the old file and image; **no file moved** | healthy | 1430 | (pre-U9) |
+
+No old container left behind at the crossing; folder removed; **live unchanged** (id, start time, image compared before
+and after). The release image is NOT built here: `spotify-companion:1.0.0-beta.3` is built only by the release
+(BR-66.7); the rehearsal used `spotify-companion:candidate`, since removed.
+
 ## Still to do (in order)
 
-6. Rehearse the crossing and the rollback on `:3011`; `verify:down`'s no-impact proof.
 7. **Live crossing** — owner present, owner's go-ahead.
 8. **First tag push** — owner's act → the `publish` job.
 9. Token probe → walk guide → agent walk of README *App only*.

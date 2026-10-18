@@ -24,7 +24,8 @@ const SELF = 'test/structure.u9.test.ts';
 const OLD_NAME_ALLOWED: Record<string, { readonly count: number; readonly why: string }> = {
   'compose.yaml': { count: 1, why: 'the comment warning that the pre-U9 container is an orphan Compose leaves running' },
   'scripts/verify-install.mjs': { count: 2, why: 'the no-impact proof recognises the live container on either side of the crossing' },
-  'scripts/lib/releaseDecision.ts': { count: 1, why: 'names the image repository it replaced' },
+  'scripts/lib/releaseDecision.ts': { count: 6, why: 'names the image it replaced, and the crossing guard refuses while the old container runs' },
+  'scripts/release.mjs': { count: 2, why: 'the crossing guard asks Docker whether the old container is running, and says so' },
   'scripts/backup-history.mjs': { count: 1, why: 'history: the 2026-09-27 incident, as it happened' },
   'scripts/reclassify-unobserved-tails.mjs': { count: 1, why: 'history: the 2026-09-27 incident, as it happened' },
 };

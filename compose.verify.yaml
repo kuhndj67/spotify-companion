@@ -18,7 +18,9 @@ services:
     # never uses `--rmi`, which would delete that shared tag.
     # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
-    image: spotify-companion:1.0.0-beta.2
+    # U9: `npm run verify:up -- --candidate` sets VERIFY_IMAGE to an image built from the working tree
+    # (`spotify-companion:candidate`, never a version tag), so a change can be accepted here BEFORE it is released.
+    image: ${VERIFY_IMAGE:-spotify-companion:1.0.0-beta.2}
     container_name: spotify-companion-verify
     ports:
       - "127.0.0.1:3011:3000"
@@ -28,7 +30,8 @@ services:
       LOCAL_ONLY: "true"
       TRUST_PUBLISHED_PORT: "true"
       # Effectively idle — and with no real credentials it cannot poll Spotify anyway.
-      POLL_INTERVAL_MS: 3600000
+      # U9: `--poll-ms <n>` overrides it for an acceptance run that must see real polls (BR-70).
+      POLL_INTERVAL_MS: ${VERIFY_POLL_INTERVAL_MS:-3600000}
       SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
       HISTORY_DB_PATH: /data/history.db
       SNAPSHOTS_ENABLED: "false"

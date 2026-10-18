@@ -13,7 +13,12 @@
  *   3. ⚠️ neither the image tag `spotify-companion:X.Y.Z` nor the git tag `vX.Y.Z` exists -- **a tag is never
  *      overwritten** (BR-66.7). This used to happen on every build, which is why rollback needed hand-made tags;
  *   4. the candidate is **strictly greater**, by SemVer precedence, than every existing `v*` tag. So
- *      `1.0.0-beta.2 < 1.0.0`, and a release can never move backwards.
+ *      `1.0.0-beta.2 < 1.0.0`, and a release can never move backwards;
+ *   5. U9 (P-74): if the connector pin differs from the last release's, it has a `pass` in
+ *      `scripts/connector-acceptance.json` -- moving the connector is a recorded act (NFR-40, BR-70);
+ *   6. U9 (P-75, BR-71.2): the pre-U9 container `spotify-now-playing` is NOT running. Compose treats it as an orphan
+ *      that `up` leaves running, and two containers would both poll Spotify and write `data/history.db`. If Docker
+ *      could not be asked (`null`), that is a refusal too: an unknown is not a *no*.
  */
 
 import { isSemVer } from '../../src/version.js';
@@ -26,6 +31,14 @@ export interface ReleaseFacts {
   readonly imageTags: readonly string[];
   readonly verifyPassed: boolean;
   readonly treeClean: boolean;
+  /** compose.yaml's connector pin now. */
+  readonly pin: string;
+  /** The pin at the latest release tag; `null` when there is no earlier release. */
+  readonly previousPin: string | null;
+  /** Pins whose latest acceptance entry is `pass`. */
+  readonly acceptedPins: readonly string[];
+  /** Is a container named `spotify-now-playing` running? `null`: Docker could not be asked. */
+  readonly oldContainerRunning: boolean | null;
 }
 
 export type RefusalReason =
@@ -35,7 +48,9 @@ export type RefusalReason =
   | 'build-metadata'
   | 'image-tag-exists'
   | 'git-tag-exists'
-  | 'not-greater';
+  | 'not-greater'
+  | 'pin-not-accepted'
+  | 'old-container-running';
 
 export type ReleaseDecision =
   | { readonly accept: true; readonly gitTag: string; readonly imageTag: string; readonly previous: string | null }
@@ -98,6 +113,22 @@ export function decide(f: ReleaseFacts): ReleaseDecision {
   const previous = released.at(-1) ?? null;
   if (previous !== null && compareSemVer(f.candidate, previous) <= 0) {
     return refuse('not-greater', `${f.candidate} is not greater than the latest release ${previous}`);
+  }
+  if (f.previousPin !== null && f.pin !== f.previousPin && !f.acceptedPins.includes(f.pin)) {
+    return refuse(
+      'pin-not-accepted',
+      `the connector pin moved (${f.previousPin.slice(0, 8)} → ${f.pin.slice(0, 8)}) and has no "pass" in ` +
+        'scripts/connector-acceptance.json: run the acceptance on the verification install first (BR-70)',
+    );
+  }
+  if (f.oldContainerRunning !== false) {
+    return refuse(
+      'old-container-running',
+      f.oldContainerRunning === null
+        ? 'Docker could not say whether the pre-U9 container spotify-now-playing is running; refusing rather than guessing'
+        : 'the pre-U9 container spotify-now-playing is running: stop it first (docker stop spotify-now-playing), or two ' +
+            'containers would both write data/history.db',
+    );
   }
   return { accept: true, gitTag: `v${f.candidate}`, imageTag: `spotify-companion:${f.candidate}`, previous };
 }

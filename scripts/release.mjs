@@ -18,8 +18,10 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readAppVersion } from '../src/version.js';
-import { decide } from './lib/releaseDecision.js';
+import { readFileSync } from 'node:fs';
+import { isSemVer, readAppVersion } from '../src/version.js';
+import { compareSemVer, decide } from './lib/releaseDecision.js';
+import { acceptedPins, parseAcceptance, pinFromCompose } from './lib/connectorAcceptance.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // `--plan` is the default and may be given explicitly (smoke does); with `--apply` as well, it is ambiguous.
@@ -55,17 +57,51 @@ if (!images.ok) {
   process.exit(2);
 }
 
+// U9 (P-74): the connector pin now, at the last release, and which pins passed the acceptance.
+const pin = pinFromCompose(readFileSync(join(root, 'compose.yaml'), 'utf8'));
+if (pin === null) {
+  console.error('compose.yaml has no full-SHA MCP_SERVER_REF; the connector pin is unknown, so no release can be decided.');
+  process.exit(2);
+}
+const lastRelease = lines(git.out)
+  .filter((t) => t.startsWith('v') && isSemVer(t.slice(1)))
+  .map((t) => t.slice(1))
+  .sort(compareSemVer)
+  .at(-1);
+let previousPin = null;
+if (lastRelease !== undefined) {
+  const before = run('git', ['show', `v${lastRelease}:compose.yaml`]);
+  previousPin = before.ok ? pinFromCompose(before.out) : null;
+  // ⚠️ Fails CLOSED: an unreadable previous pin is treated as DIFFERENT, so an unaccepted pin is still refused.
+  if (previousPin === null) previousPin = 'unknown (could not read compose.yaml at the last release tag)';
+}
+const acceptance = parseAcceptance(readFileSync(join(root, 'scripts', 'connector-acceptance.json'), 'utf8'));
+if (!acceptance.ok) {
+  console.error(`scripts/connector-acceptance.json is malformed: ${acceptance.problems.join('; ')}`);
+  process.exit(2);
+}
+
+// U9 (P-75): is the pre-U9 container running? `null` when Docker cannot say -- which the decision refuses.
+const old = run('docker', ['ps', '--filter', 'name=^spotify-now-playing$', '--filter', 'status=running', '--format', '{{.Names}}']);
+const oldContainerRunning = old.ok ? lines(old.out).length > 0 : null;
+
 const facts = {
   candidate,
   gitTags: lines(git.out),
   imageTags: lines(images.out),
   treeClean: lines(status.out).length === 0,
+  pin,
+  previousPin,
+  acceptedPins: acceptedPins(acceptance.entries),
+  oldContainerRunning,
 };
 
 console.log(`Candidate: ${candidate} (package.json)`);
 console.log(`Git tags (v*): ${facts.gitTags.filter((t) => t.startsWith('v')).join(', ') || '(none)'}`);
 console.log(`Image tags: ${facts.imageTags.join(', ') || '(none)'}`);
 console.log(`Working tree: ${facts.treeClean ? 'clean' : 'DIRTY'}`);
+console.log(`Connector pin: ${pin.slice(0, 8)} (last release: ${previousPin === null ? 'none' : previousPin.slice(0, 8)}; accepted: ${facts.acceptedPins.map((p) => p.slice(0, 8)).join(', ') || 'none'})`);
+console.log(`Pre-U9 container spotify-now-playing: ${oldContainerRunning === null ? 'UNKNOWN (docker ps failed)' : oldContainerRunning ? 'RUNNING' : 'not running'}`);
 
 if (!apply) {
   const d = decide({ ...facts, verifyPassed: true });

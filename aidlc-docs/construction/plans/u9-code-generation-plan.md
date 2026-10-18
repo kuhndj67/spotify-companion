@@ -109,16 +109,16 @@ split.
       `MCP_AUTH`) in compose files or the Dockerfile. Each fed a planted violation once (positive control).
 - [x] `.claude/settings.local.json` is the owner's local file: listed, **not edited**.
 
-### Step 7 — Release guards *(BR-70, BR-71.2, P-74, P-75, LC-67, PBT-77, IN-U9-3)*
-- [ ] `scripts/lib/releaseDecision.ts`: two new refusals: `old-container-running` (Docker reports a running
+### Step 7 — Release guards *(BR-70, BR-71.2, P-74, P-75, LC-67, PBT-77, IN-U9-3)* — ✅ DONE · `scripts/lib/connectorAcceptance.ts` (parse, accepted pins — the LAST entry for a pin decides — and the compose pin); `test/connectorAcceptance.test.ts` checks the committed file's shape (Q2 = A) · `release --plan` read on this machine: pin `6065ce5c` vs last release `7b5fde63`, none accepted, **`spotify-now-playing` RUNNING**: both guards see real conditions · an unreadable previous pin fails closed (treated as moved) · PBT-70 now draws the new facts arbitrarily ("whatever else is true") · ⚠️ **added (deviation)**: `verify:up -- --candidate` builds the working tree as `spotify-companion:candidate` and runs `:3011` on it, and `--poll-ms <n>` replaces the hourly poll. Without them BR-70 could not run before a release (`:3011` runs an existing image by version tag, and the release refuses a tag that exists); `compose.verify.yaml` takes both by `${VAR:-default}`, and `versionSources` reads the default
+- [x] `scripts/lib/releaseDecision.ts`: two new refusals: `old-container-running` (Docker reports a running
       `spotify-now-playing`, or cannot be asked) and `pin-not-accepted` (the compose pin differs from the last
       released pin and has no `pass` entry). The refusal text names the one command or record needed.
-- [ ] `scripts/release.mjs`: gathers the two facts (one `docker ps` query; reads `scripts/connector-acceptance.json`
+- [x] `scripts/release.mjs`: gathers the two facts (one `docker ps` query; reads `scripts/connector-acceptance.json`
       and the last release's pin from its git tag).
-- [ ] `scripts/connector-acceptance.json`: created **empty** (`[]`); the U9 entry is written in Build & Test.
-- [ ] `test/releaseDecision.property.test.ts`: PBT-77 (refuses whenever running **or** unknown; positive control:
+- [x] `scripts/connector-acceptance.json`: created **empty** (`[]`); the U9 entry is written in Build & Test.
+- [x] `test/releaseDecision.property.test.ts`: PBT-77 (refuses whenever running **or** unknown; positive control:
       neither → not blocked), plus `pin-not-accepted` cases; existing PBT-68…71 still pass.
-- [ ] The acceptance file's structural test: see **Question 2**.
+- [x] The acceptance file's structural test: see **Question 2**.
 
 ### Step 8 — Publishing *(BR-72, P-70–P-72, LC-64–LC-66, PBT-75, IN-U9-4)*
 - [ ] `scripts/lib/publishDecision.ts` + `test/publishDecision.property.test.ts` (PBT-75 with its positive control).

@@ -1,6 +1,6 @@
 # U9 Build & Test — Connector Upgrade & Publishable Image
 
-**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.4` LIVE and PUBLISHED (2026-10-18 20:04Z) · Order: IN-U9-7, as listed in
+**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.5` LIVE and PUBLISHED (2026-10-18 23:53Z); the App-only walk remains · Order: IN-U9-7, as listed in
 [`code-summary.md`](../u9-connector-upgrade/code/code-summary.md) · Branch `u9-build-and-test`
 
 ✅ Live is `spotify-companion` `1.0.0-beta.3` at the MIT pin (from 19:45Z); `spotify-now-playing` `1.0.0-beta.2` stopped and kept for rollback.
@@ -181,7 +181,19 @@ file; credentials directory `ok`; `verify:down` proved live unchanged.
 **Live crossing for beta.5** (owner's go-ahead after merge): `docker compose down` → move the two files → `npm run
 release -- --apply` (≈ 2–3 min without polling) → tag push → publish.
 
+## 12. `1.0.0-beta.5` live and published — ✅
+
+Owner: *"go"* (PR #8 merged). From `main` (`d0cd5d8`):
+1. `docker compose down` (23:51:57Z). `spotify-metabase` untouched; the stopped `spotify-now-playing` kept.
+2. `secrets/spotify-config.json` and `secrets/musicbrainz.json` moved to `secrets/app/`; **contents identical**
+   (checksums before and after). `metabase.json` and the templates stay in `secrets/`.
+3. `npm run release -- --apply` → `spotify-companion:1.0.0-beta.5` live and healthy, tagged (23:52:48Z; gap under a
+   minute).
+4. The live container sees **only** `musicbrainz.json` and `spotify-config.json` in `/app/secrets`: least privilege
+   restored. Version, token, MCP, MusicBrainz identity, credentials directory all `ok`; 1465 plays.
+5. `git push origin v1.0.0-beta.5` → run `39178339707`: all four jobs ✅; decision `publish 1.0.0-beta.5`, both
+   licences, no user data, the scan as before (report only).
+
 ## Still to do (in order)
 
-10. Release `1.0.0-beta.5` (move the files first) and publish it.
 11. Agent walk of README *App only* on Machine 1 (the classic token), on `1.0.0-beta.5`.

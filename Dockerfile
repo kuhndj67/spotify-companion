@@ -90,6 +90,14 @@ COPY package.json ./
 COPY public ./public
 COPY LICENSE ./LICENSE
 
+# U9 (BR-74.2/74.3, LC-68): what the *App only* commands need. `setup` copies these templates into the user's folder;
+# `auth` is the same sign-in script a source install runs with `npm run auth` (dependency-free by design).
+COPY compose.app.yaml /app/app-only/compose.app.yaml
+COPY secrets/musicbrainz.example.json /app/app-only/musicbrainz.example.json
+COPY config/rules.example.json /app/app-only/rules.example.json
+COPY scripts/auth.mjs /app/scripts/auth.mjs
+COPY scripts/lib/browserCommand.mjs scripts/lib/loopbackHost.mjs /app/scripts/lib/
+
 # U9 (BR-73.3): both licence notices must be IN the image -- this app's GPL-3.0 and the connector's MIT. A missing or
 # empty one fails the build here, before any image exists to publish.
 RUN test -s /app/LICENSE && test -s /opt/spotify-mcp/LICENSE  || { echo 'LICENSE missing from the image (BR-73.3): /app/LICENSE and /opt/spotify-mcp/LICENSE are both required' >&2; exit 1; }

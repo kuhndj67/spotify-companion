@@ -25,6 +25,38 @@
 
 set -e
 
+# ---------------------------------------------------------------------------------------------------------------
+# U9 (BR-74.2/74.3, IN-U9-5): the *App only* commands. The user mounts their folder at /work:
+#
+#   docker run --rm -v "${PWD}:/work" <image> setup                              write compose.yaml, secrets/, config/…
+#   docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 <image> auth    the Spotify sign-in
+#
+# Both run as the OWNER of /work (Infrastructure Q4 = A): on a Linux host the files then belong to the user, not to
+# root. On Windows/Rancher the mount reports root, and running as root there does no harm. Anything else starts the
+# app, as before.
+# ---------------------------------------------------------------------------------------------------------------
+case "${1:-}" in
+  setup|auth)
+    command="$1"; shift
+    if [ ! -d /work ]; then
+      echo "Mount the folder to set up at /work, e.g.:  docker run --rm -v \"\${PWD}:/work\" <image> $command" >&2
+      exit 2
+    fi
+    if [ "$command" = setup ]; then
+      set -- node /app/dist/appOnly/setupCli.js
+    else
+      export SPOTIFY_CONFIG_PATH=/work/secrets/spotify-config.json AUTH_BIND_HOST=0.0.0.0 AUTH_NO_BROWSER=1
+      set -- node /app/scripts/auth.mjs
+    fi
+    owner_uid="$(stat -c %u /work)"
+    owner_gid="$(stat -c %g /work)"
+    if [ "$(id -u)" = "0" ] && [ "$owner_uid" != "0" ]; then
+      exec setpriv --reuid="$owner_uid" --regid="$owner_gid" --clear-groups "$@"
+    fi
+    exec "$@"
+    ;;
+esac
+
 DATA_DIR="$(dirname "${HISTORY_DB_PATH:-/data/history.db}")"
 
 if [ "$(id -u)" = "0" ]; then

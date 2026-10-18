@@ -131,18 +131,18 @@ split.
       LC-64 → build with labels and build args → `check-image.sh` → push). No floating tag; `linux/amd64`.
 - [x] `test/rulesetMatchesWorkflow.test.ts`: extended, `publish` is **not** a required check.
 
-### Step 9 — *App only* entry points *(BR-74, P-73, LC-68, PBT-78, IN-U9-5)*
-- [ ] `src/appOnly/setup.ts` (compiled into `dist/`, so it ships): a pure decision over the files already in the
+### Step 9 — *App only* entry points *(BR-74, P-73, LC-68, PBT-78, IN-U9-5)* — ✅ DONE · `setup` also writes **`config/rules.json`** from the rules example (what `npm run rules:init` does for a source install; the plan said an empty `config/`) · the loopback check is a **dependency-free copy** of `localGuard`'s (`scripts/lib/loopbackHost.mjs`, because `npm run auth` runs on plain Node before `npm ci`), held to it by a property test that they **agree on every input** · `.dockerignore` lets exactly the two committed examples in · `knip` gets `setupCli.ts` as an entry · **seen in a real container**: `setup` writes the folder and a second run refuses naming every file; `auth` with FAKE credentials refuses a LAN `Host` (403), aborts on a wrong `state` (exit 1), prints the link, leaves the file untouched. The success path needs a real sign-in: owed to B&T / the walk · ⚠️ incident: a stray `import()` meant as a syntax check RAN `auth.mjs` on the host; stopped within a minute, nothing written (audit 2026-10-18T21:45)
+- [x] `src/appOnly/setup.ts` (compiled into `dist/`, so it ships): a pure decision over the files already in the
       target → write all or refuse naming each; the writer around it. PBT-78 in `test/appOnlySetup.property.test.ts`.
-- [ ] `compose.app.yaml` (repository root, copied into the image): image-only, `ghcr.io/kuhndj67/spotify-companion:<version>`,
+- [x] `compose.app.yaml` (repository root, copied into the image): image-only, `ghcr.io/kuhndj67/spotify-companion:<version>`,
       `./secrets/` directory mount, the same `127.0.0.1` port binding and environment as `compose.yaml` minus
       `build:`. Its image tag joins `versionSources`' checked copies.
-- [ ] `scripts/auth.mjs`: bind host from an environment variable (default `127.0.0.1`, unchanged on the host);
+- [x] `scripts/auth.mjs`: bind host from an environment variable (default `127.0.0.1`, unchanged on the host);
       **refuse a non-loopback `Host`** (P-73, both host and container); output path from `SPOTIFY_CONFIG_PATH` when
       set; in the container, print the link instead of opening a browser. Copied into the image.
-- [ ] `scripts/docker-entrypoint.sh`: dispatch `setup` / `auth`; for those, drop to the uid/gid of `/work`
+- [x] `scripts/docker-entrypoint.sh`: dispatch `setup` / `auth`; for those, drop to the uid/gid of `/work`
       (IN-U9-5); anything else starts the app as today.
-- [ ] Tests: the loopback-`Host` refusal (seen to refuse a LAN `Host`); the setup decision; the entrypoint's
+- [x] Tests: the loopback-`Host` refusal (seen to refuse a LAN `Host`); the setup decision; the entrypoint's
       dispatch is covered by Build & Test (a shell script, `smoke` cannot load it).
 
 ### Step 10 — Documents *(BR-71.6, BR-74.5, BR-75.2, BR-75.3, BR-69.2)*

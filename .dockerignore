@@ -17,6 +17,10 @@ data
 secrets
 config
 state
+# …except the two committed EXAMPLES the image's `setup` command copies into an App-only folder (U9, BR-74.2). They
+# hold placeholders, never values; scripts/check-image.sh still refuses any non-example credential in the image.
+!secrets/musicbrainz.example.json
+!config/rules.example.json
 verify-install
 .mcp-server
 

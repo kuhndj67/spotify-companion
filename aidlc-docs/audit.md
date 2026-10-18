@@ -8693,3 +8693,19 @@ point where the repo is ready for that (or put a step in the unit that gets us t
 - **Going public**: added **Step 13, public-readiness review** (secret scan re-run, disclosure inventory, licence
   and image readiness, after-public checklist) ending in *ready / not ready*; W-14 points to it. No visibility
   change in U9.
+
+---
+
+## 2026-10-18T21:45:00Z — ⚠️ Incident (U9 Code Generation step 9): the Spotify sign-in was started on the host by mistake
+
+While editing `scripts/auth.mjs`, Claude meant to syntax-check it, but the command also contained
+`node -e "import('./scripts/auth.mjs')"`, which **ran** the script. It found the existing credentials, opened a
+Spotify authorisation page in the owner's browser, and listened on `127.0.0.1:8888`. Had the page been approved, it
+would have rewritten `secrets/spotify-config.json`.
+
+Action: the listener (node, PID 17812) was stopped within about a minute; port 8888 confirmed free. **Nothing was
+written**: the file's last write was 12:44 local (the live connector's hourly refresh), before the run (~12:56).
+The live container stayed healthy. The owner was told to close the tab without approving.
+
+Lesson, applied for the rest of the unit: scripts are checked with `node --check` or run only inside throwaway
+containers with fake inputs (the in-container sign-in probe used `FAKE-CONTROL-*` credentials).

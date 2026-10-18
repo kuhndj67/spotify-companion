@@ -8429,3 +8429,30 @@ claude-start.md and follow it."* rather than pasting its text.
   `install-log.md` is the walk record.
 - INSTALL.md links to `claude-start.md`. The docs test now covers `claude-start.md`. Walk guide §4/§5 updated
   (download both files, the one-line prompt, copy back `install-log.md`).
+
+---
+
+## 2026-10-18T14:10:00Z — ✅ Walk ① PASSES (attempt 4, v0.8.5): U8's exit criterion met; 1.0.0-beta.1 released from the walked commit
+
+Owner: results in `D:\walk-results\2026-10-18`. The install log marked S1 and S8 "No". Owner on S1: *"I forgot to
+disable kubernetes and that warning (that it was still enabled) was fine for getting it turned off."* On S8's
+unconfirmed page check: *"It does... if I click the page link in the claude session to open it - it opens as a page
+IN vscode (not as a separate edge or chrome app)."* Verdict (question prompt): **"Yes, accept as the pass
+(Recommended)"**: S1 (Kubernetes left on) and S8 (track not skipped) are **person deviations that the document's own
+instructions recovered from**. BR-62.3 is about whether the *document* needed outside knowledge, and it did not.
+
+Transcript: only `claude-start.md` + `INSTALL.md` read; no repo `CLAUDE.md` content; gitleaks clean. Record:
+`walks/walk-1-agent-2026-10-18-attempt4-PASS.md`. Probed read-only on the dev PC: `rdctl list-settings` exposes
+`containerEngine.name` and `kubernetes.enabled` (here `moby` / `true`, and Docker works). Kubernetes on is therefore
+**not** by itself the Docker failure; on the VM it was probably k3s's first start.
+
+**The walk history**: attempt 1 (S1 WSL elevation, record lost) → 0.8.2 · attempt 2 (S1 winget prompt, S2 tag/sign-in,
+**S4 auth.mjs `&` bug**, S8 wording) → 0.8.3 (👤 boxes, agent section) · attempt 3 (S1 render/PATH/Hyper-V text,
+handoff gaps) → 0.8.4 · README Install options and shipped `claude-start.md` → 0.8.5 · **attempt 4 PASS**. Each failure
+was a real gap, and two were defects no test had seen (the Windows `&` truncation, and the Markdown join of command
+lines).
+
+Polish owed to a later patch (not a walk failure; the walk is not repeated for it): script messages say
+`docs/INSTALL.md` · the S4 box should say the agent relays the fallback URL · S8 should say why to skip, and to open
+the page in a web browser (chat links open inside VS Code) · S1 should list *"unexpected EOF"* and the Kubernetes
+cause, with an `rdctl list-settings` check.

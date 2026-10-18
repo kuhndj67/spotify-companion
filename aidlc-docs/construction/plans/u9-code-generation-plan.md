@@ -41,15 +41,15 @@ split.
 
 ## Steps
 
-### Step 1 — Guarded patch *(BR-69.1, P-65, LC-58, PBT-73, PBT-74)*
-- [ ] `scripts/lib/patchConfigPath.ts`: pure `patchConfigPath(source) → { ok, patched } | { ok: false, reason }`
+### Step 1 — Guarded patch *(BR-69.1, P-65, LC-58, PBT-73, PBT-74)* — ✅ DONE · Node 22.23 runs the `.ts` CLI directly (probed); on the host's 22.17 it cannot, which does not matter (only the build runs it). Seen to refuse on a re-run over an already-patched file
+- [x] `scripts/lib/patchConfigPath.ts`: pure `patchConfigPath(source) → { ok, patched } | { ok: false, reason }`
       (count original line, replace with `process.env.SPOTIFY_CONFIG_PATH ?? <upstream path>`, count again).
       A thin CLI entry (`--file <path>`) for the Dockerfile.
-- [ ] `test/patchConfigPath.property.test.ts`: PBT-73 (0 or ≥ 2 → refuse, reason names the count), PBT-74 ⭐
+- [x] `test/patchConfigPath.property.test.ts`: PBT-73 (0 or ≥ 2 → refuse, reason names the count), PBT-74 ⭐
       (exactly one, arbitrary surroundings → success, one patched line, every other line unchanged); seeds logged.
-- [ ] The real upstream `utils.ts` at `6065ce5c` as an example test fixture input (read from `.mcp-server` when
+- [x] The real upstream `utils.ts` at `6065ce5c` as an example test fixture input (read from `.mcp-server` when
       present, as PBT-66 does).
-- [ ] ⚠️ The Docker build stage has Node 22.23 and no `tsx`. Probe `node --experimental-strip-types` on 22.23 for
+- [x] ⚠️ The Docker build stage has Node 22.23 and no `tsx`. Probe `node --experimental-strip-types` on 22.23 for
       this file; if it cannot run it, the module is written as `.mjs` with JSDoc types (recorded as a deviation).
 
 ### Step 2 — Connector build stage and licences *(BR-68.1–68.4, BR-73, P-66, LC-59)*

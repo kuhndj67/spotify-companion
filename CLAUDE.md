@@ -86,7 +86,12 @@ Credentials are in `secrets/spotify-config.json` (gitignored). Probe scripts fol
 - **`data/` cannot be regenerated** (months of plays). It is gitignored, which makes it *more* exposed to `git clean
   -xdf`. Never delete play rows to tidy anything.
 - Mounts: `./data` (history), `./state` (automation kill switch: **never** in `data/` or `config/`), `./config` (rules,
-  written only by `RulesWriter`), `./secrets` (credentials; never in a backup, never in a response).
+  written only by `RulesWriter`), `./secrets` (credentials, a **directory** mount at `/app/secrets` since U9; never in
+  a backup, never in a response).
+- **The connector** (`spotify-mcp-server`, MIT) is pinned by SHA in `compose.yaml` and patched in one line at build
+  (CONTRIBUTING.md *Operations*). Moving the pin needs an acceptance `pass` first, or `npm run release` refuses.
+- **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (private while the
+  repository is). Pushing a tag is the owner's act.
 - Automation ships **off** (`SKIP_EXECUTOR_ENABLED`, plus the UI kill switch). Never arm it on the owner's behalf.
 - Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and need
   the container down.
@@ -114,7 +119,7 @@ npm run db:backup -- --label <why>                  # container DOWN first
 npm run db:restore -- <dir> --verify-only           # read-only; verify a backup the day you take it
 npm run db:restore -- --self-test                   # proves the verifier can FAIL (corrupt snapshot kept on purpose)
 npm run db:verify-backups                           # read-only sweep over data/
-npm run verify:up                                   # throwaway second install on :3011
+npm run verify:up                                   # throwaway second install on :3011 (--candidate: on the working tree)
 npm run verify:down                                 # remove it and PROVE the live deployment unchanged
 
 node scripts/hypothesis-gate.mjs                    # Phase 2 gate. Read-only. Its confirmatory run is SPENT

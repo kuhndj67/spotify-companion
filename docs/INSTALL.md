@@ -562,5 +562,16 @@ start armed.
   is running.
 - **Update to a newer release**: `git fetch --tags`, then `git checkout <new tag>`, then `docker compose up -d --build`.
   Take **Settings → Create backup** first.
+- **Upgrading from `1.0.0-beta.2` or earlier** (once): the container was renamed from `spotify-now-playing` to
+  `spotify-companion`, and the credentials are now mounted as the `secrets` folder. Your files stay where they are.
+  1. **Settings → Create backup**.
+  2. `docker compose down` **before** you check out the new tag. The old `compose.yaml` is the only one that knows
+     the old container; once you have the new one, `down` leaves the old container running beside the new one, and
+     both would record into `data/`.
+  3. `git fetch --tags`, `git checkout <new tag>`, `docker compose up -d --build`.
+
+  **If you already checked out the new tag**: run `docker stop spotify-now-playing`, then `docker rm
+  spotify-now-playing`, then `docker compose up -d`. **If the Spotify indicator says the credentials are mounted as
+  single files**, the old `compose.yaml` is in use with the new image: check out the new tag and start again.
 - **Remove**: `docker compose down`, then delete the folder. ⚠️ `data/` holds your play history and **nothing can
   recreate it**. Keep a backup if you may want it.

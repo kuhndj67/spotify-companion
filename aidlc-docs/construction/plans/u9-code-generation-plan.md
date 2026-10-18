@@ -145,18 +145,18 @@ split.
 - [x] Tests: the loopback-`Host` refusal (seen to refuse a LAN `Host`); the setup decision; the entrypoint's
       dispatch is covered by Build & Test (a shell script, `smoke` cannot load it).
 
-### Step 10 — Documents *(BR-71.6, BR-74.5, BR-75.2, BR-75.3, BR-69.2)*
-- [ ] `docs/INSTALL.md`: names updated; an **Upgrading from `1.0.0-beta.2`** section (stop the old container, then
+### Step 10 — Documents *(BR-71.6, BR-74.5, BR-75.2, BR-75.3, BR-69.2)* — ✅ DONE · INSTALL's upgrade note says to run `docker compose down` **before** checking out the new tag (the old compose file is the only one that knows the old service), with the recovery if that was missed · README *App only*: six steps with expected output, **coming soon kept** (not yet walked) · CONTRIBUTING *Operations*: the pin, the patch, the orphaned-service trap · `CLAUDE.md` 154 lines · upstream draft checked against upstream's code; corrected one claim of my own (reproduced on Rancher Desktop's dockerd, not Docker Desktop) · `compose.verify.yaml`'s U9→U10 comment was already done in Step 6
+- [x] `docs/INSTALL.md`: names updated; an **Upgrading from `1.0.0-beta.2`** section (stop the old container, then
       start as usual; the host files do not move).
-- [ ] `README.md` *App only*: the real steps (log in, `setup`, register a Spotify app, `auth`, `compose up`, the
+- [x] `README.md` *App only*: the real steps (log in, `setup`, register a Spotify app, `auth`, `compose up`, the
       positive check), each with expected output. ⚠️ The **coming soon** label **stays** until the walk passes
       (BR-74.6).
-- [ ] `CONTRIBUTING.md`: a trap entry for the connector patch (where it is, why, when it goes) and the pin policy
+- [x] `CONTRIBUTING.md`: a trap entry for the connector patch (where it is, why, when it goes) and the pin policy
       (NFR-40).
-- [ ] `CLAUDE.md`: container name in the commands (`docker logs -f spotify-companion`); the pin and image-publishing
+- [x] `CLAUDE.md`: container name in the commands (`docker logs -f spotify-companion`); the pin and image-publishing
       facts where they belong; stays ≤ 200 lines.
-- [ ] `src/api.ts:145,151`, `compose.verify.yaml:4`: "U9" → "U10" for the NAS (BR-75.3).
-- [ ] The upstream proposal (an environment override for the config path) **drafted** to
+- [x] `src/api.ts:145,151`, `compose.verify.yaml:4`: "U9" → "U10" for the NAS (BR-75.3).
+- [x] The upstream proposal (an environment override for the config path) **drafted** to
       `construction/u9-connector-upgrade/code/upstream-proposal-draft.md`; not posted (BR-69.3).
 
 ### Step 11 — Positive controls and a local image build *(the guard-test table, LC-58/59/66)*

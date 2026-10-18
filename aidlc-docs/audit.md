@@ -8756,3 +8756,12 @@ Owner (question prompt): *"GitHub private reporting (Recommended)"*. `SECURITY.m
 points at the Security tab's private reporting, which is switched on when the repository goes public (W-14), and
 says what to do until then. No personal email address remains in tracked files. On the commit-metadata email the
 owner asked what GitHub users usually do; answered in chat, decision open.
+
+---
+
+## 2026-10-18T23:20:00Z — Commit email: GitHub no-reply address from now on
+
+Owner: *"Ok swithc to the standard github approach going forward."* Global `git config user.email` set to the GitHub
+no-reply address (`<id>+kuhndj67@users.noreply.github.com`; id confirmed with `gh api user`). Past commits keep the
+old address: accepted, no history rewrite. Owed by the owner in GitHub's web settings (the CLI token has no `user`
+scope): *Keep my email addresses private* and *Block command line pushes that expose my email*.

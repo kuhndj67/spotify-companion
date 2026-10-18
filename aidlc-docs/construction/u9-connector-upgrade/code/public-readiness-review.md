@@ -57,7 +57,7 @@ itself (`audit.md` quotes tracks with dates) should not be public.
 
 | Class | Choice | Done |
 |---|---|---|
-| Email addresses | **Redact** → `<email address>` (tests use the obviously fake `listener@example.org`, since the code validates it) | ✅ 2026-10-18, current files. ⚠️ Still in **history**, and `<email address>` (the hotmail one) is the **author email of all 406 commit records**, which a public repository shows. Not changed by redacting files. `SECURITY.md` now points at **GitHub private vulnerability reporting** (owner, 2026-10-18; switched on when public). Commit-metadata email: owner considering |
+| Email addresses | **Redact** → `<email address>` (tests use the obviously fake `listener@example.org`, since the code validates it) | ✅ 2026-10-18, current files. ⚠️ Still in **history**, and `<email address>` (the hotmail one) is the **author email of all 406 commit records**, which a public repository shows. Not changed by redacting files. `SECURITY.md` now points at **GitHub private vulnerability reporting** (owner, 2026-10-18; switched on when public). Commit-metadata email: **GitHub no-reply address from 2026-10-18** (global `user.email`); past commits keep the old address (accepted, no rewrite) |
 | Machine names | **Redact**: the walk VM → `Machine 1`, the NAS → `Machine 2` | ✅ 2026-10-18, current files (still in history) |
 | NAS IP address | **Accept**: a private network address | — |
 | Listening history (probe files, prose, fixtures) | Not yet decided | — |
@@ -78,6 +78,7 @@ itself (`audit.md` quotes tracks with dates) should not be public.
 - [ ] Review the `main` ruleset (it works the same on a public repository; GitHub Pro is then no longer needed for it).
 - [ ] Decide the GHCR package's visibility (§3).
 - [ ] Re-run this review's secret scan on the day (W-14 item 1).
+- [ ] In GitHub *Settings → Emails*: **Keep my email addresses private** and **Block command line pushes that expose my email** (owner; the CLI token cannot change account settings).
 
 ## 5. When it would be ready
 

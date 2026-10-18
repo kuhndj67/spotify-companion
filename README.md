@@ -2,17 +2,19 @@
 
 A **local, single-user** companion for Spotify. It shows what is playing and enriches it with the record label,
 genres, liked status and your own history with the track. It records every play, and it can skip tracks
-automatically by rules you write.
+automatically by rules you write. 
 
 ## Why it exists
 
-It is a **data-collection instrument for a testable, unproven hypothesis**: that tracks placed in your feed by
-signed (major-label) artists are disproportionately paid promotion, and so likelier to be ones you dislike.
-Signed-versus-independent is a *proxy*, not the point. The app is built so the hypothesis can be **disconfirmed**,
-and its first pre-registered test did **not** support it. Rules are yours to write and stay useful either way.
-Analysis happens outside the app, on its exports.
+It started as a **data-collection instrument for a testable, unproven hypothesis**: that tracks placed in your feed by
+signed (major-label) artists include paid promotion, and so likelier to be ones you dislike. Since then Spotify publicly 
+shared that yes they promote content so now I'm wondering if it's detectable (which would indicate that their promotion
+algorithm is not wall aligned with user listening preference).
+In either case the rules engine allows users to fine tune their feeds by having it automatically skip content based on 
+metadata or prior listening history (only play unsigned artists, or music less than 5 years old... or automatically 
+skip tracks I've manually skipped before).
 
-## What it is not
+## What it is not (at the moment but some of this will change when I get to it)
 
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
   developer app** and account. Nothing is shared between installs.

@@ -18,7 +18,7 @@ services:
     # never uses `--rmi`, which would delete that shared tag.
     # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
-    image: spotify-now-playing:0.8.5
+    image: spotify-now-playing:1.0.0-beta.1
     container_name: spotify-now-playing-verify
     ports:
       - "127.0.0.1:3011:3000"

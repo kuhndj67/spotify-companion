@@ -1,9 +1,9 @@
 # U9 Build & Test — Connector Upgrade & Publishable Image
 
-**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS · Order: IN-U9-7, as listed in
+**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.3` LIVE since 2026-10-18 19:45Z · Order: IN-U9-7, as listed in
 [`code-summary.md`](../u9-connector-upgrade/code/code-summary.md) · Branch `u9-build-and-test`
 
-⚠️ Nothing deployed yet: live is `spotify-now-playing` on `1.0.0-beta.2` at the old pin.
+✅ Live is `spotify-companion` `1.0.0-beta.3` at the MIT pin (from 19:45Z); `spotify-now-playing` `1.0.0-beta.2` stopped and kept for rollback.
 
 ---
 
@@ -71,8 +71,28 @@ No old container left behind at the crossing; folder removed; **live unchanged**
 and after). The release image is NOT built here: `spotify-companion:1.0.0-beta.3` is built only by the release
 (BR-66.7); the rehearsal used `spotify-companion:candidate`, since removed.
 
+## 6. Live crossing — ✅ 2026-10-18, `1.0.0-beta.3` LIVE
+
+Owner merged PRs #4 and #5, then gave the go-ahead. From `main` (`2f626f7`), clean tree:
+
+1. `npm run release -- --apply` **with `spotify-now-playing` running** → `verify` passed (1700 tests), then
+   **REFUSED: `old-container-running`**. No tag, live untouched. The crossing guard (BR-71.2, PBT-77) seen working on
+   the real deployment.
+2. `docker stop spotify-now-playing` (19:45:18Z), **kept** with its image `1.0.0-beta.2` for rollback.
+3. `npm run release -- --apply` → built `spotify-companion:1.0.0-beta.3`, deployed, healthy, **tagged
+   `v1.0.0-beta.3` locally** (not pushed). Polling gap ≈ 19:45:18Z–19:45:42Z.
+4. Checks on the live app: version `1.0.0-beta.3`, schema v7 · **credentials directory `ok`** · token acquired · MCP
+   v2, 31 tools · now-playing parsed while playing · **1453 plays**, not degraded · first play recorded by the new
+   container: *"The Diary of Jane"*, `live`, `completed`, 19:45:42Z → 19:48:21Z.
+
+As expected for a restart mid-track, that song is split in two rows: the old container's first 12 s (`unknown`,
+19:45:04–19:45:16) and the new container's remainder (`completed`). Diagnostics still shows *"Snapshots: scheduled;
+none written yet"*: the known false green, U10's FR-80.
+
+**Still to see on the live install**: its first token refresh through the new directory mount, due ≈ 20:24Z (the live
+file was last written 19:29:34Z by the old connector).
+
 ## Still to do (in order)
 
-7. **Live crossing** — owner present, owner's go-ahead.
 8. **First tag push** — owner's act → the `publish` job.
 9. Token probe → walk guide → agent walk of README *App only*.

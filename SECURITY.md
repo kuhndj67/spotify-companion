@@ -2,12 +2,14 @@
 
 ## Reporting a vulnerability
 
-Email **kuhndj67@hotmail.com**. **Please do not open a public issue** for a vulnerability.
+Use **GitHub's private vulnerability reporting**: the repository's **Security** tab → **Report a vulnerability**.
+**Please do not open a public issue** for a vulnerability.
 
 Say what you found, how to reproduce it, and which version (Settings shows it, as does `/api/diagnostics`). You will
 get an acknowledgement; this is a one-person project, so there is no response-time promise.
 
-Reporting will move to GitHub's private vulnerability reporting when the repository becomes public.
+⚠️ Private reporting is switched on when the repository becomes public. Until then the repository is private, and
+anyone who can read it is a collaborator: open a **private** conversation with the owner rather than an issue.
 
 ## What is in scope
 

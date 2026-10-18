@@ -57,7 +57,7 @@ itself (`audit.md` quotes tracks with dates) should not be public.
 
 | Class | Choice | Done |
 |---|---|---|
-| Email addresses | **Redact** → `<email address>` (tests use the obviously fake `listener@example.org`, since the code validates it) | ✅ 2026-10-18, current files. ⚠️ Still in **history**, and `<email address>` (the hotmail one) is the **author email of all 406 commit records**, which a public repository shows. Not changed by redacting files. `SECURITY.md` kept: it is the reporting channel. Both open |
+| Email addresses | **Redact** → `<email address>` (tests use the obviously fake `listener@example.org`, since the code validates it) | ✅ 2026-10-18, current files. ⚠️ Still in **history**, and `<email address>` (the hotmail one) is the **author email of all 406 commit records**, which a public repository shows. Not changed by redacting files. `SECURITY.md` now points at **GitHub private vulnerability reporting** (owner, 2026-10-18; switched on when public). Commit-metadata email: owner considering |
 | Machine names | **Redact**: the walk VM → `Machine 1`, the NAS → `Machine 2` | ✅ 2026-10-18, current files (still in history) |
 | NAS IP address | **Accept**: a private network address | — |
 | Listening history (probe files, prose, fixtures) | Not yet decided | — |
@@ -74,7 +74,7 @@ itself (`audit.md` quotes tracks with dates) should not be public.
 
 ## 4. After going public (W-14's list)
 
-- [ ] Enable **private vulnerability reporting**; point `SECURITY.md` at it (keep or drop the email).
+- [ ] Enable **private vulnerability reporting** (`SECURITY.md` already points at it; no email address remains).
 - [ ] Review the `main` ruleset (it works the same on a public repository; GitHub Pro is then no longer needed for it).
 - [ ] Decide the GHCR package's visibility (§3).
 - [ ] Re-run this review's secret scan on the day (W-14 item 1).

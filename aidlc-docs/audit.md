@@ -8747,3 +8747,12 @@ walk VM → `Machine 1`; the NAS → `Machine 2`. IP address kept (owner). `npm 
 **Not done, and why** (asked of the owner): `SECURITY.md` keeps its address, because it is the vulnerability-reporting
 channel; and the author email on **all 406 commit records** is the hotmail address, which file edits cannot change
 and a public repository displays. The redaction also does not remove anything from **history** (W-14 option B).
+
+---
+
+## 2026-10-18T23:10:00Z — SECURITY.md → GitHub private vulnerability reporting
+
+Owner (question prompt): *"GitHub private reporting (Recommended)"*. `SECURITY.md` no longer lists an address; it
+points at the Security tab's private reporting, which is switched on when the repository goes public (W-14), and
+says what to do until then. No personal email address remains in tracked files. On the commit-metadata email the
+owner asked what GitHub users usually do; answered in chat, decision open.

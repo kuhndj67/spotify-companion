@@ -615,8 +615,8 @@ NAS, or a mistake — without re-arming anything or exposing my credentials.
 - [ ] I can undo the most recent restore once
 - [ ] Nothing accumulates on disk from backing up or restoring, beyond the one previous history
 - [ ] ⚠️ Performed for real: a corpus backed up from the live app and restored into a second installation, and
-      the restored app runs — **on this machine in U6, and across machines (the NAS) in U10** (split 2026-10-07,
-      because off-machine browsers are refused until U10; "U9" before 2026-10-18)
+      the restored app runs — **on this machine in U6, and across machines (the NAS) in U11** (split 2026-10-07,
+      because off-machine browsers are refused until U11; "U9", then "U10", before the 2026-10-18 renumberings)
 
 *Covers FR-57–FR-64 · Persona P3*
 

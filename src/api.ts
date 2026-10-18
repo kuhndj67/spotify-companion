@@ -142,13 +142,13 @@ export interface ApiDeps {
   //
   // ⚠️ **The first routes that accept a FILE from outside**, and the first that can REPLACE the corpus. Every
   // one is behind `ingestGuard` (P-42) in addition to the app-wide `localGuard`, and none may be reachable from
-  // another machine until NFR-29 is built (U10, the NAS; "U9" before the 2026-10-18 renumbering). Optional so the U0–U5 test harnesses need not construct it.
+  // another machine until NFR-29 is built (U11, the NAS; renumbered twice on 2026-10-18). Optional so the U0–U5 test harnesses need not construct it.
   maintenance?: MaintenanceService | null;
 
   // -- U7: configuration management --------------------------------------------
   //
   // ⚠️ The first routes that WRITE configuration — `rules.json` and the credential files. Every POST is behind
-  // `ingestGuard` after `localGuard`, and none is reachable off-machine until NFR-29 (U10). Optional, as U6's.
+  // `ingestGuard` after `localGuard`, and none is reachable off-machine until NFR-29 (U11). Optional, as U6's.
   rulesWriter?: RulesWriter | null;
   credentials?: CredentialsWriter | null;
   /** Whether label enrichment is running — a contact saved while it is OFF needs a restart (Step 6's limit). */

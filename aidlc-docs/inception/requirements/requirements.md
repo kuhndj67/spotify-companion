@@ -460,7 +460,7 @@ both directions** — corrected 2026-10-08 from the source: a text-error poll wa
 error as **idle** (U7 FD F5–F6). M4 has not yet been used to conclude anything.
 
 Still binding: **FR-60** (restore never changes credentials), **FR-61** (nor the automation state), **NFR-01…04**
-(every new route local-only until NFR-29 / U10). Out of scope: a built-in rules editor (later) · in-app Spotify
+(every new route local-only until NFR-29 / U11). Out of scope: a built-in rules editor (later) · in-app Spotify
 OAuth (**W-10**).
 
 ---
@@ -478,6 +478,27 @@ From Requirements Questions 26–28 (`requirement-verification-questions.md`). P
 ⚠️ **FR-74 depends on FR-73**: publishing before the pin moves would distribute the unlicensed connector (NFR-32).
 Still binding: **NFR-28** (no secret in an image or a registry), **NFR-34** (one version source; the registry tag is
 another checked copy), **FR-60/61**.
+
+---
+
+### 3.10 Data safety — *new 2026-10-18; U10 (Phase 5)*
+
+From Requirements Questions 29–33 (all **A**). The owner's three concerns: a new user never gets another person's
+listening history (**already met**, measured 2026-10-18: nothing tracked, ignored by git and the image build, refused
+by the image check, App-only `setup` starts empty); updates never lose a user's own history; developers cannot lose
+theirs by accident.
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-76 | **A backup is taken automatically before a risky change.** (a) At startup, before applying any schema migration, the app takes an in-app backup (U6's mechanism, the one writer) and **refuses to migrate** if it fails. (b) `npm run release -- --apply` asks the **running** app for a backup before it builds and deploys, and **refuses to deploy** without one. A bounded number kept, outside the snapshot rotation | Must | ⬜ New (Q29 = A) |
+| FR-77 | **One writer per database.** The running process holds a **lock file** beside the database with a heartbeat; a second process (container or host, through the same bind mount) that finds a fresh lock **refuses to open the database** and names the holder; a stale lock is taken over and logged. ⚠️ Probed across the Rancher bind mount before it is relied on | Must | ⬜ New (Q30 = A) |
+| FR-78 | **Developer runs use their own data folder.** A host run (`npm start`) defaults to `data-dev/` (gitignored), never the container's `data/history.db`, unless `HISTORY_DB_PATH` names it on purpose | Must | ⬜ New (Q31 = A) |
+| FR-79 | **An *App only* install can update itself.** The image's `update` command asks the running app for a backup (FR-76), rewrites **only the image line** of the folder's `compose.yaml` to its own version (other edits kept), refuses to move to an older version, and prints the next step | Must | ⬜ New (Q32 = A) |
+| FR-80 | **Automatic snapshots run, and say so truthfully.** They are scheduled from the **newest snapshot on disk**, not from process start (at startup, one is taken if the newest is older than the interval; at most one per interval). Diagnostics: **warn** when the newest is older than two intervals, **fail** when none exists after one interval of uptime, never **ok** for "none written" | Must | ⬜ New (Q33 = A) |
+
+⚠️ **FR-80 fixes a live defect**: no snapshot has been written since 2026-10-03, because the 24-hour timer restarts
+with every container restart, while diagnostics reported `ok`. Until U10 ships, the owner takes **Settings → Create
+backup** by hand.
 
 ---
 
@@ -513,11 +534,11 @@ From the Phase 5 requirements round (`requirement-verification-questions.md`, Qu
 | NFR-32 | The project is licensed **GPL-3.0** (`LICENSE` at the root). ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence. *Status 2026-10-16: upstream added **MIT** at `6065ce5c` (issue #106), but `compose.yaml` pins `7b5fde63`, 17 commits earlier and unlicensed. The condition therefore still holds until the pin moves (**W-15**); publishing is then a separate decision. 2026-10-18: the pin move is **FR-73**, publishing is decided as **FR-74** (Q27 = A), both in **U9**; the condition is discharged when FR-73 ships* | ⬜ New (Q16 = C) |
 | NFR-33 | A short `README` (what it is, status, where to read more), `docs/INSTALL.md`, `CONTRIBUTING.md` and `SECURITY.md` exist and are **accurate** | ⬜ New (Q15 = A) |
 | NFR-34 | **Application versions follow Semantic Versioning, pre-1.0 = development.** `0.MINOR.PATCH` — MINOR per delivered unit, PATCH per fix release; `1.0.0-beta.N` once someone else installs it; **`1.0.0` when FR-65's install routine has been walked cold**. After 1.0, MAJOR means *an existing user must act by hand* (an existing `rules.json` no longer loads, an older backup cannot be restored, or credential setup changes); the UI's own HTTP API is not a public interface. **One source of truth, `package.json`**: the image tag, the backup manifest's `appVersion` and the MusicBrainz User-Agent derive from it (`appVersion` leaves `musicbrainz.json`); each release gets a git tag `vX.Y.Z`; rollback uses the previous version's image rather than hand-made `uN-rollback` tags; the version is shown in the UI and `/api/diagnostics`. The **schema version stays separate** | ⬜ New (Q18 = A, 2026-10-12) |
-| NFR-35 | **GitHub Issues is the backlog.** Each open W-item and open item migrates to one issue; `requirements.md` §5.1 keeps a **pointer table** (W-id → issue) so old references resolve; new ideas start as issues. A **feature** issue still re-enters AI-DLC before design, and AI-DLC records cite the issue number | ⬜ New (Q21 = A) — U11 |
-| NFR-36 | **The AI-DLC records merge cleanly with several writers.** `audit.md` stays append-only and is marked **`merge=union`** in `.gitattributes` (⚠️ **probed** before relied on); `aidlc-state.md` holds **one section per unit**, so concurrent work edits different lines; `CLAUDE.md` holds no current state. The standard AI-DLC file layout is kept | ⬜ New (Q22 = A) — U11 |
-| NFR-37 | **Reviews and gates.** The owner approves every AI-DLC gate. `CODEOWNERS` makes the owner a **required reviewer** on `aidlc-docs/` and the security-sensitive paths (local-access guard, upload admission, configuration and credential writers, playback control); any other path needs **one approving review**. The owner may push directly (NFR-30) | ⬜ New (Q23 = A) — U11 |
-| NFR-38 | **`CHANGELOG.md`** in Keep a Changelog form: each PR adds its line under *Unreleased*; the **owner cuts a release** — moves *Unreleased* under the version, bumps `package.json`, tags (NFR-34) | ⬜ New (Q24 = A) — U11 |
-| NFR-39 | **Contributor tooling**: PR and issue templates (the PR template asks which path — fix or feature — which requirement or BR, and the `npm run verify` result) · **Dependabot** for npm and GitHub Actions, weekly and grouped; ⚠️ the pinned MCP server ref is **never** updated automatically · **one agent-instruction source**: `CLAUDE.md`, with `.github/copilot-instructions.md` and `AGENTS.md` pointing to it · **GitHub Discussions** for questions that are not work items | ⬜ New (Q25 = A+B+C+D) — U11 |
+| NFR-35 | **GitHub Issues is the backlog.** Each open W-item and open item migrates to one issue; `requirements.md` §5.1 keeps a **pointer table** (W-id → issue) so old references resolve; new ideas start as issues. A **feature** issue still re-enters AI-DLC before design, and AI-DLC records cite the issue number | ⬜ New (Q21 = A) — U12 |
+| NFR-36 | **The AI-DLC records merge cleanly with several writers.** `audit.md` stays append-only and is marked **`merge=union`** in `.gitattributes` (⚠️ **probed** before relied on); `aidlc-state.md` holds **one section per unit**, so concurrent work edits different lines; `CLAUDE.md` holds no current state. The standard AI-DLC file layout is kept | ⬜ New (Q22 = A) — U12 |
+| NFR-37 | **Reviews and gates.** The owner approves every AI-DLC gate. `CODEOWNERS` makes the owner a **required reviewer** on `aidlc-docs/` and the security-sensitive paths (local-access guard, upload admission, configuration and credential writers, playback control); any other path needs **one approving review**. The owner may push directly (NFR-30) | ⬜ New (Q23 = A) — U12 |
+| NFR-38 | **`CHANGELOG.md`** in Keep a Changelog form: each PR adds its line under *Unreleased*; the **owner cuts a release** — moves *Unreleased* under the version, bumps `package.json`, tags (NFR-34) | ⬜ New (Q24 = A) — U12 |
+| NFR-39 | **Contributor tooling**: PR and issue templates (the PR template asks which path — fix or feature — which requirement or BR, and the `npm run verify` result) · **Dependabot** for npm and GitHub Actions, weekly and grouped; ⚠️ the pinned MCP server ref is **never** updated automatically · **one agent-instruction source**: `CLAUDE.md`, with `.github/copilot-instructions.md` and `AGENTS.md` pointing to it · **GitHub Discussions** for questions that are not work items | ⬜ New (Q25 = A+B+C+D) — U12 |
 | NFR-40 | **The connector stays pinned to one upstream commit** (R7). Moving the pin is **deliberate work** that repeats FR-73's acceptance probes; Dependabot never moves it (NFR-39), and CI's **PBT-66** scan is the early warning of an upstream output change. No fork | ⬜ New (Q28 = A, 2026-10-18) — U9 |
 
 ⚠️ **NFR-29 amends NFR-07, it does not repeal it.** In local-only mode, *no authentication* is still justified
@@ -1056,6 +1077,29 @@ exists to break.**
 
 ---
 
+#### W-16 — The history export leaks an `error` listener per backpressure wait
+
+**Raised 2026-10-18** during U9's Build & Test. ⚠️ **Logged, not built** (owner: *"log it"*). A **fix** when taken up
+(its own branch and PR), not a feature.
+
+**Seen**: the live app logged `MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error
+listeners added to [ServerResponse]` four times, at exactly the moments a full `/api/history/export?format=json` was
+requested (18:35–18:36Z). Not Spotify, not the network: Node's warning about event handlers on one HTTP response.
+
+**Cause** (read, `src/export/ExportService.ts` `writeTo`): when `target.write()` returns `false` the code waits with
+`target.once('drain', resolve)` **and** `target.once('error', reject)`; when `drain` fires, the `error` listener is
+never removed. A large export hits backpressure more than 10 times on one response, so stale listeners accumulate.
+
+**Impact**: small. The listeners are released when the response ends, so memory does not grow across requests, and
+the export completes correctly. It gets noisier as history grows, and the same `writeTo` serves the snapshot
+scheduler's file stream.
+
+**Fix**: remove the `error` listener when `drain` fires (and `drain` when `error` fires), e.g. `events.once` with
+both, or `stream/promises`. Test: an export into a deliberately slow consumer leaves **zero** `error` listeners on the
+target, and an error mid-export still rejects (positive control).
+
+---
+
 #### W-15 — Move the MCP server pin to the MIT-licensed commit
 
 ✅ **Promoted 2026-10-18 to unit U9** as **FR-73…75** and **NFR-40** (Requirements Questions 26–28). Kept below as the record of why.
@@ -1077,7 +1121,7 @@ exists to break.**
    the new source.
 
 **Then, separately**: whether to **publish** a built image. NFR-32's blocker is gone once the pin moves, but
-publishing is a distribution decision, and it touches U10 (could the NAS pull rather than build?; U9 before the 2026-10-18 renumbering) and W-14.
+publishing is a distribution decision, and it touches U11 (could the NAS pull rather than build?; U9 before the 2026-10-18 renumbering) and W-14.
 
 ---
 

@@ -6,7 +6,7 @@ automatically by rules you write.
 
 ## Why it exists
 
-It started as a **data-collection instrument for a testable, unproven hypothesis**: that tracks placed in your feed by
+**Primary.** It started as a **data-collection instrument for a testable, unproven hypothesis**: that tracks placed in your feed by
 signed (major-label) artists include paid promotion, and so are likelier to be ones you dislike. Since then, Spotify
 has publicly said that it does promote content, so now I'm wondering whether that is detectable (which would indicate
 that their promotion algorithm is not well aligned with user listening preference).
@@ -14,6 +14,12 @@ that their promotion algorithm is not well aligned with user listening preferenc
 In either case, the rules engine lets users fine-tune their feeds by having it automatically skip content based on
 metadata or prior listening history: only play unsigned artists, or music less than 5 years old, or automatically
 skip tracks I've manually skipped before.
+
+**Secondary.** As someone who is a leader of developers but doesn't get to write code much anymore, I wanted to better understand Generative
+AI workflows and how a developer can use the tools. I'm using the AWSLabs AI-DLC framework (open source) and Claude
+(primarily Opus 5.5 with Fable code reviews) in VS Code to build this app, and I chose to do it in a language and devops
+environment I'm unfamiliar with (maybe not the right call in hindsight... but here we are) to see if I could get a
+quality product with AI doing all the coding.
 
 ## What it is not (at the moment; some of this will change when I get to it)
 

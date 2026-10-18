@@ -65,8 +65,9 @@ Two ways to do it, following the same routine:
 The steps below exist but have **not yet been walked** by someone following them cold; this label comes off when
 they have. While the repository is private, pulling the image needs access to it.
 
-You need Docker (Rancher Desktop on Windows: [`docs/INSTALL.md`](docs/INSTALL.md) S1), a GitHub token that can read
-packages, and your own Spotify developer app. Commands are the same in PowerShell and a Linux shell; `<version>` is
+You need Docker (Rancher Desktop on Windows: [`docs/INSTALL.md`](docs/INSTALL.md) S1), a **classic** GitHub token with
+**only** the `read:packages` scope and a short expiry (a fine-grained token logs in but cannot pull: measured), and your
+own Spotify developer app. Commands are the same in PowerShell and a Linux shell; `<version>` is
 a release such as `1.0.0-beta.3`.
 
 1. **Log in to the registry**: `docker login ghcr.io -u <your GitHub user name>`, and paste the token as the

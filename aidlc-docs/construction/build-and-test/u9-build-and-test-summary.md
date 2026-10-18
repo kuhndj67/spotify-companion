@@ -139,8 +139,24 @@ full run). From the job log, all on the image that was pushed:
 have, and the owner's broad token is not put into Docker's login store). Moved to the token probe (IN-U9-6), with the
 short-lived read token.
 
+## 9. Token probe (IN-U9-6) and the published image pulled back — ✅
+
+Run by the owner in their own PowerShell (the token never entered the conversation):
+
+| Token | `docker login ghcr.io` | `docker pull …:1.0.0-beta.4` |
+|---|---|---|
+| **Fine-grained**, repository `spotify-companion` only, read-only | `Login Succeeded` | ❌ **`403 Forbidden`** |
+| **Classic**, only `read:packages`, 7 days | `Login Succeeded` | ✅ pulled, digest `sha256:9cf5c083…` |
+
+So **a fine-grained token cannot pull this package**, and the walk and README *App only* use the classic
+`read:packages` token (⚠️ it reads every package the account can see; today that is this one). `Login Succeeded` proves
+nothing on its own: GHCR checks the permission at the pull. The fine-grained token is revoked.
+
+**The image as published**, checked after the pull with `scripts/check-image.sh`: both licences present (GPL 35149 B,
+MIT 1070 B), no user data, and the `revision` label is **`d8f2ce4`** = the commit tagged `v1.0.0-beta.4`. What is in the
+registry is what was released. README *App only* now names the classic token and its one scope.
+
 ## Still to do (in order)
 
 9. Live token refresh through the new mount (≈ 20:24Z).
-10. Token probe (fine-grained first; owner creates it) → pull the published image back, check both licences → walk
-    guide → agent walk of README *App only* on Machine 1.
+10. Walk guide → agent walk of README *App only* on Machine 1 (the classic token).

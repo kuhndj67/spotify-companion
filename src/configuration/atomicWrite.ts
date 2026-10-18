@@ -7,16 +7,21 @@
  *
  * ## ⚠️ Only for files on a DIRECTORY mount
  *
- * Rename replaces the inode. Through a **single-file** bind mount that either fails or silently detaches the
- * container's view from the host file — so `spotify-config.json` and `musicbrainz.json`, which are single-file
- * mounts, are written in place by `CredentialsWriter` and must never come through here.
+ * Rename replaces the inode. Through a **single-file** bind mount that fails (`EBUSY`, probed 2026-10-18) or
+ * detaches the container's view from the host file. Until U9 that kept `spotify-config.json` and `musicbrainz.json`
+ * (then single-file mounts) out of here. **Since U9 (BR-69.4/69.6) `./secrets` is a DIRECTORY mount**, so
+ * `CredentialsWriter` writes both through here, as the connector already does with its own temp + rename. The
+ * startup check (`credentialsDirectory.ts`) stops the app relying on this when an old compose file mounts files.
+ *
+ * The target's permission bits are kept (U9): a rename would otherwise turn a `600` credentials file into the
+ * process's default, which the in-place write it replaced never did.
  *
  * ⚠️ The temp file is a fixed sibling name (`.<base>.tmp`), not a random one. That is safe because every caller
  * serialises its own writes (U5's store has one writer; `RulesWriter` holds a mutex, P-52), and it means a crash
  * can leave at most ONE stray temp file per target rather than an unbounded number.
  */
 
-import { closeSync, mkdirSync, openSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
 export type AtomicWriteOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string };
@@ -31,7 +36,7 @@ export function writeFileAtomic(path: string, content: string): AtomicWriteOutco
   const temp = tempPathFor(path);
   try {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(temp, content, 'utf8');
+    writeFileSync(temp, content, { encoding: 'utf8', mode: existingMode(path) });
     renameSync(temp, path);
     return { ok: true };
   } catch (error) {
@@ -43,6 +48,15 @@ export function writeFileAtomic(path: string, content: string): AtomicWriteOutco
       /* ignore */
     }
     return { ok: false, reason: describe(error) };
+  }
+}
+
+/** The target's permission bits, or the usual default for a new file. */
+function existingMode(path: string): number {
+  try {
+    return statSync(path).mode & 0o777;
+  } catch {
+    return 0o666;
   }
 }
 
@@ -64,23 +78,6 @@ export function probeDirectoryWritable(path: string): boolean {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(probe, 'probe', 'utf8');
     rmSync(probe, { force: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Can this process write `path` IN PLACE? (IN-U7-6) — for the single-file mounts (`musicbrainz.json`,
- * `spotify-config.json`), where `probeDirectoryWritable` is the wrong question: a single-file mount's directory is
- * the container's, not the host's.
- *
- * ⚠️ Opens for read-write (`r+`) and closes — no byte is written and the file is never truncated or created, so a
- * probe can never damage the credentials it checks. A missing file is `false`: there is nothing to write in place.
- */
-export function probeFileWritable(path: string): boolean {
-  try {
-    closeSync(openSync(path, 'r+'));
     return true;
   } catch {
     return false;

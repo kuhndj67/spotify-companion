@@ -85,13 +85,13 @@ split.
 - [x] `test/credentialsDirectory.property.test.ts`: PBT-76 (every combination → exactly one class; only *mounted
       directory + writable* → `ok`); example tests for the indicator text and diagnostics.
 
-### Step 5 — `CredentialsWriter` on rename *(BR-69.6, BR-69.7, LC-62)*
-- [ ] Both files written with `writeFileAtomic` (temp in the same directory, then rename); no temp left after a
+### Step 5 — `CredentialsWriter` on rename *(BR-69.6, BR-69.7, LC-62)* — ✅ DONE · ⚠️ added: `writeFileAtomic` now **keeps the target's permission bits** (a rename would otherwise turn a `600` credentials file into the default; the in-place write never did) — its test runs on Linux CI only (Windows has no mode bits) · `probeFileWritable` **removed** (no caller left) with its test; diagnostics probe the directory · caught in my own new test: a success check `!('refused' in r)` would have passed whatever happened (the refusal key is `reason`); fixed before commit
+- [x] Both files written with `writeFileAtomic` (temp in the same directory, then rename); no temp left after a
       failure. The in-place write and its in-place probe are retired for these two files; the diagnostics'
       writability check becomes the directory check (Step 4).
-- [ ] `src/configuration/atomicWrite.ts`: the header comment that forbids these files is rewritten to say why they
+- [x] `src/configuration/atomicWrite.ts`: the header comment that forbids these files is rewritten to say why they
       are now allowed (directory mount, U9).
-- [ ] `test/credentialsWriter.test.ts`, `test/atomicWrite.test.ts`: updated; a failure-path test proves no temp file
+- [x] `test/credentialsWriter.test.ts`, `test/atomicWrite.test.ts`: updated; a failure-path test proves no temp file
       is left.
 
 ### Step 6 — One name *(BR-71.1, BR-71.5, P-69, LC-63)*

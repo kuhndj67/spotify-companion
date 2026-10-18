@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
@@ -68,6 +68,24 @@ const VALID = {
   redirectUri: 'http://127.0.0.1:8888/callback',
   refreshToken: 'newrefreshtokenvalue1234567890',
 };
+
+describe('U9 (BR-69.6): the saves are temp + rename in the credentials directory', () => {
+  it('a Spotify save replaces the file and leaves only the two credential files in the directory', async () => {
+    const r = await writer().saveSpotify(VALID);
+    assert.ok(!('reason' in r), JSON.stringify(r));
+    assert.deepEqual(readdirSync(dir).sort(), ['musicbrainz.json', 'spotify-config.json']);
+    assert.equal(JSON.parse(readFileSync(spotifyPath, 'utf8')).clientId, VALID.clientId);
+  });
+
+  it('a write that cannot complete is refused as write-failed, and NO temp file is left behind', async () => {
+    // The target is a DIRECTORY, so the rename fails after the temp file was written.
+    rmSync(spotifyPath);
+    mkdirSync(spotifyPath);
+    const r = await writer().saveSpotify(VALID);
+    assert.ok('reason' in r && r.reason === 'write-failed', JSON.stringify(r));
+    assert.deepEqual(readdirSync(dir).sort(), ['musicbrainz.json', 'spotify-config.json']);
+  });
+});
 
 describe('the Spotify save sequence (P-49) — ORDER', () => {
   it('pause → close (file still OLD) → write → forget (file NEW) → resume', async () => {

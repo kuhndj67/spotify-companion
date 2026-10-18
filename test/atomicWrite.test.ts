@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
@@ -59,6 +59,16 @@ describe('writeFileAtomic', () => {
     assert.ok(!outcome.ok && outcome.reason.length > 0);
     assert.equal(existsSync(tempPathFor(target)), false);
     assert.equal(readFileSync(join(target, 'keep'), 'utf8'), 'k', 'the occupant is untouched');
+  });
+
+  it("U9: keeps the target's permission bits (a 600 credentials file stays 600 across the rename)", (t) => {
+    // Windows has no Unix mode bits to keep (only read-only); the container and CI are Linux, where it matters.
+    if (process.platform === 'win32') return t.skip('Unix permission bits do not exist on Windows');
+    const target = join(dir, 'spotify-config.json');
+    writeFileSync(target, 'old');
+    chmodSync(target, 0o600);
+    assert.deepEqual(writeFileAtomic(target, 'new'), { ok: true });
+    assert.equal(statSync(target).mode & 0o777, 0o600);
   });
 });
 

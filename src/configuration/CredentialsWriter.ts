@@ -27,11 +27,13 @@
  * Values go in and are written; nothing returned, logged or recorded for Diagnostics can hold one. Refusals name
  * FIELDS, never values. PBT-61 holds this for generated secrets on every path.
  *
- * Both files are SINGLE-FILE bind mounts, so they are written IN PLACE (same inode) — a temp-then-rename would
- * detach the container's view. That is the pattern the MCP server itself already uses through this very mount.
+ * U9 (BR-69.6): both files live in the `./secrets` DIRECTORY mount and are written by temp + rename
+ * (`writeFileAtomic`), as the connector writes its own token refreshes. Until 1.0.0-beta.2 they were single-file
+ * mounts, written in place, because a rename through a single-file mount fails with EBUSY.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { writeFileAtomic } from './atomicWrite.js';
 
 import { validateMusicBrainzContact } from '../config.js';
 import { CREDENTIALS_CAP_BYTES } from '../ingest/types.js';
@@ -160,10 +162,9 @@ export class CredentialsWriter {
           expiresAt: 0,
           replacedAt: new Date(this.#deps.now()).toISOString(),
         };
-        try {
-          // IN PLACE (same inode): a single-file bind mount.
-          writeFileSync(this.#deps.spotifyConfigPath, `${JSON.stringify(content, null, 2)}\n`, 'utf8');
-        } catch {
+        // U9 (BR-69.6): temp + rename in the ./secrets DIRECTORY mount (was in place, for a single-file mount). A
+        // failed write leaves no temp file behind (writeFileAtomic removes it).
+        if (!writeFileAtomic(this.#deps.spotifyConfigPath, `${JSON.stringify(content, null, 2)}\n`).ok) {
           return this.#refuse('spotify', 'write-failed', []);
         }
         this.#deps.webApi.forgetCredentials();
@@ -191,9 +192,7 @@ export class CredentialsWriter {
       // U8 (BR-66.2): a legacy `appVersion` is DROPPED on rewrite -- the version comes from package.json, and a
       // per-install copy is a version no release can reach. Every other field is preserved.
       const { appVersion: _legacyVersion, ...existing } = readJson(this.#deps.musicbrainzPath) ?? { appName: 'SpotifyNowPlaying' };
-      try {
-        writeFileSync(this.#deps.musicbrainzPath, `${JSON.stringify({ ...existing, contact: checked.contact }, null, 2)}\n`, 'utf8');
-      } catch {
+      if (!writeFileAtomic(this.#deps.musicbrainzPath, `${JSON.stringify({ ...existing, contact: checked.contact }, null, 2)}\n`).ok) {
         return this.#refuse('musicbrainz', 'write-failed', []);
       }
       if (readJson(this.#deps.musicbrainzPath)?.['contact'] !== checked.contact) {

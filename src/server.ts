@@ -55,7 +55,7 @@ import { LabelBackfillJob } from './musicbrainz/LabelBackfillJob.js';
 import { LikedSetCache } from './spotify/LikedSetCache.js';
 import { loadMusicBrainzIdentity, userAgentFrom, type MusicBrainzIdentity } from './config.js';
 import { readAppVersion } from './version.js';
-import { probeDirectoryWritable, probeFileWritable } from './configuration/atomicWrite.js';
+import { probeDirectoryWritable } from './configuration/atomicWrite.js';
 import {
   classifyCredentialsDirectory,
   credentialsDirectoryMessage,
@@ -1037,9 +1037,10 @@ function configurationDiagnostics(): ConfigurationDiagnosticsInput {
   return {
     configWritable: probeDirectoryWritable(RULES_PATH),
     rulesPath: RULES_PATH,
-    musicbrainzWritable: probeFileWritable(config.musicbrainzConfigPath),
+    // U9: both files are written by temp + rename in the ./secrets directory, so the question is the DIRECTORY's.
+    musicbrainzWritable: probeDirectoryWritable(config.musicbrainzConfigPath),
     musicbrainzPath: config.musicbrainzConfigPath,
-    spotifyWritable: probeFileWritable(config.spotifyConfigPath),
+    spotifyWritable: probeDirectoryWritable(config.spotifyConfigPath),
     spotifyPath: config.spotifyConfigPath,
     credentialsDirectory: { class: credentialsDirectoryClass, message: credentialsDirectoryText },
     lastRulesWrite: rulesWriter.lastWrite(),

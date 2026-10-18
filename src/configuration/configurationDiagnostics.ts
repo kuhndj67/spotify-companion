@@ -50,12 +50,12 @@ export function configurationDiagnosticSteps(c: ConfigurationDiagnosticsInput): 
   steps.push(
     c.spotifyWritable
       ? step('Spotify credentials writable', 'ok', `${c.spotifyPath} can be replaced from Settings`)
-      : step('Spotify credentials writable', 'fail', `cannot write ${c.spotifyPath} in place — Settings cannot replace the credentials, and the MCP server cannot store a refreshed token`),
+      : step('Spotify credentials writable', 'fail', `cannot write beside ${c.spotifyPath} — Settings cannot replace the credentials, and the MCP server cannot store a refreshed token`),
   );
   steps.push(
     c.musicbrainzWritable
       ? step('MusicBrainz contact writable', 'ok', `${c.musicbrainzPath} can be changed from Settings`)
-      : step('MusicBrainz contact writable', 'fail', `cannot write ${c.musicbrainzPath} in place — is it still mounted :ro, or missing?`),
+      : step('MusicBrainz contact writable', 'fail', `cannot write beside ${c.musicbrainzPath} — is ./secrets mounted :ro?`),
   );
 
   const r = c.lastRulesWrite;

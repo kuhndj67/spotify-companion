@@ -411,14 +411,14 @@ docker compose up -d --build
 Wait about a minute, then:
 
 ```powershell
-docker inspect -f "{{.State.Health.Status}}" spotify-now-playing
+docker inspect -f "{{.State.Health.Status}}" spotify-companion
 ```
 
 **Expected**
 
 - Both secrets are files: the `Mode` begins with `-a` on Windows, or the line begins with `-` on Linux. Neither is a
   `d` (folder).
-- `docker compose up` ends with lines saying the container `spotify-now-playing` is **Started**, with no error.
+- `docker compose up` ends with lines saying the container `spotify-companion` is **Started**, with no error.
   Lines from inside the build such as `debconf: unable to initialize frontend` or npm notices are normal.
 - `docker inspect` prints **`healthy`**.
 
@@ -427,7 +427,7 @@ docker inspect -f "{{.State.Health.Status}}" spotify-now-playing
 - A secret shows as a **folder** (`d`): delete that folder (`Remove-Item -Recurse secrets\<name>` /
   `rm -r secrets/<name>`), redo S4 or S5 to create the file, run `docker compose down`, then repeat this step.
 - `docker inspect` prints `starting`: wait 30 seconds and run it again.
-- It prints `unhealthy`, or the container keeps restarting: run `docker logs spotify-now-playing`. A line naming
+- It prints `unhealthy`, or the container keeps restarting: run `docker logs spotify-companion`. A line naming
   `musicbrainz.json` means S5 is incomplete. A line naming `spotify-config.json` means S4 is incomplete. Fix the
   step, then `docker compose up -d` again.
 - `docker compose up` fails with *port is already allocated* (or *address already in use*) on `3010`: another
@@ -505,7 +505,7 @@ records a play. *No errors* is not evidence. (Port `3010`, or the port you chose
 **If it differs**
 
 - `/api/health` prints `"status":"degraded"`: the app is running but its Spotify connection is not.
-  `docker logs spotify-now-playing` names the cause. Usually S4 is incomplete; redo it, then
+  `docker logs spotify-companion` names the cause. Usually S4 is incomplete; redo it, then
   `docker compose restart`.
 - Connection refused: the container is not running (S7), or you are using the wrong port.
 - `/api/now-playing` shows `"isPlaying":false` while music plays: the music is playing on a **different Spotify
@@ -562,5 +562,16 @@ start armed.
   is running.
 - **Update to a newer release**: `git fetch --tags`, then `git checkout <new tag>`, then `docker compose up -d --build`.
   Take **Settings → Create backup** first.
+- **Upgrading from `1.0.0-beta.2` or earlier** (once): the container was renamed from `spotify-now-playing` to
+  `spotify-companion`, and the credentials are now mounted as the `secrets` folder. Your files stay where they are.
+  1. **Settings → Create backup**.
+  2. `docker compose down` **before** you check out the new tag. The old `compose.yaml` is the only one that knows
+     the old container; once you have the new one, `down` leaves the old container running beside the new one, and
+     both would record into `data/`.
+  3. `git fetch --tags`, `git checkout <new tag>`, `docker compose up -d --build`.
+
+  **If you already checked out the new tag**: run `docker stop spotify-now-playing`, then `docker rm
+  spotify-now-playing`, then `docker compose up -d`. **If the Spotify indicator says the credentials are mounted as
+  single files**, the old `compose.yaml` is in use with the new image: check out the new tag and start again.
 - **Remove**: `docker compose down`, then delete the folder. ⚠️ `data/` holds your play history and **nothing can
   recreate it**. Keep a backup if you may want it.

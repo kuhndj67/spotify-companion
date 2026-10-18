@@ -89,7 +89,7 @@ A
 | | Value | Proposed |
 |---|---|---|
 | a | **Spotify** (`clientId`, `clientSecret`, `refreshToken`, `redirectUri`) | ⭐ **Upload the `spotify-config.json` that `npm run auth` produces** (T3 = A). Never displayed back |
-| b | **MusicBrainz contact** (`musicbrainz.json`) | ⭐ An editable field — it is an email address, not a secret, but personal: shown **masked** (`k…7@gmail.com`) |
+| b | **MusicBrainz contact** (`musicbrainz.json`) | ⭐ An editable field — it is an email address, not a secret, but personal: shown **masked** (`<email address>`) |
 | c | Spotify client id/secret as separate fields | Not offered: without a refresh token they cannot work, and `npm run auth` needs them anyway |
 
 A) ⭐ a + b · B) a only · X) Other
@@ -190,7 +190,7 @@ exists (W-10, needs TLS off-machine) — so fields alone cannot make a working c
 | **B** | Fields for client id / secret / redirect URI only; the refresh token arrives **only** by upload. ⚠️ Two paths that must both be done, in order, to get one working config |
 | **C** | Upload only (as originally planned), with a read-only masked summary of what is set |
 
-MusicBrainz (4b) is unchanged: one **contact** field, shown masked (`k…7@gmail.com`), app name/version not
+MusicBrainz (4b) is unchanged: one **contact** field, shown masked (`<email address>`), app name/version not
 editable (Question 18 makes the version derived).
 
 [Answer]:

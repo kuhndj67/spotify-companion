@@ -13,6 +13,7 @@
  */
 
 import type { DiagnosticStep } from '../diagnostics.js';
+import type { CredentialsDirectoryClass } from './credentialsDirectory.js';
 import type { LastCredentialsWrite } from './CredentialsWriter.js';
 import type { LastRulesWrite } from './RulesWriter.js';
 
@@ -23,6 +24,8 @@ export interface ConfigurationDiagnosticsInput {
   readonly musicbrainzPath: string;
   readonly spotifyWritable: boolean;
   readonly spotifyPath: string;
+  /** U9 (LC-61): how the credentials directory is mounted, and the words for anything but `ok`. */
+  readonly credentialsDirectory: { readonly class: CredentialsDirectoryClass; readonly message: string | null };
   readonly lastRulesWrite: LastRulesWrite | null;
   readonly lastCredentialsWrite: LastCredentialsWrite | null;
   /** P-55's three outcomes. */
@@ -40,14 +43,19 @@ export function configurationDiagnosticSteps(c: ConfigurationDiagnosticsInput): 
       : step('Rules directory writable (config/)', 'fail', `cannot write beside ${c.rulesPath} — is ./config still mounted :ro? Uploading rules will fail`),
   );
   steps.push(
+    c.credentialsDirectory.class === 'ok'
+      ? step('Credentials directory', 'ok', 'mounted as a directory and writable: token refreshes and Settings saves can be stored')
+      : step('Credentials directory', 'fail', `${c.credentialsDirectory.class}: ${c.credentialsDirectory.message ?? ''}`),
+  );
+  steps.push(
     c.spotifyWritable
       ? step('Spotify credentials writable', 'ok', `${c.spotifyPath} can be replaced from Settings`)
-      : step('Spotify credentials writable', 'fail', `cannot write ${c.spotifyPath} in place — Settings cannot replace the credentials, and the MCP server cannot store a refreshed token`),
+      : step('Spotify credentials writable', 'fail', `cannot write beside ${c.spotifyPath} — Settings cannot replace the credentials, and the MCP server cannot store a refreshed token`),
   );
   steps.push(
     c.musicbrainzWritable
       ? step('MusicBrainz contact writable', 'ok', `${c.musicbrainzPath} can be changed from Settings`)
-      : step('MusicBrainz contact writable', 'fail', `cannot write ${c.musicbrainzPath} in place — is it still mounted :ro, or missing?`),
+      : step('MusicBrainz contact writable', 'fail', `cannot write beside ${c.musicbrainzPath} — is ./secrets mounted :ro?`),
   );
 
   const r = c.lastRulesWrite;

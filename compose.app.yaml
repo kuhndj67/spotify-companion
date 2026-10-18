@@ -1,0 +1,50 @@
+# App only (U9, FR-75, BR-74.2): the image-only compose file. The image's `setup` command writes this into a user's
+# folder as compose.yaml; nothing here builds anything. It mirrors compose.yaml's service minus `build:`, and
+# test/versionSources.test.ts keeps its image tag equal to package.json's version (a checked copy).
+#
+# Pull access: while the repository is private, `docker login ghcr.io` with a read token first (README, App only).
+
+services:
+  spotify-companion:
+    image: ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.2
+    container_name: spotify-companion
+
+    ports:
+      # ⚠️ LOAD-BEARING: 127.0.0.1 keeps the app on this machine only. Removing the prefix would put an
+      # unauthenticated view of listening history and playback control on the network. Change the port with
+      # SPOTIFY_COMPANION_PORT in a `.env` file beside this one.
+      - "127.0.0.1:${SPOTIFY_COMPANION_PORT:-3010}:3000"
+
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOCAL_ONLY: "true"
+      TRUST_PUBLISHED_PORT: "true"
+      POLL_INTERVAL_MS: 3000
+      SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
+      HISTORY_DB_PATH: /data/history.db
+      COMPLETION_THRESHOLD: "0.90"
+      SNAPSHOT_DIR: /data/snapshots
+      SNAPSHOT_INTERVAL_HOURS: 24
+      SNAPSHOT_KEEP: 14
+      LABEL_TTL_UNKNOWN_DAYS: 30
+      LABEL_TTL_RESOLVED_DAYS: 90
+      LABEL_BACKFILL_INTERVAL_HOURS: 6
+      LABEL_BACKFILL_BATCH: 25
+      MUSICBRAINZ_BASE_URL: https://musicbrainz.org/ws/2
+      RULES_PATH: /config/rules.json
+      RULES_POLL_INTERVAL_MS: 5000
+      ENRICHMENT_WAIT_MS: 10000
+      # The skip machinery exists, but automation is OFF until you arm it in the app (state/ starts empty).
+      SKIP_EXECUTOR_ENABLED: "true"
+      AUTOMATION_STATE_PATH: /state/automation-state.json
+
+    volumes:
+      # Credentials: the DIRECTORY, read-write (token refreshes and Settings saves rename a temp file into it).
+      - ./secrets:/app/secrets:rw
+      # Listening history. ⚠️ It cannot be regenerated: back it up from Settings.
+      - ./data:/data:rw
+      - ./config:/config:rw
+      - ./state:/state:rw
+
+    restart: unless-stopped

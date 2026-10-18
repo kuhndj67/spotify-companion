@@ -7,7 +7,11 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import {
+  getDefaultEnvironment,
+  StdioClientTransport,
+  type StdioServerParameters,
+} from '@modelcontextprotocol/sdk/client/stdio.js';
 import { config } from '../config.js';
 import { isMcpErrorText } from '../configuration/mcpErrorText.js';
 import { parseNowPlaying, type NowPlaying } from './parseNowPlaying.js';
@@ -33,24 +37,61 @@ export class McpToolError extends Error {
   }
 }
 
+/**
+ * The credentials directory cannot take the connector's rename-based write (U9, LC-61, P-68). Thrown INSTEAD of
+ * spawning the connector, so no refresh is attempted into a path that would fail with EBUSY. The message is the
+ * one the Spotify indicator shows.
+ */
+export class CredentialsDirectoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CredentialsDirectoryError';
+  }
+}
+
+/**
+ * How the connector is spawned (U9, LC-60, BR-69.5).
+ *
+ * ⚠️ `SPOTIFY_CONFIG_PATH` must be passed EXPLICITLY: the SDK's stdio transport gives the child only
+ * `getDefaultEnvironment()` (HOME, PATH, ...) plus this `env` -- it does not inherit (checked in the installed SDK,
+ * 2026-10-18). Without it the patched connector falls back to its own directory, where in the container the write
+ * either fails or lands somewhere the host never sees. On the host the checkout is unpatched and ignores it.
+ */
+export function connectorSpawnParams(cfg: {
+  readonly mcpServerEntrypoint: string;
+  readonly mcpServerCwd: string;
+  readonly spotifyConfigPath: string;
+}): StdioServerParameters {
+  return {
+    command: process.execPath,
+    args: [cfg.mcpServerEntrypoint],
+    cwd: cfg.mcpServerCwd,
+    env: { ...getDefaultEnvironment(), SPOTIFY_CONFIG_PATH: cfg.spotifyConfigPath },
+    // The MCP server writes diagnostics to stderr; surface them in our logs.
+    stderr: 'inherit',
+  };
+}
+
 export class SpotifyMcpClient {
   #client: Client | null = null;
   /** The live client's transport — its `pid` is how `close()` knows the child is really gone (P-49). */
   #transport: StdioClientTransport | null = null;
   /** In-flight connection, so concurrent callers share one handshake instead of racing. */
   #connecting: Promise<Client> | null = null;
+  /** U9 (LC-61): a reason not to spawn the connector at all, or `null`. Read before every spawn. */
+  readonly #blockedBecause: () => string | null;
+
+  constructor(options: { readonly blockedBecause?: () => string | null } = {}) {
+    this.#blockedBecause = options.blockedBecause ?? (() => null);
+  }
 
   async #connect(): Promise<Client> {
-    const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: [config.mcpServerEntrypoint],
-      cwd: config.mcpServerCwd,
-      // The MCP server writes diagnostics to stderr; surface them in our logs.
-      stderr: 'inherit',
-    });
+    const blocked = this.#blockedBecause();
+    if (blocked !== null) throw new CredentialsDirectoryError(blocked);
+    const transport = new StdioClientTransport(connectorSpawnParams(config));
 
     const client = new Client(
-      { name: 'spotify-now-playing', version: readAppVersion() },
+      { name: 'spotify-companion', version: readAppVersion() },
       { capabilities: {} },
     );
 

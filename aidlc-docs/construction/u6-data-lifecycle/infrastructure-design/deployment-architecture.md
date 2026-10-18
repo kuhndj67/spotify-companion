@@ -89,5 +89,5 @@ the example template) · the live container · `spotify_default` · any image ta
 
 ## 3. The NAS — not in U6
 
-The cross-machine restore is **U9's** exit criterion (P-48): the real corpus restored on `SYNNAS` through
+The cross-machine restore is **U9's** exit criterion (P-48): the real corpus restored on `Machine 2` through
 *Restore backup*, once NFR-29 lets a browser on another machine reach the app.

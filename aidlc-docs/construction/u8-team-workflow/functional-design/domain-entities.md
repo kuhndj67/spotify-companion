@@ -50,8 +50,8 @@ Lifecycle: *verified* → *built* → *deployed* → *tagged*. A release missing
 
 | Field | Notes |
 |---|---|
-| `kind` | `agent` (walk ①, `kuhndjwin11pro`, U8 exit, `1.0.0-beta.1`) · `person` (walk ②, platform recorded, `1.0.0`) |
-| `walker`, `date`, `platform`, `environment` | e.g. agent / `kuhndjwin11pro` from `clean`, fresh Claude Code session; plus the base inventory (IN-U8-2c) |
+| `kind` | `agent` (walk ①, `Machine 1`, U8 exit, `1.0.0-beta.1`) · `person` (walk ②, platform recorded, `1.0.0`) |
+| `walker`, `date`, `platform`, `environment` | e.g. agent / `Machine 1` from `clean`, fresh Claude Code session; plus the base inventory (IN-U8-2c) |
 | `steps[]` | per `InstallStep`: observed output · `passedAsWritten` (bool) · deviation note |
 | `verdict` | **pass only if every step `passedAsWritten`** (BR-62.3) |
 | `docRevision` | the commit of `INSTALL.md` walked — a fix changes it, and the changed steps are walked again |
@@ -86,7 +86,7 @@ Recorded under `construction/u8-team-workflow/` (one file per walk).
 | `README.md` | anyone | what / status / version / links (BR-67.1) |
 | `docs/INSTALL.md` | P1 and agents | the `InstallRoutine` |
 | `CONTRIBUTING.md` | P4 | `ContributionPath`, traps, the bypass |
-| `SECURITY.md` | reporters | channel `kuhndj67@hotmail.com` → GitHub reporting under W-14 |
+| `SECURITY.md` | reporters | channel `<email address>` → GitHub reporting under W-14 |
 | `LICENSE` | everyone | GPL-3.0 text |
 | `CLAUDE.md` | any contributor's agent | short orientation; no dated history (BR-67.3) |
 

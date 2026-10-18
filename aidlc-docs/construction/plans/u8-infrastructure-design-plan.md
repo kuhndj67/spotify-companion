@@ -17,7 +17,7 @@
 | | |
 |---|---|
 | ⚠️ **The MacBook is out** | Too old for VS Code or the Claude desktop app (user) — it cannot host a cold Claude Code session. The FD's 2026-10-12 MacBook amendment must be **replaced** (Q1) |
-| **Walk machine `kuhndjwin11pro`** | Hyper-V **Windows 11 Pro** VM on another physical machine. VS Code and Claude Code installed; **no** Docker, WSL2 or Rancher Desktop |
+| **Walk machine `Machine 1`** | Hyper-V **Windows 11 Pro** VM on another physical machine. VS Code and Claude Code installed; **no** Docker, WSL2 or Rancher Desktop |
 | Nested virtualization | Host: `ExposeVirtualizationExtensions : True` ✅. Guest: Sysinternals `coreinfo64 -v` shows the extensions present ✅. (`systeminfo`'s *"A hypervisor has been detected"* is **not** evidence — every Hyper-V guest says it) |
 | VM memory | **Fixed 16 GB**, dynamic memory **off** ✅ (was dynamic) |
 | Repository | **Private** (GitHub Pro). A walker on another machine needs a read credential |
@@ -39,7 +39,7 @@ silently skipped.
 
 ### Question 1 — ⭐ Deployment environment — The cold-walk machine (replaces the MacBook amendment)
 
-A) **`kuhndjwin11pro` runs walk ① (the agent, U8's exit, `1.0.0-beta.1`) on Windows.** BR-62.2 and BR-61.3 are
+A) **`Machine 1` runs walk ① (the agent, U8's exit, `1.0.0-beta.1`) on Windows.** BR-62.2 and BR-61.3 are
 amended again: macOS returns to **untested**; supported = Windows + Rancher Desktop and Docker Engine on Linux (Q3 = A's
 original reading). Linux is walked in **U9**. Walk ② (a person, `1.0.0`) is on whatever platform that person has —
 recorded, not prescribed ⭐ *recommended*

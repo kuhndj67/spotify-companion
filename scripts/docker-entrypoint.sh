@@ -25,6 +25,38 @@
 
 set -e
 
+# ---------------------------------------------------------------------------------------------------------------
+# U9 (BR-74.2/74.3, IN-U9-5): the *App only* commands. The user mounts their folder at /work:
+#
+#   docker run --rm -v "${PWD}:/work" <image> setup                              write compose.yaml, secrets/, config/…
+#   docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 <image> auth    the Spotify sign-in
+#
+# Both run as the OWNER of /work (Infrastructure Q4 = A): on a Linux host the files then belong to the user, not to
+# root. On Windows/Rancher the mount reports root, and running as root there does no harm. Anything else starts the
+# app, as before.
+# ---------------------------------------------------------------------------------------------------------------
+case "${1:-}" in
+  setup|auth)
+    command="$1"; shift
+    if [ ! -d /work ]; then
+      echo "Mount the folder to set up at /work, e.g.:  docker run --rm -v \"\${PWD}:/work\" <image> $command" >&2
+      exit 2
+    fi
+    if [ "$command" = setup ]; then
+      set -- node /app/dist/appOnly/setupCli.js
+    else
+      export SPOTIFY_CONFIG_PATH=/work/secrets/spotify-config.json AUTH_BIND_HOST=0.0.0.0 AUTH_NO_BROWSER=1
+      set -- node /app/scripts/auth.mjs
+    fi
+    owner_uid="$(stat -c %u /work)"
+    owner_gid="$(stat -c %g /work)"
+    if [ "$(id -u)" = "0" ] && [ "$owner_uid" != "0" ]; then
+      exec setpriv --reuid="$owner_uid" --regid="$owner_gid" --clear-groups "$@"
+    fi
+    exec "$@"
+    ;;
+esac
+
 DATA_DIR="$(dirname "${HISTORY_DB_PATH:-/data/history.db}")"
 
 if [ "$(id -u)" = "0" ]; then
@@ -33,9 +65,12 @@ if [ "$(id -u)" = "0" ]; then
   # Only the mount points, never a recursive pass over application code.
   chown node:node "$DATA_DIR" "${SNAPSHOT_DIR:-/data/snapshots}" 2>/dev/null || true
 
-  # The MCP server rewrites this file when it refreshes an access token.
-  if [ -f "${SPOTIFY_CONFIG_PATH:-/opt/spotify-mcp/spotify-config.json}" ]; then
-    chown node:node "${SPOTIFY_CONFIG_PATH:-/opt/spotify-mcp/spotify-config.json}" 2>/dev/null || true
+  # U9 (IN-U9-1): the credentials DIRECTORY, not a file. The connector refreshes its token, and CredentialsWriter
+  # saves Settings, by writing a temp file IN THIS DIRECTORY and renaming it over the original, so `node` must be
+  # able to create files here. The directory only, never recursive; the files keep whatever owner they have.
+  SECRETS_DIR="$(dirname "${SPOTIFY_CONFIG_PATH:-/app/secrets/spotify-config.json}")"
+  if [ -d "$SECRETS_DIR" ]; then
+    chown node:node "$SECRETS_DIR" 2>/dev/null || true
   fi
 
   # setpriv rather than su/sudo: no extra package, no intermediate shell, and the app keeps

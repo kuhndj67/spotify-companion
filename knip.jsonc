@@ -12,7 +12,10 @@
   // ⚠️ `src/server.ts` is deliberately ABSENT. It is reached from nothing -- importing it starts the
   // process -- so listing it as an entry point would be redundant with `project` below while implying
   // something imports it. The tests are the real entry points for `src/`.
-  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js"],
+  //
+  // U9 (LC-68): `src/appOnly/setupCli.ts` IS an entry point -- the image's `setup` command, run by
+  // scripts/docker-entrypoint.sh as `node /app/dist/appOnly/setupCli.js`. Nothing imports it; that is its job.
+  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts"],
 
   "project": ["src/**/*.ts", "scripts/**/*.mjs", "scripts/**/*.ts", "test/**/*.ts"],
 

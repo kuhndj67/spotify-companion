@@ -460,8 +460,24 @@ both directions** — corrected 2026-10-08 from the source: a text-error poll wa
 error as **idle** (U7 FD F5–F6). M4 has not yet been used to conclude anything.
 
 Still binding: **FR-60** (restore never changes credentials), **FR-61** (nor the automation state), **NFR-01…04**
-(every new route local-only until NFR-29 / U9). Out of scope: a built-in rules editor (later) · in-app Spotify
+(every new route local-only until NFR-29 / U10). Out of scope: a built-in rules editor (later) · in-app Spotify
 OAuth (**W-10**).
+
+---
+
+### 3.9 Connector upgrade and a publishable image — *new 2026-10-18; U9 (Phase 5)*
+
+From Requirements Questions 26–28 (`requirement-verification-questions.md`). Promotes backlog **W-15**.
+
+| ID | Requirement | Priority | Status |
+|---|---|---|---|
+| FR-73 | **The bundled `spotify-mcp-server` moves to its MIT-licensed commit `6065ce5c`** (upstream `main` at 2026-10-18, probed), and **every upstream change that reaches this app is accounted for**. It ships only when the `:3011` verification install shows: **(a)** a token refresh **lands** and the container sees it across a refresh cycle (upstream `b56bb07` now writes the config by temp-then-rename; if that breaks the single-file bind mount, `spotify-config.json` moves to a **directory mount** and `CredentialsWriter` follows); **(b)** now-playing parses the new output, with its property tests updated to the new shape, and **PBT-66** passes against the new source; **(c)** the MCP client works against upstream's MCP v2 (`d7445af`); **(d)** a play is recorded end to end. **None of upstream's new features is adopted** (HTTP transport, OAuth mode, `getFollowedArtists`): the scope is the move | Must | ⬜ New (Q26 = X) |
+| FR-74 | **CI publishes the image on every release tag** to GitHub Container Registry as `ghcr.io/kuhndj67/spotify-companion:<version>`. It is **private while the repository is private**, so a pull needs a read token. The image carries **both licence notices**: GPL-3.0 for this app and **MIT for the bundled connector**, whose copyright notice must travel with every copy. A published tag is never overwritten (as the local image tags). **One name, `spotify-companion`**, for the repository, the package, the published image, the local image and the container (owner, 2026-10-18); `spotify-now-playing` is retired. ⚠️ Renaming `container_name` makes Compose start a **second** container beside the old one, and two pollers both write `data/history.db`: the old container is stopped first | Must | ⬜ New (Q27 = A) |
+| FR-75 | **README *App only* gets real steps**: pull the image, provide the two secrets, `docker compose up`. They are walked as `docs/INSTALL.md` was (FR-65) before the *coming soon* label comes off | Must | ⬜ New (Q27 = A) |
+
+⚠️ **FR-74 depends on FR-73**: publishing before the pin moves would distribute the unlicensed connector (NFR-32).
+Still binding: **NFR-28** (no secret in an image or a registry), **NFR-34** (one version source; the registry tag is
+another checked copy), **FR-60/61**.
 
 ---
 
@@ -494,14 +510,15 @@ From the Phase 5 requirements round (`requirement-verification-questions.md`, Qu
 | NFR-29 | **Off-machine access uses delegated authentication.** The app never handles passwords. Behind a proxy or load balancer that signs the user in (OIDC) and terminates TLS, the app runs in a **trusted-proxy mode** that requires a **verified, signed identity token** on every request — HTTP **and** the WebSocket upgrade, through **one** policy function (`decideAccess`). Local-only stays the default mode | ⬜ New (Q11a = B) |
 | NFR-30 | `main` is protected: changes arrive by pull request with required CI checks (typecheck, tests, `smoke`, `knip`, the secret scan); the owner may push directly | ⬜ New (Q13 = B) |
 | NFR-31 | `npm run smoke` runs in CI, and the workflow states that there it proves scripts **load**, not that they behave | ⬜ New (Q14 = A) |
-| NFR-32 | The project is licensed **GPL-3.0** (`LICENSE` at the root). ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence. *Status 2026-10-16: upstream added **MIT** at `6065ce5c` (issue #106), but `compose.yaml` pins `7b5fde63`, 17 commits earlier and unlicensed. The condition therefore still holds until the pin moves (**W-15**); publishing is then a separate decision* | ⬜ New (Q16 = C) |
+| NFR-32 | The project is licensed **GPL-3.0** (`LICENSE` at the root). ⚠️ **No built image is published** while the bundled `spotify-mcp-server` has no licence. *Status 2026-10-16: upstream added **MIT** at `6065ce5c` (issue #106), but `compose.yaml` pins `7b5fde63`, 17 commits earlier and unlicensed. The condition therefore still holds until the pin moves (**W-15**); publishing is then a separate decision. 2026-10-18: the pin move is **FR-73**, publishing is decided as **FR-74** (Q27 = A), both in **U9**; the condition is discharged when FR-73 ships* | ⬜ New (Q16 = C) |
 | NFR-33 | A short `README` (what it is, status, where to read more), `docs/INSTALL.md`, `CONTRIBUTING.md` and `SECURITY.md` exist and are **accurate** | ⬜ New (Q15 = A) |
 | NFR-34 | **Application versions follow Semantic Versioning, pre-1.0 = development.** `0.MINOR.PATCH` — MINOR per delivered unit, PATCH per fix release; `1.0.0-beta.N` once someone else installs it; **`1.0.0` when FR-65's install routine has been walked cold**. After 1.0, MAJOR means *an existing user must act by hand* (an existing `rules.json` no longer loads, an older backup cannot be restored, or credential setup changes); the UI's own HTTP API is not a public interface. **One source of truth, `package.json`**: the image tag, the backup manifest's `appVersion` and the MusicBrainz User-Agent derive from it (`appVersion` leaves `musicbrainz.json`); each release gets a git tag `vX.Y.Z`; rollback uses the previous version's image rather than hand-made `uN-rollback` tags; the version is shown in the UI and `/api/diagnostics`. The **schema version stays separate** | ⬜ New (Q18 = A, 2026-10-12) |
-| NFR-35 | **GitHub Issues is the backlog.** Each open W-item and open item migrates to one issue; `requirements.md` §5.1 keeps a **pointer table** (W-id → issue) so old references resolve; new ideas start as issues. A **feature** issue still re-enters AI-DLC before design, and AI-DLC records cite the issue number | ⬜ New (Q21 = A) — U10 |
-| NFR-36 | **The AI-DLC records merge cleanly with several writers.** `audit.md` stays append-only and is marked **`merge=union`** in `.gitattributes` (⚠️ **probed** before relied on); `aidlc-state.md` holds **one section per unit**, so concurrent work edits different lines; `CLAUDE.md` holds no current state. The standard AI-DLC file layout is kept | ⬜ New (Q22 = A) — U10 |
-| NFR-37 | **Reviews and gates.** The owner approves every AI-DLC gate. `CODEOWNERS` makes the owner a **required reviewer** on `aidlc-docs/` and the security-sensitive paths (local-access guard, upload admission, configuration and credential writers, playback control); any other path needs **one approving review**. The owner may push directly (NFR-30) | ⬜ New (Q23 = A) — U10 |
-| NFR-38 | **`CHANGELOG.md`** in Keep a Changelog form: each PR adds its line under *Unreleased*; the **owner cuts a release** — moves *Unreleased* under the version, bumps `package.json`, tags (NFR-34) | ⬜ New (Q24 = A) — U10 |
-| NFR-39 | **Contributor tooling**: PR and issue templates (the PR template asks which path — fix or feature — which requirement or BR, and the `npm run verify` result) · **Dependabot** for npm and GitHub Actions, weekly and grouped; ⚠️ the pinned MCP server ref is **never** updated automatically · **one agent-instruction source**: `CLAUDE.md`, with `.github/copilot-instructions.md` and `AGENTS.md` pointing to it · **GitHub Discussions** for questions that are not work items | ⬜ New (Q25 = A+B+C+D) — U10 |
+| NFR-35 | **GitHub Issues is the backlog.** Each open W-item and open item migrates to one issue; `requirements.md` §5.1 keeps a **pointer table** (W-id → issue) so old references resolve; new ideas start as issues. A **feature** issue still re-enters AI-DLC before design, and AI-DLC records cite the issue number | ⬜ New (Q21 = A) — U11 |
+| NFR-36 | **The AI-DLC records merge cleanly with several writers.** `audit.md` stays append-only and is marked **`merge=union`** in `.gitattributes` (⚠️ **probed** before relied on); `aidlc-state.md` holds **one section per unit**, so concurrent work edits different lines; `CLAUDE.md` holds no current state. The standard AI-DLC file layout is kept | ⬜ New (Q22 = A) — U11 |
+| NFR-37 | **Reviews and gates.** The owner approves every AI-DLC gate. `CODEOWNERS` makes the owner a **required reviewer** on `aidlc-docs/` and the security-sensitive paths (local-access guard, upload admission, configuration and credential writers, playback control); any other path needs **one approving review**. The owner may push directly (NFR-30) | ⬜ New (Q23 = A) — U11 |
+| NFR-38 | **`CHANGELOG.md`** in Keep a Changelog form: each PR adds its line under *Unreleased*; the **owner cuts a release** — moves *Unreleased* under the version, bumps `package.json`, tags (NFR-34) | ⬜ New (Q24 = A) — U11 |
+| NFR-39 | **Contributor tooling**: PR and issue templates (the PR template asks which path — fix or feature — which requirement or BR, and the `npm run verify` result) · **Dependabot** for npm and GitHub Actions, weekly and grouped; ⚠️ the pinned MCP server ref is **never** updated automatically · **one agent-instruction source**: `CLAUDE.md`, with `.github/copilot-instructions.md` and `AGENTS.md` pointing to it · **GitHub Discussions** for questions that are not work items | ⬜ New (Q25 = A+B+C+D) — U11 |
+| NFR-40 | **The connector stays pinned to one upstream commit** (R7). Moving the pin is **deliberate work** that repeats FR-73's acceptance probes; Dependabot never moves it (NFR-39), and CI's **PBT-66** scan is the early warning of an upstream output change. No fork | ⬜ New (Q28 = A, 2026-10-18) — U9 |
 
 ⚠️ **NFR-29 amends NFR-07, it does not repeal it.** In local-only mode, *no authentication* is still justified
 by NFR-01…04. Off-machine, that justification is gone, and NFR-29 is what replaces it. ⚠️ **And NFR-28 is not
@@ -1041,6 +1058,8 @@ exists to break.**
 
 #### W-15 — Move the MCP server pin to the MIT-licensed commit
 
+✅ **Promoted 2026-10-18 to unit U9** as **FR-73…75** and **NFR-40** (Requirements Questions 26–28). Kept below as the record of why.
+
 **Raised 2026-10-16** after upstream added an **MIT** licence at `6065ce5c` (issue #106, opened by the owner). ⚠️
 **Logged, not built**, and deliberately **not** part of U8's cold walk, which walks `v0.8.1` at the old pin.
 
@@ -1058,11 +1077,14 @@ exists to break.**
    the new source.
 
 **Then, separately**: whether to **publish** a built image. NFR-32's blocker is gone once the pin moves, but
-publishing is a distribution decision, and it touches U9 (could the NAS pull rather than build?) and W-14.
+publishing is a distribution decision, and it touches U10 (could the NAS pull rather than build?; U9 before the 2026-10-18 renumbering) and W-14.
 
 ---
 
 #### W-14 — Make the repository public, then move vulnerability reports to GitHub
+
+▶ **2026-10-18**: U9 Code Generation **Step 13** reviews readiness against the list below and reports *ready / not
+ready* to the owner (owner's request, so it is not forgotten). Going public itself stays the owner's decision.
 
 **Raised 2026-10-12** by the user (U8 FD Q10: *"since the plan is to make the repo public we should have a work item
 to shift to GitHub reporting once we do"*). ⚠️ **Logged, not built.** U8 ships `SECURITY.md` with an email address
@@ -1268,7 +1290,7 @@ metrics that measure it.**
 | R12 | **A rule language over arbitrary fields invites `eval`** | Arbitrary code execution reachable from the rule store, collapsing the §4.1 posture | FR-43 structured predicate tree, FR-44 prohibits code evaluation, FR-45 validates at creation |
 | R6 | Upstream `getNowPlaying` returns **markdown**; a template change breaks parsing silently | Display and data collection both stop | NFR-19; raw text surfaced; parser property-tested |
 | ~~R7~~ | `MCP_SERVER_REF` was **unpinned** in `compose.yaml` | Silent upstream drift | ✅ **CLOSED 2026-08-25** — pinned to `7b5fde6309a52a7874768c63deda7880ee85935b` (2026-08-21) during U1 Infrastructure Design. The CI Docker-build job is now a genuine drift detector |
-| R8 | Upstream MCP server **declares no license** | Blocks open-sourcing later | Accepted for personal use (Q8 = A). ✅ **Resolved upstream 2026-10-16**: **MIT** at `6065ce5c`, after the owner's request (marcelmarais/spotify-mcp-server#106). ⚠️ **Our pin `7b5fde63` predates it**, so the risk is discharged only when the pin moves (**W-15**) |
+| R8 | Upstream MCP server **declares no license** | Blocks open-sourcing later | Accepted for personal use (Q8 = A). ✅ **Resolved upstream 2026-10-16**: **MIT** at `6065ce5c`, after the owner's request (marcelmarais/spotify-mcp-server#106). ⚠️ **Our pin `7b5fde63` predates it**, so the risk is discharged only when the pin moves (**W-15** → **FR-73**, U9) |
 | R9 | Development Mode restrictions are **permanent** — Extended Quota needs 250k MAU | No route to richer data | Accepted; external sources fill gaps |
 | R10 | `node:sqlite` is **experimental** in Node 22.17 | API may change | NFR-10 repository interface makes the engine swappable |
 

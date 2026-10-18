@@ -171,8 +171,18 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
   clean -xdf`. **Verify a backup the day you take it.** Row counts are not verification: a corrupt snapshot with
   plausible counts is kept as the negative control.
 - **SQLite WAL over the Rancher Desktop bind mount works**: probed, despite general advice. Do not re-derive; re-probe.
-- **A single-file bind mount binds an inode.** Write-temp-then-rename needs a directory mount. Single-file mounts
-  are written in place.
+- **A single-file bind mount binds an inode.** Write-temp-then-rename needs a directory mount: a rename onto a
+  single-file mount fails with `EBUSY` (probed 2026-10-18). Since U9 the credentials are a **directory** mount
+  (`./secrets` → `/app/secrets`) and every writer renames.
+- **The connector is pinned, and patched in one line.** `compose.yaml`'s `MCP_SERVER_REF` is the one pin (the
+  Dockerfile default and `npm run mcp:setup` follow it; a test holds them equal). Moving it repeats U9's acceptance
+  on the verification install (`npm run verify:up -- --candidate --probe-credentials --poll-ms 3000`) and needs a
+  `pass` in `scripts/connector-acceptance.json`, or `npm run release` refuses. Dependabot never moves it. The
+  Dockerfile patches upstream's fixed config path to honour `SPOTIFY_CONFIG_PATH` (`scripts/lib/patchConfigPath.ts`);
+  the build fails if upstream changes that line. It goes when upstream accepts an equivalent override.
+- **Renaming a compose service orphans the old container**, and `up`/`down` leave an orphan running. U9 renamed
+  everything to `spotify-companion`; upgrading from `1.0.0-beta.2` stops the old container first
+  (`docs/INSTALL.md`, *Updating*), and `npm run release` refuses while it runs.
 - **Check build exit codes directly.** `docker compose build | tail` reports the pipe's exit code.
 - **The owner's host is UTC−4.** Check `ls --time-style=full-iso data/snapshots/` before reasoning about any file
   time. A WAL mtime is the last write, never a heartbeat.

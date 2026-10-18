@@ -20,11 +20,19 @@ const pre = fc.option(
 const version = fc.tuple(n, n, n, pre).map(([a, b, c, p]) => `${a}.${b}.${c}${p ? `-${p.join('.')}` : ''}`);
 const tagSet = fc.uniqueArray(version, { maxLength: 8 });
 
+const PIN_A = 'a'.repeat(40);
+const PIN_B = 'b'.repeat(40);
+
 const ok = (over: Partial<ReleaseFacts> & { candidate: string }): ReleaseFacts => ({
   gitTags: [],
   imageTags: [],
   verifyPassed: true,
   treeClean: true,
+  // U9: by default the pin did not move and the old container is not running, so PBT-68…71 test what they did.
+  pin: PIN_A,
+  previousPin: PIN_A,
+  acceptedPins: [],
+  oldContainerRunning: false,
   ...over,
 });
 
@@ -91,13 +99,21 @@ describe('PBT-69 — pre-release ordering', () => {
 describe('PBT-70 — an existing image tag or git tag refuses, whatever else is true', () => {
   it('for any facts, a candidate whose image or git tag exists is refused', () => {
     fc.assert(
-      fc.property(tagSet, version, fc.boolean(), fc.boolean(), fc.boolean(), (tags, candidate, viaImage, verifyPassed, treeClean) => {
+      fc.property(
+        tagSet, version, fc.boolean(), fc.boolean(), fc.boolean(),
+        // U9: the new facts are arbitrary too -- "whatever else is true" includes them.
+        fc.constantFrom(PIN_A, PIN_B), fc.constantFrom(PIN_A, PIN_B, null), fc.subarray([PIN_A, PIN_B]), fc.constantFrom(true, false, null),
+        (tags, candidate, viaImage, verifyPassed, treeClean, pin, previousPin, acceptedPins, oldContainerRunning) => {
         const d = decide({
           candidate,
           gitTags: viaImage ? tags.map((t) => `v${t}`) : [...tags.map((t) => `v${t}`), `v${candidate}`],
           imageTags: viaImage ? [candidate] : [],
           verifyPassed,
           treeClean,
+          pin,
+          previousPin,
+          acceptedPins,
+          oldContainerRunning,
         });
         assert.equal(d.accept, false);
       }),
@@ -126,8 +142,47 @@ describe('⭐ PBT-71 — positive control: the next PATCH / MINOR / MAJOR is acc
 
   it("this project's first releases: 0.8.0 from nothing, then 1.0.0-beta.1, then 1.0.0", () => {
     const first = decide(ok({ candidate: '0.8.0', imageTags: ['0.1.0', 'u6-rollback'] }));
-    assert.deepEqual(first, { accept: true, gitTag: 'v0.8.0', imageTag: 'spotify-now-playing:0.8.0', previous: null });
+    assert.deepEqual(first, { accept: true, gitTag: 'v0.8.0', imageTag: 'spotify-companion:0.8.0', previous: null });
     assert.equal(decide(ok({ candidate: '1.0.0-beta.1', gitTags: ['v0.8.0'] })).accept, true);
     assert.equal(decide(ok({ candidate: '1.0.0', gitTags: ['v0.8.0', 'v1.0.0-beta.1'] })).accept, true);
+  });
+});
+
+describe('U9 (P-74) — a moved connector pin needs a recorded pass', () => {
+  it('refuses a moved pin with no pass, and accepts it once accepted; an unmoved pin needs nothing', () => {
+    fc.assert(
+      fc.property(fc.uniqueArray(fc.constantFrom(PIN_A, PIN_B, 'c'.repeat(40)), { maxLength: 3 }), (accepted) => {
+        const d = decide(ok({ candidate: '1.0.0', pin: PIN_B, previousPin: PIN_A, acceptedPins: accepted }));
+        assert.equal(d.accept, accepted.includes(PIN_B));
+        if (!d.accept) assert.equal(d.reason, 'pin-not-accepted');
+        assert.equal(decide(ok({ candidate: '1.0.0', pin: PIN_A, previousPin: PIN_A, acceptedPins: accepted })).accept, true);
+      }),
+    );
+  });
+
+  it('the first release ever (no previous pin) is not asked for an acceptance', () => {
+    assert.equal(decide(ok({ candidate: '0.8.0', previousPin: null, pin: PIN_B })).accept, true);
+  });
+});
+
+describe('PBT-77 — the crossing guard: refuses while the pre-U9 container runs, or when Docker cannot say', () => {
+  it('for any otherwise-acceptable facts, running or unknown refuses with old-container-running', () => {
+    fc.assert(
+      fc.property(fc.constantFrom(true, null), tagSet, (running, tags) => {
+        const candidate = bumps(latest(tags))[0]!;
+        const d = decide(ok({ candidate, gitTags: tags.map((t) => `v${t}`), oldContainerRunning: running }));
+        assert.equal(d.accept, false);
+        if (!d.accept) assert.equal(d.reason, 'old-container-running');
+      }),
+    );
+  });
+
+  it('⭐ positive control: not running, and the same facts are accepted', () => {
+    fc.assert(
+      fc.property(tagSet, (tags) => {
+        const candidate = bumps(latest(tags))[0]!;
+        assert.equal(decide(ok({ candidate, gitTags: tags.map((t) => `v${t}`), oldContainerRunning: false })).accept, true);
+      }),
+    );
   });
 });

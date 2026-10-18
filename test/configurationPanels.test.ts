@@ -80,7 +80,7 @@ describe('credentials sections (BR-56.6–56.8, BR-57)', () => {
   });
 
   it('MusicBrainz: a contact saved while labels are off says it needs a restart', () => {
-    assert.equal(musicbrainzSectionView({ set: true, masked: 'k…7@gmail.com' }, true).note, null);
+    assert.equal(musicbrainzSectionView({ set: true, masked: 'l…r@example.org' }, true).note, null);
     assert.match(musicbrainzSectionView({ set: false, masked: null }, false).note ?? '', /next restart/);
   });
 });

@@ -49,6 +49,10 @@ function missingChecks(rs: Ruleset, workflowYaml: string): string[] {
   return requiredChecks(rs).filter((c) => !jobs.has(c));
 }
 
+/** U9: runs only on release tags, so it must never be required (see below). */
+const PUBLISH_JOB = 'Publish image (release tags only)';
+const NOT_REQUIRED: readonly string[] = [PUBLISH_JOB];
+
 const ruleset = JSON.parse(readFileSync(join(root, '.github', 'rulesets', 'main.json'), 'utf8')) as Ruleset;
 const ci = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
 
@@ -59,7 +63,20 @@ describe('main ruleset ↔ ci.yml (BR-63.4)', () => {
   });
 
   it('every ci.yml job is required -- a job added later must be a deliberate choice either way', () => {
-    assert.deepEqual(jobNames(ci).sort(), requiredChecks(ruleset).sort());
+    assert.deepEqual(jobNames(ci).filter((n) => !NOT_REQUIRED.includes(n)).sort(), requiredChecks(ruleset).sort());
+  });
+
+  // U9 (P-70): `publish` runs ONLY on a pushed release tag. Required on main, it would never report on a pull
+  // request, and every PR would wait for it for ever -- the same failure as a renamed job.
+  it('the publish job exists and is NOT a required check', () => {
+    assert.ok(jobNames(ci).includes(PUBLISH_JOB), `no "${PUBLISH_JOB}" job in ci.yml`);
+    assert.ok(!requiredChecks(ruleset).includes(PUBLISH_JOB));
+  });
+
+  it('positive control: a ruleset that requires publish is reported', () => {
+    const requiring: Ruleset = JSON.parse(JSON.stringify(ruleset));
+    requiring.rules.find((r) => r.type === 'required_status_checks')!.parameters!.required_status_checks!.push({ context: PUBLISH_JOB });
+    assert.ok(requiredChecks(requiring).includes(PUBLISH_JOB));
   });
 
   it('a pull request is required on main', () => {

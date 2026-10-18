@@ -1676,7 +1676,7 @@ Awaiting approval. Next: Code Generation. Open item 1 deliberately still open
 ## U2 Build and Test Complete — Three Defects Found by Running, Not by Testing
 **Timestamp**: 2026-09-01
 **User Input**: "lets build and test" · authorised creating `secrets/musicbrainz.json` with
-kuhndj67@gmail.com, and attempting the container egress check
+<email address>, and attempting the container egress check
 **AI Response**: "Ran the stage against the real service rather than against fixtures, which is
 where all of its value turned out to be.
 
@@ -7116,7 +7116,7 @@ in `requirement-verification-questions.md`, and this log quotes the mistyped add
 
 **Decision (user, same day)**: the NAS hostname and address **stay in the repository**. The LAN is private and
 non-forwarding, anyone already on it could find the NAS with a scan, and a concrete hostname helps readers of
-the install documentation. Added to U9's entry in `unit-of-work.md`: target **`SYNNAS` (192.168.0.223)**.
+the install documentation. Added to U9's entry in `unit-of-work.md`: target **`Machine 2` (192.168.0.223)**.
 
 ---
 
@@ -7841,7 +7841,7 @@ with the owner's direct-push bypass (Q13 = B).
 User answers in the plan file: **Q2 C · Q3 A · Q4 A · Q5 A · Q6 A · Q7 A · Q8 A · Q9 A · Q10 B** — *"B - but since
 the plan is to make the repo public we should have a work item to shift to GitHub reporting once we do."* Follow-ups
 by question prompt: **Q20 "Ratify as written"** (P4 The Contributor, US-30, US-31 → `personas.md`, `stories.md`);
-Q10 address **"kuhndj67@hotmail.com - but once we go public this should change to the GitHub path."** Backlog
+Q10 address **"<email address> - but once we go public this should change to the GitHub path."** Backlog
 **W-14** logged (go public: history scan, exposure review of docs, then GitHub private vulnerability reporting).
 
 FD written: `construction/u8-team-workflow/functional-design/` — **BR-61** install routine · **BR-62** cold walk
@@ -7944,11 +7944,11 @@ measurement — caught here because the change was measured before it was commit
 
 ---
 
-## 2026-10-13T15:00:00Z — Cold-walk machine: the MacBook is out; `kuhndjwin11pro` (Hyper-V Windows 11 VM) probed
+## 2026-10-13T15:00:00Z — Cold-walk machine: the MacBook is out; `Machine 1` (Hyper-V Windows 11 VM) probed
 
 User: the MacBook *"is too old to run vscode.app or claude.app"* — so it cannot host a cold Claude Code session, and is
 very likely too old for a container engine too (not measured: `sw_vers` was not run). User then offered
-**`kuhndjwin11pro`**, a Hyper-V Windows 11 Pro VM on another machine, *"100% clean"* — VS Code and Claude Code
+**`Machine 1`**, a Hyper-V Windows 11 Pro VM on another machine, *"100% clean"* — VS Code and Claude Code
 installed; no Docker, WSL2 or Rancher Desktop. Claude recommended **neither** of the user's two options (copy the whole
 project in / a scripted install): the first hands the walker `CLAUDE.md` and the history (BR-62.1/62.6), the second
 tests a script instead of `docs/INSTALL.md` (FR-65). Instead: a fresh session in an empty folder follows INSTALL.md from
@@ -7967,7 +7967,7 @@ the release tag; a fine-grained, read-only, short-lived token for the private re
   as pending.)* **The walk machine's prerequisites are complete.**
 
 Pending (Infrastructure Design, after NFR Design approval): amend BR-62.2 / BR-61.3 again — agent walk on
-`kuhndjwin11pro` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`
+`Machine 1` (Windows), macOS back to *untested* — and probe whether Claude Code loads a cloned repo's `CLAUDE.md`
 from a subfolder (BR-62.6).
 
 ---
@@ -7975,14 +7975,14 @@ from a subfolder (BR-62.6).
 ## 2026-10-13T15:30:00Z — U8 NFR Design APPROVED; Infrastructure Design plan written
 
 User: *"approve and continue"*. Plan: `construction/plans/u8-infrastructure-design-plan.md`, 7 questions — walk machine
-`kuhndjwin11pro` (replacing the MacBook amendment) · a `clean` Hyper-V checkpoint so re-walks are cold · a
+`Machine 1` (replacing the MacBook amendment) · a `clean` Hyper-V checkpoint so re-walks are cold · a
 fine-grained read-only 7-day token for the private repo · a canary probe for `CLAUDE.md` loading from a subfolder
 (BR-62.6) · a new Spotify app for the walk · live deployment keeps running · the walk record copied back by the owner
 (walker cannot push). Storage, messaging and networking stated not applicable, with reasons.
 
 ---
 
-## 2026-10-14T15:20:00Z — U8 Infrastructure Design plan answered; IN-U8-1…7 written; FD amended for `kuhndjwin11pro`
+## 2026-10-14T15:20:00Z — U8 Infrastructure Design plan answered; IN-U8-1…7 written; FD amended for `Machine 1`
 
 User (after a reboot): *"I needed to answer the questions in infra design plan... which I've just done."* Answers in
 the plan file: **Q1 A · Q2 A** — *"always want to start with just a base install (right now that includes vscode with
@@ -8009,7 +8009,7 @@ the **session transcript**, which comes back for review only and is never commit
 secret).
 
 **FD amended** (Q1 = A): BR-61.3 (macOS → untested), **BR-61.10 withdrawn** (Mac probes; principle carried to U9),
-BR-62.2 (walk ① on `kuhndjwin11pro`; walk ②'s platform recorded, not prescribed), BR-62.6, business-logic-model S1/§2,
+BR-62.2 (walk ① on `Machine 1`; walk ②'s platform recorded, not prescribed), BR-62.6, business-logic-model S1/§2,
 domain-entities §4. Awaiting approval.
 
 ---
@@ -8161,7 +8161,7 @@ precondition, BR-65.2, the U8 HANDOFF, the README line (no longer "no licence"),
 
 ## 2026-10-16T17:15:00Z — Walk VM base inventory, first run: git is NOT in the base; step 8 script fixed
 
-Owner ran §1 step 8 on `kuhndjwin11pro`, output pasted in chat (first run): `git`, `node` and `docker` are all *not
+Owner ran §1 step 8 on `Machine 1`, output pasted in chat (first run): `git`, `node` and `docker` are all *not
 recognized*; WSL is not installed; `.claude` holds no `CLAUDE.md` and no `projects\` folder (only sign-in, cache,
 synced skills and plugins); C: 48.6 GB used, 225 GB free. ⚠️ **git is absent**: Claude Code (VS Code extension) runs
 without it, so S1's `winget install Git.Git` is walked for real. That resolves the open question in IN-U8-2 §2b.
@@ -8209,7 +8209,7 @@ found" that names the wrong cause.
 
 ## 2026-10-16T18:30:00Z — Canary probe (IN-U8-4 / BR-62.6): subfolder CLAUDE.md DOES load; `claudeMdExcludes` stops it
 
-Owner on `kuhndjwin11pro`, VS Code extension. **C1** (session opened in `C:\walk\canary`): canary seen, so the
+Owner on `Machine 1`, VS Code extension. **C1** (session opened in `C:\walk\canary`): canary seen, so the
 method can detect loading. **C2** (session in `C:\walk`, asked to read `canary\README.md`): it saw `hello` **and loaded
 `canary\CLAUDE.md`**. A cold walk session would therefore pick up the clone's `CLAUDE.md` as soon as it reads any file
 in the clone. C3 was not run, because C2 decided it. `/memory` turned out to be useless here: in the extension it
@@ -8493,3 +8493,275 @@ build a container for easier deployment."* **U8 Team Workflow & Onboarding is AP
 passed on v0.8.5). The new scope is backlog **W-15** promoted to a unit. Under the standard process, new scope
 **re-enters Inception**: Requirements **Questions 26–28** (`requirement-verification-questions.md`) and Units
 **Question 7** (`unit-of-work-plan.md`), answered before any design.
+
+---
+
+## 2026-10-18T16:00:00Z — Inception round answered: U9 Connector Upgrade & Publishable Image declared; U9 → U10, U10 → U11
+
+Answers (question prompt, owner):
+- **Requirements Q26 = X**: *"The only real change the mcp update needs is to move to the new version with the GPL
+  allowing redistribution (insuring that any changes to the library are accounted for on our end)."* Read as the pin
+  move only (B's new features rejected), with A's probes as the way changes are "accounted for", including the
+  directory-mount fallback. ⚠️ The connector's licence is **MIT**, not GPL. GPL-3.0 is this app's own licence. Noted in
+  the answer and flagged in chat for correction.
+- **Q27 = A** (GHCR on release tags; private while the repository is). **Q28 = A** (keep pinning; no fork).
+- **Units Q7 = A**: new **U9 Connector Upgrade & Publishable Image**; Off-machine Deployment **U9 → U10**, Team
+  Operations **U10 → U11**.
+
+**Probed, not assumed**: `git ls-remote` on upstream shows `main` = **`6065ce5c`** today, so the licensed commit is
+still the newest and is the target. `origin` is `kuhndj67/spotify-companion`, matching Q27's registry name; the
+local image is `spotify-now-playing`, carried to U9's FD rather than decided here.
+
+**Written**: `requirements.md` §3.9 **FR-73…75**, §4.1a **NFR-40**; NFR-32 and R8 point at FR-73; W-15 marked
+promoted. Renumbered in the living Inception documents (`unit-of-work.md`, `-dependency.md`, `-story-map.md`,
+`stories.md`, `execution-plan.md`, `requirements.md`). **Not renumbered**: this log, already-asked questions, and
+the **U6–U8 construction records** (finished and approved; their "U9" is the NAS, stated in `unit-of-work.md`).
+The NAS's carried questions keep the labels U9-a…c. The dependency matrix and execution plan **lacked Team
+Operations** since 2026-10-12; added now as U11. Two code comments (`src/api.ts`, `compose.verify.yaml`) still say
+U9 for the NAS. They are left for U9's Code Generation, so this round changes no code.
+
+**Gate**: requirements and units round awaits owner approval before U9's Functional Design.
+
+---
+
+## 2026-10-18T16:30:00Z — Naming settled: `spotify-companion` everywhere
+
+Owner: *"Lets firm naming up on \"spotify-companion\" since that's how it's operating."* Added to **FR-74**: one name
+for the repository, the package, the published image, the local image and the container; `spotify-now-playing` is
+retired in U9. Measured scope: about 18 files outside `aidlc-docs/` still use the old name (both compose files,
+`scripts/release.mjs` and `releaseDecision.ts`, `verify-install.mjs`, `test/versionSources` and `releaseDecision`
+tests, `docs/INSTALL.md`, `CLAUDE.md`, `src/server.ts`, `src/mcp/spotifyMcpClient.ts`). ⚠️ Trap recorded in FR-74:
+a changed `container_name` starts a second container beside the old one, and both would write `data/history.db`.
+The unit-of-work carried item on the image name is closed.
+
+---
+
+## 2026-10-18T17:00:00Z — ✅ Inception round APPROVED; U9 Functional Design plan opened (9 questions)
+
+Owner, after the review summary (insert U9, renumber, FR-73…75 + NFR-40, Team Operations added to the matrix, U6–U8
+construction records left on old numbers): *"Looks good... lets go!"* **Requirements and units round approved.**
+
+**Probes for the plan** (upstream cloned read-only to the scratchpad; throwaway containers; live deployment untouched):
+- `getNowPlaying` handler body **byte-identical** at `7b5fde63` and `6065ce5c`; it is the only tool the app calls.
+- Upstream now declares **Node `>=26.8.1`** (engines, Dockerfile, CI). Our connector stage at the new pin **builds on
+  Node 22.23** (npm `EBADENGINE` warnings only), and the built server **handshakes** with our client's protocol
+  version `2025-11-25` and lists 31 tools. Probe image removed.
+- 🔴 **`rename` onto a single-file bind mount → `EBUSY`**, host file unchanged (node 22.23, throwaway mount). Upstream's
+  `writeFileAtomic` (`b56bb07`) would therefore fail on every token refresh. Its path is fixed
+  (`<package root>/spotify-config.json`) with no environment override. This confirms the W-15 prediction by
+  measurement, and refines it: the failure is loud (an error), not a silent detach.
+- The runtime stage does **not** copy the connector's `LICENSE`; CI pushes no image and no workflow reacts to tags.
+
+Plan: `construction/plans/u9-functional-design-plan.md`, Q1 Node version · Q2 config-write fix · Q3 host location
+of credentials · Q4 rename scope and crossing · Q5 architectures (Machine 2's CPU unrecorded) · Q6 who publishes · Q7
+licence notices · Q8 FR-75 walk · Q9 story US-32. Entry point `construction/u9-connector-upgrade/HANDOFF.md` created.
+
+---
+
+## 2026-10-18T18:00:00Z — U9 FD Q1–Q9 answered; Q5 withdrawn as U10's; follow-ups Q10–Q11 opened
+
+Owner (in the plan file): Q1 A · Q2 A · Q3 A · Q4 A · Q6 A · Q7 A · Q8 A · Q9 A. **Q5**: *"This is for U10 so should
+not be in this unit... please check to make sure U9 and U10 have been kept separate."* Checked: FR-73…75 and NFR-40
+never mention the NAS; U9's other U10 mentions are context (U10 depends on U9). Q5 was the one leak (reading
+Machine 2's CPU), plus Q8's option text describing U10's walk. **Resolved**: U9 publishes `linux/amd64` only (the
+platform of U9's own consumers: this PC, CI, the walk VM); the NAS's architecture is carried to U10 in
+`unit-of-work.md`.
+
+Found while writing the rules (Step 5, follow-ups before artifacts):
+- At the new pin, upstream still forces a refresh for U7's placeholder token (`needsRefresh`: a truthy
+  `accessToken`, a `refreshToken`, and `expiresAt` ≤ now) and caches its client in memory, now keyed by token.
+  **Read from source, not probed**, so P-U7-1 is re-run on `:3011` as part of FR-73's acceptance.
+- FR-75 assumed an *App only* user can obtain a refresh token and the compose file. Today the token needs
+  `npm run auth` (source + Node), and a private repository's files need a second credential. → **Q10, Q11**.
+- U8's **BR-61.8** ("never pulls a published image") and **BR-65.2** are superseded by U9 for the *App only*
+  path; **BR-66.5**'s "until U9 completes" was written with the old numbers and means the NAS unit (now U10), so
+  U9 does not remove the `u4/u5/u6-rollback` tags.
+
+---
+
+## 2026-10-18T18:30:00Z — U9 FD Q10 = A, Q11 = A; Functional Design written (BR-68…BR-75, US-32)
+
+Owner: *"accepted the recommendeds for 10 and 11... continue"*: the image runs the Spotify sign-in (Q10) and sets
+up the *App only* folder (Q11); one GHCR read token is the only credential.
+
+Written: `construction/u9-connector-upgrade/functional-design/` (business-rules BR-68…75 with facts G1–G7,
+domain-entities, business-logic-model; no frontend). Story **US-32** (P1) added to `stories.md` with its coverage
+row (FR-74, 75). **Checked before stating it** in BR-69.5: the installed MCP SDK's stdio client gives the child only
+`getDefaultEnvironment()` plus the caller's `env`, and `spotifyMcpClient.ts` passes none, so
+`SPOTIFY_CONFIG_PATH` must be passed explicitly. Still **to be probed** (named in the rules, not assumed): P-U7-1 at
+the new pin (BR-70.5), upstream's tests on Node 22.23 (BR-68.3), the in-image sign-in keeping the redirect URI
+(BR-74.4). Awaiting owner approval.
+
+---
+
+## 2026-10-18T19:00:00Z — ✅ U9 Functional Design APPROVED; NFR Design plan opened (6 questions)
+
+Owner, after the FD completion message: *"continue"*, the *Continue to Next Stage* option (approve FD → NFR Design).
+**U9 Functional Design APPROVED.** NFR Requirements **skipped**, as for U1–U8.
+
+Probe for the plan: upstream's own suite at `6065ce5c`, `npm ci` + `npm test` in `node:22.23-bookworm-slim`
+(throwaway container, source mounted read-only): **113/113 pass**, ~0.7 s, so BR-68.3 is workable. (A first attempt
+was stopped by Claude Code's removal safety check over an `rm -rf node_modules` inside the container script; the
+step was unnecessary on a fresh clone and was dropped.) Also read: CI actions are pinned by major tag; the base
+image's patch floats (IN-U6-1); `auth.mjs` already checks OAuth `state` and times out.
+
+Plan `construction/plans/u9-nfr-design-plan.md`: Q1 where publishing lives · Q2 what runs beside the write token ·
+Q3 vulnerability scan (**security posture, surfaced**) · Q4 floating base patch · Q5 wrong credentials directory ·
+Q6 sign-in listener hardening. Scalability and performance recorded as not applicable, with reasons.
+
+---
+
+## 2026-10-18T19:30:00Z — U9 NFR Design: all 6 answered A; artifacts written
+
+Owner (in the plan file): Q1–Q6 all **A**; then *"continue"*. Q3 (scan, report only, never gate) is a
+**security-posture decision made by the owner**, recorded as such in P-72.
+
+Written: `construction/u9-connector-upgrade/nfr-design/`: **P-65…P-75** (guarded patch; upstream tests as drift
+detector; directory mount with explicit env; start-and-say-so for a wrong mount; name and pin tests; publishing in
+`ci.yml` behind the same jobs, tag `concurrency`; least code beside the write token; image checks before push incl.
+report-only scan and recorded base digest; loopback-`Host` on the sign-in listener; acceptance gate before a pin
+reaches live; crossing guard) and **LC-58…LC-68**, **PBT-73…PBT-78** (each pure decision has a positive-control
+property). P-74 (acceptance gate) comes from the FD's "live only after BR-70", made enforceable; its record shape is
+left to Infrastructure Design. Awaiting owner approval.
+
+---
+
+## 2026-10-18T20:00:00Z — ✅ U9 NFR Design APPROVED; Infrastructure Design plan opened (5 questions)
+
+Owner, after the NFR completion message: *"continue"* (approve → Infrastructure Design). **U9 NFR Design APPROVED.**
+
+Read for the plan:
+- 🔴 `compose.verify.yaml` runs `:3011` on **placeholder** credentials (refresh-token rotation risk), yet BR-70 needs a
+  real refresh and play. U7 already solved this with a reduced copy (IN-U7-3) and **measured** no rotation
+  (P-U7-1). Re-checked against the source: **both** connector versions persist a rotated token if Spotify returns one
+  (old `utils.ts:284`, new `:452`), so U7's "byte-identical after refresh" was a real observation of Spotify, not of
+  code that ignored a new token; the `invalid_grant` handling is identical in both. → Q1.
+- The entrypoint `chown`s the credentials **file**; a directory mount needs the directory.
+- `gh` on this PC has no `write:packages` (none needed under NFR Q2 = A). Whether a fine-grained token can pull from
+  GHCR is **not probed**, and documentation is not taken as the answer → Q5.
+
+Plan: Q1 acceptance credentials · Q2 acceptance record location · Q3 scanner · Q4 Linux file ownership for
+`setup`/`auth` · Q5 the walk's read token. Messaging, compute, networking and shared infrastructure are recorded as
+having nothing to decide, with reasons.
+
+---
+
+## 2026-10-18T20:30:00Z — U9 Infrastructure Design: all 5 answered A; artifacts written
+
+Owner: *"recommendations accepted"* (Q1–Q5 = A, also in the plan file).
+
+Written: `construction/u9-connector-upgrade/infrastructure-design/`: **IN-U9-1** credentials directory at
+`/app/secrets` on live, verification and *App only* installs; entrypoint `chown`s the directory · **IN-U9-2**
+acceptance on `:3011` with the reduced copy, ≥ 50 minutes, rotation watch after every refresh, negative control ·
+**IN-U9-3** `scripts/connector-acceptance.json` read by the release and checked by a test · **IN-U9-4** publishing
+in `ci.yml` (Trivy binary pinned by SHA-256, report only; `publish` asserted not required) · **IN-U9-5** `setup` /
+`auth` entry points, dropping to the folder's owner · **IN-U9-6** the walk's read token, fine-grained probed first ·
+**IN-U9-7** Build & Test order, with the live crossing and the tag push each waiting for the owner's go-ahead.
+`deployment-architecture.md` draws the after-state and the crossing. Awaiting owner approval.
+
+---
+
+## 2026-10-18T21:00:00Z — ✅ U9 Infrastructure Design APPROVED; Code Generation plan presented for approval
+
+Owner, after the Infrastructure completion message: *"continue"* (approve → Code Generation). **U9 Infrastructure
+Design APPROVED.**
+
+**Approval prompt (Code Generation Part 1, Step 6)**: `construction/plans/u9-code-generation-plan.md`, 12 steps
+(guarded patch · connector stage and licences · credentials directory · directory check · `CredentialsWriter` on
+rename · one name · release guards · publishing · *App only* entry points · documents · positive controls and a
+local build · verify and summary), and 2 questions: **Q1** a local branch `u9-connector-upgrade`, nothing committed
+until the owner asks · **Q2** ⚠️ a conflict found while planning: IN-U9-3's test that the compose pin has a `pass`
+entry would keep `npm run verify` red from the pin move until Build & Test; recommended split: the test checks the
+file's shape, the release refuses an unaccepted pin. Survey for the plan: 17 files outside `aidlc-docs/` carry the old
+name (`.claude/settings.local.json` is the owner's and is not edited).
+
+---
+
+## 2026-10-18T21:15:00Z — ✅ U9 Code Generation plan APPROVED; standard GitHub flow adopted; public-readiness step added
+
+Owner: *"Agree with both, and from here forward we should be using a standard (for a multi-dev project) github
+process for development, also... part of the plan for this project is go \"go public\", let me know when we reach the
+point where the repo is ready for that (or put a step in the unit that gets us there so we don't forget to do it)."*
+
+- **Plan APPROVED**: Q1 = A (branch `u9-connector-upgrade`), Q2 = A (IN-U9-3 amended: the test checks the
+  acceptance file's shape; the release refuses an unaccepted pin).
+- **Standard multi-developer flow, from now on**: a branch per unit or fix, reviewable commits, pushed, merged by PR
+  with checks green, the owner merges; no agent commits to `main`. Recorded in `CLAUDE.md` *Git and CI* (replacing
+  "commits to `main` only when the owner asks"). Releases, tag pushes and the live deployment still wait for the
+  owner. ⚠️ This is the **branch/PR** part of a team process; issues as backlog, CODEOWNERS, CHANGELOG and templates
+  remain **U11** (NFR-35…39).
+- **Going public**: added **Step 13, public-readiness review** (secret scan re-run, disclosure inventory, licence
+  and image readiness, after-public checklist) ending in *ready / not ready*; W-14 points to it. No visibility
+  change in U9.
+
+---
+
+## 2026-10-18T21:45:00Z — ⚠️ Incident (U9 Code Generation step 9): the Spotify sign-in was started on the host by mistake
+
+While editing `scripts/auth.mjs`, Claude meant to syntax-check it, but the command also contained
+`node -e "import('./scripts/auth.mjs')"`, which **ran** the script. It found the existing credentials, opened a
+Spotify authorisation page in the owner's browser, and listened on `127.0.0.1:8888`. Had the page been approved, it
+would have rewritten `secrets/spotify-config.json`.
+
+Action: the listener (node, PID 17812) was stopped within about a minute; port 8888 confirmed free. **Nothing was
+written**: the file's last write was 12:44 local (the live connector's hourly refresh), before the run (~12:56).
+The live container stayed healthy. The owner was told to close the tab without approving.
+
+Lesson, applied for the rest of the unit: scripts are checked with `node --check` or run only inside throwaway
+containers with fake inputs (the in-container sign-in probe used `FAKE-CONTROL-*` credentials).
+
+---
+
+## 2026-10-18T22:30:00Z — U9 Code Generation COMPLETE (13 steps); public readiness: not yet
+
+All 13 steps done on branch `u9-connector-upgrade` (draft PR #3; each step its own commit, pushed, CI green):
+guarded patch · MIT pin with upstream's suite in the build (113/113, Node 22.23) · credentials as a directory mount ·
+start-and-say-so check · rename-based `CredentialsWriter` (mode kept) · one name `spotify-companion` with structural
+guards · release guards (acceptance, crossing) + `verify:up --candidate/--poll-ms` · CI `publish` job with image
+checks and report-only Trivy · App-only `setup`/`auth` + `compose.app.yaml` · documents · positive controls ·
+summary. `npm run verify` **1701 tests** green.
+
+**Found and fixed on the way** (recorded at their steps): CI had been building upstream `main`, not the pin;
+`mcp:setup` cloned `main`; `verify:up` could not run an acceptance before a release; a rename would have widened a
+`600` credentials file. Two of my own test bugs (a vacuous success check; quoting slips) and two invalid first
+attempts at build controls were caught and redone with the failure *reason* asserted.
+
+**Public readiness (step 13, owner's request)**: secrets clean (gitleaks 8.30.1, 203 commits, positive control
+found); **not ready** until the owner chooses, per class, accept / redact / rewrite history / fresh repository for:
+7 raw timestamped listening-probe files, 73 track/artist names across 25 design files, fixture artist names, the
+personal gmail address, NAS address and names. Record: `construction/u9-connector-upgrade/code/public-readiness-review.md`.
+
+Nothing deployed or released. Awaiting the owner's approval of Code Generation → Build & Test.
+
+---
+
+## 2026-10-18T23:00:00Z — Redaction for going public: email addresses and machine names
+
+Owner: *"redact email addresses and machine names (replace with generic text \"<email address>\" and \"Machine 1\",
+\"Machine 2\". No worries about ip addresses (private network)."*
+
+Done across **33 tracked files** (this log included, as a redaction, not a change of record): both personal email
+addresses → `<email address>` (tests → `listener@example.org` / `l…r@example.org`, valid for the code's checks); the
+walk VM → `Machine 1`; the NAS → `Machine 2`. IP address kept (owner). `npm run verify` green, 1701 tests.
+
+**Not done, and why** (asked of the owner): `SECURITY.md` keeps its address, because it is the vulnerability-reporting
+channel; and the author email on **all 406 commit records** is the hotmail address, which file edits cannot change
+and a public repository displays. The redaction also does not remove anything from **history** (W-14 option B).
+
+---
+
+## 2026-10-18T23:10:00Z — SECURITY.md → GitHub private vulnerability reporting
+
+Owner (question prompt): *"GitHub private reporting (Recommended)"*. `SECURITY.md` no longer lists an address; it
+points at the Security tab's private reporting, which is switched on when the repository goes public (W-14), and
+says what to do until then. No personal email address remains in tracked files. On the commit-metadata email the
+owner asked what GitHub users usually do; answered in chat, decision open.
+
+---
+
+## 2026-10-18T23:20:00Z — Commit email: GitHub no-reply address from now on
+
+Owner: *"Ok swithc to the standard github approach going forward."* Global `git config user.email` set to the GitHub
+no-reply address (`<id>+kuhndj67@users.noreply.github.com`; id confirmed with `gh api user`). Past commits keep the
+old address: accepted, no history rewrite. Owed by the owner in GitHub's web settings (the CLI token has no `user`
+scope): *Keep my email addresses private* and *Block command line pushes that expose my email*.

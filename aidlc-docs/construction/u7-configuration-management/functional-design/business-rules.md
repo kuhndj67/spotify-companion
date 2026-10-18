@@ -77,7 +77,7 @@
 
 | ID | Rule | Source |
 |---|---|---|
-| **BR-57.1** | **Settings → MusicBrainz**: one *contact* field, displayed masked — first character of the local part, `…`, last character, `@domain` (`k…7@gmail.com`); a non-email contact (a URL is allowed) shows its first 8 characters and `…` | Q4b |
+| **BR-57.1** | **Settings → MusicBrainz**: one *contact* field, displayed masked — first character of the local part, `…`, last character, `@domain` (`<email address>`); a non-email contact (a URL is allowed) shows its first 8 characters and `…` | Q4b |
 | **BR-57.2** | Validated by the **same function** `loadMusicBrainzIdentity` applies at startup — extracted and shared, never re-implemented: non-empty, not a placeholder (`example.com`) | NFR-14 |
 | **BR-57.3** | Written **in place** (single-file mount, F8); only `contact` changes — `appName` / `appVersion` are preserved untouched (Question 18 will make the version derived, in U8) | — |
 | **BR-57.4** | Applied **without a restart**: the MusicBrainz client reads its identity through a getter, so the next request carries the new User-Agent | — |

@@ -5,20 +5,25 @@
 #   containerd      ->  nerdctl compose up --build
 
 services:
-  now-playing:
+  spotify-companion:
     build:
       context: .
       args:
-        # Pinned 2026-08-25, closing risk R7. Upstream declares no license and no release tags,
-        # so `main` can move underneath you and silently change the getNowPlaying output the
-        # parser depends on. Pinning also makes the CI Docker-build job a real drift detector:
-        # against `main` a failure was ambiguous, against a SHA it is unambiguously ours.
-        #   7b5fde63 (2026-08-21) "fix: add offset param to getMyPlaylists (#72)"
-        MCP_SERVER_REF: 7b5fde6309a52a7874768c63deda7880ee85935b
+        # Pinned since 2026-08-25, closing risk R7: upstream has no release tags, so `main` can move underneath you
+        # and silently change the getNowPlaying output the parser depends on. Pinning also makes the CI Docker-build
+        # job a real drift detector: against a SHA a failure is unambiguously ours.
+        # U9 (FR-73, NFR-40): moved 2026-10-18 from 7b5fde63 (unlicensed) to the MIT-licensed commit below. Moving it
+        # again is deliberate work that repeats U9's acceptance (BR-70); Dependabot never moves it. This is the ONE
+        # pin: CI's PBT-66 fetch and `npm run mcp:setup` both read it from here.
+        #   6065ce5c (2026-10-16) "Add MIT license"
+        MCP_SERVER_REF: 6065ce5cdef13ffeb43042e295bb788ce7ad00df
     # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
-    image: spotify-now-playing:1.0.0-beta.2
-    container_name: spotify-now-playing
+    # U9 (BR-71.1): one name everywhere -- image, container, service. ⚠️ Until 1.0.0-beta.2 the service was `now-playing`
+    # and the container `spotify-now-playing`: Compose treats that old container as an ORPHAN that `up` and `down` leave
+    # RUNNING, so stop it first (docs/INSTALL.md, Upgrading). `npm run release -- --apply` refuses while it runs.
+    image: spotify-companion:1.0.0-beta.2
+    container_name: spotify-companion
 
     ports:
       # 127.0.0.1 binding keeps this localhost-only (Question 7, option A). ⚠️ Do NOT drop the prefix: see below.
@@ -55,9 +60,10 @@ services:
       # rather than switching on silently. The host deployment keeps the strict check.
       TRUST_PUBLISHED_PORT: "true"
       POLL_INTERVAL_MS: 3000
-      # Shared with the MCP server: `npm run auth` writes it, the MCP server refreshes it,
-      # this app reads it. The app never writes, to avoid racing the MCP server's rewrites.
-      SPOTIFY_CONFIG_PATH: /opt/spotify-mcp/spotify-config.json
+      # Shared with the MCP server: `npm run auth` writes it, the MCP server refreshes it, the app reads it (and
+      # writes it only from Settings, through CredentialsWriter). U9 (BR-69.4): inside the ./secrets DIRECTORY mount,
+      # where a temp-then-rename write works. The app passes this same path to the connector when it spawns it.
+      SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
 
       # -- U1: listening history ------------------------------------------------
       HISTORY_DB_PATH: /data/history.db
@@ -185,10 +191,12 @@ services:
       # holds; it does not change if the repo's visibility does.
 
     volumes:
-      # Question 6, option A: authenticate once on the host, mount the token file in.
-      # The MCP server rewrites this file when it refreshes the access token, so it is
-      # mounted read-write.
-      - ./secrets/spotify-config.json:/opt/spotify-mcp/spotify-config.json:rw
+      # Credentials (Question 6, option A: authenticate once on the host). U9 (BR-69.4, IN-U9-1): the DIRECTORY is
+      # mounted, read-write. Both writers -- the connector refreshing its token, CredentialsWriter saving Settings --
+      # write by temp file + rename, which needs the directory: through the single-file mounts used until 1.0.0-beta.2
+      # a rename fails with EBUSY (probed 2026-10-18). Host paths are unchanged: secrets/spotify-config.json and
+      # secrets/musicbrainz.json. The *.example.json files become visible inside the container too (no secrets).
+      - ./secrets:/app/secrets:rw
 
       # Listening history (NFR-11): survives `compose up --build`.
       #
@@ -197,16 +205,8 @@ services:
       # above would be a subtle and hard-to-diagnose mistake.
       - ./data:/data:rw
 
-      # NFR-14 contact address (U2).
-      #
-      # READ-WRITE since U7 (IN-U7-2): the app writes the `contact` field from Settings (FR-70), through
-      # `CredentialsWriter`, and NOTHING ELSE — `appName`/`appVersion` are preserved untouched. It used to be :ro
-      # because "nothing rewrites this file"; U7 gives the write a use, which is the condition that comment set.
-      #
-      # ⚠️ Still a SINGLE-FILE mount, so the app writes it IN PLACE (same inode). A write-temp-then-rename here
-      # would detach the container's view — the hazard the ./config note below describes. In place is the pattern
-      # the MCP server already uses through the spotify-config.json mount above, hourly, so it is proven here.
-      - ./secrets/musicbrainz.json:/app/secrets/musicbrainz.json:rw
+      # NFR-14 contact address (U2): secrets/musicbrainz.json arrives through the ./secrets directory mount above.
+      # The app writes only its `contact` field, from Settings (FR-70, U7), now by temp + rename (U9, BR-69.6).
 
       # Rule definitions (U3) — WRITABLE BY THE APP since U7 (IN-U7-1, FD Q1 = A).
       #

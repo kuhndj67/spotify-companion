@@ -30,6 +30,13 @@
  * BR-56.4 would write, which is the premise P-U7-1 tests. It is a COPY inside `verify-install/`: the live
  * `secrets/` is read, never mounted and never written. `down` deletes it with the rest and says so.
  * ⚠️ For every other use of the copy, the placeholder contract above still holds.
+ *
+ * ## `up --candidate` and `--poll-ms <n>` — U9's acceptance (IN-U9-2, BR-70)
+ *
+ * `--candidate` builds the WORKING TREE as `spotify-companion:candidate` and runs this install on it, so a change
+ * (U9: the connector pin) is accepted here BEFORE `npm run release` builds and deploys it. `candidate` is never a
+ * version tag, so the release's never-overwrite rule (BR-66.7) is not touched; `down` removes it. `--poll-ms`
+ * replaces the hourly poll with a real one, for an acceptance run that must see plays and token refreshes.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -42,12 +49,24 @@ const COMPOSE_FILE = join(root, 'compose.verify.yaml');
 const PROJECT = 'spotify-verify';
 const INSTALL = join(root, 'verify-install');
 const BASELINE = join(INSTALL, 'baseline.json');
-const LIVE_CONTAINER = 'spotify-now-playing';
-const VERIFY_CONTAINER = 'spotify-now-playing-verify';
+/**
+ * U9 (BR-71.1, BR-71.3): the live container is `spotify-companion`, or `spotify-now-playing` before the crossing.
+ * The no-impact proof must work on either side of it, so the baseline records WHICH one was found, and the proof
+ * compares that same container afterwards.
+ */
+const LIVE_CONTAINERS = ['spotify-companion', 'spotify-now-playing'];
+const VERIFY_CONTAINER = 'spotify-companion-verify';
 const URL = 'http://localhost:3011';
 
 const mode = process.argv.includes('--plan') ? 'plan' : process.argv[2];
 const probeCredentials = process.argv.includes('--probe-credentials');
+const candidate = process.argv.includes('--candidate');
+const CANDIDATE_IMAGE = 'spotify-companion:candidate';
+const pollMsArg = process.argv.includes('--poll-ms') ? process.argv[process.argv.indexOf('--poll-ms') + 1] : undefined;
+if (pollMsArg !== undefined && !/^\d{3,}$/.test(pollMsArg)) {
+  console.error(`--poll-ms needs a whole number of milliseconds (>= 100), got "${pollMsArg}"`);
+  process.exit(2);
+}
 const PROBE_FILE = join(INSTALL, 'secrets', 'spotify-config.json');
 
 /**
@@ -71,8 +90,8 @@ function writeReducedCredentials() {
   console.log('   credentials (4 values + accessToken "placeholder", expiresAt 0). Removed by `npm run verify:down`.');
 }
 
-function run(cmd, args, { allowFail = false } = {}) {
-  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
+function run(cmd, args, { allowFail = false, env = undefined } = {}) {
+  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8', env: env ? { ...process.env, ...env } : process.env });
   if (r.error) {
     if (allowFail) return null;
     throw new Error(`${cmd} could not be run: ${r.error.message}`);
@@ -96,18 +115,22 @@ function assertProjectName() {
 }
 
 /** The five live properties the contract promises not to change. */
-function liveSnapshot() {
-  const out = run('docker', ['inspect', LIVE_CONTAINER], { allowFail: true });
-  if (out === null) return { present: false };
-  const c = JSON.parse(out)[0];
-  return {
-    present: true,
-    id: c.Id,
-    startedAt: c.State.StartedAt,
-    restartCount: c.RestartCount,
-    image: c.Image,
-    health: c.State.Health?.Status ?? null,
-  };
+function liveSnapshot(only = null) {
+  for (const name of only ? [only] : LIVE_CONTAINERS) {
+    const out = run('docker', ['inspect', name], { allowFail: true });
+    if (out === null) continue;
+    const c = JSON.parse(out)[0];
+    return {
+      present: true,
+      name,
+      id: c.Id,
+      startedAt: c.State.StartedAt,
+      restartCount: c.RestartCount,
+      image: c.Image,
+      health: c.State.Health?.Status ?? null,
+    };
+  }
+  return { present: false };
 }
 
 /** Tracked-file changes only — `verify-install/` is gitignored and must not appear here. */
@@ -126,6 +149,8 @@ function plan() {
   up:   refuse unless the project resolves to "${PROJECT}" · record the live baseline · create verify-install/
         (data/, state/ empty, config/rules.json from the template, a PLACEHOLDER Spotify config — or, with
         --probe-credentials, a REDUCED COPY of the real one for U7's probes P-U7-1/2 only, IN-U7-3) ·
+        with --candidate, first build the working tree as ${CANDIDATE_IMAGE} and run on it (U9) ·
+        with --poll-ms <n>, poll Spotify every n ms instead of hourly ·
         docker compose -f compose.verify.yaml up -d · wait for health · ${URL}
   down: refuse unless the project resolves · docker compose -f compose.verify.yaml down (no --rmi) ·
         delete verify-install/ · prove the live container and git status unchanged, and nothing *verify* left`);
@@ -135,16 +160,23 @@ function up() {
   if (existsSync(INSTALL)) fail('verify-install/ already exists — run `npm run verify:down` first (a half-removed install is not a clean start).');
   assertProjectName();
   const live = liveSnapshot();
-  if (!live.present) console.warn(`⚠️ The live container "${LIVE_CONTAINER}" is not present; the no-impact proof will compare against its absence.`);
+  if (!live.present) console.warn(`⚠️ No live container (${LIVE_CONTAINERS.join(' or ')}) is present; the no-impact proof will compare against its absence.`);
 
   for (const d of ['data', 'state', 'config', 'secrets']) mkdirSync(join(INSTALL, d), { recursive: true });
-  writeFileSync(BASELINE, JSON.stringify({ takenAt: new Date().toISOString(), live, git: gitStatus(), probeCredentials }, null, 2));
+  writeFileSync(BASELINE, JSON.stringify({ takenAt: new Date().toISOString(), live, git: gitStatus(), probeCredentials, candidate }, null, 2));
   copyFileSync(join(root, 'config', 'rules.example.json'), join(INSTALL, 'config', 'rules.json'));
   // ⚠️ The EXAMPLE, with placeholder values. Never secrets/spotify-config.json — except the reduced COPY in probe mode.
   copyFileSync(join(root, 'secrets', 'spotify-config.example.json'), PROBE_FILE);
   if (probeCredentials) writeReducedCredentials();
 
-  run('docker', ['compose', '-f', COMPOSE_FILE, 'up', '-d']);
+  const env = {};
+  if (candidate) {
+    console.log(`Building the working tree as ${CANDIDATE_IMAGE} (U9 acceptance) …`);
+    run('docker', ['build', '--tag', CANDIDATE_IMAGE, '.']); // throws on a failed build: no install on a stale image
+    env.VERIFY_IMAGE = CANDIDATE_IMAGE;
+  }
+  if (pollMsArg !== undefined) env.VERIFY_POLL_INTERVAL_MS = pollMsArg;
+  run('docker', ['compose', '-f', COMPOSE_FILE, 'up', '-d'], { env });
   const deadline = Date.now() + 60_000;
   let health = 'starting';
   while (Date.now() < deadline) {
@@ -166,10 +198,13 @@ function down() {
 
   run('docker', ['compose', '-f', COMPOSE_FILE, 'down']); // ⚠️ never --rmi: the image tag is the live one
   rmSync(INSTALL, { recursive: true, force: true });
+  // U9: the candidate image is this install's own (never a version tag), so it goes with it.
+  if (baseline.candidate) run('docker', ['image', 'rm', CANDIDATE_IMAGE], { allowFail: true });
 
   const problems = [];
-  const now = liveSnapshot();
-  for (const key of ['present', 'id', 'startedAt', 'restartCount', 'image', 'health']) {
+  // The SAME container the baseline found (U9: either name), so the proof cannot pass by looking at another one.
+  const now = liveSnapshot(baseline.live.name ?? null);
+  for (const key of ['present', 'name', 'id', 'startedAt', 'restartCount', 'image', 'health']) {
     if (JSON.stringify(now[key]) !== JSON.stringify(baseline.live[key])) {
       problems.push(`live ${key} changed: ${JSON.stringify(baseline.live[key])} → ${JSON.stringify(now[key])}`);
     }

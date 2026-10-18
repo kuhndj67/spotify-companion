@@ -21,10 +21,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { browserCommand } from './lib/browserCommand.mjs';
+import { isLoopbackHostHeader } from './lib/loopbackHost.mjs';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const secretsDir = join(projectRoot, 'secrets');
-const configPath = join(secretsDir, 'spotify-config.json');
+// U9 (BR-74.3): the image's `auth` command points this at the user's folder (/work/secrets/…). On the host the
+// default is unchanged: secrets/spotify-config.json.
+const configPath = process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'spotify-config.json');
+const secretsDir = dirname(configPath);
+// U9: inside the container the listener must bind all interfaces to receive the published port; the documented
+// `-p 127.0.0.1:8888:8888` keeps it on the host, and the Host check below refuses anything else regardless.
+const BIND_HOST = process.env.AUTH_BIND_HOST ?? '127.0.0.1';
+// U9: a container cannot open the host's browser, so it only prints the link.
+const OPEN_BROWSER = process.env.AUTH_NO_BROWSER !== '1';
 
 const PORT = 8888;
 const REDIRECT_URI = `http://127.0.0.1:${PORT}/callback`;
@@ -67,7 +75,7 @@ async function promptCredentials() {
   if (existsSync(configPath)) {
     const existing = JSON.parse(readFileSync(configPath, 'utf8'));
     if (existing.clientId && existing.clientSecret) {
-      console.log('✓ Using existing credentials from secrets/spotify-config.json');
+      console.log(`✓ Using existing credentials from ${configPath}`);
       return existing;
     }
   }
@@ -88,6 +96,11 @@ async function promptCredentials() {
 function awaitCallback(expectedState) {
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
+      // U9 (P-73): only a request addressed to this machine by a loopback name -- whatever interface we bound.
+      if (!isLoopbackHostHeader(req.headers.host)) {
+        res.writeHead(403).end();
+        return;
+      }
       const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
       if (url.pathname !== '/callback') {
         res.writeHead(404).end();
@@ -122,7 +135,7 @@ function awaitCallback(expectedState) {
     });
 
     server.on('error', reject);
-    server.listen(PORT, '127.0.0.1');
+    server.listen(PORT, BIND_HOST);
     setTimeout(() => {
       server.close();
       reject(new Error('Timed out after 5 minutes waiting for authorisation.'));
@@ -166,9 +179,14 @@ try {
 
   const pending = awaitCallback(state);
 
-  console.log('\nOpening your browser to authorise. If it does not open, paste this URL:\n');
-  console.log(`${authorizeUrl}\n`);
-  openBrowser(authorizeUrl);
+  if (OPEN_BROWSER) {
+    console.log('\nOpening your browser to authorise. If it does not open, paste this URL:\n');
+    console.log(`${authorizeUrl}\n`);
+    openBrowser(authorizeUrl);
+  } else {
+    console.log('\nOpen this link in your web browser to authorise (it is valid for 5 minutes):\n');
+    console.log(`${authorizeUrl}\n`);
+  }
 
   const code = await pending;
   const tokens = await exchangeCode(config, code);
@@ -190,7 +208,7 @@ try {
     )}\n`,
   );
 
-  console.log('✓ Tokens written to secrets/spotify-config.json (gitignored)');
+  console.log(`✓ Tokens written to ${configPath}`);
   console.log(`✓ Scopes granted include user-follow-read`);
   console.log('\nNext: continue with S5 of INSTALL.md.');
 } catch (error) {

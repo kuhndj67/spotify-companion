@@ -1,14 +1,11 @@
 /**
- * IN-U7-6 — the Configuration block of `/api/diagnostics`, and the in-place writability probe.
+ * IN-U7-6 — the Configuration block of `/api/diagnostics`. (The in-place writability probe it also tested was
+ * retired in U9: the credentials are written by rename in a directory mount, so the question is the directory's.)
  */
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { probeFileWritable } from '../src/configuration/atomicWrite.js';
 import { configurationDiagnosticSteps, type ConfigurationDiagnosticsInput } from '../src/configuration/configurationDiagnostics.js';
 
 const BASE: ConfigurationDiagnosticsInput = {
@@ -17,7 +14,8 @@ const BASE: ConfigurationDiagnosticsInput = {
   musicbrainzWritable: true,
   musicbrainzPath: '/app/secrets/musicbrainz.json',
   spotifyWritable: true,
-  spotifyPath: '/opt/spotify-mcp/spotify-config.json',
+  spotifyPath: '/app/secrets/spotify-config.json',
+  credentialsDirectory: { class: 'ok', message: null },
   lastRulesWrite: null,
   lastCredentialsWrite: null,
   polls: { total: 0, idle: 0, error: 0, idleShare: null },
@@ -57,31 +55,5 @@ describe('configurationDiagnosticSteps (IN-U7-6)', () => {
   it('an all-error run reports the idle share as unknown, never 100%', () => {
     const p = byName(configurationDiagnosticSteps({ ...BASE, polls: { total: 4, idle: 0, error: 4, idleShare: null } }), 'Now-playing polls');
     assert.match(p.detail, /unknown/);
-  });
-});
-
-describe('probeFileWritable — never changes the file it checks', () => {
-  it('true for a writable file, and the content and size are untouched', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'probe-file-'));
-    try {
-      const f = join(dir, 'musicbrainz.json');
-      writeFileSync(f, '{"contact":"x"}');
-      const before = statSync(f).size;
-      assert.equal(probeFileWritable(f), true);
-      assert.equal(readFileSync(f, 'utf8'), '{"contact":"x"}');
-      assert.equal(statSync(f).size, before);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('false for a missing file — and does not create it', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'probe-file-'));
-    try {
-      assert.equal(probeFileWritable(join(dir, 'absent.json')), false);
-      assert.throws(() => statSync(join(dir, 'absent.json')));
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });

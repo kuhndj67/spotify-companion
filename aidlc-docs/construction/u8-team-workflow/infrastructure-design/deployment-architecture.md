@@ -8,7 +8,7 @@
 THIS PC (owner)                                    SECOND PHYSICAL MACHINE
 -----------------------------------------          ------------------------------------------------------
 Rancher Desktop                                    Hyper-V host
-  spotify-now-playing:0.8.0  :3010  LIVE             └─ VM kuhndjwin11pro (Win 11 Pro, 16 GB fixed, nested virt)
+  spotify-now-playing:0.8.0  :3010  LIVE             └─ VM Machine 1 (Win 11 Pro, 16 GB fixed, nested virt)
   ./data  ./state  ./config  ./secrets                    checkpoint `clean` = base B1–B7   (every walk reverts here)
   (UNCHANGED by U8; keeps recording)                       │
                                                            ├─ C:\walk\INSTALL.md   (from tag; the ONLY input)

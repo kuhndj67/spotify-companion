@@ -151,7 +151,7 @@ before the thing it guards.
 ### Step 9 — Licence and security *(BR-65, BR-67.4)* — ✅ DONE · LICENSE SHA-256 `3972dc97…6986`
 - [x] `LICENSE`: GPL-3.0 text **unmodified**, fetched from gnu.org and its SHA-256 recorded · `package.json`
       `license` per **Question 1**
-- [x] `SECURITY.md`: `kuhndj67@hotmail.com`; no public issues for vulnerabilities; scope: the local-only guard, the
+- [x] `SECURITY.md`: `<email address>`; no public issues for vulnerabilities; scope: the local-only guard, the
       upload admission path, credential handling; W-14 noted
 - [x] **Draft** of the upstream licence request for `spotify-mcp-server` →
       `construction/u8-team-workflow/code/mcp-licence-issue-draft.md`. ⚠️ **The owner posts it**, not Claude

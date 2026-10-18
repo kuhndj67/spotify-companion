@@ -9,20 +9,22 @@
 `→` hard dependency (cannot build without) · `↝` soft dependency (better with, works without) ·
 `E` extends existing U0 code
 
-| | U0 | U1 | U2 | U3 | U4 | U5 | U6 | U7 | U8 | U9 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **U0** Existing | — | | | | | | | | | |
-| **U1** History & Export | E | — | | | | | | | | |
-| **U2** Label Enrichment | E | → | — | | | | | | | |
-| **U3** Rule Model | | ↝ | ↝ | — | | | | | | |
-| **U4** Rule Observability | E | → | | → | — | | | | | |
-| **U5** Automated Skipping | E | → | | → | → | — | | | | |
-| **U6** User-Data Lifecycle | E | → | | | | ↝ | — | | | |
-| **U7** Configuration Management | E | | | → | | ↝ | → | — | | |
-| **U8** Team Workflow & Onboarding | | | | | | | → | → | — | |
-| **U9** Off-machine Deployment | E | | | | | | → | → | → | — |
+| | U0 | U1 | U2 | U3 | U4 | U5 | U6 | U7 | U8 | U9 | U10 | U11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **U0** Existing | — | | | | | | | | | | | |
+| **U1** History & Export | E | — | | | | | | | | | | |
+| **U2** Label Enrichment | E | → | — | | | | | | | | | |
+| **U3** Rule Model | | ↝ | ↝ | — | | | | | | | | |
+| **U4** Rule Observability | E | → | | → | — | | | | | | | |
+| **U5** Automated Skipping | E | → | | → | → | — | | | | | | |
+| **U6** User-Data Lifecycle | E | → | | | | ↝ | — | | | | | |
+| **U7** Configuration Management | E | | | → | | ↝ | → | — | | | | |
+| **U8** Team Workflow & Onboarding | | | | | | | → | → | — | | | |
+| **U9** Connector Upgrade & Image | E | | | | | | | | → | — | | |
+| **U10** Off-machine Deployment | E | | | | | | → | → | → | → | — | |
+| **U11** Team Operations | | | | | | | | | → | | | — |
 
-*Phase 5 rows added 2026-10-07 (Units Generation, Phase 5 round).*
+*Phase 5 rows added 2026-10-07 (Units Generation, Phase 5 round); U9 inserted and U10–U11 renumbered 2026-10-18 (Units Question 7 = A).*
 
 **No unit depends on a later unit.** The matrix is strictly lower-triangular, which is the
 property that makes the phase ordering safe.
@@ -97,9 +99,12 @@ example if MusicBrainz coverage turns out to be poor and the label work needs re
   are validated with U3's validator before any write.
 - **U8 → U6, U7 (hard)**: the install routine documents their steps; written before them, it would describe
   features that do not exist.
-- **U9 → U6, U7, U8 (hard)**: the deployment is performed by following U8's routine.
+- **U9 → U8 (hard)**: the release script, CI and the `:3011` verification install it probes on are U8's. It
+  extends U0's container build (the connector stage of the `Dockerfile`).
+- **U10 → U6, U7, U8, U9 (hard)**: the deployment is performed by following U8's routine, with U9's published image.
+- **U11 → U8 (hard)**: CI gates, branch protection, CONTRIBUTING, versions. Built after U10.
 
-**Phase 5 build order: U6 → U7 → U8 → U9.**
+**Phase 5 build order: U6 → U7 → U8 → U9 → U10 → U11.**
 
 ---
 

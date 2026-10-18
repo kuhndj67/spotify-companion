@@ -37,7 +37,7 @@ in Build & Test.
 
 | Element | Behaviour |
 |---|---|
-| Status line | *Contact: k…7@gmail.com* / *Not set* |
+| Status line | *Contact: <email address>* / *Not set* |
 | Field + **Save** | Not pre-filled; refused with the startup rule's message (BR-57.2) |
 
 ## 4. Settings → Restore (U6 dialog, extended)

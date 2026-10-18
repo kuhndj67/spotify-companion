@@ -34,14 +34,20 @@ tractable units while still shipping as one runnable checkpoint.
 | **U3** | 3 | Rule Model & Evaluation | Pure core | **CI green** |
 | **U4** | 3 | Rule Observability | Feature | CI green **+ live** |
 | **U5** | 4 | Automated Skipping | Feature | CI green **+ live** |
-| **U6** | **5** | **User-Data Lifecycle** | Feature *(was Infrastructure until its FD, 2026-10-07)* | CI green **+ live + a verified round trip into a second installation on this machine** *(cross-machine half → U9)* |
+| **U6** | **5** | **User-Data Lifecycle** | Feature *(was Infrastructure until its FD, 2026-10-07)* | CI green **+ live + a verified round trip into a second installation on this machine** *(cross-machine half → U10)* |
 | **U7** | 5 | Configuration Management | Feature | CI green **+ live** — rules and credentials changed in-app on a running deployment |
 | **U8** | 5 | Team Workflow & Onboarding | Process & docs | CI gating enforced **+ the install walked cold** by someone who did not write it |
-| **U9** | 5 | Off-machine Deployment | Deployment | Reachable and fully working from a second machine, **deployed by following U8's install routine** |
-| **U10** | 5 | Team Operations | Process | Two contributors work in parallel units through reviewed PRs **with no conflict in the AI-DLC records** (declared 2026-10-12) |
+| **U9** | 5 | Connector Upgrade & Publishable Image | Dependency & release | The connector on its MIT-licensed commit with every upstream change accounted for on `:3011`, **+ a release tag publishes the image** and README *App only* walked (declared 2026-10-18) |
+| **U10** | 5 | Off-machine Deployment | Deployment | Reachable and fully working from a second machine, **deployed by following U8's install routine** |
+| **U11** | 5 | Team Operations | Process | Two contributors work in parallel units through reviewed PRs **with no conflict in the AI-DLC records** (declared 2026-10-12) |
 
 ⚠️ **Phase 5's units were renumbered on 2026-10-07** to match build order (Units Question 5a = A). Old → new:
 U8 → **U7**, U9 → **U8**, U7 → **U9**. `audit.md` entries written before that date use the old numbers.
+
+⚠️ **Renumbered again on 2026-10-18** (Units Question 7 = A): a new **U9 Connector Upgrade & Publishable Image** was
+inserted before the NAS. Old → new: U9 Off-machine Deployment → **U10**, U10 Team Operations → **U11**. `audit.md`
+entries and **U6–U8 construction records** written before that date use the old numbers (their "U9" is the NAS); the
+NAS unit's carried questions keep their labels **U9-a…c** as they were asked.
 
 ---
 
@@ -241,8 +247,8 @@ scripts/           db:backup / db:restore / db:verify-backups — developer-only
 FD: `construction/u6-data-lifecycle/functional-design/`.
 
 **Exit criterion is an operation, not a screen**: a corpus backed up from the live app, restored into a second
-installation **on this machine**, and the restored app runs. ⚠️ The **cross-machine** half belongs to **U9**
-(NFR Design Q10 = A, 2026-10-07): until U9 builds NFR-29, `localGuard` refuses a browser on another machine.
+installation **on this machine**, and the restored app runs. ⚠️ The **cross-machine** half belongs to **U10**
+(NFR Design Q10 = A, 2026-10-07): until U10 builds NFR-29, `localGuard` refuses a browser on another machine.
 
 ---
 
@@ -251,7 +257,7 @@ installation **on this machine**, and the restored app runs. ⚠️ The **cross-
 **Purpose**: on an appliance the user cannot edit host files, so **rules and credentials must be
 manageable from inside the app**. Split out of U6 by FD T1 = A (2026-10-07).
 
-**Gates U9** alongside U6. **Reuses U6's FR-64 admission path** for every file it ingests — it does not get
+**Gates U10** alongside U6. **Reuses U6's FR-64 admission path** for every file it ingests — it does not get
 its own.
 
 **Scope as settled so far** (U6 FD §10): rules **download/upload now, a built-in editor later** (T2 = C),
@@ -291,9 +297,34 @@ steps. **Stories**: none yet — to be settled in its FD, not invented here.
 
 ---
 
-## U9 — Off-machine Deployment *(Phase 5)* — NOT YET DESIGNED
+## U9 — Connector Upgrade & Publishable Image *(Phase 5)* — declared 2026-10-18, NOT YET DESIGNED
 
-**Target**: the owner's Synology NAS, **`SYNNAS` (192.168.0.223)**, on a private, non-forwarding LAN.
+**Purpose**: move the bundled `spotify-mcp-server` from `7b5fde63` (unlicensed) to **`6065ce5c`** (MIT, upstream
+`main` at 2026-10-18) and account for every upstream change that reaches this app; then **publish the image** so
+another machine can pull rather than build. Promotes backlog **W-15**. Inserted before the NAS (Units **Question
+7 = A**) because the owner wants U10 to deploy a container.
+
+**Requirements**: **FR-73** the pin move and its acceptance probes on `:3011` (token refresh across the atomic
+config write, the new output format and PBT-66, MCP v2, a play end to end; directory-mount fallback for
+`spotify-config.json`) · **FR-74** CI publishes `ghcr.io/kuhndj67/spotify-companion:<version>` on each release tag,
+private while the repo is, carrying GPL-3.0 and MIT notices · **FR-75** README *App only* steps, walked ·
+**NFR-40** the pin policy (deliberate moves only; Dependabot excluded; PBT-66 as early warning). Discharges
+**NFR-32**'s publishing block and risk **R8**. **Out of scope**: upstream's new features (Q26).
+
+**Depends on**: U8 (release script, CI, the `:3011` verification install, INSTALL's walk method). **Nothing** in
+U10 or U11. **Stories**: to be settled in its FD.
+
+**Naming settled** (owner, 2026-10-18): everything is **`spotify-companion`** (image, container, registry); the old
+`spotify-now-playing` name is retired in this unit (FR-74).
+
+**Carried into its design plan**: how `npm run release` and CI divide the publishing · the read-token for a private pull ·
+how FR-75's walk is done · the code comments that still call the NAS "U9" (`src/api.ts`, `compose.verify.yaml`).
+
+---
+
+## U10 — Off-machine Deployment *(Phase 5)* — NOT YET DESIGNED
+
+**Target**: the owner's Synology NAS, **`Machine 2` (192.168.0.223)**, on a private, non-forwarding LAN.
 
 **Purpose**: the app runs on another machine on the user's LAN (a Synology NAS first), fully working, under
 the security posture chosen in Requirements **Question 11a = B**: **delegated authentication** (NFR-29) —
@@ -302,7 +333,7 @@ OAuth/SSO service installed but unconfigured — a candidate identity provider, 
 server could let the agent do NAS configuration directly; ⚠️ that is an administrator credential (NFR-28,
 least privilege).
 
-**Depends on**: U6 (the corpus can move), U7 (an appliance needs in-app configuration), U8 (the deployment is
+**Depends on**: U9 (the image it pulls), U6 (the corpus can move), U7 (an appliance needs in-app configuration), U8 (the deployment is
 performed **by following U8's install routine** — so the cold walk is this unit's verification).
 
 **Exit criterion inherited from U6** (NFR Design Q10 = A): the **real corpus** is backed up from this machine
@@ -310,7 +341,7 @@ and restored on the NAS through *Restore backup*, and the NAS app runs with the 
 
 **Carried into its design plan** (Units round, *Carried to U9's design plan*): **U9-a** NAS as *the* deployment
 or a throwaway second one · **U9-b** two deployments on one Spotify registration · probe **WAL on the NAS
-volume** · verify the WebSocket handshake **both directions** off-machine. **U9-c** *(2026-10-12, user + Claude)*: deploy to the NAS
+volume** · verify the WebSocket handshake **both directions** off-machine. **The NAS's CPU architecture** (added 2026-10-18, from U9 FD Q5): U9 publishes `linux/amd64` only; add `arm64` here if Machine 2 needs it. **U9-c** *(2026-10-12, user + Claude)*: deploy to the NAS
 with **least authority** — no MCP server and no Docker-group account (Docker access is root-equivalent: a container
 can mount the host). Recommended: a dedicated NAS user whose single SSH key is locked by `command=` to an
 owner-controlled deploy script (`deploy <vX.Y.Z>` · `status` · `logs` · `rollback <tag>`), reaching Docker through a
@@ -319,10 +350,10 @@ reachable off-machine before Question 11 is decided.
 
 ---
 
-## U10 — Team Operations *(Phase 5)* — declared 2026-10-12, NOT YET DESIGNED
+## U11 — Team Operations *(Phase 5)* — declared 2026-10-12, NOT YET DESIGNED
 
 **Purpose**: several developers can work **at the same time** — on issues, in parallel units, through reviewed PRs —
-without colliding in the project's records. U8 gets a second person to *install and open one PR*; U10 makes a team
+without colliding in the project's records. U8 gets a second person to *install and open one PR*; U11 makes a team
 **work**. Added by Units **Question 6 = A** after the user found no issue tracking or multi-developer coordination in
 Phase 5 (2026-10-12).
 
@@ -330,8 +361,8 @@ Phase 5 (2026-10-12).
 single-writer `audit.md` and *Current Stage* are the core problem) · **NFR-37** CODEOWNERS and gate approval ·
 **NFR-38** CHANGELOG · **NFR-39** templates, Dependabot, one agent-instruction source, Discussions.
 
-**Depends on**: U8 (CI gates, branch protection, CONTRIBUTING, versions). **Not** a dependency of U9.
-**Built after U9**, so its design can use what the cold walk and the NAS install showed. **Stories**: to be settled
+**Depends on**: U8 (CI gates, branch protection, CONTRIBUTING, versions). **Not** a dependency of U10.
+**Built after U10**, so its design can use what the cold walk and the NAS install showed. **Stories**: to be settled
 in its FD (P4 The Contributor exists since Requirements Question 20).
 
 ---

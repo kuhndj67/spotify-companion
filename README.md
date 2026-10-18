@@ -56,7 +56,30 @@ Two ways to do it, following the same routine:
 ### App only
 
 **Coming soon.** Just the running app, from a prebuilt container image, with no source code or development tools.
-It needs the bundled Spotify connector moved to its newly licensed version first, so that the image may be published.
+The steps below exist but have **not yet been walked** by someone following them cold; this label comes off when
+they have. While the repository is private, pulling the image needs access to it.
+
+You need Docker (Rancher Desktop on Windows: [`docs/INSTALL.md`](docs/INSTALL.md) S1), a GitHub token that can read
+packages, and your own Spotify developer app. Commands are the same in PowerShell and a Linux shell; `<version>` is
+a release such as `1.0.0-beta.3`.
+
+1. **Log in to the registry**: `docker login ghcr.io -u <your GitHub user name>`, and paste the token as the
+   password. *Expected*: `Login Succeeded`.
+2. **Set up a folder**: in a new, empty folder, run
+   `docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup`.
+   *Expected*: `✓ setup wrote: compose.yaml, secrets/musicbrainz.json, config/rules.json`. It refuses, and writes
+   nothing, if any of those already exist.
+3. **Your contact address**: open `secrets/musicbrainz.json` in that folder and replace `you@example.com` with an
+   address where you can be reached (MusicBrainz requires it; the app does not start with the placeholder).
+4. **Your Spotify app**: register one as in [`docs/INSTALL.md`](docs/INSTALL.md) S3, with the redirect URI exactly
+   `http://127.0.0.1:8888/callback`.
+5. **Sign in to Spotify**:
+   `docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:<version> auth`.
+   Enter the app's Client ID and Client Secret, open the printed link in your web browser and approve.
+   *Expected*: `✓ Tokens written to /work/secrets/spotify-config.json`. Keep the `127.0.0.1:` in the command: it keeps
+   the sign-in reachable from this computer only.
+6. **Start it**: `docker compose up -d`, then open `http://localhost:3010`. *Expected*: the Spotify indicator is
+   **ok**, and a track you play appears in the history. Automated skipping is **off** until you turn it on.
 
 ## Getting started
 

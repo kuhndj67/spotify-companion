@@ -87,6 +87,7 @@ wsl --status
 docker version
 node --version
 git --version
+rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.containerEngine.name) kubernetes=$($_.kubernetes.enabled)" }
 ```
 
 **Expected**
@@ -97,6 +98,7 @@ git --version
 - `docker version` prints a **`Client:`** section **and a `Server:`** section, with no error.
 - `node --version` prints `v22` or higher (for example `v22.12.0` or `v24.20.0`).
 - `git --version` prints `git version 2.` followed by more digits.
+- *Windows*: the `rdctl` line prints `engine=moby kubernetes=False`, the two settings from the 👤 box's step 5.
 
 **If it differs**
 
@@ -106,9 +108,14 @@ git --version
 - `winget` stops at *"Do you agree to all the source agreements terms?"* and does not accept typed input: the command
   was run without `--accept-source-agreements --accept-package-agreements`. Use the commands exactly as in the box.
 - `docker version` shows `Client:` but then an error such as *cannot connect to the Docker daemon*, *the system
-  cannot find the file specified*, or *failed to connect to the backend: timed out dialing Hyper-V socket*: Rancher
-  Desktop is not running yet (its first start takes about a minute), or the engine is not dockerd. Wait a minute and
-  run `docker version` again. Check **Preferences → Container Engine = dockerd (moby)**, wait for it to finish starting, and run
+  cannot find the file specified*, *failed to read the response from the backend: unexpected EOF*, or *failed to
+  connect to the backend: timed out dialing Hyper-V socket*: Rancher Desktop is not running yet (its first start
+  takes about a minute), or a setting from the 👤 box's step 5 was missed. Check the `rdctl` line's output, wait a
+  minute, and run `docker version` again.
+- The `rdctl` line prints `kubernetes=True`, or an engine other than `moby`: step 5 of the 👤 box was missed or not
+  saved. In Rancher Desktop open **Preferences**, set **Container Engine** to **dockerd (moby)** and turn
+  **Kubernetes off**, click **Apply**, wait for it to restart, and re-check. Kubernetes left on makes Rancher Desktop's
+  first start slow, and Docker can fail with the errors above until it settles. Check **Preferences → Container Engine = dockerd (moby)**, wait for it to finish starting, and run
   `docker version` again.
 - `docker`, `node` or `git` is *not recognized*: open a **new** PowerShell window. A window opened before the install
   does not see the new PATH. An agent refreshes its PATH instead, as in rule 6 of the agent section.
@@ -245,8 +252,9 @@ only (the file is gitignored).
    >
    > 1. When the browser opens on Spotify's page, sign in if asked, check it names your app, and click **Agree**.
    > 2. If the page shows an error instead of *Agree* (for example *"response_type must be code"*), or no page opened,
-   >    copy the long `https://accounts.spotify.com/authorize?...` line the terminal printed into the browser's
-   >    address bar, and approve there.
+   >    copy the long `https://accounts.spotify.com/authorize?...` line that `npm run auth` printed into the
+   >    browser's address bar, and approve there. If an agent ran the command, you cannot see its terminal: ask the
+   >    agent for that line.
    >
    > **You should see:** a page saying **Authorised** and *You can close this tab and return to the terminal.*
    > **When done, tell the agent:** "S4 approved", and whether the page said **Authorised**.
@@ -451,7 +459,8 @@ records a play. *No errors* is not evidence. (Port `3010`, or the port you chose
    > web player), and a browser on this machine
    >
    > 1. **Play music** and leave it playing.
-   > 2. Open <http://localhost:3010>.
+   > 2. Open <http://localhost:3010> in your web browser (Edge, Chrome…). A link clicked in a Claude Code chat opens
+   >    inside VS Code instead; that view works too, but a browser shows the page as users will see it.
    >
    > **You should see:** the page shows the track that is playing. In the status bar at the top, the **Spotify**
    > indicator is **●**, and hovering it shows *The last poll succeeded.* The same bar reads **Automation off**.
@@ -472,7 +481,8 @@ records a play. *No errors* is not evidence. (Port `3010`, or the port you chose
 
    > 👤 **YOU DO THIS** — S8 next track · needs: the Spotify player you are listening on
    >
-   > 1. **Skip to the next track.**
+   > 1. **Skip to the next track.** This matters: the track playing now started *before* the time just noted, so
+   >    only a track that starts *after* it can prove that a new play was recorded.
    > 2. Let **that** track play **to its end**, then let the one after it start.
    >
    > **You should see:** the player moves on to another track by itself.

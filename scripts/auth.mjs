@@ -192,7 +192,7 @@ try {
 
   console.log('✓ Tokens written to secrets/spotify-config.json (gitignored)');
   console.log(`✓ Scopes granted include user-follow-read`);
-  console.log('\nNext: continue with docs/INSTALL.md (S5).');
+  console.log('\nNext: continue with S5 of INSTALL.md.');
 } catch (error) {
   console.error(`\n✗ Authentication failed: ${error.message}`);
   process.exit(1);

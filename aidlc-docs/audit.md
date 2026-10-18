@@ -8456,3 +8456,30 @@ Polish owed to a later patch (not a walk failure; the walk is not repeated for i
 `docs/INSTALL.md` · the S4 box should say the agent relays the fallback URL · S8 should say why to skip, and to open
 the page in a web browser (chat links open inside VS Code) · S1 should list *"unexpected EOF"* and the Kubernetes
 cause, with an `rdctl list-settings` check.
+
+---
+
+## 2026-10-18T15:00:00Z — Wording polish → 1.0.0-beta.2 (README Install split; owner's README edit merged and corrected)
+
+Owner: *"Lets finish the wording cleanup, I made a few changes and committed in github so grab those first... look for
+spelling mistakes (I see one) and also … Install have 2 sections... a 'full development environment' section … and a
+second 'app only' with a 'coming soon'… along with any other polishing tasks."*
+
+- **Pulled** the owner's PR #2 (`a887055`, merged as `68ac019`): a new *Why it exists* (Spotify has said it promotes
+  content; is that detectable; rules examples) and *What it is not (at the moment…)*.
+- **Spelling**: **"wall aligned" → "well aligned"**, the one real error. `cspell@8.17.5` over README, INSTALL,
+  claude-start, CONTRIBUTING, SECURITY and CLAUDE.md flags only technical terms and the docs' consistent British
+  spellings, so a spell checker could not have found it ("wall" is a word). Light grammar, keeping the owner's voice
+  ("and so are likelier", "Since then, Spotify has publicly said that it does promote content", "fine-tune"); trailing
+  spaces removed. The rules examples were **checked against the field catalogue** and are all real fields:
+  `label.classification`, `album.ageYears`, `history.skipsOfTrack`. ⚠️ The owner's edit dropped the sentence saying the
+  first pre-registered test did not support the hypothesis. Left as the owner wrote it; flagged in chat.
+- **README Install** split: **Full development environment (from source)** (the app plus the source at a release and
+  the tools; then `npm ci` + `npm run verify`, made true by one line added to CONTRIBUTING, because INSTALL does not run
+  `npm ci`), with its two ways (VS Code + Claude Code / by hand), and **App only: coming soon** (needs the connector
+  moved to its licensed version first: W-15). *Status* is now "Beta…".
+- **Walk polish list, done**: scripts say "S5/S10 of INSTALL.md", not `docs/INSTALL.md` · S1 gains an `rdctl` settings
+  check (`engine=moby kubernetes=False`; probed read-only on the dev PC, where it prints `kubernetes=True`), plus *If it
+  differs* for *unexpected EOF* and for missed step-5 settings · the S4 box says to ask the agent for the fallback URL ·
+  the S8 box says to open the page in a web browser (a chat link opens inside VS Code) · the S8 next-track box says
+  **why** to skip. Not re-walked, per the owner's 2026-10-18 ruling (the polish is outside the walk).

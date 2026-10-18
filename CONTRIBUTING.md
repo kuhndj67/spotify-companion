@@ -4,7 +4,8 @@ Thanks for looking. This is a small, single-user app with an unusually long memo
 file is that memory, the **traps** below, because they are what a newcomer, person or AI agent, would otherwise
 rediscover the hard way.
 
-To run it first, follow [`docs/INSTALL.md`](docs/INSTALL.md). Licence: GPL-3.0-or-later ([`LICENSE`](LICENSE)).
+To run it first, follow [`docs/INSTALL.md`](docs/INSTALL.md), then run `npm ci` once in the `spotify-companion`
+folder to install the development dependencies that `npm run verify` needs. Licence: GPL-3.0-or-later ([`LICENSE`](LICENSE)).
 Security reports: [`SECURITY.md`](SECURITY.md), not public issues.
 
 ---

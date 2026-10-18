@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { config } from './config.js';
+import { config, CONTAINER_SECRETS_DIR } from './config.js';
 import { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import { EnrichmentService } from './spotify/enrichment.js';
@@ -85,7 +85,13 @@ const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const credentialsDirectoryClass = classifyCredentialsDirectory(
   probeCredentialsDirectory(config.spotifyConfigPath, config.inContainer),
 );
-const credentialsDirectoryText = credentialsDirectoryMessage(credentialsDirectoryClass, dirname(config.spotifyConfigPath));
+// The message names WHERE the directory belongs, not where the (possibly stale) configuration points: under a
+// 1.0.0-beta.2 compose file the configured path is /opt/spotify-mcp/…, and telling the user to mount ./secrets
+// there would be wrong (found in U9 Build & Test, 2026-10-18).
+const credentialsDirectoryText = credentialsDirectoryMessage(
+  credentialsDirectoryClass,
+  config.inContainer ? CONTAINER_SECRETS_DIR : dirname(config.spotifyConfigPath),
+);
 if (credentialsDirectoryText !== null) console.error(`[credentials] ${credentialsDirectoryText}`);
 const spotify = new SpotifyMcpClient({ blockedBecause: () => credentialsDirectoryText });
 const webApi = new SpotifyWebApiClient();

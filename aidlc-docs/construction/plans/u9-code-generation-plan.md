@@ -1,7 +1,7 @@
 # Code Generation Plan — U9: Connector Upgrade & Publishable Image
 
 **Date**: 2026-10-18 · **Stage**: CONSTRUCTION — Code Generation (Part 1: Planning), Unit U9
-**Status**: ✅ **APPROVED 2026-10-18** (Q1 = A: branch `u9-connector-upgrade`, standard PR flow · Q2 = A: the acceptance test checks shape, the release refuses). Step 13 (public-readiness review) added at the owner's request.
+**Status**: ✅ **APPROVED 2026-10-18** · ✅ **Steps 1–12 DONE 2026-10-18** (1701 tests; nothing deployed) · ▶ Step 13 next · (Q1 = A: branch `u9-connector-upgrade`, standard PR flow · Q2 = A: the acceptance test checks shape, the release refuses). Step 13 (public-readiness review) added at the owner's request.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield. *Generate* means modify existing files
 where they exist, never duplicate them.
 
@@ -159,18 +159,18 @@ split.
 - [x] The upstream proposal (an environment override for the config path) **drafted** to
       `construction/u9-connector-upgrade/code/upstream-proposal-draft.md`; not posted (BR-69.3).
 
-### Step 11 — Positive controls and a local image build *(the guard-test table, LC-58/59/66)*
-- [ ] `docker build` (new tag, **no `up`**): the connector stage runs the patched upstream suite on 22.23 and passes.
-- [ ] Seen to fail, each in a throwaway build or run: a mutated `CONFIG_FILE` line · a missing `LICENSE` · a planted
+### Step 11 — Positive controls and a local image build *(the guard-test table, LC-58/59/66)* — ✅ DONE · every control in the table seen to fail, with the failure **reason** asserted (two first attempts were invalid and redone) · table in `code/code-summary.md`
+- [x] `docker build` (new tag, **no `up`**): the connector stage runs the patched upstream suite on 22.23 and passes.
+- [x] Seen to fail, each in a throwaway build or run: a mutated `CONFIG_FILE` line · a missing `LICENSE` · a planted
       `secrets/spotify-config.json` in an image under `check-image.sh` · each structural test with a planted
       violation. Recorded in the code summary.
 
-### Step 12 — Verify and summarise
-- [ ] `npm run verify` green; test count recorded.
-- [ ] `construction/u9-connector-upgrade/code/code-summary.md`: files modified and created, deviations, and the
+### Step 12 — Verify and summarise — ✅ DONE · **1701 tests** (1 skipped on Windows, run on CI) · U9's PBT-73…78 joined `propertyObligations` · [`code-summary.md`](../u9-connector-upgrade/code/code-summary.md)
+- [x] `npm run verify` green; test count recorded.
+- [x] `construction/u9-connector-upgrade/code/code-summary.md`: files modified and created, deviations, and the
       **owed-to-Build-&-Test list** (IN-U9-7: acceptance on `:3011` with rotation watch and negative control,
       rollback rehearsal, live crossing, tag push, token probe, walk).
-- [ ] `HANDOFF.md`, `aidlc-state.md`, `audit.md`.
+- [x] `HANDOFF.md`, `aidlc-state.md`, `audit.md`.
 
 ### Step 13 — Public-readiness review *(W-14; owner request 2026-10-18)*
 

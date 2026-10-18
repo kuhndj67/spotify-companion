@@ -12,7 +12,7 @@
 
 import { EventEmitter } from 'node:events';
 import { config } from './config.js';
-import { McpToolError, SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
+import { CredentialsDirectoryError, McpToolError, SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import type { NowPlaying } from './mcp/parseNowPlaying.js';
 import type { EnrichmentService, Enrichment } from './spotify/enrichment.js';
 
@@ -85,6 +85,12 @@ export class NowPlayingService extends EventEmitter {
       if (error instanceof McpToolError) {
         console.error('[now-playing] Spotify returned an error:', error.toolText);
         this.#publish({ error: `Spotify returned an error: ${clip(error.toolText)}`, detail: error.toolText });
+        return;
+      }
+      // U9 (P-68): the connector was deliberately NOT started -- the credentials mount cannot take a token refresh.
+      // The message names the fix; "could not reach" would send the user looking at the connector.
+      if (error instanceof CredentialsDirectoryError) {
+        this.#publish({ error: clip(error.message), detail: error.message });
         return;
       }
       const detail = error instanceof Error ? error.message : String(error);

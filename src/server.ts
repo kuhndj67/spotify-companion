@@ -56,6 +56,11 @@ import { LikedSetCache } from './spotify/LikedSetCache.js';
 import { loadMusicBrainzIdentity, userAgentFrom, type MusicBrainzIdentity } from './config.js';
 import { readAppVersion } from './version.js';
 import { probeDirectoryWritable, probeFileWritable } from './configuration/atomicWrite.js';
+import {
+  classifyCredentialsDirectory,
+  credentialsDirectoryMessage,
+  probeCredentialsDirectory,
+} from './configuration/credentialsDirectory.js';
 import type { ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
 import { CredentialsWriter } from './configuration/CredentialsWriter.js';
 import { RulesWriter } from './configuration/RulesWriter.js';
@@ -72,7 +77,17 @@ import {
 
 const publicDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
-const spotify = new SpotifyMcpClient();
+/**
+ * U9 (LC-61, P-68): read ONCE at startup -- mounts do not change while the container runs. Anything but `ok` keeps
+ * the connector from being spawned (no refresh into a path that would fail with EBUSY), shows the reason on the
+ * Spotify indicator, and is reported by diagnostics. The app itself still starts (NFR-13).
+ */
+const credentialsDirectoryClass = classifyCredentialsDirectory(
+  probeCredentialsDirectory(config.spotifyConfigPath, config.inContainer),
+);
+const credentialsDirectoryText = credentialsDirectoryMessage(credentialsDirectoryClass, dirname(config.spotifyConfigPath));
+if (credentialsDirectoryText !== null) console.error(`[credentials] ${credentialsDirectoryText}`);
+const spotify = new SpotifyMcpClient({ blockedBecause: () => credentialsDirectoryText });
 const webApi = new SpotifyWebApiClient();
 const enrichment = new EnrichmentService(webApi);
 const nowPlaying = new NowPlayingService(spotify, enrichment);
@@ -1026,6 +1041,7 @@ function configurationDiagnostics(): ConfigurationDiagnosticsInput {
     musicbrainzPath: config.musicbrainzConfigPath,
     spotifyWritable: probeFileWritable(config.spotifyConfigPath),
     spotifyPath: config.spotifyConfigPath,
+    credentialsDirectory: { class: credentialsDirectoryClass, message: credentialsDirectoryText },
     lastRulesWrite: rulesWriter.lastWrite(),
     lastCredentialsWrite: credentials.lastWrite(),
     polls: { total: m.pollsTotal, idle: m.pollsIdle, error: m.pollsError, idleShare: m.idleShare },

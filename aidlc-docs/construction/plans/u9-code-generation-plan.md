@@ -77,12 +77,12 @@ split.
 - [x] `scripts/verify-install.mjs`: creates `verify-install/secrets/` with the placeholder (or, with
       `--probe-credentials`, the reduced copy) and the MusicBrainz file inside it.
 
-### Step 4 — Credentials-directory check *(Q5 = A, P-68, LC-61, PBT-76)*
-- [ ] `src/configuration/credentialsDirectory.ts`: a pure classifier over probe answers → `ok` · `not-mounted` ·
+### Step 4 — Credentials-directory check *(Q5 = A, P-68, LC-61, PBT-76)* — ✅ DONE · read once at startup (mounts do not change); single-file is detected from `/proc/self/mountinfo` (the config file itself a mount point); an unreadable mount table does not block, writability still does · `SpotifyMcpClient` takes `blockedBecause` and throws `CredentialsDirectoryError` instead of spawning · messages kept ≤ 200 characters so the fix is not clipped (tested). The real-container check (old compose → `single-file` shown) is Build & Test's
+- [x] `src/configuration/credentialsDirectory.ts`: a pure classifier over probe answers → `ok` · `not-mounted` ·
       `not-writable` · `single-file`, with the probes at the edge (reusing `probeDirectoryWritable`).
-- [ ] Wiring: on anything but `ok`, the connector is **not spawned**, the Spotify indicator shows the reason in words
+- [x] Wiring: on anything but `ok`, the connector is **not spawned**, the Spotify indicator shows the reason in words
       (pointing at INSTALL's upgrading note), `/api/diagnostics` reports the class. The app keeps running.
-- [ ] `test/credentialsDirectory.property.test.ts`: PBT-76 (every combination → exactly one class; only *mounted
+- [x] `test/credentialsDirectory.property.test.ts`: PBT-76 (every combination → exactly one class; only *mounted
       directory + writable* → `ok`); example tests for the indicator text and diagnostics.
 
 ### Step 5 — `CredentialsWriter` on rename *(BR-69.6, BR-69.7, LC-62)*

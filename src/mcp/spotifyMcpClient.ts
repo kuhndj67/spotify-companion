@@ -38,6 +38,18 @@ export class McpToolError extends Error {
 }
 
 /**
+ * The credentials directory cannot take the connector's rename-based write (U9, LC-61, P-68). Thrown INSTEAD of
+ * spawning the connector, so no refresh is attempted into a path that would fail with EBUSY. The message is the
+ * one the Spotify indicator shows.
+ */
+export class CredentialsDirectoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CredentialsDirectoryError';
+  }
+}
+
+/**
  * How the connector is spawned (U9, LC-60, BR-69.5).
  *
  * ⚠️ `SPOTIFY_CONFIG_PATH` must be passed EXPLICITLY: the SDK's stdio transport gives the child only
@@ -66,8 +78,16 @@ export class SpotifyMcpClient {
   #transport: StdioClientTransport | null = null;
   /** In-flight connection, so concurrent callers share one handshake instead of racing. */
   #connecting: Promise<Client> | null = null;
+  /** U9 (LC-61): a reason not to spawn the connector at all, or `null`. Read before every spawn. */
+  readonly #blockedBecause: () => string | null;
+
+  constructor(options: { readonly blockedBecause?: () => string | null } = {}) {
+    this.#blockedBecause = options.blockedBecause ?? (() => null);
+  }
 
   async #connect(): Promise<Client> {
+    const blocked = this.#blockedBecause();
+    if (blocked !== null) throw new CredentialsDirectoryError(blocked);
     const transport = new StdioClientTransport(connectorSpawnParams(config));
 
     const client = new Client(

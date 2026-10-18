@@ -23,7 +23,7 @@ process.env.POLL_INTERVAL_MS = String(POLL_MS);
 const { NowPlayingService } = await import('../src/nowPlayingService.js');
 // ⚠️ Dynamic too, and for the same reason: a STATIC import of the client loads config.ts before the line above
 // sets the interval, and the change-detection tests then see one poll and fail (found 2026-10-08).
-const { McpToolError } = await import('../src/mcp/spotifyMcpClient.js');
+const { CredentialsDirectoryError, McpToolError } = await import('../src/mcp/spotifyMcpClient.js');
 
 /** Long enough for several poll cycles plus the async enrichment hop. */
 const SEVERAL_POLLS = POLL_MS * 12;
@@ -160,6 +160,20 @@ describe('NowPlayingService', () => {
     assert.match(error.error, /^Spotify returned an error: Error getting current track: Failed to refresh/);
     assert.equal(error.detail, text);
     assert.ok(!('playing' in (snapshot as object)), 'never a now-playing snapshot — the F5 shape');
+  });
+
+  it('U9 (P-68): a blocked credentials directory shows ITS reason, not "could not reach the MCP server"', async () => {
+    const reason = 'Credentials are mounted as single files, which cannot take a token refresh: mount ./secrets as a directory';
+    const service = makeService({ mcpError: new CredentialsDirectoryError(reason) });
+    const tick = once(service, 'tick');
+    service.start();
+    const [snapshot] = await tick;
+    service.stop();
+
+    const error = snapshot as { error: string; detail: string };
+    assert.equal(error.error, reason);
+    assert.equal(error.detail, reason);
+    assert.doesNotMatch(error.error, /Spotify MCP server/);
   });
 
   it('BR-58.2: the reason on the indicator is bounded; the full text stays in detail', async () => {

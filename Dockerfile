@@ -9,7 +9,11 @@
 # arrive on rebuild. ⚠️ The startup capability check is what protects a HOST deployment (`npm start`),
 # which this pin cannot reach.
 ARG NODE_VERSION=22.23
-ARG MCP_SERVER_REF=main
+# U9 (NFR-40): a CHECKED COPY of compose.yaml's pin (test/structure.u9.test.ts fails if they differ). Until
+# 2026-10-18 this said `main`, and CI's `docker build .` passed no ref -- so CI built upstream's moving `main`, not
+# the pin. With the guarded patch below tied to one exact upstream line, a moving default would break CI the day
+# upstream edits that line.
+ARG MCP_SERVER_REF=6065ce5cdef13ffeb43042e295bb788ce7ad00df
 
 # ---------------------------------------------------------------------------
 # Stage 1: build marcelmarais/spotify-mcp-server from source
@@ -32,8 +36,18 @@ RUN git init -q . \
  && git fetch --depth 1 origin "${MCP_SERVER_REF}" \
  && git checkout -q FETCH_HEAD
 
-WORKDIR /opt/spotify-mcp
-RUN npm install && npm run build && npm prune --omit=dev
+# U9 (LC-58, BR-69.1): the ONE divergence from upstream. Its config path is fixed next to its build, and it writes
+# the file by temp + rename, which fails with EBUSY on a single-file bind mount (probed 2026-10-18). The patch lets
+# SPOTIFY_CONFIG_PATH point it into the /app/secrets DIRECTORY mount. It refuses -- and so fails this build --
+# unless upstream's line is found exactly once. Remove it when upstream accepts an equivalent override (BR-69.2).
+COPY scripts/lib/patchConfigPath.ts /tmp/patchConfigPath.ts
+RUN node /tmp/patchConfigPath.ts --file src/utils.ts && rm /tmp/patchConfigPath.ts
+
+# U9 (LC-59, BR-68.3, Q1 = A): upstream declares Node >=26.8.1, so npm prints EBADENGINE warnings here; they are
+# EXPECTED. This image stays on Node 22.23 for node:sqlite's backup(). Upstream's OWN suite runs below on 22.23 --
+# so a future pin that really needs Node 26 fails this build, not the running app (113/113 passed, 2026-10-18).
+# `npm ci`: upstream ships a lockfile since 6065ce5c's history (d7445af).
+RUN npm ci && npm test && npm prune --omit=dev
 
 # ---------------------------------------------------------------------------
 # Stage 2: build the web app
@@ -67,11 +81,24 @@ WORKDIR /app
 COPY --from=mcp-build /opt/spotify-mcp/build /opt/spotify-mcp/build
 COPY --from=mcp-build /opt/spotify-mcp/node_modules /opt/spotify-mcp/node_modules
 COPY --from=mcp-build /opt/spotify-mcp/package.json /opt/spotify-mcp/package.json
+# U9 (BR-73.1): MIT requires the connector's copyright notice to travel with every copy of it.
+COPY --from=mcp-build /opt/spotify-mcp/LICENSE /opt/spotify-mcp/LICENSE
 
 COPY --from=app-build /app/node_modules ./node_modules
 COPY --from=app-build /app/dist ./dist
 COPY package.json ./
 COPY public ./public
+COPY LICENSE ./LICENSE
+
+# U9 (BR-73.3): both licence notices must be IN the image -- this app's GPL-3.0 and the connector's MIT. A missing or
+# empty one fails the build here, before any image exists to publish.
+RUN test -s /app/LICENSE && test -s /opt/spotify-mcp/LICENSE  || { echo 'LICENSE missing from the image (BR-73.3): /app/LICENSE and /opt/spotify-mcp/LICENSE are both required' >&2; exit 1; }
+
+# U9 (BR-73.2, P-72): OCI labels. Local builds get placeholders; CI's publish job passes the real values.
+ARG APP_VERSION=local
+ARG VCS_REF=unknown
+ARG BASE_DIGEST=unknown
+LABEL org.opencontainers.image.title="spotify-companion"       org.opencontainers.image.licenses="GPL-3.0-or-later AND MIT"       org.opencontainers.image.source="https://github.com/kuhndj67/spotify-companion"       org.opencontainers.image.version="${APP_VERSION}"       org.opencontainers.image.revision="${VCS_REF}"       org.opencontainers.image.base.digest="${BASE_DIGEST}"
 
 # The MCP server writes refreshed OAuth tokens back to spotify-config.json, so its directory
 # must be writable by the runtime user.

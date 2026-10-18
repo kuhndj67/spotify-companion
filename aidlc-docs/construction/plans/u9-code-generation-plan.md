@@ -52,16 +52,16 @@ split.
 - [x] ⚠️ The Docker build stage has Node 22.23 and no `tsx`. Probe `node --experimental-strip-types` on 22.23 for
       this file; if it cannot run it, the module is written as `.mjs` with JSDoc types (recorded as a deviation).
 
-### Step 2 — Connector build stage and licences *(BR-68.1–68.4, BR-73, P-66, LC-59)*
-- [ ] `compose.yaml`, `compose.verify.yaml`: `MCP_SERVER_REF` → `6065ce5cdef13ffeb43042e295bb788ce7ad00df`, comment
+### Step 2 — Connector build stage and licences *(BR-68.1–68.4, BR-73, P-66, LC-59)* — ✅ DONE · patched upstream suite **113/113** on 22.23 in the build; both LICENSEs and the labels seen in the image; PBT-66 passes over the new source (≈31 `Error` literals in 5 files, all matching). ⚠️ Deviations: **(a)** `compose.verify.yaml` has no `build:` and no pin (it runs the image by tag), so "both compose files" is **compose.yaml only**; **(b)** the Dockerfile's `ARG MCP_SERVER_REF` defaulted to **`main`** and CI's `docker build .` passed no ref, so **CI built upstream `main`, not the pin**: the default is now the pin, a checked copy (Step 6's test); **(c)** `npm run mcp:setup` cloned `main` and never updated: it now follows the compose pin (host checkout moved to `6065ce5`); **(d)** `.dockerignore` gains `config`, `state`, `verify-install`, `.mcp-server` (BR-69.8) and loses the untrue "the repository is public"
+- [x] `compose.yaml`, `compose.verify.yaml`: `MCP_SERVER_REF` → `6065ce5cdef13ffeb43042e295bb788ce7ad00df`, comment
       updated (date, **MIT**, R7 still applies).
-- [ ] `Dockerfile` connector stage: run LC-58 on `src/utils.ts` (build fails on refusal) → `npm ci` (upstream ships a
+- [x] `Dockerfile` connector stage: run LC-58 on `src/utils.ts` (build fails on refusal) → `npm ci` (upstream ships a
       lockfile now) → `npm run build` → **`npm test`** (fails the build) → prune. Comment: the expected
       `EBADENGINE` warnings and why (Q1 = A).
-- [ ] Runtime stage: `COPY` the connector's `LICENSE` to `/opt/spotify-mcp/LICENSE` and the root `LICENSE` to
+- [x] Runtime stage: `COPY` the connector's `LICENSE` to `/opt/spotify-mcp/LICENSE` and the root `LICENSE` to
       `/app/LICENSE`; a `RUN` check that both exist and are non-empty (BR-73.3); OCI labels (`licenses`, `source`;
       `revision`, `version` and base digest via build args, defaulted for local builds).
-- [ ] `.mcp-server` for host and CI (`npm run mcp:setup`, CI's PBT-66 fetch) follows the compose pin already; checked,
+- [x] `.mcp-server` for host and CI (`npm run mcp:setup`, CI's PBT-66 fetch) follows the compose pin already; checked,
       not assumed.
 
 ### Step 3 — Credentials directory *(BR-69.4, BR-69.5, P-67, LC-60, IN-U9-1)*

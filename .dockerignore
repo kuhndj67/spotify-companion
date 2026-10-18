@@ -12,8 +12,13 @@ dist
 # ⚠️ The irreplaceable artefact. It is bind-mounted at runtime, never copied in.
 data
 
-# Mounted at runtime (compose.yaml), never built in. The repository is public.
+# Mounted at runtime (compose.yaml), never built in. U9 (BR-69.8, NFR-28): an image may now be PUBLISHED, so
+# nothing a user owns -- credentials, rules, the automation switch, a verification copy -- may enter the context.
 secrets
+config
+state
+verify-install
+.mcp-server
 
 aidlc-docs
 test

@@ -9,12 +9,14 @@ services:
     build:
       context: .
       args:
-        # Pinned 2026-08-25, closing risk R7. Upstream declares no license and no release tags,
-        # so `main` can move underneath you and silently change the getNowPlaying output the
-        # parser depends on. Pinning also makes the CI Docker-build job a real drift detector:
-        # against `main` a failure was ambiguous, against a SHA it is unambiguously ours.
-        #   7b5fde63 (2026-08-21) "fix: add offset param to getMyPlaylists (#72)"
-        MCP_SERVER_REF: 7b5fde6309a52a7874768c63deda7880ee85935b
+        # Pinned since 2026-08-25, closing risk R7: upstream has no release tags, so `main` can move underneath you
+        # and silently change the getNowPlaying output the parser depends on. Pinning also makes the CI Docker-build
+        # job a real drift detector: against a SHA a failure is unambiguously ours.
+        # U9 (FR-73, NFR-40): moved 2026-10-18 from 7b5fde63 (unlicensed) to the MIT-licensed commit below. Moving it
+        # again is deliberate work that repeats U9's acceptance (BR-70); Dependabot never moves it. This is the ONE
+        # pin: CI's PBT-66 fetch and `npm run mcp:setup` both read it from here.
+        #   6065ce5c (2026-10-16) "Add MIT license"
+        MCP_SERVER_REF: 6065ce5cdef13ffeb43042e295bb788ce7ad00df
     # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
     image: spotify-now-playing:1.0.0-beta.2

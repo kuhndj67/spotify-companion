@@ -1,7 +1,7 @@
 # Code Generation Plan — U9: Connector Upgrade & Publishable Image
 
 **Date**: 2026-10-18 · **Stage**: CONSTRUCTION — Code Generation (Part 1: Planning), Unit U9
-**Status**: ✅ **APPROVED 2026-10-18** · ✅ **Steps 1–12 DONE 2026-10-18** (1701 tests; nothing deployed) · ▶ Step 13 next · (Q1 = A: branch `u9-connector-upgrade`, standard PR flow · Q2 = A: the acceptance test checks shape, the release refuses). Step 13 (public-readiness review) added at the owner's request.
+**Status**: ✅ **APPROVED 2026-10-18** · ✅ **ALL 13 STEPS DONE 2026-10-18** (1701 tests; nothing deployed; public readiness: not yet, owner decisions) · (Q1 = A: branch `u9-connector-upgrade`, standard PR flow · Q2 = A: the acceptance test checks shape, the release refuses). Step 13 (public-readiness review) added at the owner's request.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield. *Generate* means modify existing files
 where they exist, never duplicate them.
 
@@ -172,20 +172,20 @@ split.
       rollback rehearsal, live crossing, tag push, token probe, walk).
 - [x] `HANDOFF.md`, `aidlc-state.md`, `audit.md`.
 
-### Step 13 — Public-readiness review *(W-14; owner request 2026-10-18)*
+### Step 13 — Public-readiness review *(W-14; owner request 2026-10-18)* — ✅ DONE · **verdict: NOT READY YET**, the disclosure choices are the owner's · secrets clean (gitleaks 8.30.1, 203 commits, positive control found) · listening history measured against the owner's own snapshot (copied, `data/` untouched): 7 raw probe files with timestamps, 25 design files, fixtures · [`public-readiness-review.md`](../u9-connector-upgrade/code/public-readiness-review.md)
 
 The owner plans to make the repository public. This step **reviews and reports**; it changes no visibility. Going
 public is the owner's exposure decision, made outside the unit (W-14).
 
-- [ ] Re-run the **full-history secret scan** (gitleaks, the U8 pattern) on the branch tip; record the result.
-- [ ] **Disclosure inventory** (W-14 item 2): where `aidlc-docs/`, tests and fixtures quote listening history (track
+- [x] Re-run the **full-history secret scan** (gitleaks, the U8 pattern) on the branch tip; record the result.
+- [x] **Disclosure inventory** (W-14 item 2): where `aidlc-docs/`, tests and fixtures quote listening history (track
       and artist names with dates), the NAS's LAN address, personal email addresses and account names. Counted and
       listed per file, with the options *accept · redact going forward · rewrite history* for each class.
-- [ ] **Licence and image readiness**: NFR-32's block is discharged once U9's acceptance passes (the image is MIT +
+- [x] **Licence and image readiness**: NFR-32's block is discharged once U9's acceptance passes (the image is MIT +
       GPL-clean); note what changes on going public (the GHCR package can be made public; FR-74's *private while the
       repository is* follows; GPL source availability is then met by the public repository).
-- [ ] **After-going-public checklist** from W-14: private vulnerability reporting, `SECURITY.md`, ruleset review.
-- [ ] Record: `construction/u9-connector-upgrade/code/public-readiness-review.md`, ending in a plain **ready / not
+- [x] **After-going-public checklist** from W-14: private vulnerability reporting, `SECURITY.md`, ruleset review.
+- [x] Record: `construction/u9-connector-upgrade/code/public-readiness-review.md`, ending in a plain **ready / not
       ready, because …**, and tell the owner.
 
 ---

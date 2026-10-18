@@ -2,9 +2,16 @@
 
 **The single entry point for U9.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-18) — ✅ FD, NFR and Infrastructure Design APPROVED; Code Generation plan AWAITING APPROVAL
+## ▶ Current state (2026-10-18) — ✅ Code Generation COMPLETE (13 steps), awaiting approval → Build & Test
 
-[`u9-code-generation-plan.md`](../plans/u9-code-generation-plan.md): 12 steps, 2 questions (branch; the IN-U9-3 test conflict).
+Read [`code/code-summary.md`](code/code-summary.md): files, deviations, controls seen to fail, and the **ordered list
+owed to Build & Test** (version bump → acceptance on `:3011` → startup check → rehearsed crossing and rollback → live
+crossing → first tag push → token probe and walk). Branch `u9-connector-upgrade`, **draft PR #3**, CI green. ⚠️
+**Nothing deployed**: live is still `spotify-now-playing` on `1.0.0-beta.2` at the old pin. Public readiness:
+[`code/public-readiness-review.md`](code/public-readiness-review.md), **not yet** (owner's disclosure choices).
+
+### Earlier (2026-10-18) — Code Generation plan
+[`u9-code-generation-plan.md`](../plans/u9-code-generation-plan.md): approved (Q1 = A branch + PR flow, Q2 = A).
 
 ### Earlier (2026-10-18) — Infrastructure Design
 

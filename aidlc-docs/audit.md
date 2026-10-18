@@ -8709,3 +8709,26 @@ The live container stayed healthy. The owner was told to close the tab without a
 
 Lesson, applied for the rest of the unit: scripts are checked with `node --check` or run only inside throwaway
 containers with fake inputs (the in-container sign-in probe used `FAKE-CONTROL-*` credentials).
+
+---
+
+## 2026-10-18T22:30:00Z — U9 Code Generation COMPLETE (13 steps); public readiness: not yet
+
+All 13 steps done on branch `u9-connector-upgrade` (draft PR #3; each step its own commit, pushed, CI green):
+guarded patch · MIT pin with upstream's suite in the build (113/113, Node 22.23) · credentials as a directory mount ·
+start-and-say-so check · rename-based `CredentialsWriter` (mode kept) · one name `spotify-companion` with structural
+guards · release guards (acceptance, crossing) + `verify:up --candidate/--poll-ms` · CI `publish` job with image
+checks and report-only Trivy · App-only `setup`/`auth` + `compose.app.yaml` · documents · positive controls ·
+summary. `npm run verify` **1701 tests** green.
+
+**Found and fixed on the way** (recorded at their steps): CI had been building upstream `main`, not the pin;
+`mcp:setup` cloned `main`; `verify:up` could not run an acceptance before a release; a rename would have widened a
+`600` credentials file. Two of my own test bugs (a vacuous success check; quoting slips) and two invalid first
+attempts at build controls were caught and redone with the failure *reason* asserted.
+
+**Public readiness (step 13, owner's request)**: secrets clean (gitleaks 8.30.1, 203 commits, positive control
+found); **not ready** until the owner chooses, per class, accept / redact / rewrite history / fresh repository for:
+7 raw timestamped listening-probe files, 73 track/artist names across 25 design files, fixture artist names, the
+personal gmail address, NAS address and names. Record: `construction/u9-connector-upgrade/code/public-readiness-review.md`.
+
+Nothing deployed or released. Awaiting the owner's approval of Code Generation → Build & Test.

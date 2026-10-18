@@ -615,8 +615,8 @@ NAS, or a mistake — without re-arming anything or exposing my credentials.
 - [ ] I can undo the most recent restore once
 - [ ] Nothing accumulates on disk from backing up or restoring, beyond the one previous history
 - [ ] ⚠️ Performed for real: a corpus backed up from the live app and restored into a second installation, and
-      the restored app runs — **on this machine in U6, and across machines (the NAS) in U9** (split 2026-10-07,
-      because off-machine browsers are refused until U9)
+      the restored app runs — **on this machine in U6, and across machines (the NAS) in U10** (split 2026-10-07,
+      because off-machine browsers are refused until U10; "U9" before 2026-10-18)
 
 *Covers FR-57–FR-64 · Persona P3*
 
@@ -679,6 +679,22 @@ request, **so that** what reaches `main` has been judged by CI rather than by tr
 
 ---
 
+### US-32 — Run the app from a published image, without the source ⬜
+**As** the Listener, **I want** to install the app from a published image, without the source or a build
+toolchain, **so that** running it does not require me to be a developer, and my credentials stay on my machine.
+
+**Acceptance criteria**
+- [ ] With only Docker and a read token, the image sets up my folder and runs the Spotify sign-in; I never need
+      Node or the source
+- [ ] My credentials live only in my folder, never in the image or the registry
+- [ ] Each step tells me what I should see, and the install ends with the app recording a play
+- [ ] The image tells me its licences: GPL-3.0 for the app, MIT for the bundled connector
+
+*Covers FR-74, FR-75 · Persona P1 · Source: U9 FD Q9 = A (2026-10-18). FR-73 (the connector move) is maintenance
+and has no story*
+
+---
+
 ## INVEST Validation
 
 | Criterion | Finding |
@@ -716,6 +732,7 @@ request, **so that** what reaches `main` has been judged by CI rather than by tr
 | | | FR-66–72 | US-29 |
 | | | FR-65 | US-30 |
 | | | NFR-28, 30–33 | US-31 |
+| | | FR-74, 75 | US-32 |
 
 **All in-scope functional requirements are covered.** FR-55 was withdrawn on 2026-08-25 and moved
 to the wishlist (§5.1, W-1); US-27 is retained as a **deferred** story documenting why, and is

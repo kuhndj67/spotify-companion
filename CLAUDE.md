@@ -68,8 +68,11 @@ Credentials are in `secrets/spotify-config.json` (gitignored). Probe scripts fol
 - `main` is protected: changes arrive by **pull request** with every check green: **Typecheck, test, smoke, knip,
   build** · **Container image builds** · **Secret scan**. The ruleset is code: `.github/rulesets/main.json`, applied
   by `npm run protect`, and cross-checked against `ci.yml` by a test.
-- ⚠️ **The owner may push directly** (ruleset bypass, stated in CONTRIBUTING.md). An agent working for the owner
-  commits to `main` only when the owner asks, and pushes only when asked.
+- **Standard multi-developer flow** (owner, 2026-10-18): all work happens on a **branch** (one per unit or fix, e.g.
+  `u9-connector-upgrade`), committed in reviewable steps, pushed, and merged to `main` only by **pull request** with
+  every check green. The **owner merges**. An agent never commits to `main` directly.
+- ⚠️ **The owner may push directly** (ruleset bypass, stated in CONTRIBUTING.md). Releases, tag pushes and anything
+  touching the live deployment still wait for the owner's go-ahead.
 - Commit messages end with the attribution line the session specifies.
 - **Versions**: SemVer, `package.json` is the one source (`src/version.ts` is its one reader; the compose image tags
   are checked copies). Releases go through `npm run release`. An image tag is never overwritten.

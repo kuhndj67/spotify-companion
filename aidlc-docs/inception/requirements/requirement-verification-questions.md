@@ -725,7 +725,9 @@ none of them is needed for the container, and each widens what the app exposes
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **X** (owner, 2026-10-18, question prompt): *"The only real change the mcp update needs is to move to the new version with the GPL allowing redistribution (insuring that any changes to the library are accounted for on our end)."*
+
+*Recorded reading*: scope is **the pin move only**; none of upstream's new features (B is rejected). "Accounted for on our end" is A's acceptance criteria: each upstream change that reaches this app (atomic config write, MCP v2, output format) is probed on `:3011` and adapted to, including the directory-mount fallback if the atomic write breaks the single-file mount. ⚠️ Licence note: upstream's new licence is **MIT** (`6065ce5c`), not GPL. MIT is what permits redistribution; GPL-3.0 is this app's own licence (NFR-32), and MIT's notice must ship in the image.
 
 ---
 
@@ -748,7 +750,7 @@ decided in U9, which is the first consumer
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-18, question prompt: *"A: GHCR on release tag (Recommended)"*).
 
 ---
 
@@ -762,4 +764,4 @@ a second codebase to maintain
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-18, question prompt: *"A: keep pinning (Recommended)"*).

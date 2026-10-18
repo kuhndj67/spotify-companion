@@ -346,4 +346,4 @@ match the build order
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-18, question prompt: *"A: new U9, renumber (Recommended)"*). **U9 — Connector Upgrade & Publishable Image** is built next; Off-machine Deployment **U9 → U10**, Team Operations **U10 → U11**. Questions 1–6 above keep the numbers they were asked with.

@@ -1077,6 +1077,29 @@ exists to break.**
 
 ---
 
+#### W-16 — The history export leaks an `error` listener per backpressure wait
+
+**Raised 2026-10-18** during U9's Build & Test. ⚠️ **Logged, not built** (owner: *"log it"*). A **fix** when taken up
+(its own branch and PR), not a feature.
+
+**Seen**: the live app logged `MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error
+listeners added to [ServerResponse]` four times, at exactly the moments a full `/api/history/export?format=json` was
+requested (18:35–18:36Z). Not Spotify, not the network: Node's warning about event handlers on one HTTP response.
+
+**Cause** (read, `src/export/ExportService.ts` `writeTo`): when `target.write()` returns `false` the code waits with
+`target.once('drain', resolve)` **and** `target.once('error', reject)`; when `drain` fires, the `error` listener is
+never removed. A large export hits backpressure more than 10 times on one response, so stale listeners accumulate.
+
+**Impact**: small. The listeners are released when the response ends, so memory does not grow across requests, and
+the export completes correctly. It gets noisier as history grows, and the same `writeTo` serves the snapshot
+scheduler's file stream.
+
+**Fix**: remove the `error` listener when `drain` fires (and `drain` when `error` fires), e.g. `events.once` with
+both, or `stream/promises`. Test: an export into a deliberately slow consumer leaves **zero** `error` listeners on the
+target, and an error mid-export still rejects (positive control).
+
+---
+
 #### W-15 — Move the MCP server pin to the MIT-licensed commit
 
 ✅ **Promoted 2026-10-18 to unit U9** as **FR-73…75** and **NFR-40** (Requirements Questions 26–28). Kept below as the record of why.

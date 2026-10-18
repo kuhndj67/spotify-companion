@@ -54,7 +54,7 @@ const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB = process.env.HISTORY_DB_PATH ?? join(projectRoot, 'data', 'history.db');
 const CACHE = process.env.ARTIST_CREDITS_PATH ?? join(projectRoot, 'data', 'artist-credits.json');
 const CONFIG =
-  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'spotify-config.json');
+  process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'app', 'spotify-config.json');
 const ALL = process.argv.includes('--all');
 
 /** Spacing between requests. Generous: this is a one-off and the rate limit is shared with the app. */

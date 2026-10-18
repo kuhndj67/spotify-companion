@@ -64,11 +64,11 @@ export function credentialsDirectoryMessage(cls: CredentialsDirectoryClass, dire
     case 'ok':
       return null;
     case 'single-file':
-      return `Credentials are mounted as single files, which cannot take a token refresh: mount ./secrets as a directory at ${directory} (${UPGRADING}).`;
+      return `Credentials are mounted as single files, which cannot take a token refresh: mount ./secrets/app as a directory at ${directory} (${UPGRADING}).`;
     case 'not-mounted':
-      return `Credentials directory ${directory} is not mounted: mount ./secrets there (${UPGRADING}).`;
+      return `Credentials directory ${directory} is not mounted: mount ./secrets/app there (${UPGRADING}).`;
     case 'not-writable':
-      return `Credentials directory ${directory} is read-only, so a token refresh cannot be saved: mount ./secrets read-write.`;
+      return `Credentials directory ${directory} is read-only, so a token refresh cannot be saved: mount ./secrets/app read-write.`;
   }
 }
 

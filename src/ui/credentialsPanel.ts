@@ -39,7 +39,7 @@ export function spotifySectionView(v: SpotifyCredentialsView): SpotifySectionVie
       'Each person uses their own Spotify app — create one at developer.spotify.com (Dashboard → Create app).',
       'In the app’s settings, add the redirect URI http://127.0.0.1:8888/callback, and copy the Client ID and Client secret.',
       'Spotify apps start in Development Mode: only the accounts you add under User Management can use it.',
-      'The refresh token needs a browser sign-in: on a computer with a browser, run “npm run auth” in this project. It writes secrets/spotify-config.json.',
+      'The refresh token needs a browser sign-in: on a computer with a browser, run “npm run auth” in this project. It writes secrets/app/spotify-config.json.',
       'Upload that file here with “Fill from spotify-config.json…” — it fills all four fields — then Save.',
     ],
   };

@@ -156,7 +156,32 @@ nothing on its own: GHCR checks the permission at the pull. The fine-grained tok
 MIT 1070 B), no user data, and the `revision` label is **`d8f2ce4`** = the commit tagged `v1.0.0-beta.4`. What is in the
 registry is what was released. README *App only* now names the classic token and its one scope.
 
+## 10. Live token refresh through the new mount — ✅
+
+At **20:24:34Z** the live connector refreshed the token and wrote `secrets/spotify-config.json` by temp + rename through
+the directory mount (the write that is `EBUSY` on the old single-file mount). No temp file left; Spotify, MCP and the
+credentials directory `ok`. The last live check of FR-73.
+
+## 11. ⚠️ Found live: the directory mount exposed other credentials → `1.0.0-beta.5`
+
+The same listing showed that `secrets/` also holds **`metabase.json`** (the owner's Metabase reporting credentials).
+Mounting the whole folder (FD Q3 = A) made it readable by the app container, which never needs it; the design had
+considered only the harmless `*.example.json` templates. A **least-privilege regression**, surfaced to the owner as a
+security-posture decision. Owner (question prompt): **"Separate subfolder (Recommended)"**.
+
+**Fix**, as `1.0.0-beta.5` (BR-69.4 amended): the host's **`secrets/app/`** holds the app's two files and is the only
+thing mounted (container path still `/app/secrets`); templates and other credentials stay in `secrets/`. Every host
+path moved (`npm run auth`, `mcp:setup`, the probes, `verify:up`, INSTALL S4/S5/S7, README *App only*, `setup`).
+`npm run release` now **refuses** (`credentials-not-in-place`) until `secrets/app/musicbrainz.json` exists, naming the
+move when the files are still in `secrets/` (property-tested with its positive control): without it the app would
+start with no MusicBrainz contact, refuse to run, and restart in a loop. INSTALL's upgrade note gives the move for both
+platforms. **Seen in a real container** (verification install, candidate image): `/app/secrets` holds only the app's
+file; credentials directory `ok`; `verify:down` proved live unchanged.
+
+**Live crossing for beta.5** (owner's go-ahead after merge): `docker compose down` → move the two files → `npm run
+release -- --apply` (≈ 2–3 min without polling) → tag push → publish.
+
 ## Still to do (in order)
 
-9. Live token refresh through the new mount (≈ 20:24Z).
-10. Walk guide → agent walk of README *App only* on Machine 1 (the classic token).
+10. Release `1.0.0-beta.5` (move the files first) and publish it.
+11. Agent walk of README *App only* on Machine 1 (the classic token), on `1.0.0-beta.5`.

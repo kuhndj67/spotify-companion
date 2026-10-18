@@ -25,8 +25,8 @@ import { isLoopbackHostHeader } from './lib/loopbackHost.mjs';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 // U9 (BR-74.3): the image's `auth` command points this at the user's folder (/work/secrets/…). On the host the
-// default is unchanged: secrets/spotify-config.json.
-const configPath = process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'spotify-config.json');
+// default is secrets/app/spotify-config.json (U9: only secrets/app/ is mounted into the container).
+const configPath = process.env.SPOTIFY_CONFIG_PATH ?? join(projectRoot, 'secrets', 'app', 'spotify-config.json');
 const secretsDir = dirname(configPath);
 // U9: inside the container the listener must bind all interfaces to receive the published port; the documented
 // `-p 127.0.0.1:8888:8888` keeps it on the host, and the Host check below refuses anything else regardless.

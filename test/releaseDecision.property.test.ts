@@ -33,6 +33,8 @@ const ok = (over: Partial<ReleaseFacts> & { candidate: string }): ReleaseFacts =
   previousPin: PIN_A,
   acceptedPins: [],
   oldContainerRunning: false,
+  appCredentialsPresent: true,
+  oldCredentialsPresent: false,
   ...over,
 });
 
@@ -114,6 +116,8 @@ describe('PBT-70 — an existing image tag or git tag refuses, whatever else is 
           previousPin,
           acceptedPins,
           oldContainerRunning,
+          appCredentialsPresent: true,
+          oldCredentialsPresent: false,
         });
         assert.equal(d.accept, false);
       }),
@@ -186,3 +190,22 @@ describe('PBT-77 — the crossing guard: refuses while the pre-U9 container runs
     );
   });
 });
+
+describe('1.0.0-beta.5 — the credentials must be in secrets/app/ before a deploy', () => {
+  it('refuses when secrets/app/musicbrainz.json is missing, naming the move when the files are still in secrets/', () => {
+    fc.assert(
+      fc.property(fc.boolean(), (old) => {
+        const d = decide(ok({ candidate: '1.0.0', appCredentialsPresent: false, oldCredentialsPresent: old }));
+        assert.ok(!d.accept && d.reason === 'credentials-not-in-place');
+        if (!d.accept) assert.equal(/move secrets\/spotify-config\.json/.test(d.detail), old);
+      }),
+    );
+  });
+
+  it('⭐ positive control: with the files in secrets/app/ (leftovers in secrets/ or not), the release is accepted', () => {
+    for (const old of [false, true]) {
+      assert.equal(decide(ok({ candidate: '1.0.0', appCredentialsPresent: true, oldCredentialsPresent: old })).accept, true);
+    }
+  });
+});
+

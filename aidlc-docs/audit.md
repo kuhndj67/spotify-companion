@@ -78,3 +78,20 @@ the previous message laid out step by step.)
 - Also: backlog **W-16** (the export's leaked `error` listener, seen as `MaxListenersExceededWarning`).
 
 Next: the owner's tag push (publishes the image), then the token probe and the App-only walk.
+
+---
+
+## 2026-10-18T21:00:00Z — U9: published, verified; live refresh ✅; least-privilege regression found → secrets/app/ (1.0.0-beta.5)
+
+- **1.0.0-beta.3** tag run: `publish` failed at its first step (the decision container mounted `scripts/lib` over
+  `/lib`, Debian's system library folder); nothing published. Reproduced, fixed, guarded by a structural test; the rest
+  of the job (incl. Trivy) exercised on Linux first; shipped as **1.0.0-beta.4** (owner merged PR #6), released and
+  **published** (first full publish run).
+- **Token probe** (owner, own terminal): fine-grained token → `403` on pull; classic `read:packages` → pulls. The
+  pulled image passed the image checks; its `revision` label = the released commit `d8f2ce4`. README names the classic
+  token. Walk guide written (Machine 1). Owner merged PR #7.
+- **Live token refresh** through the directory mount at 20:24:34Z ✅.
+- ⚠️ **Found**: `secrets/` also holds `metabase.json`, which the whole-folder mount exposed to the app container.
+  Surfaced as a security-posture decision; owner chose **"Separate subfolder (Recommended)"**. BR-69.4 amended; built as
+  **1.0.0-beta.5** on branch `u9-secrets-subfolder` (all host paths → `secrets/app/`; release guard
+  `credentials-not-in-place`; INSTALL upgrade note). The App-only walk waits for it.

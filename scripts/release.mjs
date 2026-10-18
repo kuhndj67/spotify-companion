@@ -18,7 +18,7 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isSemVer, readAppVersion } from '../src/version.js';
 import { compareSemVer, decide } from './lib/releaseDecision.js';
 import { acceptedPins, parseAcceptance, pinFromCompose } from './lib/connectorAcceptance.js';
@@ -85,6 +85,10 @@ if (!acceptance.ok) {
 const old = run('docker', ['ps', '--filter', 'name=^spotify-now-playing$', '--filter', 'status=running', '--format', '{{.Names}}']);
 const oldContainerRunning = old.ok ? lines(old.out).length > 0 : null;
 
+// 1.0.0-beta.5: where the credentials are (only secrets/app/ is mounted).
+const appCredentialsPresent = existsSync(join(root, 'secrets', 'app', 'musicbrainz.json'));
+const oldCredentialsPresent = ['spotify-config.json', 'musicbrainz.json'].some((f) => existsSync(join(root, 'secrets', f)));
+
 const facts = {
   candidate,
   gitTags: lines(git.out),
@@ -94,6 +98,8 @@ const facts = {
   previousPin,
   acceptedPins: acceptedPins(acceptance.entries),
   oldContainerRunning,
+  appCredentialsPresent,
+  oldCredentialsPresent,
 };
 
 console.log(`Candidate: ${candidate} (package.json)`);

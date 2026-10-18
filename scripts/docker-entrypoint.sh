@@ -45,7 +45,7 @@ case "${1:-}" in
     if [ "$command" = setup ]; then
       set -- node /app/dist/appOnly/setupCli.js
     else
-      export SPOTIFY_CONFIG_PATH=/work/secrets/spotify-config.json AUTH_BIND_HOST=0.0.0.0 AUTH_NO_BROWSER=1
+      export SPOTIFY_CONFIG_PATH=/work/secrets/app/spotify-config.json AUTH_BIND_HOST=0.0.0.0 AUTH_NO_BROWSER=1
       set -- node /app/scripts/auth.mjs
     fi
     owner_uid="$(stat -c %u /work)"

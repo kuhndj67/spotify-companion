@@ -39,6 +39,10 @@ export interface ReleaseFacts {
   readonly acceptedPins: readonly string[];
   /** Is a container named `spotify-now-playing` running? `null`: Docker could not be asked. */
   readonly oldContainerRunning: boolean | null;
+  /** Does `secrets/app/musicbrainz.json` exist? Without it the app refuses to start (NFR-14). */
+  readonly appCredentialsPresent: boolean;
+  /** Is either credential file still at the pre-1.0.0-beta.5 place, directly in `secrets/`? */
+  readonly oldCredentialsPresent: boolean;
 }
 
 export type RefusalReason =
@@ -50,7 +54,8 @@ export type RefusalReason =
   | 'git-tag-exists'
   | 'not-greater'
   | 'pin-not-accepted'
-  | 'old-container-running';
+  | 'old-container-running'
+  | 'credentials-not-in-place';
 
 export type ReleaseDecision =
   | { readonly accept: true; readonly gitTag: string; readonly imageTag: string; readonly previous: string | null }
@@ -119,6 +124,17 @@ export function decide(f: ReleaseFacts): ReleaseDecision {
       'pin-not-accepted',
       `the connector pin moved (${f.previousPin.slice(0, 8)} → ${f.pin.slice(0, 8)}) and has no "pass" in ` +
         'scripts/connector-acceptance.json: run the acceptance on the verification install first (BR-70)',
+    );
+  }
+  // 1.0.0-beta.5: only secrets/app/ is mounted. Deploying before the files move would start an app with no
+  // MusicBrainz contact, which refuses to start (NFR-14) and restarts in a loop.
+  if (!f.appCredentialsPresent) {
+    return refuse(
+      'credentials-not-in-place',
+      f.oldCredentialsPresent
+        ? 'the credentials are still directly in secrets/: move secrets/spotify-config.json and secrets/musicbrainz.json ' +
+            'into secrets/app/ first (docs/INSTALL.md, Updating)'
+        : 'secrets/app/musicbrainz.json is missing: the app would refuse to start (docs/INSTALL.md S5)',
     );
   }
   if (f.oldContainerRunning !== false) {

@@ -217,7 +217,7 @@ app says so (*"Spotify no longer returns artist genres in Development Mode"*). T
 
 ## S4 — Sign in to Spotify
 
-**Purpose**: give the app a long-lived Spotify sign-in, stored in `secrets/spotify-config.json` on your machine
+**Purpose**: give the app a long-lived Spotify sign-in, stored in `secrets/app/spotify-config.json` on your machine
 only (the file is gitignored).
 
 **Commands**
@@ -226,19 +226,21 @@ only (the file is gitignored).
 
    ```powershell
    # Windows
-   Copy-Item secrets\spotify-config.example.json secrets\spotify-config.json
+   New-Item -ItemType Directory -Force secrets\app | Out-Null
+   Copy-Item secrets\spotify-config.example.json secrets\app\spotify-config.json
    ```
 
    ```bash
    # Linux
-   cp secrets/spotify-config.example.json secrets/spotify-config.json
+   mkdir -p secrets/app
+   cp secrets/spotify-config.example.json secrets/app/spotify-config.json
    ```
 
 2. Put the two values from S3 into it:
 
    > 👤 **YOU DO THIS** — S4 values · needs: a text editor, and the Client ID and secret from S3
    >
-   > 1. Open `secrets\spotify-config.json` in the `spotify-companion` folder, in any text editor (Notepad is fine).
+   > 1. Open `secrets\app\spotify-config.json` in the `spotify-companion` folder, in any text editor (Notepad is fine).
    > 2. Replace `your-spotify-client-id` with your Client ID, and `your-spotify-client-secret` with your Client
    >    secret. Keep the quotes. Leave `redirectUri` as it is. Save.
    >
@@ -268,13 +270,13 @@ only (the file is gitignored).
 **Expected** (in the terminal, after approving):
 
 ```
-✓ Using existing credentials from secrets/spotify-config.json
+✓ Using existing credentials from secrets/app/spotify-config.json
 ...
-✓ Tokens written to secrets/spotify-config.json (gitignored)
+✓ Tokens written to secrets/app/spotify-config.json
 ✓ Scopes granted include user-follow-read
 ```
 
-`secrets/spotify-config.json` now also contains `accessToken`, `refreshToken` and `expiresAt`. An npm notice about a
+`secrets/app/spotify-config.json` now also contains `accessToken`, `refreshToken` and `expiresAt`. An npm notice about a
 new npm version may appear too. It is harmless.
 
 **If it differs**
@@ -300,19 +302,19 @@ operator. **The app refuses to start without this file**, so it is created befor
 
    ```powershell
    # Windows
-   Copy-Item secrets\musicbrainz.example.json secrets\musicbrainz.json
+   Copy-Item secrets\musicbrainz.example.json secrets\app\musicbrainz.json
    ```
 
    ```bash
    # Linux
-   cp secrets/musicbrainz.example.json secrets/musicbrainz.json
+   cp secrets/musicbrainz.example.json secrets/app/musicbrainz.json
    ```
 
 2. Put your contact in:
 
    > 👤 **YOU DO THIS** — S5 contact · needs: a text editor
    >
-   > 1. Open `secrets\musicbrainz.json` in the `spotify-companion` folder.
+   > 1. Open `secrets\app\musicbrainz.json` in the `spotify-companion` folder.
    > 2. Replace `you@example.com` with **your own** email address, or another way to reach you such as a URL. Keep
    >    the quotes. Leave the other fields as they are. Save.
    >
@@ -323,15 +325,15 @@ operator. **The app refuses to start without this file**, so it is created befor
 
    ```powershell
    # Windows
-   (Get-Content secrets\musicbrainz.json -Raw | ConvertFrom-Json).contact -notin @('', 'you@example.com')
+   (Get-Content secrets\app\musicbrainz.json -Raw | ConvertFrom-Json).contact -notin @('', 'you@example.com')
    ```
 
    ```bash
    # Linux
-   grep -q '"contact": "you@example.com"' secrets/musicbrainz.json && echo False || echo True
+   grep -q '"contact": "you@example.com"' secrets/app/musicbrainz.json && echo False || echo True
    ```
 
-**Expected**: the check prints `True`: `secrets/musicbrainz.json` exists, and its `"contact"` is set and no longer
+**Expected**: the check prints `True`: `secrets/app/musicbrainz.json` exists, and its `"contact"` is set and no longer
 `you@example.com`.
 
 **If it differs**: it prints `False`, so do the *S5 contact* box again. If the copy fails with *cannot find path*, you are not in the `spotify-companion` folder (S2).
@@ -376,8 +378,8 @@ Test-Path data, state
 
 - `config/rules.json already exists — leaving it alone.`: it was created before. That is fine.
 - *Linux*: `id -u` prints something other than `1000`. The app inside the container runs as user id 1000 and must
-  be able to write `config`, `state` and `secrets/musicbrainz.json`. Run
-  `sudo chown -R 1000:1000 config state secrets/musicbrainz.json`. *(Not yet walked; to be confirmed on Linux.)*
+  be able to write `config`, `state` and `secrets/app`. Run
+  `sudo chown -R 1000:1000 config state secrets/app`. *(Not yet walked; to be confirmed on Linux.)*
 
 ---
 
@@ -394,12 +396,12 @@ creates a **folder** in its place:
 
 ```powershell
 # Windows
-Get-Item secrets\spotify-config.json, secrets\musicbrainz.json | Select-Object Name, Mode
+Get-Item secrets\app\spotify-config.json, secrets\app\musicbrainz.json | Select-Object Name, Mode
 ```
 
 ```bash
 # Linux
-ls -ld secrets/spotify-config.json secrets/musicbrainz.json
+ls -ld secrets/app/spotify-config.json secrets/app/musicbrainz.json
 ```
 
 Then build and start. The first build takes a few minutes:
@@ -424,7 +426,7 @@ docker inspect -f "{{.State.Health.Status}}" spotify-companion
 
 **If it differs**
 
-- A secret shows as a **folder** (`d`): delete that folder (`Remove-Item -Recurse secrets\<name>` /
+- A secret shows as a **folder** (`d`): delete that folder (`Remove-Item -Recurse secrets\app\<name>` /
   `rm -r secrets/<name>`), redo S4 or S5 to create the file, run `docker compose down`, then repeat this step.
 - `docker inspect` prints `starting`: wait 30 seconds and run it again.
 - It prints `unhealthy`, or the container keeps restarting: run `docker logs spotify-companion`. A line naming
@@ -562,13 +564,30 @@ start armed.
   is running.
 - **Update to a newer release**: `git fetch --tags`, then `git checkout <new tag>`, then `docker compose up -d --build`.
   Take **Settings → Create backup** first.
-- **Upgrading from `1.0.0-beta.2` or earlier** (once): the container was renamed from `spotify-now-playing` to
-  `spotify-companion`, and the credentials are now mounted as the `secrets` folder. Your files stay where they are.
+- **Upgrading from `1.0.0-beta.4` or earlier** (once): since `1.0.0-beta.5` the two credential files live in
+  **`secrets/app/`**, and only that folder is mounted into the container (so other tools' credentials in `secrets/`
+  stay out of it). And from `1.0.0-beta.2` or earlier, the container was also renamed from `spotify-now-playing` to
+  `spotify-companion`.
   1. **Settings → Create backup**.
   2. `docker compose down` **before** you check out the new tag. The old `compose.yaml` is the only one that knows
      the old container; once you have the new one, `down` leaves the old container running beside the new one, and
      both would record into `data/`.
-  3. `git fetch --tags`, `git checkout <new tag>`, `docker compose up -d --build`.
+  3. Move the two files:
+
+     Windows (PowerShell):
+     ```powershell
+     New-Item -ItemType Directory -Force secrets\app | Out-Null
+     Move-Item secrets\spotify-config.json, secrets\musicbrainz.json secrets\app\
+     ```
+
+     Linux:
+     ```bash
+     mkdir -p secrets/app && mv secrets/spotify-config.json secrets/musicbrainz.json secrets/app/
+     ```
+  4. `git fetch --tags`, `git checkout <new tag>`, `docker compose up -d --build`.
+
+  **If the app will not start after the update** (`docker logs spotify-companion` says the MusicBrainz contact is
+  missing), step 3 was skipped: do it, then `docker compose up -d`.
 
   **If you already checked out the new tag**: run `docker stop spotify-now-playing`, then `docker rm
   spotify-now-playing`, then `docker compose up -d`. **If the Spotify indicator says the credentials are mounted as

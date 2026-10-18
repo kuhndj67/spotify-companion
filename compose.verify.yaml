@@ -20,7 +20,7 @@ services:
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
     # U9: `npm run verify:up -- --candidate` sets VERIFY_IMAGE to an image built from the working tree
     # (`spotify-companion:candidate`, never a version tag), so a change can be accepted here BEFORE it is released.
-    image: ${VERIFY_IMAGE:-spotify-companion:1.0.0-beta.4}
+    image: ${VERIFY_IMAGE:-spotify-companion:1.0.0-beta.5}
     container_name: spotify-companion-verify
     ports:
       - "127.0.0.1:3011:3000"
@@ -46,7 +46,7 @@ services:
       # ⚠️ A PLACEHOLDER copied from secrets/spotify-config.example.json — NEVER the live file. If Spotify
       # rotates refresh tokens, a second container refreshing a copy of the live token could invalidate it.
       # U9 (IN-U9-1): the secrets DIRECTORY, like live, so the rename-based writes are exercised as they run live.
-      - ./verify-install/secrets:/app/secrets:rw
+      - ./verify-install/secrets/app:/app/secrets:rw
       - ./verify-install/data:/data:rw
       # U7 (IN-U7-1): :rw like the live mount, so the exit test exercises the real mode — rules upload, undo, restore.
       - ./verify-install/config:/config:rw

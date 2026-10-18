@@ -162,7 +162,7 @@ export class CredentialsWriter {
           expiresAt: 0,
           replacedAt: new Date(this.#deps.now()).toISOString(),
         };
-        // U9 (BR-69.6): temp + rename in the ./secrets DIRECTORY mount (was in place, for a single-file mount). A
+        // U9 (BR-69.6): temp + rename in the ./secrets/app DIRECTORY mount (was in place, for a single-file mount). A
         // failed write leaves no temp file behind (writeFileAtomic removes it).
         if (!writeFileAtomic(this.#deps.spotifyConfigPath, `${JSON.stringify(content, null, 2)}\n`).ok) {
           return this.#refuse('spotify', 'write-failed', []);

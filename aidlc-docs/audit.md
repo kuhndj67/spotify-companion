@@ -38,3 +38,21 @@ paragraph's first line (as separate lines they ran into the paragraph when rende
 
 **Gate**: requirements and units round awaits the owner's approval before U10's Functional Design. U9's Build & Test
 awaits approval of its Code Generation.
+
+---
+
+## 2026-10-19T00:10:00Z — ✅ U10 round APPROVED; ✅ U9 Code Generation APPROVED → Build & Test; owner backup taken
+
+Owner: *"approve adding another unit (10 with reordering of existing units above 9). Approve U9. Created a backup on
+this machine (in D:\Software\Spotify-SavedWorkingItems where I've been keeping some data that is of use during the
+dev/test process)"*.
+
+- **U10 Data Safety round APPROVED** (FR-76…80; U10 inserted, NAS → U11, Team Operations → U12). Next for U10: its
+  Functional Design plan, after U9's Build & Test.
+- **U9 Code Generation APPROVED** → **Build & Test** begins (IN-U9-7 order; the live crossing and the tag push each
+  wait for the owner's go-ahead).
+- **Backup** taken by the owner in-app, kept outside the repository in `D:\Software\Spotify-SavedWorkingItems`
+  (the stand-in for FR-76/FR-80 until U10 ships).
+- PR flow explained to the owner (Azure DevOps background): PRs target `main`; drafts cannot be merged; Claude marks a
+  PR *Ready for review* when it is the owner's to merge. PR #3 was merged before U9's Build & Test; harmless, since a
+  merge deploys nothing and the release guard refuses an unaccepted pin.

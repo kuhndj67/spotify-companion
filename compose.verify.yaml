@@ -1,7 +1,7 @@
 # U6 — the VERIFICATION INSTALLATION (IN-U6-3, deployment-architecture.md §2).
 #
 # A second, throwaway copy of the app for U6's exit test: back up the LIVE app, restore into THIS one, check it
-# runs. The cross-machine half of that test is U9's.
+# runs. The cross-machine half of that test is U10's (the NAS; it was called U9 until the 2026-10-18 renumbering).
 #
 # ⚠️ NEVER run this file together with compose.yaml (`-f compose.yaml -f compose.verify.yaml`): merging would pull
 # in the live service. Use `npm run verify:up` / `npm run verify:down`, which refuse unless the project name
@@ -13,13 +13,13 @@
 name: spotify-verify
 
 services:
-  now-playing:
+  spotify-companion:
     # ⚠️ The live image, by tag. NO `build:` — this file can never rebuild or re-tag the live image. And removal
     # never uses `--rmi`, which would delete that shared tag.
     # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
-    image: spotify-now-playing:1.0.0-beta.2
-    container_name: spotify-now-playing-verify
+    image: spotify-companion:1.0.0-beta.2
+    container_name: spotify-companion-verify
     ports:
       - "127.0.0.1:3011:3000"
     environment:

@@ -28,7 +28,7 @@ if (apply && process.argv.includes('--plan')) {
   console.error('Give --plan or --apply, not both.');
   process.exit(2);
 }
-const CONTAINER = 'spotify-now-playing';
+const CONTAINER = 'spotify-companion'; // U9 (BR-71.1); the image repository has the same name
 const HEALTH_TIMEOUT_MS = 180_000;
 
 function run(cmd, args, { inherit = false } = {}) {

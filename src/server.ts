@@ -1449,7 +1449,7 @@ registerEvaluationTick();
 // ---------------------------------------------------------------------------
 
 server.listen(config.port, config.host, () => {
-  console.log(`spotify-now-playing listening on http://${config.host}:${config.port}`);
+  console.log(`spotify-companion listening on http://${config.host}:${config.port}`);
   console.log(`MCP server entrypoint: ${config.mcpServerEntrypoint}`);
   console.log(`Local-only enforcement: ${config.localOnly ? 'on' : 'OFF'}`);
 

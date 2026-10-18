@@ -139,7 +139,7 @@ function containerRunning() {
   try {
     const out = execFileSync(
       'docker',
-      ['ps', '--filter', 'name=spotify-now-playing', '--format', '{{.Names}}'],
+      ['ps', '--filter', 'name=spotify-companion', '--format', '{{.Names}}'],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     );
     return out.trim().length > 0;
@@ -163,7 +163,7 @@ async function preflightContainer() {
 
   if (running === true) {
     die(
-      `the ${b('spotify-now-playing')} container is UP.
+      `the ${b('spotify-companion')} container is UP.
 
   This probe writes to the player, and the container records what the player does. Each trial
   would be recorded as a ${b('skipped')} play with ${b("skip_source = 'user'")} — 4–6 artefact
@@ -180,7 +180,7 @@ async function preflightContainer() {
       yellow('\n⚠  Could not reach docker, so the container state is UNPROVEN, not proven-down.'),
     );
     const answer = await rl.question(
-      `   ${b('Is the spotify-now-playing container definitely stopped?')} (yes/no) `,
+      `   ${b('Is the spotify-companion container definitely stopped?')} (yes/no) `,
     );
     if (!/^y(es)?$/i.test(answer.trim())) {
       die('stopped at your request. Run `docker compose down`, then try again.');

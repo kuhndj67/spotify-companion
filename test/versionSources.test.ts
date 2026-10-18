@@ -19,9 +19,9 @@ import { isSemVer, readAppVersion } from '../src/version.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Every `image: spotify-now-playing:<tag>` in a compose file. */
+/** Every `image: spotify-companion:<tag>` (local or `ghcr.io/kuhndj67/…`) in a compose file. */
 function composeTags(yaml: string): string[] {
-  return [...yaml.matchAll(/^\s*image:\s*spotify-now-playing:(\S+)\s*$/gm)].map((m) => m[1] ?? '');
+  return [...yaml.matchAll(/^\s*image:\s*(?:ghcr\.io\/kuhndj67\/)?spotify-companion:(\S+)\s*$/gm)].map((m) => m[1] ?? '');
 }
 
 /** Quoted `X.Y.Z[-pre]` literals in code, after removing comments (which may legitimately quote one). */
@@ -47,13 +47,13 @@ describe('the compose image tags equal package.json (P-58)', () => {
   for (const file of ['compose.yaml', 'compose.verify.yaml']) {
     it(`${file}: image tag is ${version}`, () => {
       const tags = composeTags(readFileSync(join(root, file), 'utf8'));
-      assert.ok(tags.length > 0, `no spotify-now-playing image line found in ${file} -- did its format change?`);
+      assert.ok(tags.length > 0, `no spotify-companion image line found in ${file} -- did its format change?`);
       assert.deepEqual(tags, tags.map(() => version));
     });
   }
 
   it('positive control: a stale tag is caught', () => {
-    const stale = 'services:\n  app:\n    image: spotify-now-playing:0.1.0\n';
+    const stale = 'services:\n  app:\n    image: spotify-companion:0.1.0\n';
     assert.deepEqual(composeTags(stale), ['0.1.0']);
     assert.notEqual(composeTags(stale)[0], version);
   });

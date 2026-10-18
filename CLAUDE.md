@@ -102,7 +102,7 @@ npm run knip            # dead files, exports and dependencies over src/ and scr
 
 docker compose up -d --build   # build and run the deployment; check the build's exit code directly, not via a pipe
 docker compose down
-docker logs -f spotify-now-playing
+docker logs -f spotify-companion
 
 npm run auth            # host-side Spotify OAuth, once per install
 npm run rules:init      # create config/rules.json from the template (refuses to overwrite)

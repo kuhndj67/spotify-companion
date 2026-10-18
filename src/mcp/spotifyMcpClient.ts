@@ -91,7 +91,7 @@ export class SpotifyMcpClient {
     const transport = new StdioClientTransport(connectorSpawnParams(config));
 
     const client = new Client(
-      { name: 'spotify-now-playing', version: readAppVersion() },
+      { name: 'spotify-companion', version: readAppVersion() },
       { capabilities: {} },
     );
 

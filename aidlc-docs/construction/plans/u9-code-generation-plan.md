@@ -94,20 +94,20 @@ split.
 - [x] `test/credentialsWriter.test.ts`, `test/atomicWrite.test.ts`: updated; a failure-path test proves no temp file
       is left.
 
-### Step 6 — One name *(BR-71.1, BR-71.5, P-69, LC-63)*
-- [ ] Rename to `spotify-companion` in: `compose.yaml` (service, container, image), `compose.verify.yaml`
+### Step 6 — One name *(BR-71.1, BR-71.5, P-69, LC-63)* — ✅ DONE · test is `test/structure.u9.test.ts`; the old-name allow-list holds **exact counts** per file (a new occurrence in an allowed file fails too) · the compose **service** is renamed as well, which makes the old container an orphan that `up`/`down` leave running (comment in `compose.yaml`; guard in Step 7; note in Step 10) · `docs/INSTALL.md` and `CLAUDE.md` renamed here, not in Step 10, so the test is clean now · upstream feature variables read from its source: `MCP_AUTH`, `MCP_TRANSPORT`, `MCP_HTTP_HOST`, `MCP_HTTP_PORT`, `SPOTIFY_AUTHORIZATION_SERVERS`, `SPOTIFY_RESOURCE_URL` · `.claude/settings.local.json` is untracked and untouched · CI on PR #3 green, incl. the Linux-only mode test (ran, not skipped)
+- [x] Rename to `spotify-companion` in: `compose.yaml` (service, container, image), `compose.verify.yaml`
       (`spotify-companion-verify`), `scripts/release.mjs`, `scripts/lib/releaseDecision.ts`,
       `scripts/verify-install.mjs` (live **and** verify names), `scripts/backup-history.mjs` (default container),
       `scripts/post-boot-check.ps1`, the two P-U5-1 probe scripts, `src/server.ts` (log line),
       `src/mcp/spotifyMcpClient.ts` (MCP client name), `test/versionSources.test.ts`,
       `test/releaseDecision.property.test.ts`.
-- [ ] ⚠️ `scripts/verify-install.mjs`'s no-impact proof must recognise the live container by **either** name during
+- [x] ⚠️ `scripts/verify-install.mjs`'s no-impact proof must recognise the live container by **either** name during
       the crossing window (it checks live is unchanged; live is still `spotify-now-playing` until step 5 of
       IN-U9-7).
-- [ ] `test/structure.u9.test.ts` (name settled in the step; family of `versionSources`): **no old name** outside the
+- [x] `test/structure.u9.test.ts` (name settled in the step; family of `versionSources`): **no old name** outside the
       allow-list · **one full-SHA pin** in both compose files · **no upstream feature variables** (HTTP transport,
       `MCP_AUTH`) in compose files or the Dockerfile. Each fed a planted violation once (positive control).
-- [ ] `.claude/settings.local.json` is the owner's local file: listed, **not edited**.
+- [x] `.claude/settings.local.json` is the owner's local file: listed, **not edited**.
 
 ### Step 7 — Release guards *(BR-70, BR-71.2, P-74, P-75, LC-67, PBT-77, IN-U9-3)*
 - [ ] `scripts/lib/releaseDecision.ts`: two new refusals: `old-container-running` (Docker reports a running

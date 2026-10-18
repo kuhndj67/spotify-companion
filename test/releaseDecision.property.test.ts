@@ -126,7 +126,7 @@ describe('⭐ PBT-71 — positive control: the next PATCH / MINOR / MAJOR is acc
 
   it("this project's first releases: 0.8.0 from nothing, then 1.0.0-beta.1, then 1.0.0", () => {
     const first = decide(ok({ candidate: '0.8.0', imageTags: ['0.1.0', 'u6-rollback'] }));
-    assert.deepEqual(first, { accept: true, gitTag: 'v0.8.0', imageTag: 'spotify-now-playing:0.8.0', previous: null });
+    assert.deepEqual(first, { accept: true, gitTag: 'v0.8.0', imageTag: 'spotify-companion:0.8.0', previous: null });
     assert.equal(decide(ok({ candidate: '1.0.0-beta.1', gitTags: ['v0.8.0'] })).accept, true);
     assert.equal(decide(ok({ candidate: '1.0.0', gitTags: ['v0.8.0', 'v1.0.0-beta.1'] })).accept, true);
   });

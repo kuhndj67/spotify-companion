@@ -7,7 +7,7 @@
 
       Windows login -> Rancher Desktop (autoStart, startInBackground)
                     -> dockerd
-                    -> spotify-now-playing (restart: unless-stopped)
+                    -> spotify-companion (restart: unless-stopped)
 
   Nothing in that chain reports failure anywhere the user would notice. A silent failure looks
   exactly like a quiet listening day, and the corpus simply stops growing -- which is the one
@@ -48,7 +48,7 @@ param(
   # during parameter binding, which silently wrote the baseline to the root of the drive.
   # Found by running this, not by reading it.
   [string]$BaselinePath,
-  [string]$Container = 'spotify-now-playing',
+  [string]$Container = 'spotify-companion',
   [int]$Port = 3010
 )
 

@@ -5,7 +5,7 @@
 #   containerd      ->  nerdctl compose up --build
 
 services:
-  now-playing:
+  spotify-companion:
     build:
       context: .
       args:
@@ -19,8 +19,11 @@ services:
         MCP_SERVER_REF: 6065ce5cdef13ffeb43042e295bb788ce7ad00df
     # U8 (P-58, BR-66.1): MUST equal package.json's version -- test/versionSources.test.ts fails otherwise.
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
-    image: spotify-now-playing:1.0.0-beta.2
-    container_name: spotify-now-playing
+    # U9 (BR-71.1): one name everywhere -- image, container, service. ⚠️ Until 1.0.0-beta.2 the service was `now-playing`
+    # and the container `spotify-now-playing`: Compose treats that old container as an ORPHAN that `up` and `down` leave
+    # RUNNING, so stop it first (docs/INSTALL.md, Upgrading). `npm run release -- --apply` refuses while it runs.
+    image: spotify-companion:1.0.0-beta.2
+    container_name: spotify-companion
 
     ports:
       # 127.0.0.1 binding keeps this localhost-only (Question 7, option A). ⚠️ Do NOT drop the prefix: see below.

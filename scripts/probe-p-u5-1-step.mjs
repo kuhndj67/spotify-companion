@@ -92,7 +92,7 @@ function containerRunning() {
   try {
     const stdout = execFileSync(
       'docker',
-      ['ps', '--filter', 'name=spotify-now-playing', '--format', '{{.Names}}'],
+      ['ps', '--filter', 'name=spotify-companion', '--format', '{{.Names}}'],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     );
     return stdout.trim().length > 0;
@@ -112,7 +112,7 @@ function preflightContainer() {
   const running = containerRunning();
   if (running === true) {
     fail(
-      'the spotify-now-playing container is UP. This probe writes to the player and the container ' +
+      'the spotify-companion container is UP. This probe writes to the player and the container ' +
         'records the result as a skipped play. Run `docker compose down` first.',
       { containerRunning: true },
     );

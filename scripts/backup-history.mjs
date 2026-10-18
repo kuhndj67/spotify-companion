@@ -75,7 +75,7 @@ function stamp(now) {
   return `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '')}Z`;
 }
 
-export const CONTAINER_NAME = process.env.SPOTIFY_CONTAINER_NAME ?? 'spotify-now-playing';
+export const CONTAINER_NAME = process.env.SPOTIFY_CONTAINER_NAME ?? 'spotify-companion';
 
 /**
  * Is the recording container running?

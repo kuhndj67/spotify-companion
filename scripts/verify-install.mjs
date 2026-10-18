@@ -42,8 +42,13 @@ const COMPOSE_FILE = join(root, 'compose.verify.yaml');
 const PROJECT = 'spotify-verify';
 const INSTALL = join(root, 'verify-install');
 const BASELINE = join(INSTALL, 'baseline.json');
-const LIVE_CONTAINER = 'spotify-now-playing';
-const VERIFY_CONTAINER = 'spotify-now-playing-verify';
+/**
+ * U9 (BR-71.1, BR-71.3): the live container is `spotify-companion`, or `spotify-now-playing` before the crossing.
+ * The no-impact proof must work on either side of it, so the baseline records WHICH one was found, and the proof
+ * compares that same container afterwards.
+ */
+const LIVE_CONTAINERS = ['spotify-companion', 'spotify-now-playing'];
+const VERIFY_CONTAINER = 'spotify-companion-verify';
 const URL = 'http://localhost:3011';
 
 const mode = process.argv.includes('--plan') ? 'plan' : process.argv[2];
@@ -96,18 +101,22 @@ function assertProjectName() {
 }
 
 /** The five live properties the contract promises not to change. */
-function liveSnapshot() {
-  const out = run('docker', ['inspect', LIVE_CONTAINER], { allowFail: true });
-  if (out === null) return { present: false };
-  const c = JSON.parse(out)[0];
-  return {
-    present: true,
-    id: c.Id,
-    startedAt: c.State.StartedAt,
-    restartCount: c.RestartCount,
-    image: c.Image,
-    health: c.State.Health?.Status ?? null,
-  };
+function liveSnapshot(only = null) {
+  for (const name of only ? [only] : LIVE_CONTAINERS) {
+    const out = run('docker', ['inspect', name], { allowFail: true });
+    if (out === null) continue;
+    const c = JSON.parse(out)[0];
+    return {
+      present: true,
+      name,
+      id: c.Id,
+      startedAt: c.State.StartedAt,
+      restartCount: c.RestartCount,
+      image: c.Image,
+      health: c.State.Health?.Status ?? null,
+    };
+  }
+  return { present: false };
 }
 
 /** Tracked-file changes only — `verify-install/` is gitignored and must not appear here. */
@@ -135,7 +144,7 @@ function up() {
   if (existsSync(INSTALL)) fail('verify-install/ already exists — run `npm run verify:down` first (a half-removed install is not a clean start).');
   assertProjectName();
   const live = liveSnapshot();
-  if (!live.present) console.warn(`⚠️ The live container "${LIVE_CONTAINER}" is not present; the no-impact proof will compare against its absence.`);
+  if (!live.present) console.warn(`⚠️ No live container (${LIVE_CONTAINERS.join(' or ')}) is present; the no-impact proof will compare against its absence.`);
 
   for (const d of ['data', 'state', 'config', 'secrets']) mkdirSync(join(INSTALL, d), { recursive: true });
   writeFileSync(BASELINE, JSON.stringify({ takenAt: new Date().toISOString(), live, git: gitStatus(), probeCredentials }, null, 2));
@@ -168,8 +177,9 @@ function down() {
   rmSync(INSTALL, { recursive: true, force: true });
 
   const problems = [];
-  const now = liveSnapshot();
-  for (const key of ['present', 'id', 'startedAt', 'restartCount', 'image', 'health']) {
+  // The SAME container the baseline found (U9: either name), so the proof cannot pass by looking at another one.
+  const now = liveSnapshot(baseline.live.name ?? null);
+  for (const key of ['present', 'name', 'id', 'startedAt', 'restartCount', 'image', 'health']) {
     if (JSON.stringify(now[key]) !== JSON.stringify(baseline.live[key])) {
       problems.push(`live ${key} changed: ${JSON.stringify(baseline.live[key])} → ${JSON.stringify(now[key])}`);
     }

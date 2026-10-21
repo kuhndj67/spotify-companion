@@ -252,3 +252,21 @@ never merged; run 39640995752) and throwaway tag `v0.0.0-envcheck` on `a063cdf` 
 Package versions after: beta.4, beta.5, beta.6 only (nothing pushed). Branch and tag deleted. **Still owed**: James's
 own tag push refused (after he has access); that the environment token can **push** (not only log in and read), first
 shown by the beta.7 release.
+
+---
+
+## 2026-10-21T17:30:00Z — PR #12 merged; the switch's wording prepared as PR `go-public`
+
+PR #12 merged by the owner at 17:13Z (head `be04355`, the three required checks green, publish skipped; GitHub shows
+*review required* because the owner's bypass merged it, which is the designed path for the owner's own PRs). Owner:
+*"Yes continue and I'll change visibility when I start the merge."*
+
+Branch `go-public`: code review 4.1's list. README's *not a public image yet* bullet removed; INSTALL-APP's
+*while private* line removed and **A2 is now *Download the image*** (`docker pull` of the current version; *If it
+differs*: `manifest unknown`, a `denied` from an old stored sign-in → `docker logout ghcr.io`, an ARM platform
+message), keeping A3–A8's numbers; A3's 403 line points at A2; INSTALL-DEV S2's private-repository box and its two
+sign-in bullets removed (a *Repository not found* now means a mistyped address); SECURITY's *until then* paragraph
+removed; `compose.app.yaml`'s pull note removed (it ships in the image, so from beta.7); CLAUDE.md names the image
+public. Swept for `private`, `read:packages` and `docker login` across the documents, `src/`, `scripts/` and the
+Dockerfile: none left. ⚠️ A2's ARM wording is deliberately generic: what Docker prints for this image on ARM is not
+measured. The A2 commands are walked for the first time in walk ③.

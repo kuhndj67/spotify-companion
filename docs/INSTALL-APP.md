@@ -19,8 +19,6 @@ just do every step, boxes included. To have Claude Code do it with you, see [`cl
 macOS untested. The image is published for **`linux/amd64`** (Intel and AMD processors) only. On an **ARM** machine
 (Apple Silicon Mac, Raspberry Pi, some NAS models) it has not been tested and may not run. On Windows, run commands in **PowerShell**; they are the same in a Linux shell unless both are shown.
 
-**While the repository is private**, pulling the image needs read access to it (A2).
-
 ## If you are an AI agent following this file
 
 1. When you reach a **👤 YOU DO THIS** box, **show it to the person word for word**. Do not summarise it, reword it
@@ -110,32 +108,29 @@ rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.container
 
 ---
 
-## A2 — Registry access
+## A2 — Download the image
 
-**Purpose**: let Docker download the image. While the repository is private, that needs a GitHub token that can
-read it. Use a **classic** token: a fine-grained token signs in but cannot download this image (measured).
+**Purpose**: download the app's image from GitHub's container registry. The image is public: no GitHub account or
+sign-in is needed.
 
-> 👤 **YOU DO THIS** — A2 · needs: a web browser signed in to a GitHub account with access to the repository, and an
-> ordinary PowerShell window
->
-> 1. In GitHub: your picture → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens
->    (classic)** → **Generate new token (classic)**. **Note**: `spotify-companion-pull`. **Expiration**: 7 days (or
->    what you prefer). **Scopes**: tick **only** `read:packages`. Click **Generate token** and copy it.
-> 2. In PowerShell, run `docker login ghcr.io -u <your GitHub user name>`. At `Password:`, paste the token
->    (nothing appears as you paste; that is normal) and press Enter.
-> 3. Do not paste the token anywhere else, including into a chat with an agent.
->
-> **You should see:** `Login Succeeded`.
-> **When done, tell the agent:** "A2 login done" (not the token).
+**Commands**
 
-**Commands**: none beyond the box (the next step's download proves the access).
+```powershell
+docker pull ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7
+```
 
-**Expected**: `Login Succeeded`.
+**Expected**: the download takes a minute or two the first time, and ends with
+`Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7` (or `Image is up to date` if it
+was downloaded before).
 
 **If it differs**
 
-- A3 later fails with **`denied`** or **`403`**: the token is not a **classic** one with `read:packages`, or your
-  account has no access to the repository. Make a classic token as in the box and log in again.
+- `manifest unknown` or `not found`: that version does not exist. Copy the command exactly as written here; the
+  current release is named at the top of this file.
+- `denied` or `unauthorized`: Docker is probably sending an old GitHub sign-in (for example, from an earlier install
+  of this app). Run `docker logout ghcr.io` and repeat. Still refused: stop and report it.
+- An error or warning naming a **platform**, `arm64` or `linux/amd64`: this is an ARM machine. See **Platforms** at
+  the top: it is untested there.
 
 ---
 
@@ -149,12 +144,12 @@ read it. Use a **classic** token: a fine-grained token signs in but cannot downl
 docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7 setup
 ```
 
-**Expected**: the image downloads (the first time only, a minute or two), then:
+**Expected**:
 `✓ setup wrote: compose.yaml, secrets/app/musicbrainz.json, config/rules.json (and empty data/, state/)`.
 
 **If it differs**
 
-- `denied` or `403` while downloading: back to A2.
+- An error while downloading the image: back to A2.
 - `✗ setup: refusing to overwrite: …`: the folder is not empty. Use a new, empty folder. Nothing was written.
 
 ---

@@ -2,7 +2,14 @@
 
 **The single entry point for U9.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-21) — going public: review done, the switch is next
+## ▶ Current state (2026-10-21, later) — PR #12 merged; the switch is PR `go-public`
+
+PR #12 merged by the owner (install split, review triage, tag ruleset, release-environment publishing, one approval
+on `main`; controls in `audit.md`). **PR `go-public`** holds the public-repository wording; the owner flips
+visibility when merging it. Then: settings after the switch (private vulnerability reporting, package visibility,
+fork-PR approval), release `1.0.0-beta.7` (the publish token's first real push), App-only walk ③.
+
+### Earlier (2026-10-21) — going public: review done, the switch is next
 
 `1.0.0-beta.6` live and published. **PR #12** (branch `install-docs-split`, open): the install documents split into
 `docs/INSTALL-APP.md` / `docs/INSTALL-DEV.md`, version `1.0.0-beta.7` (**not yet tagged**), walk ② gaps, and the

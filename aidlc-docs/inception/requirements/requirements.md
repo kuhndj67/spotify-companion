@@ -1209,6 +1209,8 @@ publishing is a distribution decision, and it touches U11 (could the NAS pull ra
 
 #### W-14 — Make the repository public, then move vulnerability reports to GitHub
 
+▶ **2026-10-21**: the switch is the owner's, at the merge of PR `go-public` (`public-readiness-review.md` §6 step 3).
+
 ▶ **2026-10-18**: U9 Code Generation **Step 13** reviews readiness against the list below and reports *ready / not
 ready* to the owner (owner's request, so it is not forgotten). Going public itself stays the owner's decision.
 

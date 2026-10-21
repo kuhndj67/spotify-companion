@@ -92,8 +92,7 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
   a backup, never in a response).
 - **The connector** (`spotify-mcp-server`, MIT) is pinned by SHA in `compose.yaml` and patched in one line at build
   (CONTRIBUTING.md *Operations*). Moving the pin needs an acceptance `pass` first, or `npm run release` refuses.
-- **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (private while the
-  repository is). Pushing a tag is the owner's act.
+- **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (public). Pushing a tag is the owner's act.
 - Automation ships **off** (`SKIP_EXECUTOR_ENABLED`, plus the UI kill switch). Never arm it on the owner's behalf.
 - Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and need
   the container down.

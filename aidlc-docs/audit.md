@@ -356,3 +356,22 @@ the first; the owner's choice is open (and whether the two forms go in now, befo
 Owner's UI idea, a **frameless app window that scales to fit**: *"This is a feature request not an issue... issues
 are bugs or problems, this is an enhancement."* Logged as **W-20** (enhancement) with the owner's words and the
 feasibility questions to probe; no UI unit exists, so it re-enters Inception when scheduled.
+## 2026-10-21T20:30:00Z — 1.0.0-beta.8 live and published; GitHub Releases announce new versions
+
+**beta.8** (owner: *"lets build beta.8 and get a clean build before starting u10"*): PR #17 (version in
+`package.json` and its checked copies) merged by the owner; backup taken by the owner; `npm run release -- --apply`:
+verify 1,734 pass / 0 fail, build, deploy, healthy, tag. Live: `healthy`, image `spotify-companion:1.0.0-beta.8`,
+*App version 1.0.0-beta.8*, 1,514 plays, 0 gaps. Issue #14's fix seen on the live app: light mode emulated after a
+fresh reload (no injected style), all five labels `rgb(242, 243, 245)`. The owner pushed the tag (*"Bypassed rule
+violations … creations being restricted"*); run 39664055744 all green; publish *Login Succeeded*, `publishDecision:
+publish 1.0.0-beta.8`, `digest: sha256:f885c7be…`; anonymous manifest HTTP 200.
+
+**How users learn of a new version** (owner: *"how do users know a new version is available, and do we need an
+'update' feature"*). Updating is already **FR-79** (U10). Knowing was covered nowhere. Owner, *"Yes to both"*: (1)
+every release gets a **GitHub Release** with notes, a pre-release while the version is a beta, published by the owner
+after the tag push; first one `v1.0.0-beta.8`. Documented in INSTALL-APP (the current-release line and *Updating*),
+INSTALL-DEV (*Updating*), README (*Status*), CONTRIBUTING and CLAUDE.md (the release steps). ⚠️ *Watch → Custom →
+Releases* is written from GitHub's interface, not walked. (2) An **in-app "newer version available" notice** goes to
+the U10 requirements round as questions (show it at all; opt-in or opt-out; how often), because it would be the app's
+first outbound call to a service that is neither Spotify nor MusicBrainz: a privacy and security posture decision for
+the owner. Rejected for now: having CI create the Release (it would need `contents: write` in the publish job).

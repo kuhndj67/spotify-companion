@@ -4,7 +4,8 @@ This installs **just the running app**, from its published container image: no s
 It runs on your own machine, with **your own Spotify account and your own Spotify developer credentials** (a client
 id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
 
-The current release is **`1.0.0-beta.8`**. The commands below use it.
+The current release is **`1.0.0-beta.8`**. The commands below use it. Newer releases are announced on the
+[Releases page](https://github.com/kuhndj67/spotify-companion/releases), with what changed and how to update.
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should
 see (**Expected**), and what to do if you see something else (**If it differs**). If a step does not match its
@@ -390,6 +391,8 @@ Do not print the full diagnostics output into a log instead.
 
 - **Back up first**: in the app, **Settings → Create backup**. Your listening history in `data/` **cannot be
   recreated**.
+- **Know when there is a new release**: on GitHub, open the repository and choose **Watch → Custom → Releases**.
+  Each release is listed on the [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
 - **Update to a newer release**: stop it, change the version in the `image:` line of `compose.yaml` to the new
   release, and start it again:
 

@@ -51,7 +51,11 @@ token is never written to a file), and replace it the same way before it expires
 publish job at its login step, and the tag stays unpublished until the job is re-run.
 
 **Versions** follow SemVer, and `package.json` is the only source. A release is `npm run release` (owner only). It
-refuses unless verify passes, the tree is clean, and the version is new and greater than every release.
+refuses unless verify passes, the tree is clean, and the version is new and greater than every release. After the
+owner pushes the tag and the publish job has pushed the image, the owner publishes a **GitHub Release** for that tag
+with short notes (what changed, and how to update an app-only install), as a pre-release while the version is a beta:
+`gh release create v<version> --prerelease --notes-file <notes>`. The Releases page is how users learn that a new
+version exists.
 
 ---
 

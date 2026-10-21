@@ -210,7 +210,8 @@ try {
 
   console.log(`✓ Tokens written to ${configPath}`);
   console.log(`✓ Scopes granted include user-follow-read`);
-  console.log('\nNext: continue with S5 of INSTALL.md.');
+  // Shared by INSTALL-DEV (npm run auth) and INSTALL-APP (the image's auth command): name neither step number.
+  console.log('\nNext: go back to the install document you are following.');
 } catch (error) {
   console.error(`\n✗ Authentication failed: ${error.message}`);
   process.exit(1);

@@ -68,7 +68,7 @@ async function main() {
   console.log(`  ${target}`);
   console.log(``);
   console.log(`It contains no rules, which is a valid rule set — nothing will be skipped.`);
-  console.log(`Automated skipping is also OFF until you turn it on in the app (S10 of INSTALL.md).`);
+  console.log(`Automated skipping is also OFF until you turn it on in the app (S10 of docs/INSTALL-DEV.md).`);
 }
 
 main().catch((error) => {

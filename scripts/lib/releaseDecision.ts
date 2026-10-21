@@ -133,8 +133,8 @@ export function decide(f: ReleaseFacts): ReleaseDecision {
       'credentials-not-in-place',
       f.oldCredentialsPresent
         ? 'the credentials are still directly in secrets/: move secrets/spotify-config.json and secrets/musicbrainz.json ' +
-            'into secrets/app/ first (docs/INSTALL.md, Updating)'
-        : 'secrets/app/musicbrainz.json is missing: the app would refuse to start (docs/INSTALL.md S5)',
+            'into secrets/app/ first (docs/INSTALL-DEV.md, Updating)'
+        : 'secrets/app/musicbrainz.json is missing: the app would refuse to start (docs/INSTALL-DEV.md S5)',
     );
   }
   if (f.oldContainerRunning !== false) {

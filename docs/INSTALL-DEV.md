@@ -1,6 +1,7 @@
-# Install
+# Install: full development environment
 
-This installs your own copy of Spotify Companion on your own machine, with **your own Spotify account and your own
+This installs your own copy of Spotify Companion **from source**, with the tools to change and test it (to run
+just the app, use [`INSTALL-APP.md`](INSTALL-APP.md) instead), on your own machine, with **your own Spotify account and your own
 Spotify developer app**. Nothing is shared with anyone else's install.
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should

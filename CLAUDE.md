@@ -141,7 +141,7 @@ never by editing the script.
 | `src/maintenance/`, `src/backup/`, `src/configuration/` | Backup/restore, verification, rules and credential writes |
 | `scripts/` | Developer and owner scripts; covered by `smoke` (load only) and `knip` |
 | `test/` | `node:test` + fast-check. Structural guards: `purity`, `noOrphanModules`, `localGuard`, `propertyObligations`, `versionSources`, `rulesetMatchesWorkflow`, `secretsTracked`, `docs` |
-| `docs/INSTALL.md` | The install routine, walked cold by an agent before each major release |
+| `docs/INSTALL-DEV.md`, `docs/INSTALL-APP.md` | The two install routines (development environment; app only), each walked cold by an agent |
 | `aidlc-docs/` | All design records |
 
 ## Before you change…

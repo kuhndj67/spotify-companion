@@ -1,6 +1,6 @@
 # Spotify Companion
 
-A **local, single-user** companion for Spotify. It shows what is playing and enriches it with the record label,
+A **local, single-user** companion for Spotify subscribers (you need to have a paid subscription for api access). It shows what is playing and enriches it with the record label,
 genres, liked status and your own history with the track. It records every play, and it can skip tracks
 automatically by rules you write.
 
@@ -26,9 +26,9 @@ quality product with AI doing all the coding.
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
   developer app** and account. Nothing is shared between installs.
 - **Not reachable from other machines.** The app answers only on `localhost`.
-- **No published image.** You build your own from this source (see [`docs/INSTALL.md`](docs/INSTALL.md)). The
-  bundled Spotify MCP server became MIT-licensed on 2026-10-16, but this project still builds it from an earlier,
-  unlicensed commit, so for now no built image is published.
+- **Not a public image yet.** A prebuilt image is published to GitHub's container registry, with the bundled Spotify
+  MCP server at its MIT-licensed version, but it is **private while this repository is** (see
+  [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md)).
 
 ## Status
 
@@ -38,65 +38,14 @@ off until you arm it.
 
 ## Install
 
-Each install runs on your own machine, with your own Spotify account.
+Each install runs on your own machine, with your own Spotify account and your own Spotify developer app.
 
-### Full development environment (from source)
+- **Just the app** (most people): [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md). Docker and a prebuilt image; no
+  source code or development tools. ⚠️ *Coming soon*: its steps are being walked cold before this label comes off.
+- **Full development environment** (to change the code): [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md). Then
+  `npm ci` and `npm run verify` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
-The result is the running app **and** a working development environment for it: the source code at the release you
-chose, the tools to build and run it (Node.js, git, and Docker through Rancher Desktop on Windows), and the app built
-from that source. To finish the development side, run `npm ci` once in the `spotify-companion` folder; after that,
-`npm run verify` runs the full test suite (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-
-Two ways to do it, following the same routine:
-
-- **With VS Code and Claude Code** (Windows; recommended). You need VS Code with the Claude Code extension, signed
-  in, a Spotify account, and read access to this repository.
-  1. Create an empty folder, and copy [`docs/INSTALL.md`](docs/INSTALL.md) and
-     [`docs/claude-start.md`](docs/claude-start.md) into it, from the release you want to install.
-  2. Open the folder in VS Code and start a Claude Code session.
-  3. Type: *Read claude-start.md and follow it.* Claude does the steps it can, and shows you a **👤 YOU DO THIS** box
-     for each step that needs you.
-- **By hand** (Windows with Rancher Desktop, or Docker Engine on Linux): follow
-  [`docs/INSTALL.md`](docs/INSTALL.md) yourself.
-
-### App only
-
-**Coming soon.** Just the running app, from a prebuilt container image, with no source code or development tools.
-The steps below exist but have **not yet been walked** by someone following them cold; this label comes off when
-they have. While the repository is private, pulling the image needs access to it.
-
-You need:
-- **Docker**. On Windows: [`docs/INSTALL.md`](docs/INSTALL.md) S1, **the Rancher Desktop parts only**: steps 1, 2, 4
-  (only its `SUSE.RancherDesktop` line), 5 and 6, and the `wsl --status`, `docker version` and settings checks. *App
-  only* needs neither Node.js nor git. On Linux: Docker Engine.
-- A **classic** GitHub token with **only** the `read:packages` scope and a short expiry (a fine-grained token logs in
-  but cannot pull: measured).
-- Your own Spotify developer app (step 4).
-
-The current release is **`1.0.0-beta.6`**, which is the version in the commands below. Commands are the same in
-PowerShell and a Linux shell.
-
-**With Claude Code** (it does the steps it can, and keeps an install log): put this `README.md`,
-[`docs/INSTALL.md`](docs/INSTALL.md) and [`docs/claude-start.md`](docs/claude-start.md) together in an empty folder,
-open it in VS Code, start a Claude Code session, and type: *Read claude-start.md and install App only.*
-
-1. **Log in to the registry**: `docker login ghcr.io -u <your GitHub user name>`, and paste the token as the
-   password. *Expected*: `Login Succeeded`.
-2. **Set up a folder**: in a new, empty folder, run
-   `docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.6 setup`.
-   *Expected*: `✓ setup wrote: compose.yaml, secrets/app/musicbrainz.json, config/rules.json (and empty data/,
-   state/)`. It refuses, and writes nothing, if any of those already exist.
-3. **Your contact address**: open `secrets/app/musicbrainz.json` in that folder and replace `you@example.com` with an
-   address where you can be reached (MusicBrainz requires it; the app does not start with the placeholder).
-4. **Your Spotify app**: register one as in [`docs/INSTALL.md`](docs/INSTALL.md) S3, with the redirect URI exactly
-   `http://127.0.0.1:8888/callback`.
-5. **Sign in to Spotify**:
-   `docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.6 auth`.
-   Enter the app's Client ID and Client Secret, open the printed link in your web browser and approve.
-   *Expected*: `✓ Tokens written to /work/secrets/app/spotify-config.json`. Keep the `127.0.0.1:` in the command: it keeps
-   the sign-in reachable from this computer only.
-6. **Start it**: `docker compose up -d`, then open `http://localhost:3010`. *Expected*: the Spotify indicator is
-   **ok**, and a track you play appears in the history. Automated skipping is **off** until you turn it on.
+Either can be done with you by Claude Code: see [`docs/claude-start.md`](docs/claude-start.md).
 
 ## Getting started
 

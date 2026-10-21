@@ -111,3 +111,20 @@ in the entrypoint, valid control on fresh folders (an earlier invalid control is
 the App-only path had no `claude-start.md` route, so the log rule lived only in the walk guide's prompt; fixed.
 Built as **1.0.0-beta.6** on branch `u9-walk-fixes`. Record:
 `construction/u9-connector-upgrade/walks/walk-app-only-2026-10-21.md`. Next: release, publish, re-walk the changed steps.
+
+---
+
+## 2026-10-21T15:30:00Z — Install documents split: INSTALL-DEV.md and INSTALL-APP.md (FR-75, BR-74.5 amended) → 1.0.0-beta.7
+
+1.0.0-beta.6 released and published (owner *"go"*; F4 seen fixed on the live install). During the re-walk the owner
+asked whether Node.js is needed for a container install (it is not: the image carries its own), saw that the App-only
+route still ran INSTALL S1's whole box, and that a note below it comes too late. Owner: keep README *"clean and tight"*,
+with *"separate dev and app only docs"*, named *"Install-dev.md and install-app.md"* (made `INSTALL-DEV.md` /
+`INSTALL-APP.md` for consistency with the other top-level documents; flagged as easy to change).
+
+Done on branch `install-docs-split`: `INSTALL.md` renamed `INSTALL-DEV.md`; a self-contained `INSTALL-APP.md` (A1–A8,
+no Node, no git; A8 checks rules and automation-state writability through diagnostics, never arming); README Install 8
+lines; `claude-start.md` routes by what the person types; duplicated passages held identical by a test. Checked
+against the live app before writing: the diagnostics step names and the automation response; the redirect-URI error
+text copied from INSTALL-DEV's measured wording (my first draft had invented one). Image texts naming the old file
+mean a release: **1.0.0-beta.7**. The re-walk walks the new document from its start.

@@ -4,7 +4,7 @@ Thanks for looking. This is a small, single-user app with an unusually long memo
 file is that memory, the **traps** below, because they are what a newcomer, person or AI agent, would otherwise
 rediscover the hard way.
 
-To run it first, follow [`docs/INSTALL.md`](docs/INSTALL.md), then run `npm ci` once in the `spotify-companion`
+To run it first, follow [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md), then run `npm ci` once in the `spotify-companion`
 folder to install the development dependencies that `npm run verify` needs. Licence: GPL-3.0-or-later ([`LICENSE`](LICENSE)).
 Security reports: [`SECURITY.md`](SECURITY.md), not public issues.
 
@@ -182,7 +182,7 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
   the build fails if upstream changes that line. It goes when upstream accepts an equivalent override.
 - **Renaming a compose service orphans the old container**, and `up`/`down` leave an orphan running. U9 renamed
   everything to `spotify-companion`; upgrading from `1.0.0-beta.2` stops the old container first
-  (`docs/INSTALL.md`, *Updating*), and `npm run release` refuses while it runs.
+  (`docs/INSTALL-DEV.md`, *Updating*), and `npm run release` refuses while it runs.
 - **Check build exit codes directly.** `docker compose build | tail` reports the pipe's exit code.
 - **The owner's host is UTC−4.** Check `ls --time-style=full-iso data/snapshots/` before reasoning about any file
   time. A WAL mtime is the last write, never a heartbeat.

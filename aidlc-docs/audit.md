@@ -375,3 +375,20 @@ Releases* is written from GitHub's interface, not walked. (2) An **in-app "newer
 the U10 requirements round as questions (show it at all; opt-in or opt-out; how often), because it would be the app's
 first outbound call to a service that is neither Spotify nor MusicBrainz: a privacy and security posture decision for
 the owner. Rejected for now: having CI create the Release (it would need `contents: write` in the publish job).
+
+## 2026-10-21T22:00:00Z — Questions 34–36 answered (A, B, A): FR-81, an update notice on by default
+
+Owner (question prompt, U10 session start): **Q34 = A**, one line in Settings beside the version and a status-bar
+indicator only when a newer version exists, never updating anything itself; **Q35 = B**, **on by default** with a
+Settings switch to turn it off, *against the recommendation* (A, opt-in), which would have kept a fresh install's
+outbound traffic to Spotify and MusicBrainz; **Q36 = A**, at most once a day plus once shortly after start, one
+anonymous `GET …/releases?per_page=10`, silent on failure, outside the Spotify poll budget. Ratified as **FR-81**
+(priority **Should**, set by the agent: a notice is not data safety; the owner may change it).
+
+⚠️ Consequence recorded so it is not lost: **every install now calls GitHub by default**, which tells GitHub the
+user's IP address and, from the timing, that they run the app. No NFR names the permitted outbound services, so
+nothing is amended; the Settings sentence saying what is sent and to whom is the user's only notice, and Functional
+Design must keep it next to the switch. Rejected: opt-in (A) and a manual button only (C).
+
+State correction: the *Current Stage* line still said `1.0.0-beta.7` live; `1.0.0-beta.8` is (container
+`spotify-companion:1.0.0-beta.8`, healthy, read 2026-10-21). Issue #14 is closed (19:32Z).

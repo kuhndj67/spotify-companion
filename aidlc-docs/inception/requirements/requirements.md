@@ -486,7 +486,8 @@ another checked copy), **FR-60/61**.
 From Requirements Questions 29–33 (all **A**). The owner's three concerns: a new user never gets another person's
 listening history (**already met**, measured 2026-10-18: nothing tracked, ignored by git and the image build, refused
 by the image check, App-only `setup` starts empty); updates never lose a user's own history; developers cannot lose
-theirs by accident.
+theirs by accident. **FR-81** was added 2026-10-21 from Questions 34–36 (A, B, A): telling a user that a newer
+version exists.
 
 | ID | Requirement | Priority | Status |
 |---|---|---|---|
@@ -495,6 +496,7 @@ theirs by accident.
 | FR-78 | **Developer runs use their own data folder.** A host run (`npm start`) defaults to `data-dev/` (gitignored), never the container's `data/history.db`, unless `HISTORY_DB_PATH` names it on purpose | Must | ⬜ New (Q31 = A) |
 | FR-79 | **An *App only* install can update itself.** The image's `update` command asks the running app for a backup (FR-76), rewrites **only the image line** of the folder's `compose.yaml` to its own version (other edits kept), refuses to move to an older version, and prints the next step | Must | ⬜ New (Q32 = A) |
 | FR-80 | **Automatic snapshots run, and say so truthfully.** They are scheduled from the **newest snapshot on disk**, not from process start (at startup, one is taken if the newest is older than the interval; at most one per interval). Diagnostics: **warn** when the newest is older than two intervals, **fail** when none exists after one interval of uptime, never **ok** for "none written" | Must | ⬜ New (Q33 = A) |
+| FR-81 | **The app says when a newer version exists, and never updates itself.** (a) One line in **Settings** beside the version (*"1.0.0-beta.9 is available: what changed"*, linking to its GitHub Release page and naming FR-79's `update` command), and a small **status-bar indicator** shown only when a newer version exists. (b) **On by default** (opt-out): a Settings switch turns it off, beside one sentence saying what is sent and to whom. (c) At most **once a day**, plus once shortly after start: one anonymous `GET https://api.github.com/repos/kuhndj67/spotify-companion/releases?per_page=10` (⚠️ not `/releases/latest`, which **measured 404** while every release is a pre-release); no account and no identifiers beyond what any HTTP request carries; the User-Agent names the app and its version. Pre-releases count only while the running version is itself a pre-release. A failed check is **silent** (Settings shows *"could not check (time)"*; the status bar never shows an error for it) and **never touches the poll's Spotify budget** | Should | ⬜ New (Q34 = A, Q35 = B, Q36 = A) |
 
 ⚠️ **FR-80 fixes a live defect**: no snapshot has been written since 2026-10-03, because the 24-hour timer restarts
 with every container restart, while diagnostics reported `ok`. Until U10 ships, the owner takes **Settings → Create

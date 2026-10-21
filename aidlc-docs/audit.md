@@ -408,3 +408,30 @@ choice, so every issue arrives labelled; reversible in one line) and a link to p
 (`enabled: true`, read 2026-10-21). CONTRIBUTING points to the chooser. Verified: the three files parse as YAML.
 ⚠️ **Not verified**: GitHub's own form-schema check runs only once the files are on `main`; open
 `/issues/new/choose` after the merge.
+
+## 2026-10-21T23:30:00Z — U10 Functional Design plan opened (Q1–Q6); issue forms seen live
+
+Owner, after PR #21 merged: *"looks good... I see issue and feature options."* The two issue forms render on GitHub,
+so GitHub's form-schema check passed (the one item the 22:30Z entry left unverified).
+
+**U10 FD plan** (`construction/plans/u10-functional-design-plan.md`). Measured for it, not reasoned:
+- The scheduled snapshots (FR-56/FR-80) are **CSV exports**, one flattened row per play, with no decision log,
+  skip attempts, trails or rules; *Restore backup* accepts only the archive. Built as worded, FR-80 would restore
+  nothing.
+- *Create backup* streams its archive to the browser and deletes it: **no backup is kept on disk**, which FR-76's
+  "bounded number kept" assumes.
+- From a throwaway container (what FR-79's `update` is), `host.docker.internal:3010` → **`403 Invalid Host or
+  Origin`**; with a `localhost` Host header → **`200`**. Not a defect: the peer check is off in the container
+  deployment by design (`TRUST_PUBLISHED_PORT`, 2026-09-05) and the `127.0.0.1` publish is the boundary, which admits
+  any process on this machine, containers included. Recorded so it is not rediscovered as a breach. Not probed: the
+  same on Linux (U11's NAS).
+- FR-77's lock file: exclusive create refused with **`EEXIST`** in both directions across the Rancher bind mount
+  (throwaway container and scratch folder; `data/` untouched); heartbeat visible; clocks within 1 s. Stale takeover by
+  unlink-and-create can race between two takers; the rules must close it.
+- The MusicBrainz User-Agent carries the user's contact address (NFR-14); FR-81's GitHub request must not reuse it.
+
+Questions: Q1 how `update` gets its backup (recommended: the updated app backs up on its first start, rewording
+FR-79), Q2 one kind of kept backup, the verified archive in `data/backups/`, rotated per kind (rewording FR-56/80),
+Q3 which processes take the lock, Q4 how far `data-dev/` reaches, Q5 kept backups in Settings, Q6 a story. FR-81 added
+to the U10 rows of `execution-plan.md` and `unit-of-work.md`. U10's `HANDOFF.md` created. Business rules start at
+BR-78 (BR-77 is taken).

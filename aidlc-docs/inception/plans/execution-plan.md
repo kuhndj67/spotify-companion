@@ -249,7 +249,7 @@ and changing it is a **security-posture decision**, surfaced rather than decided
 | **U7** Configuration Management | Rules and credentials manageable in-app (upload/download, write-only fields) via U6's admission path | U6 |
 | **U8** Team Workflow & Onboarding | CI gating, README/INSTALL/CONTRIBUTING/LICENSE/SECURITY, the install routine | U6, U7 |
 | **U9** Connector Upgrade & Publishable Image | The connector on its MIT-licensed commit (FR-73), the image published on release tags (FR-74), README *App only* (FR-75) | U8 |
-| **U10** Data Safety | Automatic backups before migration and release, one writer per database, developer data apart, App-only `update`, truthful snapshots (FR-76…80) | U6, U8, U9 |
+| **U10** Data Safety | Automatic backups before migration and release, one writer per database, developer data apart, App-only `update`, truthful snapshots (FR-76…80) · in-app newer-version notice (FR-81) | U6, U8, U9 |
 | **U11** Off-machine Deployment | The NAS target, under the chosen security posture, deployed by following U8's routine | U6, U7, U8, U9, U10 |
 | **U12** Team Operations | Parallel work through reviewed PRs without conflicts in the AI-DLC records (NFR-35…39) | U8 |
 

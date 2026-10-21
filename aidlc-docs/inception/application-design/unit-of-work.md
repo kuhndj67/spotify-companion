@@ -327,7 +327,7 @@ how FR-75's walk is done · the code comments that still call the NAS "U9" (`src
 
 ---
 
-## U10 — Data Safety *(Phase 5)* — declared 2026-10-18, NOT YET DESIGNED
+## U10 — Data Safety *(Phase 5)* — declared 2026-10-18; Functional Design plan open 2026-10-21
 
 **Purpose**: a user's listening history survives every update, and a developer cannot lose theirs by accident.
 (That a new user never receives another person's history is already met, measured 2026-10-18.) Raised by the owner
@@ -337,7 +337,7 @@ where these risks become real.
 **Requirements**: **FR-76** automatic backup before a migration and before a release deploys · **FR-77** one writer
 per database (lock file with heartbeat, probed across the bind mount) · **FR-78** host runs use `data-dev/` ·
 **FR-79** App-only `update` command · **FR-80** snapshots scheduled from the newest on disk, diagnostics truthful
-(fixes a live defect: none since 2026-10-03).
+(fixes a live defect: none since 2026-10-03) · **FR-81** in-app *newer version available* notice, on by default (Questions 34–36, added 2026-10-21).
 
 **Depends on**: U6 (in-app backup, the one writer), U8 (release script), U9 (the App-only image and its `setup`).
 **Stories**: to be settled in its FD. **No sample database** (owner, 2026-10-18).

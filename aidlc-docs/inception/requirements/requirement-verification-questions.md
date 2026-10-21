@@ -903,7 +903,7 @@ C) **No**: the Releases page and *Watch → Releases* are enough (already docume
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ## Question 35 — Consent for the check
 
@@ -918,7 +918,9 @@ C) **Never in the background**: a *Check for updates* button in Settings, one ca
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **B** (owner, 2026-10-21, question prompt), against the recommendation: **on by default**, with a Settings
+switch to turn it off. ⚠️ A fresh install therefore calls GitHub; the Settings sentence saying what is sent and to whom
+still applies (it is now the user's only notice of the call).
 
 ## Question 36 — How the check is made
 
@@ -933,4 +935,4 @@ B) **Only at startup** (every restart, including each release, checks once)
 
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt). Ratified as **FR-81**.

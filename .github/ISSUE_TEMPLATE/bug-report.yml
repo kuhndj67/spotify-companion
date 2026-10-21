@@ -1,0 +1,57 @@
+name: Bug report
+description: Something that should work does not, or works wrongly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A bug is behaviour that is broken. A new idea or a change to how something works is a **Feature request**.
+        **Security problems are not reported here**: see [SECURITY.md](https://github.com/kuhndj67/spotify-companion/blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that shows it. Say if it happens every time or only sometimes.
+      placeholder: |
+        1. Open Settings
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Settings → Run diagnostics… → copy the *Version* line (it begins `App version`)."
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it is installed
+      options:
+        - App only (docs/INSTALL-APP.md)
+        - Development environment (docs/INSTALL-DEV.md)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, operating system and colour scheme
+      description: Light or dark mode matters; some defects show in only one.
+      placeholder: e.g. Edge 130, Windows 11, light mode
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines (optional)
+      description: |
+        From `docker logs spotify-companion`. **Check them first**: never paste credentials, tokens or the contents of
+        `secrets/`. Listening history is personal; trim track and artist names if you prefer.
+      render: text

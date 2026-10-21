@@ -6,7 +6,8 @@ rediscover the hard way.
 
 To run it first, follow [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md), then run `npm ci` once in the `spotify-companion`
 folder to install the development dependencies that `npm run verify` needs. Licence: GPL-3.0-or-later ([`LICENSE`](LICENSE)).
-Security reports: [`SECURITY.md`](SECURITY.md), not public issues.
+Bugs and feature requests: [open an issue](https://github.com/kuhndj67/spotify-companion/issues/new/choose) and pick
+*Bug report* (labelled `bug`) or *Feature request* (labelled `enhancement`). Security reports: [`SECURITY.md`](SECURITY.md), not public issues.
 
 ---
 

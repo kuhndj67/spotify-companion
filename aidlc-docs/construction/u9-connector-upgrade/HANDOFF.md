@@ -2,7 +2,13 @@
 
 **The single entry point for U9.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-21, later) — PR #12 merged; the switch is PR `go-public`
+## ▶ Current state (2026-10-21, 17:30Z) — ✅ public; ✅ `1.0.0-beta.7` live and published
+
+Repository and image public (PR #13 merged with the switch); beta.7 released and published by the `release`
+environment's token (`audit.md`, 17:30Z). **Next: App-only walk ③** of `docs/INSTALL-APP.md` on a clean machine, no
+token; on a pass, README's *coming soon* comes off and U9 closes. Owed: the collaborator's `v*` tag push refused.
+
+### Earlier (2026-10-21) — PR #12 merged; the switch is PR `go-public`
 
 PR #12 merged by the owner (install split, review triage, tag ruleset, release-environment publishing, one approval
 on `main`; controls in `audit.md`). **PR `go-public`** holds the public-repository wording; the owner flips

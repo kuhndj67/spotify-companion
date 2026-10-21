@@ -270,3 +270,27 @@ removed; `compose.app.yaml`'s pull note removed (it ships in the image, so from 
 public. Swept for `private`, `read:packages` and `docker login` across the documents, `src/`, `scripts/` and the
 Dockerfile: none left. ⚠️ A2's ARM wording is deliberately generic: what Docker prints for this image on ARM is not
 measured. The A2 commands are walked for the first time in walk ③.
+
+---
+
+## 2026-10-21T17:30:00Z — ✅ Public; 1.0.0-beta.7 live and published (the release-environment token's first push)
+
+**The switch** (owner): PR #13 merged at 17:20:49Z with the repository made public, the package made public,
+private vulnerability reporting on, and the fork-PR setting confirmed. Read back by API: repository `public`, package
+`public`, private vulnerability reporting `enabled: true`, fork-PR approval `first_time_contributors`, default workflow
+token `read`. **Probed as a stranger**: `git ls-remote` with no credential helper lists the tags; the registry serves
+the beta.6 manifest to an anonymous token (HTTP 200), and a made-up `9.9.9` is 404 (the probe can tell). GitHub's
+*"This branch has not been deployed"* on PRs is the `release` environment's notice: no PR ever deploys to it.
+
+**The release** (owner: *"backup created, run npm script"*): `npm run release -- --apply`: verify (0 failures),
+build, deploy, healthy, tag `v1.0.0-beta.7` (local). Live: `healthy`, image `spotify-companion:1.0.0-beta.7`,
+diagnostics *App version 1.0.0-beta.7 · Database schema v7*, token refresh ok, connector connected, **1,497 plays,
+0 gaps**. The tag push (owner's command, typed twice; run by me when the `!` form arrived as a message): GitHub printed
+*"Bypassed rule violations … Cannot create ref due to creations being restricted"*, the owner's bypass seen working
+for creation. Run 39643903712: all four jobs green; publish *Login Succeeded* (environment token),
+`publishDecision: publish 1.0.0-beta.7`, push `digest: sha256:b54d271261d6…`. The package lists `1.0.0-beta.7`
+(17:29:01Z); an anonymous pull of its manifest is HTTP 200; the `release` environment's first successful deployment
+is `v1.0.0-beta.7`. **The token's push, owed since the hardening, is now shown.**
+
+Still owed: the collaborator's own `v*` tag push refused (after James has access); App-only walk ③ on the public
+image (its new A2 walked for the first time).

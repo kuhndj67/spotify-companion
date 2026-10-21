@@ -30,13 +30,22 @@ the code does not do it.
 - Questions go in the existing documents: inception questions in the requirements and units plans, unit questions
   in `aidlc-docs/construction/plans/uN-*-plan.md`. **Do not invent new document types.**
 
-**`main` is protected**: changes arrive by pull request, and the checks above are required. ⚠️ **The owner may push
-to `main` directly.** That bypass is deliberate and lives in the committed ruleset
+**`main` is protected**: changes arrive by pull request, the checks above are required, and a pull request needs
+**one approval**, given again after any later push. ⚠️ **The owner may push to `main` directly**, and merges their own
+pull requests without an approval. That bypass is deliberate and lives in the committed ruleset
 ([`.github/rulesets/main.json`](.github/rulesets/main.json)), where review can see it. It is not hidden in settings.
 
-**Release tags are protected**: pushing a `v*` tag publishes the image, so only the owner can create, move or delete
-one ([`.github/rulesets/release-tags.json`](.github/rulesets/release-tags.json)). A contributor with write access
-pushes branches and opens pull requests; the owner cuts releases.
+**Releases are the owner's**: pushing a `v*` tag publishes the image, so only the owner can create, move or delete
+one ([`.github/rulesets/release-tags.json`](.github/rulesets/release-tags.json)). The only credential that can push
+the image is `GHCR_PUBLISH_TOKEN`, a secret of the `release` environment, which GitHub gives only to `v*` tags
+([`.github/environments/release.json`](.github/environments/release.json)). No workflow asks for `packages: write`,
+so a branch with an edited `ci.yml` cannot publish. A contributor with write access pushes branches and opens pull
+requests. All of this is applied by `npm run protect`.
+
+*The token (owner):* a **classic** token with only `write:packages` (GitHub's documentation says its container
+registry does not take fine-grained tokens; not probed here), with an expiry. Set it with `gh secret set GHCR_PUBLISH_TOKEN --env release` (it prompts; the
+token is never written to a file), and replace it the same way before it expires. An expired token fails the
+publish job at its login step, and the tag stays unpublished until the job is re-run.
 
 **Versions** follow SemVer, and `package.json` is the only source. A release is `npm run release` (owner only). It
 refuses unless verify passes, the tree is clean, and the version is new and greater than every release.

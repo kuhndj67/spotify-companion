@@ -199,3 +199,30 @@ still lets the next release tag through (the next `v*` push shows it). (3) Two p
 may still have, from GitHub's documentation and **not probed** (the `gh` login lacks `read:packages`): a branch push
 with an edited `ci.yml` using the workflow token's `packages: write`, and a direct `docker push` with their own token
 if the package inherits repository permissions. Surfaced to the owner, not decided.
+
+---
+
+## 2026-10-21T19:30:00Z — Publish process hardened: a release-only credential; one approval on main
+
+Owner: *"James is certainly trustworthy but we should follow sound practice with regards to public projects so lets
+harden the publish process."* `gh` given `read:packages` by the owner. **Probed**: the package record exposes
+visibility (`private`) and the linked repository only; access inheritance and Actions access are **not in the API**
+(settings page only). The publish job logged in with the workflow token, which pushed beta.4–6, so a branch with an
+edited `ci.yml` **could** publish. Found while probing: `main`'s ruleset required **0** approvals.
+
+Decisions (question prompt): *"Token in environment (Recommended)"*; *"No extra click"* per publish; *"Yes, require 1
+approval (Recommended)"*.
+
+Done: `.github/environments/release.json` (deployment policy: `v*` tags only), synced by `npm run protect` like the
+rulesets (secrets are never read or written by it); `ci.yml` publish runs in `release`, logs in with
+`GHCR_PUBLISH_TOKEN`, and no job asks for `packages: write`; `main.json` requires 1 approval, dismisses stale
+approvals, and requires approval of the last push. `test/rulesetMatchesWorkflow.test.ts` pins all three, **positive
+controls**: the old 0-approval rule, the old publish job (workflow token, `packages: write`, no environment) and an
+environment that also admits a branch are each reported. `npm run protect`: diff showed exactly the three review
+fields and the missing environment; `--apply` read back matching; a second run MATCHES all three.
+
+**Owed** (not yet done or proven): the owner creates the classic `write:packages` token and sets it on the
+environment; the owner turns off the package's inheritance and removes this repository's Actions write access; then
+the controls: a branch job naming `release` is refused, a branch job pushing with the workflow token is refused, and
+the environment token logs in on a throwaway `v0.0.0-*` tag (whose publish decision refuses, so nothing is pushed).
+Until the token is set, a `v*` tag push fails at the login step.

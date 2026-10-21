@@ -171,17 +171,21 @@ jobs:
   # jobs that guard `main` pass. NOT a required check (a check that runs only on tags would block every PR):
   # test/rulesetMatchesWorkflow.test.ts asserts that.
   #
-  # ⚠️ This is the one job that can WRITE to the registry. So: `packages: write` is granted here and nowhere else;
-  # the only action is actions/checkout, pinned by full SHA (credentials not persisted); everything else is the
+  # ⚠️ This is the one job that can WRITE to the registry. 2026-10-21 (pre-public code review 2.5.1): it does so
+  # with GHCR_PUBLISH_TOKEN, a secret of the `release` ENVIRONMENT, which GitHub releases only to `v*` tags
+  # (`.github/environments/release.json`), and only the owner can create those (`.github/rulesets/release-tags.json`).
+  # No job asks for `packages: write`, and the package grants this repository's workflow token no write access, so a
+  # branch whose ci.yml was edited to publish has no credential that can. test/rulesetMatchesWorkflow.test.ts pins
+  # this. The only action is actions/checkout, pinned by full SHA (credentials not persisted); everything else is the
   # runner's own docker CLI. The decision runs inside node:22.23 (no npm install beside the token).
   publish:
     name: Publish image (release tags only)
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [test, container, secrets]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: read
-      packages: write
     # Serialise per tag, never cancel: "is this version already published?" and the push must not race.
     concurrency:
       group: publish-${{ github.ref }}
@@ -196,10 +200,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Log in to GHCR (token on stdin, this job only)
+      - name: Log in to GHCR (environment token on stdin, this job only)
         env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          TOKEN: ${{ secrets.GHCR_PUBLISH_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "GHCR_PUBLISH_TOKEN is not set on the release environment"; exit 1; fi
+          echo "$TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
 
       # BR-72.2/72.3: tag == v + package.json, and the version is not already published. "Could not ask" refuses.
       - name: Decide (LC-64)

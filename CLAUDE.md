@@ -66,9 +66,10 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 ## Git and CI
 
 - `main` is protected: changes arrive by **pull request** with every check green: **Typecheck, test, smoke, knip,
-  build** · **Container image builds** · **Secret scan**. The rulesets are code: `.github/rulesets/main.json`, and
-  `.github/rulesets/release-tags.json` (only the owner creates, moves or deletes a `v*` tag, which publishes the
-  image), applied by `npm run protect` and cross-checked against `ci.yml` by a test.
+  build** · **Container image builds** · **Secret scan**. A pull request needs one approval. The protection is code:
+  `.github/rulesets/main.json`, `.github/rulesets/release-tags.json` (only the owner creates, moves or deletes a `v*`
+  tag) and `.github/environments/release.json` (the publish token reaches only `v*` tags), applied by
+  `npm run protect` and cross-checked against `ci.yml` by a test.
 - **Standard multi-developer flow** (owner, 2026-10-18): all work happens on a **branch** (one per unit or fix, e.g.
   `u9-connector-upgrade`), committed in reviewable steps, pushed, and merged to `main` only by **pull request** with
   every check green. The **owner merges**. An agent never commits to `main` directly.

@@ -1118,6 +1118,13 @@ refused. ⚠️ **Not closed by it** (from GitHub's documentation, **not probed*
 publish (a) from a branch whose edited `ci.yml` runs a push with the workflow token's `packages: write`, if the
 package grants this repository's Actions write access, and (b) with their own token, if the package inherits the
 repository's permissions. Closing both is a package-settings and workflow-design decision for the owner.
+✅ **Owner decided 2026-10-21** (*"lets harden the publish process"*): (a) **probed**: the workflow token did push
+beta.4–6, so the path was real. Closed by publishing only with `GHCR_PUBLISH_TOKEN`, a secret of the `release`
+environment that admits only `v*` tags (`.github/environments/release.json`), and by no job asking for
+`packages: write`; the package's *Actions access* for this repository is removed by the owner on GitHub. (b) Closed
+by the owner turning off the package's *inherit access from the repository*. No extra approval per publish (owner).
+Found while probing and closed the same day: `main` required **0** approvals, so a write-access account could merge
+its own pull request; now 1, re-required after a later push (owner bypass unchanged).
 
 **Backlog**: 2.3.2 (trim the OAuth scopes to those used; probe first), 2.4.1 and 4.5 (document the entrypoint's
 `chown` on Linux), 2.4.2 (anchor `check-image.sh`'s file-name patterns), 2.5.2 (confirm the fork-PR approval setting

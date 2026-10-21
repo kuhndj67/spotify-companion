@@ -22,7 +22,7 @@ services:
     # U9 (BR-71.1): one name everywhere -- image, container, service. ⚠️ Until 1.0.0-beta.2 the service was `now-playing`
     # and the container `spotify-now-playing`: Compose treats that old container as an ORPHAN that `up` and `down` leave
     # RUNNING, so stop it first (docs/INSTALL.md, Upgrading). `npm run release -- --apply` refuses while it runs.
-    image: spotify-companion:1.0.0-beta.5
+    image: spotify-companion:1.0.0-beta.6
     container_name: spotify-companion
 
     ports:

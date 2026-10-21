@@ -95,3 +95,19 @@ Next: the owner's tag push (publishes the image), then the token probe and the A
   Surfaced as a security-posture decision; owner chose **"Separate subfolder (Recommended)"**. BR-69.4 amended; built as
   **1.0.0-beta.5** on branch `u9-secrets-subfolder` (all host paths → `secrets/app/`; release guard
   `credentials-not-in-place`; INSTALL upgrade note). The App-only walk waits for it.
+
+---
+
+## 2026-10-21T14:30:00Z — App-only walk ① NOT PASSED (BR-62.3); four findings fixed as 1.0.0-beta.6
+
+Owner: *"performed the cold walk... transcript is in U:"*, then *"the installation process didn't create an install
+log."* Reviewed the transcript outside the repository, redacting as read (pattern check: no token, client id/secret or
+refresh token in it; the owner's email address 10 times, so it is not committed).
+
+The app installed and ran, but: **F1** the README gave no version (the agent guessed registry tags) · **F2** INSTALL S1
+installs Node and git too (the agent skipped their checks on its own judgement) · **F3** step 2's *Expected* incomplete
+· **F4 defect**: `/state` and `/config` not writable by `node` after `setup` (root-created folders); reproduced, fixed
+in the entrypoint, valid control on fresh folders (an earlier invalid control is recorded as such). No install log:
+the App-only path had no `claude-start.md` route, so the log rule lived only in the walk guide's prompt; fixed.
+Built as **1.0.0-beta.6** on branch `u9-walk-fixes`. Record:
+`construction/u9-connector-upgrade/walks/walk-app-only-2026-10-21.md`. Next: release, publish, re-walk the changed steps.

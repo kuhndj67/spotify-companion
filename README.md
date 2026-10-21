@@ -65,23 +65,33 @@ Two ways to do it, following the same routine:
 The steps below exist but have **not yet been walked** by someone following them cold; this label comes off when
 they have. While the repository is private, pulling the image needs access to it.
 
-You need Docker (Rancher Desktop on Windows: [`docs/INSTALL.md`](docs/INSTALL.md) S1), a **classic** GitHub token with
-**only** the `read:packages` scope and a short expiry (a fine-grained token logs in but cannot pull: measured), and your
-own Spotify developer app. Commands are the same in PowerShell and a Linux shell; `<version>` is
-a release such as `1.0.0-beta.3`.
+You need:
+- **Docker**. On Windows: [`docs/INSTALL.md`](docs/INSTALL.md) S1, **the Rancher Desktop parts only**: steps 1, 2, 4
+  (only its `SUSE.RancherDesktop` line), 5 and 6, and the `wsl --status`, `docker version` and settings checks. *App
+  only* needs neither Node.js nor git. On Linux: Docker Engine.
+- A **classic** GitHub token with **only** the `read:packages` scope and a short expiry (a fine-grained token logs in
+  but cannot pull: measured).
+- Your own Spotify developer app (step 4).
+
+The current release is **`1.0.0-beta.6`**, which is the version in the commands below. Commands are the same in
+PowerShell and a Linux shell.
+
+**With Claude Code** (it does the steps it can, and keeps an install log): put this `README.md`,
+[`docs/INSTALL.md`](docs/INSTALL.md) and [`docs/claude-start.md`](docs/claude-start.md) together in an empty folder,
+open it in VS Code, start a Claude Code session, and type: *Read claude-start.md and install App only.*
 
 1. **Log in to the registry**: `docker login ghcr.io -u <your GitHub user name>`, and paste the token as the
    password. *Expected*: `Login Succeeded`.
 2. **Set up a folder**: in a new, empty folder, run
-   `docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup`.
-   *Expected*: `✓ setup wrote: compose.yaml, secrets/app/musicbrainz.json, config/rules.json`. It refuses, and writes
-   nothing, if any of those already exist.
+   `docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.6 setup`.
+   *Expected*: `✓ setup wrote: compose.yaml, secrets/app/musicbrainz.json, config/rules.json (and empty data/,
+   state/)`. It refuses, and writes nothing, if any of those already exist.
 3. **Your contact address**: open `secrets/app/musicbrainz.json` in that folder and replace `you@example.com` with an
    address where you can be reached (MusicBrainz requires it; the app does not start with the placeholder).
 4. **Your Spotify app**: register one as in [`docs/INSTALL.md`](docs/INSTALL.md) S3, with the redirect URI exactly
    `http://127.0.0.1:8888/callback`.
 5. **Sign in to Spotify**:
-   `docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:<version> auth`.
+   `docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.6 auth`.
    Enter the app's Client ID and Client Secret, open the printed link in your web browser and approve.
    *Expected*: `✓ Tokens written to /work/secrets/app/spotify-config.json`. Keep the `127.0.0.1:` in the command: it keeps
    the sign-in reachable from this computer only.

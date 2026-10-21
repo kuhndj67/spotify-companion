@@ -4,7 +4,7 @@ This installs **just the running app**, from its published container image: no s
 It runs on your own machine, with **your own Spotify account and your own Spotify developer credentials** (a client
 id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
 
-The current release is **`1.0.0-beta.7`**. The commands below use it.
+The current release is **`1.0.0-beta.8`**. The commands below use it.
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should
 see (**Expected**), and what to do if you see something else (**If it differs**). If a step does not match its
@@ -130,16 +130,16 @@ folder, and no files appear. Your folder and its files come in A3.
 **Commands**
 
 ```powershell
-docker pull ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7
-docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7
+docker pull ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.8
+docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.8
 ```
 
 **Expected**
 
 - `docker pull` takes a minute or two the first time. It prints a line per part of the image (`Pull complete`), and
-  ends with `Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7` (or `Image is up to
+  ends with `Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.8` (or `Image is up to
   date` if it was downloaded before).
-- `docker image ls` prints a heading line and **one line naming `1.0.0-beta.7`**: the image is stored and ready.
+- `docker image ls` prints a heading line and **one line naming `1.0.0-beta.8`**: the image is stored and ready.
   (The columns differ between Docker versions; the version on the line is what matters.)
 
 **If it differs**
@@ -161,7 +161,7 @@ docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7
 **Commands**: in a **new, empty** folder (for example `C:\spotify-companion`):
 
 ```powershell
-docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7 setup
+docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.8 setup
 ```
 
 **Expected**:
@@ -258,7 +258,7 @@ edit and change only the address.
 >    Then run:
 >
 >    ```powershell
->    docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7 auth
+>    docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.8 auth
 >    ```
 >    Keep the `127.0.0.1:` in it: it keeps the sign-in reachable from this computer only.
 > 2. Type the **Client ID** and **Client Secret** when asked.

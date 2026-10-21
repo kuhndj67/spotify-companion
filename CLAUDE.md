@@ -66,8 +66,9 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 ## Git and CI
 
 - `main` is protected: changes arrive by **pull request** with every check green: **Typecheck, test, smoke, knip,
-  build** · **Container image builds** · **Secret scan**. The ruleset is code: `.github/rulesets/main.json`, applied
-  by `npm run protect`, and cross-checked against `ci.yml` by a test.
+  build** · **Container image builds** · **Secret scan**. The rulesets are code: `.github/rulesets/main.json`, and
+  `.github/rulesets/release-tags.json` (only the owner creates, moves or deletes a `v*` tag, which publishes the
+  image), applied by `npm run protect` and cross-checked against `ci.yml` by a test.
 - **Standard multi-developer flow** (owner, 2026-10-18): all work happens on a **branch** (one per unit or fix, e.g.
   `u9-connector-upgrade`), committed in reviewable steps, pushed, and merged to `main` only by **pull request** with
   every check green. The **owner merges**. An agent never commits to `main` directly.
@@ -113,7 +114,7 @@ npm run auth            # host-side Spotify OAuth, once per install
 npm run rules:init      # create config/rules.json from the template (refuses to overwrite)
 
 npm run release         # plan a release (read-only); `-- --apply` builds, deploys, health-checks and tags (no push)
-npm run protect         # diff the committed ruleset against GitHub (read-only); `-- --apply` writes it
+npm run protect         # diff the committed rulesets against GitHub (read-only); `-- --apply` writes them
 
 npm run db:backup -- --label <why>                  # container DOWN first
 npm run db:restore -- <dir> --verify-only           # read-only; verify a backup the day you take it

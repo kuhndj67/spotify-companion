@@ -180,3 +180,22 @@ Logged, not built: **W-18** (code hardening: next beta 2.1.1, 2.1.2, 2.1.3, 2.3.
 before any collaborator gets write access**; the rest backlog); **W-19** (job registry, release/deploy split,
 composition and browser tests, layering, trail retention, arm64, Node LTS). Review 4.1 (private-repository wording)
 is part of the switch itself. **Visibility not changed.**
+
+---
+
+## 2026-10-21T18:40:00Z — Release tags protected (code review 2.5.1), before a collaborator gets write access
+
+Owner: *"lets add the tag ruleset because I'll give James write access."* `.github/rulesets/release-tags.json`: target
+`tag`, `refs/tags/v*`, rules creation, update, deletion and non-fast-forward, bypass the admin role only (as `main`).
+`scripts/protect.mjs` now syncs every file in `.github/rulesets/` and names any live ruleset without a file.
+`test/rulesetMatchesWorkflow.test.ts` asserts the ruleset covers what CI publishes from (`tags: ['v*']` and the
+publish job's `refs/tags/v` gate) and the bypass; **positive controls**: a ruleset missing creation, targeting branches
+or covering another prefix, and a CI trigger moved to another prefix, are each reported. `npm run protect`
+(read-only): `main` MATCHES, `release-tags` would be created; `--apply`: created (id 25564987) and read back matching.
+
+**Not verified**: (1) that the ruleset refuses James's tag push; that is his first `git push origin v0.0.0-refused`
+(safe either way: `publishDecision` refuses a tag that is not `package.json`'s version). (2) That the owner's bypass
+still lets the next release tag through (the next `v*` push shows it). (3) Two publish paths a write-access account
+may still have, from GitHub's documentation and **not probed** (the `gh` login lacks `read:packages`): a branch push
+with an edited `ci.yml` using the workflow token's `packages: write`, and a direct `docker push` with their own token
+if the package inherits repository permissions. Surfaced to the owner, not decided.

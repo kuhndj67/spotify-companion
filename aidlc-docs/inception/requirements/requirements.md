@@ -1112,7 +1112,12 @@ seen to **fail** on the bad input first. Finding numbers are the review's.
 
 **Before any collaborator has write access**: **2.5.1**, a tag ruleset for `refs/tags/v*` (today any write-access
 account can publish an image by pushing a tag), applied by `npm run protect` and asserted by
-`test/rulesetMatchesWorkflow.test.ts`.
+`test/rulesetMatchesWorkflow.test.ts`. ✅ **Done and live 2026-10-21** (`.github/rulesets/release-tags.json`, owner:
+*"I'll give James write access"*). ⚠️ Its positive control is owed: a `v*` tag push by the collaborator must be
+refused. ⚠️ **Not closed by it** (from GitHub's documentation, **not probed**): a write-access account may still
+publish (a) from a branch whose edited `ci.yml` runs a push with the workflow token's `packages: write`, if the
+package grants this repository's Actions write access, and (b) with their own token, if the package inherits the
+repository's permissions. Closing both is a package-settings and workflow-design decision for the owner.
 
 **Backlog**: 2.3.2 (trim the OAuth scopes to those used; probe first), 2.4.1 and 4.5 (document the entrypoint's
 `chown` on Linux), 2.4.2 (anchor `check-image.sh`'s file-name patterns), 2.5.2 (confirm the fork-PR approval setting

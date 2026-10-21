@@ -34,6 +34,10 @@ the code does not do it.
 to `main` directly.** That bypass is deliberate and lives in the committed ruleset
 ([`.github/rulesets/main.json`](.github/rulesets/main.json)), where review can see it. It is not hidden in settings.
 
+**Release tags are protected**: pushing a `v*` tag publishes the image, so only the owner can create, move or delete
+one ([`.github/rulesets/release-tags.json`](.github/rulesets/release-tags.json)). A contributor with write access
+pushes branches and opens pull requests; the owner cuts releases.
+
 **Versions** follow SemVer, and `package.json` is the only source. A release is `npm run release` (owner only). It
 refuses unless verify passes, the tree is clean, and the version is new and greater than every release.
 

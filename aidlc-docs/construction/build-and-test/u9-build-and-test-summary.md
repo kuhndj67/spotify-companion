@@ -1,6 +1,6 @@
 # U9 Build & Test — Connector Upgrade & Publishable Image
 
-**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.5` LIVE and PUBLISHED (2026-10-18 23:53Z); the App-only walk remains · Order: IN-U9-7, as listed in
+**Started**: 2026-10-18 (owner approved Code Generation) · **Status**: ▶ IN PROGRESS — ✅ `1.0.0-beta.6` LIVE and PUBLISHED (2026-10-21 13:55Z); the App-only re-walk remains · Order: IN-U9-7, as listed in
 [`code-summary.md`](../u9-connector-upgrade/code/code-summary.md) · Branch `u9-build-and-test`
 
 ✅ Live is `spotify-companion` `1.0.0-beta.3` at the MIT pin (from 19:45Z); `spotify-now-playing` `1.0.0-beta.2` stopped and kept for rollback.
@@ -205,7 +205,14 @@ upload). F4 reproduced on the dev PC and fixed in the entrypoint; **valid contro
 chowned was invalid, and is not counted.)* No install log was kept: the App-only path lacked `claude-start.md`'s logging
 rule; it now has an App-only route.
 
+## 14. `1.0.0-beta.6` live and published — ✅
+
+Owner: *"go"* (PRs #9 and #10 merged). From `main` (`27cc6a1`): released 13:54:22Z → live and healthy 13:55:03Z (gap
+under a minute); tag pushed → run `39612225938`, all four jobs ✅. **F4 seen fixed on the live install**: as `node`,
+`/state`, `/config`, `/data` and `/app/secrets` all writable; diagnostics *Automation state file … writable*, *Rules
+directory writable*. Version `1.0.0-beta.6`, MCP `ok`, 1470 plays.
+
 ## Still to do (in order)
 
-11. Release and publish `1.0.0-beta.6`, then **re-walk** the changed steps on Machine 1 with the shipped prompt (S1
-    Docker parts, step 2, step 6 incl. arming automation and a rules upload), keeping `install-log.md`.
+11. **Re-walk** the changed steps on Machine 1 with the shipped prompt (S1 Docker parts, step 2, step 6 incl. arming
+    automation and a rules upload), keeping `install-log.md`.

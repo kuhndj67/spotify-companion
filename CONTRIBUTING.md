@@ -43,7 +43,10 @@ so a branch with an edited `ci.yml` cannot publish. A contributor with write acc
 requests. All of this is applied by `npm run protect`.
 
 *The token (owner):* a **classic** token with only `write:packages` (GitHub's documentation says its container
-registry does not take fine-grained tokens; not probed here), with an expiry. Set it with `gh secret set GHCR_PUBLISH_TOKEN --env release` (it prompts; the
+registry does not take fine-grained tokens; not probed here), with an expiry. Create it from
+<https://github.com/settings/tokens/new?scopes=write:packages>. ⚠️ Two traps on GitHub's pages (2026-10-21): the
+*Generate new token* button can open the **fine-grained** form even from the classic list, and ticking
+`write:packages` by hand also ticks **`repo`** (every repository). The link avoids both; check `repo` is unticked. Set it with `gh secret set GHCR_PUBLISH_TOKEN --env release` (it prompts; the
 token is never written to a file), and replace it the same way before it expires. An expired token fails the
 publish job at its login step, and the tag stays unpublished until the job is re-run.
 

@@ -226,3 +226,9 @@ environment; the owner turns off the package's inheritance and removes this repo
 the controls: a branch job naming `release` is refused, a branch job pushing with the workflow token is refused, and
 the environment token logs in on a throwaway `v0.0.0-*` tag (whose publish decision refuses, so nothing is pushed).
 Until the token is set, a `v*` tag push fails at the login step.
+
+**2026-10-21T17:05Z — token set.** The owner created the classic `write:packages` token and set it on the `release`
+environment; `gh secret list --env release` shows `GHCR_PUBLISH_TOKEN` (17:00:49Z), and the repository has **no**
+repository-level secrets. My first instructions were wrong twice, caught by the owner and by GitHub's docs: the
+*Generate new token* button opened the fine-grained form from the classic page, and ticking `write:packages` by hand
+also ticks `repo`. CONTRIBUTING now gives the preselecting link. Still owed: the package settings, then the controls.

@@ -21,8 +21,8 @@ services:
     # Compose cannot read package.json, so this is a checked copy, not a second source. Change it with the version.
     # U9 (BR-71.1): one name everywhere -- image, container, service. ⚠️ Until 1.0.0-beta.2 the service was `now-playing`
     # and the container `spotify-now-playing`: Compose treats that old container as an ORPHAN that `up` and `down` leave
-    # RUNNING, so stop it first (docs/INSTALL.md, Upgrading). `npm run release -- --apply` refuses while it runs.
-    image: spotify-companion:1.0.0-beta.6
+    # RUNNING, so stop it first (docs/INSTALL-DEV.md, Updating). `npm run release -- --apply` refuses while it runs.
+    image: spotify-companion:1.0.0-beta.7
     container_name: spotify-companion
 
     ports:
@@ -34,7 +34,7 @@ services:
       # control on the LAN.
       #
       # Host port 3010 by default (3000 is taken on the owner's machine by another project). U8: if 3010 is taken on
-      # yours, set SPOTIFY_COMPANION_PORT in a `.env` file beside this one (gitignored) -- docs/INSTALL.md S7.
+      # yours, set SPOTIFY_COMPANION_PORT in a `.env` file beside this one (gitignored) -- docs/INSTALL-DEV.md S7.
       # Probed 2026-10-14: the variable is read from `.env` and from the shell. The access guard checks host NAMES,
       # never the port, so any port works. The container-internal port stays 3000.
       - "127.0.0.1:${SPOTIFY_COMPANION_PORT:-3010}:3000"

@@ -2,7 +2,17 @@
 
 **The single entry point for U9.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-18) — ✅ Code Generation COMPLETE (13 steps), awaiting approval → Build & Test
+## ▶ Current state (2026-10-21) — going public: review done, the switch is next
+
+`1.0.0-beta.6` live and published. **PR #12** (branch `install-docs-split`, open): the install documents split into
+`docs/INSTALL-APP.md` / `docs/INSTALL-DEV.md`, version `1.0.0-beta.7` (**not yet tagged**), walk ② gaps, and the
+pre-public review: [`code/pre-public-code-review.md`](code/pre-public-code-review.md) and
+[`code/pre-public-solution-review.md`](code/pre-public-solution-review.md), **no blocker**, triaged into pre-switch
+fixes and backlog **W-17…W-19** (`requirements.md` §5.1). Sequence and what is left:
+[`code/public-readiness-review.md`](code/public-readiness-review.md) §6: merge PR #12 → the switch (owner's go-ahead,
+with review 4.1's wording list) → next beta → App-only walk ③. U9 closes when walk ③ passes.
+
+### Earlier (2026-10-18) — ✅ Code Generation COMPLETE (13 steps), awaiting approval → Build & Test
 
 Read [`code/code-summary.md`](code/code-summary.md): files, deviations, controls seen to fail, and the **ordered list
 owed to Build & Test** (version bump → acceptance on `:3011` → startup check → rehearsed crossing and rollback → live

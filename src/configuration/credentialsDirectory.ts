@@ -53,7 +53,7 @@ export function classifyCredentialsDirectory(p: CredentialsDirectoryProbes): Cre
   return 'ok';
 }
 
-const UPGRADING = 'see Upgrading in docs/INSTALL.md';
+const UPGRADING = 'see Updating in docs/INSTALL-DEV.md';
 
 /**
  * The words the Spotify indicator and diagnostics show; `null` for `ok`. Kept under the indicator's 200-character

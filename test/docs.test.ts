@@ -14,7 +14,7 @@
  * ## ⚠️ What it CANNOT check
  *
  * Whether a command's **output** still matches what a document says it prints. That is the cold walk's job
- * (BR-62): an agent with only `docs/INSTALL.md` and a clean machine. A green run of this test says the documents
+ * (BR-62): an agent with only `docs/INSTALL-DEV.md` (or `docs/INSTALL-APP.md`) and a clean machine. A green run of this test says the documents
  * are internally consistent with the repository; it does not say the install works. A docs test that claimed more
  * would be the decorative guard this project keeps warning about.
  */
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = ['README.md', 'docs/INSTALL.md', 'docs/claude-start.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
+const DOCS = ['README.md', 'docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md', 'docs/claude-start.md', 'docs/ARCHITECTURE.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
 const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
 
 const scripts = new Set(Object.keys((JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts));
@@ -72,9 +72,9 @@ function handWrittenCounts(text: string): string[] {
 /** INSTALL steps (`## S<n> — …`) missing any of the four parts. */
 function stepsMissingParts(install: string): string[] {
   const parts = ['**Purpose**', '**Commands**', '**Expected**', '**If it differs**'];
-  const steps = install.split(/^## (?=S\d+\b)/m).slice(1);
+  const steps = install.split(/^## (?=[SA]\d+\b)/m).slice(1);
   return steps.flatMap((body) => {
-    const id = body.match(/^S\d+/)?.[0] ?? '?';
+    const id = body.match(/^[SA]\d+/)?.[0] ?? '?';
     const section = body.split(/^## /m)[0] ?? '';
     return parts.filter((p) => !section.includes(p)).map((p) => `${id}: ${p}`);
   });
@@ -117,6 +117,9 @@ describe('documents link only to things that exist (P-63 ②)', () => {
 describe('README holds no hand-written counts (P-63 ③)', () => {
   it('README.md', () => {
     assert.deepEqual(handWrittenCounts(read('README.md')), []);
+  });
+  it('docs/ARCHITECTURE.md', () => {
+    assert.deepEqual(handWrittenCounts(read('docs/ARCHITECTURE.md')), []);
   });
   it('positive control: the old README shape is caught', () => {
     assert.deepEqual(handWrittenCounts('1,565 tests passing · 977 plays · five units, 7 units'), ['1,565 tests', '977 plays', '7 units']);
@@ -169,9 +172,11 @@ function unfencedCommandRuns(install: string): string[] {
 }
 
 describe('no 👤 box holds consecutive commands outside a code block', () => {
-  it('docs/INSTALL.md', () => {
-    assert.deepEqual(unfencedCommandRuns(read('docs/INSTALL.md')), []);
-  });
+  for (const doc of ['docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md']) {
+    it(doc, () => {
+      assert.deepEqual(unfencedCommandRuns(read(doc)), []);
+    });
+  }
   it('positive control: the attempt-3 shape is reported, the fenced shape is not', () => {
     const bad = '> 4. install:\n>    `winget install a`\n>    `winget install b`\n';
     const good = '> 4. install:\n>\n>    ```powershell\n>    winget install a\n>    winget install b\n>    ```\n';
@@ -181,9 +186,14 @@ describe('no 👤 box holds consecutive commands outside a code block', () => {
 });
 
 describe('every 👤 box in INSTALL says what to see and what to report', () => {
-  it('docs/INSTALL.md', () => {
-    const install = read('docs/INSTALL.md');
+  it('docs/INSTALL-DEV.md', () => {
+    const install = read('docs/INSTALL-DEV.md');
     assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 8, 'expected the S1–S8 person boxes');
+    assert.deepEqual(personBoxesMissingParts(install), []);
+  });
+  it('docs/INSTALL-APP.md', () => {
+    const install = read('docs/INSTALL-APP.md');
+    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 6, 'expected the A1, A2, A4–A7 person boxes');
     assert.deepEqual(personBoxesMissingParts(install), []);
   });
   it('positive control: a box without its hand-back line is reported', () => {
@@ -193,9 +203,14 @@ describe('every 👤 box in INSTALL says what to see and what to report', () => 
 });
 
 describe('every INSTALL step has its four parts (P-63 ⑤, BR-61.1)', () => {
-  it('docs/INSTALL.md', () => {
-    const install = read('docs/INSTALL.md');
+  it('docs/INSTALL-DEV.md', () => {
+    const install = read('docs/INSTALL-DEV.md');
     assert.ok((install.match(/^## S\d+/gm) ?? []).length >= 10, 'expected S1…S10');
+    assert.deepEqual(stepsMissingParts(install), []);
+  });
+  it('docs/INSTALL-APP.md', () => {
+    const install = read('docs/INSTALL-APP.md');
+    assert.ok((install.match(/^## A\d+/gm) ?? []).length >= 8, 'expected A1…A8');
     assert.deepEqual(stepsMissingParts(install), []);
   });
   it('positive control: a step without "If it differs" is reported', () => {
@@ -203,3 +218,29 @@ describe('every INSTALL step has its four parts (P-63 ⑤, BR-61.1)', () => {
     assert.deepEqual(stepsMissingParts(doc), ['S2: **If it differs**']);
   });
 });
+
+/**
+ * Each install document stands alone (owner, 2026-10-21), so two passages exist in both: the Rancher Desktop install
+ * and the Spotify app registration. These lines must stay IDENTICAL, or one document drifts from what was walked.
+ */
+const SHARED_LINES = [
+  'winget install --id SUSE.RancherDesktop -e --source winget --accept-source-agreements --accept-package-agreements',
+  'wsl --install --no-distribution',
+  'rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.containerEngine.name) kubernetes=$($_.kubernetes.enabled)" }',
+  '**Redirect URIs**: exactly `http://127.0.0.1:8888/callback`. Type it, then click **Add**. **Which API/SDKs are',
+  'Open <https://developer.spotify.com/dashboard> and sign in. Accept the developer terms if asked.',
+];
+
+describe('the passages shared by INSTALL-DEV and INSTALL-APP are identical', () => {
+  for (const line of SHARED_LINES) {
+    it(`both contain: ${line.slice(0, 60)}…`, () => {
+      assert.ok(read('docs/INSTALL-DEV.md').includes(line), 'missing from INSTALL-DEV.md');
+      assert.ok(read('docs/INSTALL-APP.md').includes(line), 'missing from INSTALL-APP.md');
+    });
+  }
+
+  it('INSTALL-APP needs neither Node.js nor git (the walk-1 finding F2)', () => {
+    assert.doesNotMatch(read('docs/INSTALL-APP.md'), /OpenJS\.NodeJS|Git\.Git|node --version|git --version/);
+  });
+});
+

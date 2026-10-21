@@ -111,3 +111,144 @@ in the entrypoint, valid control on fresh folders (an earlier invalid control is
 the App-only path had no `claude-start.md` route, so the log rule lived only in the walk guide's prompt; fixed.
 Built as **1.0.0-beta.6** on branch `u9-walk-fixes`. Record:
 `construction/u9-connector-upgrade/walks/walk-app-only-2026-10-21.md`. Next: release, publish, re-walk the changed steps.
+
+---
+
+## 2026-10-21T15:30:00Z — Install documents split: INSTALL-DEV.md and INSTALL-APP.md (FR-75, BR-74.5 amended) → 1.0.0-beta.7
+
+1.0.0-beta.6 released and published (owner *"go"*; F4 seen fixed on the live install). During the re-walk the owner
+asked whether Node.js is needed for a container install (it is not: the image carries its own), saw that the App-only
+route still ran INSTALL S1's whole box, and that a note below it comes too late. Owner: keep README *"clean and tight"*,
+with *"separate dev and app only docs"*, named *"Install-dev.md and install-app.md"* (made `INSTALL-DEV.md` /
+`INSTALL-APP.md` for consistency with the other top-level documents; flagged as easy to change).
+
+Done on branch `install-docs-split`: `INSTALL.md` renamed `INSTALL-DEV.md`; a self-contained `INSTALL-APP.md` (A1–A8,
+no Node, no git; A8 checks rules and automation-state writability through diagnostics, never arming); README Install 8
+lines; `claude-start.md` routes by what the person types; duplicated passages held identical by a test. Checked
+against the live app before writing: the diagnostics step names and the automation response; the redirect-URI error
+text copied from INSTALL-DEV's measured wording (my first draft had invented one). Image texts naming the old file
+mean a release: **1.0.0-beta.7**. The re-walk walks the new document from its start.
+
+---
+
+## 2026-10-21T16:00:00Z — App-only walk ② NOT PASSED (on the pre-split documents); gaps fixed in PR #12
+
+Owner: *"copied walk results to D:\walk-results\2026-10-21.Run2"*. The walk ran on `1.0.0-beta.6` with the
+documents before the split (PR #12 not yet merged). The agent kept `install-log.md` (the shipped rule worked) and read
+only `claude-start.md`, `README.md`, `INSTALL.md`. Installed and recording; F1 and F3 from walk ① fixed. Seven gaps:
+five closed by `INSTALL-APP.md`, three more added to it on PR #12 (first-start `docker version` retry up to about
+three minutes in both documents; sign-in in the install folder; the first-start import of earlier plays). Record:
+`construction/u9-connector-upgrade/walks/walk-app-only-2026-10-21-run2.md` (the agent's log, secret-checked).
+
+---
+
+## 2026-10-21T16:20:00Z — Going public: decisions; a code review by another model first
+
+Owner: *"before we start walk 3 lets make the project public so I can send a link to one of my dev's … we can tune
+the installation instructions for a public repo (especially the app only install probably shouldn't require a
+key)."* Re-checked on the day: gitleaks over all 238 commits, no leaks; redacted classes absent from the tips.
+Decisions (question prompt): listening history **accepted as is**; image **public** (*"Yes, public image
+(Recommended)"*); and *"please add a code review step before going public where I switch you to fable for the task
+(get a different model looking at the project)."* **Visibility not changed.** Sequence recorded in
+`public-readiness-review.md` §6: merge PR #12 → review by another model → the switch (repo, package, private
+reporting, token-free App-only docs) → next beta → walk 3.
+
+---
+
+## 2026-10-21T18:00:00Z — Pre-public review by another model: no blocker; triage and owner decisions
+
+Owner: *"the fable reviews generated two review documents with recommendations but with no blockers to going
+public."* Records: `construction/u9-connector-upgrade/code/pre-public-code-review.md` (file and line) and
+`pre-public-solution-review.md` (architecture), both by Claude Fable 5.1 at `fefd768`, changing no other file.
+
+Decisions (question prompt): **MCP**: *"Schedule removal unit"*, recorded as D1's changed premise and **W-17** (a unit
+before U11, numbered in the next Inception round). **arm64**: *"State untested (Recommended)"*, a line in
+INSTALL-APP; multi-arch publishing is in **W-19**. **Architecture page**: *"Yes, before switch"*. **Commit email
+history**: *"Keep: no rewrite"*, the 2026-10-18 decision reconfirmed against the review's numbers (205 of 239 commits'
+metadata).
+
+Done on `install-docs-split` (PR #12): `aidlc-state.md` current line (review 1.4: it was two betas stale; on checking,
+`1.0.0-beta.7` is the version in PR #12 but **not tagged**, so the line says so); INSTALL-DEV S7 no longer says no
+image is published (4.2) and checks the secrets **exist** instead of the pre-U9 file-versus-folder check (4.3);
+INSTALL-APP A8 prints only its two diagnostics steps, never the contact address (4.4; both the PowerShell and the
+`grep` variant run against the live app, two lines `ok`); `docs/ARCHITECTURE.md` from the solution review §2, each
+named test and path checked to exist (the review's `ingestGuard` test is `ingestPolicy.test.ts`), added to
+`test/docs.test.ts`'s documents and its no-counts check (**positive control**: a dead path and a hand-written count
+in the page each turned the test red; restored, green); `application-design.md` marked as the inception-time plan.
+
+Logged, not built: **W-18** (code hardening: next beta 2.1.1, 2.1.2, 2.1.3, 2.3.1, 3.1; **2.5.1, a tag ruleset,
+before any collaborator gets write access**; the rest backlog); **W-19** (job registry, release/deploy split,
+composition and browser tests, layering, trail retention, arm64, Node LTS). Review 4.1 (private-repository wording)
+is part of the switch itself. **Visibility not changed.**
+
+---
+
+## 2026-10-21T18:40:00Z — Release tags protected (code review 2.5.1), before a collaborator gets write access
+
+Owner: *"lets add the tag ruleset because I'll give James write access."* `.github/rulesets/release-tags.json`: target
+`tag`, `refs/tags/v*`, rules creation, update, deletion and non-fast-forward, bypass the admin role only (as `main`).
+`scripts/protect.mjs` now syncs every file in `.github/rulesets/` and names any live ruleset without a file.
+`test/rulesetMatchesWorkflow.test.ts` asserts the ruleset covers what CI publishes from (`tags: ['v*']` and the
+publish job's `refs/tags/v` gate) and the bypass; **positive controls**: a ruleset missing creation, targeting branches
+or covering another prefix, and a CI trigger moved to another prefix, are each reported. `npm run protect`
+(read-only): `main` MATCHES, `release-tags` would be created; `--apply`: created (id 25564987) and read back matching.
+
+**Not verified**: (1) that the ruleset refuses James's tag push; that is his first `git push origin v0.0.0-refused`
+(safe either way: `publishDecision` refuses a tag that is not `package.json`'s version). (2) That the owner's bypass
+still lets the next release tag through (the next `v*` push shows it). (3) Two publish paths a write-access account
+may still have, from GitHub's documentation and **not probed** (the `gh` login lacks `read:packages`): a branch push
+with an edited `ci.yml` using the workflow token's `packages: write`, and a direct `docker push` with their own token
+if the package inherits repository permissions. Surfaced to the owner, not decided.
+
+---
+
+## 2026-10-21T19:30:00Z — Publish process hardened: a release-only credential; one approval on main
+
+Owner: *"James is certainly trustworthy but we should follow sound practice with regards to public projects so lets
+harden the publish process."* `gh` given `read:packages` by the owner. **Probed**: the package record exposes
+visibility (`private`) and the linked repository only; access inheritance and Actions access are **not in the API**
+(settings page only). The publish job logged in with the workflow token, which pushed beta.4–6, so a branch with an
+edited `ci.yml` **could** publish. Found while probing: `main`'s ruleset required **0** approvals.
+
+Decisions (question prompt): *"Token in environment (Recommended)"*; *"No extra click"* per publish; *"Yes, require 1
+approval (Recommended)"*.
+
+Done: `.github/environments/release.json` (deployment policy: `v*` tags only), synced by `npm run protect` like the
+rulesets (secrets are never read or written by it); `ci.yml` publish runs in `release`, logs in with
+`GHCR_PUBLISH_TOKEN`, and no job asks for `packages: write`; `main.json` requires 1 approval, dismisses stale
+approvals, and requires approval of the last push. `test/rulesetMatchesWorkflow.test.ts` pins all three, **positive
+controls**: the old 0-approval rule, the old publish job (workflow token, `packages: write`, no environment) and an
+environment that also admits a branch are each reported. `npm run protect`: diff showed exactly the three review
+fields and the missing environment; `--apply` read back matching; a second run MATCHES all three.
+
+**Owed** (not yet done or proven): the owner creates the classic `write:packages` token and sets it on the
+environment; the owner turns off the package's inheritance and removes this repository's Actions write access; then
+the controls: a branch job naming `release` is refused, a branch job pushing with the workflow token is refused, and
+the environment token logs in on a throwaway `v0.0.0-*` tag (whose publish decision refuses, so nothing is pushed).
+Until the token is set, a `v*` tag push fails at the login step.
+
+**2026-10-21T17:05Z — token set.** The owner created the classic `write:packages` token and set it on the `release`
+environment; `gh secret list --env release` shows `GHCR_PUBLISH_TOKEN` (17:00:49Z), and the repository has **no**
+repository-level secrets. My first instructions were wrong twice, caught by the owner and by GitHub's docs: the
+*Generate new token* button opened the fine-grained form from the classic page, and ticking `write:packages` by hand
+also ticks `repo`. CONTRIBUTING now gives the preselecting link. Still owed: the package settings, then the controls.
+
+**2026-10-21 — package settings (owner, on GitHub).** *Manage Actions access*: `spotify-companion` set to Read or
+removed; *Inherit access from repository (recommended)*: unticked (no overwrite warning appeared; the box stays
+unticked). My first instructions named an organisation-level setting and omitted the side-column *Package settings*
+link; corrected from GitHub's docs. Not readable by the API, so verified by the controls, not by a read-back.
+
+**2026-10-21T17:10Z — controls run (owner: *"yes... push"*).** Throwaway branch `publish-control` (one workflow,
+never merged; run 39640995752) and throwaway tag `v0.0.0-envcheck` on `a063cdf` (run 39640999459). Each read for its
+**reason**, not its colour:
+
+| Control | Expected | Seen |
+|---|---|---|
+| A branch job naming `release` | refused by GitHub | *"Branch "publish-control" is not allowed to deploy to release due to environment protection rules."* The job's own step never ran |
+| A branch job pushing with the workflow token (`packages: write`) | refused by the registry | `denied: permission_denied: write_package` |
+| A `v*` tag reaches `release`; the environment token logs in | login, then the decision refuses | `Login Succeeded`; the registry lookup answered (no *registry answer* line, printed only for `unknown`); `publishDecision: REFUSED (tag-mismatch)`; build and push skipped |
+| The owner creates and deletes a `v*` tag | allowed by the bypass | the push created it; the delete printed GitHub's rule notice *"Cannot delete this tag"* and the tag is gone (API 404): the deletion rule is live **and** bypassed for the owner |
+
+Package versions after: beta.4, beta.5, beta.6 only (nothing pushed). Branch and tag deleted. **Still owed**: James's
+own tag push refused (after he has access); that the environment token can **push** (not only log in and read), first
+shown by the beta.7 release.

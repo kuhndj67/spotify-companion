@@ -4,7 +4,7 @@ Thanks for looking. This is a small, single-user app with an unusually long memo
 file is that memory, the **traps** below, because they are what a newcomer, person or AI agent, would otherwise
 rediscover the hard way.
 
-To run it first, follow [`docs/INSTALL.md`](docs/INSTALL.md), then run `npm ci` once in the `spotify-companion`
+To run it first, follow [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md), then run `npm ci` once in the `spotify-companion`
 folder to install the development dependencies that `npm run verify` needs. Licence: GPL-3.0-or-later ([`LICENSE`](LICENSE)).
 Security reports: [`SECURITY.md`](SECURITY.md), not public issues.
 
@@ -30,9 +30,25 @@ the code does not do it.
 - Questions go in the existing documents: inception questions in the requirements and units plans, unit questions
   in `aidlc-docs/construction/plans/uN-*-plan.md`. **Do not invent new document types.**
 
-**`main` is protected**: changes arrive by pull request, and the checks above are required. ⚠️ **The owner may push
-to `main` directly.** That bypass is deliberate and lives in the committed ruleset
+**`main` is protected**: changes arrive by pull request, the checks above are required, and a pull request needs
+**one approval**, given again after any later push. ⚠️ **The owner may push to `main` directly**, and merges their own
+pull requests without an approval. That bypass is deliberate and lives in the committed ruleset
 ([`.github/rulesets/main.json`](.github/rulesets/main.json)), where review can see it. It is not hidden in settings.
+
+**Releases are the owner's**: pushing a `v*` tag publishes the image, so only the owner can create, move or delete
+one ([`.github/rulesets/release-tags.json`](.github/rulesets/release-tags.json)). The only credential that can push
+the image is `GHCR_PUBLISH_TOKEN`, a secret of the `release` environment, which GitHub gives only to `v*` tags
+([`.github/environments/release.json`](.github/environments/release.json)). No workflow asks for `packages: write`,
+so a branch with an edited `ci.yml` cannot publish. A contributor with write access pushes branches and opens pull
+requests. All of this is applied by `npm run protect`.
+
+*The token (owner):* a **classic** token with only `write:packages` (GitHub's documentation says its container
+registry does not take fine-grained tokens; not probed here), with an expiry. Create it from
+<https://github.com/settings/tokens/new?scopes=write:packages>. ⚠️ Two traps on GitHub's pages (2026-10-21): the
+*Generate new token* button can open the **fine-grained** form even from the classic list, and ticking
+`write:packages` by hand also ticks **`repo`** (every repository). The link avoids both; check `repo` is unticked. Set it with `gh secret set GHCR_PUBLISH_TOKEN --env release` (it prompts; the
+token is never written to a file), and replace it the same way before it expires. An expired token fails the
+publish job at its login step, and the tag stays unpublished until the job is re-run.
 
 **Versions** follow SemVer, and `package.json` is the only source. A release is `npm run release` (owner only). It
 refuses unless verify passes, the tree is clean, and the version is new and greater than every release.
@@ -182,7 +198,7 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
   the build fails if upstream changes that line. It goes when upstream accepts an equivalent override.
 - **Renaming a compose service orphans the old container**, and `up`/`down` leave an orphan running. U9 renamed
   everything to `spotify-companion`; upgrading from `1.0.0-beta.2` stops the old container first
-  (`docs/INSTALL.md`, *Updating*), and `npm run release` refuses while it runs.
+  (`docs/INSTALL-DEV.md`, *Updating*), and `npm run release` refuses while it runs.
 - **Check build exit codes directly.** `docker compose build | tail` reports the pipe's exit code.
 - **The owner's host is UTC−4.** Check `ls --time-style=full-iso data/snapshots/` before reasoning about any file
   time. A WAL mtime is the last write, never a heartbeat.

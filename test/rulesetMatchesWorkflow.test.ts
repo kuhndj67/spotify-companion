@@ -96,6 +96,161 @@ describe('the owner bypass is present and is the only one (BR-63.3)', () => {
 });
 
 /**
+ * Release tags (2026-10-21, pre-public code review 2.5.1). A pushed `v*` tag runs `publish`, which writes the image
+ * under the project's name with no review. Without this ruleset any account with WRITE access could do that. So:
+ * the ruleset must exist, cover every tag CI publishes from, forbid creating, moving and deleting them, and let only
+ * the owner (the admin-role bypass) through.
+ */
+interface TagRuleset {
+  target: string;
+  enforcement: string;
+  conditions: { ref_name: { include: string[]; exclude: string[] } };
+  bypass_actors: Ruleset['bypass_actors'];
+  rules: { type: string }[];
+}
+
+const REQUIRED_TAG_RULES = ['creation', 'update', 'deletion'] as const;
+
+function tagRulesetProblems(rs: TagRuleset, workflowYaml: string): string[] {
+  const problems: string[] = [];
+  if (rs.target !== 'tag') problems.push(`target is ${rs.target}, not tag`);
+  if (rs.enforcement !== 'active') problems.push(`enforcement is ${rs.enforcement}, not active`);
+  // What CI publishes from: the push trigger's tag filter and the publish job's `if`. Both must be `v`-prefixed
+  // tags, and the ruleset must cover exactly that prefix -- a ruleset on `release-*` would protect nothing.
+  if (!/^ {4}tags: \['v\*'\]\s*$/m.test(workflowYaml)) problems.push("ci.yml no longer triggers on tags: ['v*']");
+  if (!workflowYaml.includes("if: startsWith(github.ref, 'refs/tags/v')")) problems.push('publish is no longer gated on refs/tags/v');
+  const { include, exclude } = rs.conditions.ref_name;
+  if (include.length !== 1 || include[0] !== 'refs/tags/v*') problems.push(`includes ${JSON.stringify(include)}, not ["refs/tags/v*"]`);
+  if (exclude.length > 0) problems.push(`excludes ${JSON.stringify(exclude)}`);
+  const types = new Set(rs.rules.map((r) => r.type));
+  for (const t of REQUIRED_TAG_RULES) if (!types.has(t)) problems.push(`no ${t} rule`);
+  return problems;
+}
+
+const tagRuleset = JSON.parse(readFileSync(join(root, '.github', 'rulesets', 'release-tags.json'), 'utf8')) as TagRuleset;
+
+describe('release tags are protected (code review 2.5.1)', () => {
+  it('the release-tags ruleset covers what CI publishes from and forbids creating, moving and deleting it', () => {
+    assert.deepEqual(tagRulesetProblems(tagRuleset, ci), []);
+  });
+
+  it('the bypass is exactly the repository-admin role, always (the owner pushes release tags)', () => {
+    assert.deepEqual(tagRuleset.bypass_actors, [{ actor_id: 5, actor_type: 'RepositoryRole', bypass_mode: 'always' }]);
+  });
+
+  it('positive control: a ruleset that misses creation, targets branches or protects another prefix is reported', () => {
+    const weakened: TagRuleset = JSON.parse(JSON.stringify(tagRuleset));
+    weakened.rules = weakened.rules.filter((r) => r.type !== 'creation');
+    weakened.target = 'branch';
+    weakened.conditions.ref_name.include = ['refs/tags/release-*'];
+    assert.deepEqual(tagRulesetProblems(weakened, ci), [
+      'target is branch, not tag',
+      'includes ["refs/tags/release-*"], not ["refs/tags/v*"]',
+      'no creation rule',
+    ]);
+  });
+
+  it('positive control: a CI trigger that moved to another tag prefix is reported', () => {
+    const moved = ci.replace("tags: ['v*']", "tags: ['release-*']");
+    assert.deepEqual(tagRulesetProblems(tagRuleset, moved), ["ci.yml no longer triggers on tags: ['v*']"]);
+  });
+});
+
+/**
+ * `main` needs one approval (2026-10-21, owner: *"we should follow sound practice with regards to public projects"*).
+ * "The owner merges" was a convention: with 0 approvals any write-access account could merge its own pull request.
+ * The owner's own pull requests still merge through the admin bypass pinned above.
+ */
+interface PullRequestRule {
+  type: 'pull_request';
+  parameters: { required_approving_review_count: number; dismiss_stale_reviews_on_push: boolean; require_last_push_approval: boolean };
+}
+
+function reviewProblems(rs: { rules: { type: string }[] }): string[] {
+  const pr = rs.rules.find((r) => r.type === 'pull_request') as PullRequestRule | undefined;
+  if (!pr) return ['no pull_request rule'];
+  const problems: string[] = [];
+  if (pr.parameters.required_approving_review_count < 1) problems.push('no approving review required');
+  if (!pr.parameters.dismiss_stale_reviews_on_push) problems.push('a push after approval keeps the approval');
+  if (!pr.parameters.require_last_push_approval) problems.push('the last pusher can approve their own push');
+  return problems;
+}
+
+describe('a pull request into main needs an approval', () => {
+  it('one approval, re-required after any later push', () => {
+    assert.deepEqual(reviewProblems(ruleset), []);
+  });
+  it('positive control: the 0-approval ruleset of 2026-10-14 is reported', () => {
+    const old = JSON.parse(JSON.stringify(ruleset)) as { rules: PullRequestRule[] };
+    const pr = old.rules.find((r) => r.type === 'pull_request')!;
+    pr.parameters = { required_approving_review_count: 0, dismiss_stale_reviews_on_push: false, require_last_push_approval: false };
+    assert.deepEqual(reviewProblems(old), [
+      'no approving review required',
+      'a push after approval keeps the approval',
+      'the last pusher can approve their own push',
+    ]);
+  });
+});
+
+/**
+ * The publish credential (2026-10-21, code review 2.5.1 hardened). The tag ruleset stops a collaborator pushing a
+ * `v*` tag, but on a push to ANY branch GitHub runs that branch's own `ci.yml`. If the workflow token could write
+ * the package, an edited `ci.yml` could publish. So the only credential that can push lives in the `release`
+ * environment, which GitHub hands only to `v*` tags, and no job asks the workflow token for `packages: write`.
+ * (The package's own setting, *no Actions write for this repository*, is outside the repo: recorded, not testable.)
+ */
+interface Environment {
+  name: string;
+  deployment_branch_policy: { protected_branches: boolean; custom_branch_policies: boolean };
+  policies: { name: string; type: string }[];
+}
+
+/** Workflow lines that are not comments: a comment may (and does) explain what is forbidden. */
+const codeLines = (yaml: string) => yaml.split(/\r?\n/).filter((l) => !/^\s*#/.test(l)).join('\n');
+
+function publishCredentialProblems(workflowYaml: string, env: Environment): string[] {
+  const code = codeLines(workflowYaml);
+  const problems: string[] = [];
+  if (/packages:\s*write/.test(code)) problems.push('a job asks for packages: write');
+  if (/secrets\.GITHUB_TOKEN/.test(code)) problems.push('a step uses the workflow token as a secret');
+  const publish = code.slice(code.indexOf('  publish:'));
+  if (!/^ {4}environment: release\s*$/m.test(publish)) problems.push('publish does not run in the release environment');
+  if (!publish.includes('secrets.GHCR_PUBLISH_TOKEN')) problems.push('publish does not log in with GHCR_PUBLISH_TOKEN');
+  if (env.name !== 'release') problems.push(`environment file names ${env.name}`);
+  if (!env.deployment_branch_policy.custom_branch_policies || env.deployment_branch_policy.protected_branches) {
+    problems.push('the environment is not limited to its own ref list');
+  }
+  if (JSON.stringify(env.policies) !== JSON.stringify([{ name: 'v*', type: 'tag' }])) {
+    problems.push(`the environment admits ${JSON.stringify(env.policies)}, not only v* tags`);
+  }
+  return problems;
+}
+
+const releaseEnv = JSON.parse(readFileSync(join(root, '.github', 'environments', 'release.json'), 'utf8')) as Environment;
+
+describe('only a release tag can reach the publish credential', () => {
+  it('publish uses the release environment token; no job asks for packages: write', () => {
+    assert.deepEqual(publishCredentialProblems(ci, releaseEnv), []);
+  });
+  it('positive control: the pre-2026-10-21 publish job (workflow token, packages: write) is reported', () => {
+    const old = ci
+      .replace('    environment: release\n', '')
+      .replace('      contents: read\n    # Serialise per tag', '      contents: read\n      packages: write\n    # Serialise per tag')
+      .replace('secrets.GHCR_PUBLISH_TOKEN', 'secrets.GITHUB_TOKEN');
+    assert.deepEqual(publishCredentialProblems(old, releaseEnv), [
+      'a job asks for packages: write',
+      'a step uses the workflow token as a secret',
+      'publish does not run in the release environment',
+      'publish does not log in with GHCR_PUBLISH_TOKEN',
+    ]);
+  });
+  it('positive control: an environment that also admits a branch is reported', () => {
+    const wide: Environment = { ...releaseEnv, policies: [...releaseEnv.policies, { name: 'main', type: 'branch' }] };
+    assert.equal(publishCredentialProblems(ci, wide).length, 1);
+  });
+});
+
+/**
  * ⚠️ A required check that cannot FAIL is not a check (found 2026-10-14 by the BR-63.5 positive control).
  *
  * GitHub's default shell is `bash -e` with no `pipefail`, so `npm run test:coverage | tee …` reported `tee`'s exit

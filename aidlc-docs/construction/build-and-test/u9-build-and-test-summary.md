@@ -212,7 +212,35 @@ under a minute); tag pushed → run `39612225938`, all four jobs ✅. **F4 seen 
 `/state`, `/config`, `/data` and `/app/secrets` all writable; diagnostics *Automation state file … writable*, *Rules
 directory writable*. Version `1.0.0-beta.6`, MCP `ok`, 1470 plays.
 
+## 15. Install documents split (owner, 2026-10-21) → `1.0.0-beta.7`
+
+During the re-walk the owner saw the conflict the fix to F2 had left: README pointed *App only* into S1, and an agent
+shows a 👤 box word for word, so Node.js and git were installed anyway; a note below the box comes too late for a
+person reading top to bottom. Owner: *"The readme is what displays in github so we should keep that document clean and
+tight … lets take a look at a clean process that has separate dev and app only docs"*, then *"lets make
+Install-dev.md and install-app.md docs"* (made `INSTALL-DEV.md` / `INSTALL-APP.md`, capitals as the other top-level
+docs; GitHub is case-sensitive).
+
+- `docs/INSTALL.md` → **`docs/INSTALL-DEV.md`** (git rename; title says *full development environment*).
+- **`docs/INSTALL-APP.md`**, self-contained, A1–A8: Docker only (WSL + Rancher Desktop, no Node, no git), registry
+  access, `setup`, the Spotify app, the contact address, `auth`, start and check, and **A8: automation and rules
+  ready and off**, checked through diagnostics (the F4 check without ever arming automation).
+- README's Install section: 8 lines (README 110 → 59 lines); its stale *"No published image"* bullet corrected.
+- `claude-start.md`: one document per install, chosen by what the person types (*"…and install the app"* /
+  *"…and follow it"*).
+- Tests: both documents under the step-shape, box and command checks; the duplicated passages held **identical** by
+  a test; INSTALL-APP must not mention Node or git; its version is a checked copy of `package.json`.
+- Two texts inside the image named the old file (`auth`'s last line, sent App-only users to *"S5 of INSTALL.md"*; the
+  credentials message), so this ships as **`1.0.0-beta.7`**, before the re-walk.
+
+## 16. App-only walk ② (2026-10-21, `1.0.0-beta.6`, the pre-split documents) — ❌ NOT PASSED; gaps fixed in PR #12
+
+Record: [`walk-app-only-2026-10-21-run2.md`](../u9-connector-upgrade/walks/walk-app-only-2026-10-21-run2.md). The log
+was kept (the shipped rule worked); the agent read only its three documents. Walk ①'s F1 and F3 matched as written.
+Seven gaps, five already closed by the split, three closed by additions to it: the first-start `docker version`
+retry (both documents), "run the sign-in in your folder", and the warning that the first start imports earlier plays.
+
 ## Still to do (in order)
 
-11. **Re-walk** the changed steps on Machine 1 with the shipped prompt (S1 Docker parts, step 2, step 6 incl. arming
-    automation and a rules upload), keeping `install-log.md`.
+11. Release and publish `1.0.0-beta.7`, then **re-walk** `INSTALL-APP.md` on Machine 1 (a fresh walk: the document is
+    new), with *"Read claude-start.md and install the app."*, keeping `install-log.md`.

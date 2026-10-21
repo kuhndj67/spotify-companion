@@ -689,6 +689,10 @@ table.coverage th { color: var(--muted, #7a8290); font-weight: 500; }
   gap: 0.5rem 1rem;
   padding: 0.35rem 0.9rem;
   background: rgba(12, 12, 14, 0.92);
+  /* ⚠️ The bar is dark in BOTH colour schemes, so it sets its own text colour. Inherited, its labels took the page's
+     light-mode `--text` (#16171a): black on black, the glyphs alone visible (issue #14).
+     test/statusBarContrast.test.ts holds the contrast. */
+  color: #f2f3f5;
   border-top: 1px solid rgba(255, 255, 255, 0.09);
   backdrop-filter: blur(8px);
   font-size: 0.78rem;

@@ -270,3 +270,72 @@ removed; `compose.app.yaml`'s pull note removed (it ships in the image, so from 
 public. Swept for `private`, `read:packages` and `docker login` across the documents, `src/`, `scripts/` and the
 Dockerfile: none left. ⚠️ A2's ARM wording is deliberately generic: what Docker prints for this image on ARM is not
 measured. The A2 commands are walked for the first time in walk ③.
+
+---
+
+## 2026-10-21T17:30:00Z — ✅ Public; 1.0.0-beta.7 live and published (the release-environment token's first push)
+
+**The switch** (owner): PR #13 merged at 17:20:49Z with the repository made public, the package made public,
+private vulnerability reporting on, and the fork-PR setting confirmed. Read back by API: repository `public`, package
+`public`, private vulnerability reporting `enabled: true`, fork-PR approval `first_time_contributors`, default workflow
+token `read`. **Probed as a stranger**: `git ls-remote` with no credential helper lists the tags; the registry serves
+the beta.6 manifest to an anonymous token (HTTP 200), and a made-up `9.9.9` is 404 (the probe can tell). GitHub's
+*"This branch has not been deployed"* on PRs is the `release` environment's notice: no PR ever deploys to it.
+
+**The release** (owner: *"backup created, run npm script"*): `npm run release -- --apply`: verify (0 failures),
+build, deploy, healthy, tag `v1.0.0-beta.7` (local). Live: `healthy`, image `spotify-companion:1.0.0-beta.7`,
+diagnostics *App version 1.0.0-beta.7 · Database schema v7*, token refresh ok, connector connected, **1,497 plays,
+0 gaps**. The tag push (owner's command, typed twice; run by me when the `!` form arrived as a message): GitHub printed
+*"Bypassed rule violations … Cannot create ref due to creations being restricted"*, the owner's bypass seen working
+for creation. Run 39643903712: all four jobs green; publish *Login Succeeded* (environment token),
+`publishDecision: publish 1.0.0-beta.7`, push `digest: sha256:b54d271261d6…`. The package lists `1.0.0-beta.7`
+(17:29:01Z); an anonymous pull of its manifest is HTTP 200; the `release` environment's first successful deployment
+is `v1.0.0-beta.7`. **The token's push, owed since the hardening, is now shown.**
+
+Still owed: the collaborator's own `v*` tag push refused (after James has access); App-only walk ③ on the public
+image (its new A2 walked for the first time).
+
+---
+
+## 2026-10-21T18:30:00Z — ✅ U9 CLOSED (owner); walk ③ by the owner; status-bar defect filed as issue #14
+
+Owner: *"I think we're done with this unit correct?"*. I answered no by the records (U9 closed on walk ③ passing).
+Owner: *"the dev install has been completely walked by me (for vscode/rancher desktop deployment both using ai and
+manually installing) and the app install has been walked multiple times, deploys successfully each time and now we're
+just cleaning up loose ends."* The records agree on the second half: walks ① and ② each **installed and ran**, and
+were *not passed* only under BR-62.3 (a step needing outside knowledge fails the walk). BR-62.3 asks for the **fixed
+steps** to be re-walked; *walk ③ passes* was a stricter closing condition written today. The owner's own walks of
+the development install were **not recorded** before this entry; recorded now from the owner's statement.
+
+**Walk ③** (owner, App-only, `1.0.0-beta.7`, the public image, a different machine from this one): *"went through the
+whole app install process and the app is running and the process did work well."* One finding: **A2** `docker pull`
+printed *Pull complete* lines and no files appeared in the folder, so whether it had worked needed outside knowledge
+(BR-62.3). Fixed: A2 says the image goes into Docker's own storage and the files arrive in A3, and adds
+`docker image ls` (both outcomes seen here). Also asked: every command a reader runs in a code block (done in both
+install documents) and "developer credentials (client id and secret)" for "developer app" in the introductions.
+
+Side finding on **this** machine, not a document defect: `docker pull` of any `ghcr.io` image, ours or
+`linuxcontainers/alpine`, is `denied`, even with an empty client configuration, while the registry serves beta.7's
+manifest, config and layers to an anonymous client (HTTP 200, full sizes) and the owner's pull elsewhere worked. A
+`ghcr.io` sign-in is stored (`credsStore: wincred`). Inferred, **not measured**: Rancher Desktop's CLI still sends it.
+A2's `docker logout ghcr.io` fix was not run here (the owner's credential; not needed for the walk).
+
+**UI defect → issue #14**: in **light** mode the status-bar labels are invisible. Owner: *"the text is there but it's
+black and the status bar background is black."* Reproduced here by emulating light mode: every label computed
+`rgb(22, 23, 26)` on the bar's `rgba(12, 12, 14, 0.92)`; dark mode (this machine's default) renders `rgb(242, 243,
+245)`. Cause: `.statusbar` sets a fixed dark background but no text colour, so it inherits the page's `--text`. The
+`⊘` that looked like a question mark: the owner, *"it's just small so the 'slash' is pixellated … not a problem."* The
+fix is its own branch and PR.
+
+**Decision (owner, accepting my proposal)**: **U9 is closed.** README's Status names the walks that happened, and the
+App-only *coming soon* label is off. Carried forward: re-walk the steps changed after walk ② that walk ③ did not
+cover as written (A2's new check and text; INSTALL-DEV S2 and S7, which no walk has run since they changed). BR-62.2's
+walk by a person who did not write the documents remains the `1.0.0` trigger. Owed under W-18: the collaborator's
+`v*` tag push refused.
+
+**2026-10-21 — the side finding resolved.** The owner ran `docker logout ghcr.io` on this machine (*"removing
+credentials…"*). After it: `auths: []`; `docker pull …:1.0.0-beta.7` ends *Status: Downloaded newer image*;
+`docker image ls` shows one line, ID `b54d271261d6`, the digest CI published. So the stored sign-in **was** the cause
+(measured, no longer inferred), and A2's *If it differs* fix works as written. Still unexplained: the earlier pull with
+an empty `DOCKER_CONFIG` was also refused, so this Docker found the sign-in by another route; it does not change the
+document.

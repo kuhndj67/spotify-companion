@@ -1125,8 +1125,8 @@ environment that admits only `v*` tags (`.github/environments/release.json`), an
 by the owner turning off the package's *inherit access from the repository*. No extra approval per publish (owner).
 Found while probing and closed the same day: `main` required **0** approvals, so a write-access account could merge
 its own pull request; now 1, re-required after a later push (owner bypass unchanged). ✅ **Controls passed 2026-10-21** (`audit.md`): a branch refused the environment, the workflow token refused
-write, a `v*` tag logged in with the environment token. Owed: the collaborator's tag push refused; the token's first
-real push (beta.7).
+write, a `v*` tag logged in with the environment token. Owed: the collaborator's tag push refused. ✅ The token's first
+real push: beta.7, 2026-10-21 (`digest: sha256:b54d2712…`).
 
 **Backlog**: 2.3.2 (trim the OAuth scopes to those used; probe first), 2.4.1 and 4.5 (document the entrypoint's
 `chown` on Linux), 2.4.2 (anchor `check-image.sh`'s file-name patterns), 2.5.2 (confirm the fork-PR approval setting

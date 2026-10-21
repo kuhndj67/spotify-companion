@@ -1,8 +1,8 @@
 # Install: the app only
 
 This installs **just the running app**, from its published container image: no source code and no development tools.
-It runs on your own machine, with **your own Spotify account and your own Spotify developer app**. Nothing is shared
-with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
+It runs on your own machine, with **your own Spotify account and your own Spotify developer credentials** (a client
+id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
 
 The current release is **`1.0.0-beta.7`**. The commands below use it.
 
@@ -45,12 +45,25 @@ macOS untested. The image is published for **`linux/amd64`** (Intel and AMD proc
 > 👤 **YOU DO THIS** — A1, Windows · needs: PowerShell **as administrator**, then a restart, then an ordinary
 > PowerShell window
 >
-> 1. **WSL** (Windows Subsystem for Linux, which Rancher Desktop runs on). Skip to 4 if `wsl --status` already prints
->    settings rather than *not installed*. Open **PowerShell as administrator**: Start menu → type `PowerShell` →
->    right-click **Windows PowerShell** → **Run as administrator** → **Yes**. In that window run:
->    `wsl --install --no-distribution`
+> 1. **WSL** (Windows Subsystem for Linux, which Rancher Desktop runs on). First check whether it is there already:
+>
+>    ```powershell
+>    wsl --status
+>    ```
+>
+>    If that prints settings rather than *not installed*, skip to 4. Otherwise open **PowerShell as administrator**:
+>    Start menu → type `PowerShell` → right-click **Windows PowerShell** → **Run as administrator** → **Yes**. In that
+>    window run:
+>
+>    ```powershell
+>    wsl --install --no-distribution
+>    ```
 > 2. When it finishes, **restart Windows**.
-> 3. After the restart, in an **ordinary** PowerShell window, run `wsl --status`.
+> 3. After the restart, in an **ordinary** PowerShell window, run:
+>
+>    ```powershell
+>    wsl --status
+>    ```
 > 4. In an ordinary PowerShell window, install **Rancher Desktop** (skip if you have it). Click **Yes** if Windows asks
 >    to allow changes:
 >
@@ -111,17 +124,23 @@ rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.container
 ## A2 — Download the image
 
 **Purpose**: download the app's image from GitHub's container registry. The image is public: no GitHub account or
-sign-in is needed.
+sign-in is needed. Docker keeps the image in **its own storage, not in a folder of yours**: you can run this from any
+folder, and no files appear. Your folder and its files come in A3.
 
 **Commands**
 
 ```powershell
 docker pull ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7
+docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7
 ```
 
-**Expected**: the download takes a minute or two the first time, and ends with
-`Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7` (or `Image is up to date` if it
-was downloaded before).
+**Expected**
+
+- `docker pull` takes a minute or two the first time. It prints a line per part of the image (`Pull complete`), and
+  ends with `Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7` (or `Image is up to
+  date` if it was downloaded before).
+- `docker image ls` prints a heading line and **one line naming `1.0.0-beta.7`**: the image is stored and ready.
+  (The columns differ between Docker versions; the version on the line is what matters.)
 
 **If it differs**
 
@@ -129,6 +148,7 @@ was downloaded before).
   current release is named at the top of this file.
 - `denied` or `unauthorized`: Docker is probably sending an old GitHub sign-in (for example, from an earlier install
   of this app). Run `docker logout ghcr.io` and repeat. Still refused: stop and report it.
+- `docker image ls` prints only the heading line: the download did not finish. Run `docker pull` again.
 - An error or warning naming a **platform**, `arm64` or `linux/amd64`: this is an ARM machine. See **Platforms** at
   the top: it is untested there.
 
@@ -209,7 +229,11 @@ app **does not start** with the placeholder.
 (Get-Content secrets\app\musicbrainz.json -Raw | ConvertFrom-Json).contact -notin @('', 'you@example.com')
 ```
 
-*Linux:* `grep -q '"contact": "you@example.com"' secrets/app/musicbrainz.json && echo False || echo True`
+*Linux:*
+
+```bash
+grep -q '"contact": "you@example.com"' secrets/app/musicbrainz.json && echo False || echo True
+```
 
 **Expected**: `True`.
 
@@ -225,8 +249,13 @@ edit and change only the address.
 > 👤 **YOU DO THIS** — A6 · needs: an ordinary PowerShell window in your folder, a web browser, and A4's Client ID and
 > Client secret
 >
-> 1. In PowerShell, go to **your folder** from A3 (e.g. `cd C:\spotify-companion`): the command writes into the
->    folder it is run in. Then run:
+> 1. In PowerShell, go to **your folder** from A3 (the command writes into the folder it is run in), for example:
+>
+>    ```powershell
+>    cd C:\spotify-companion
+>    ```
+>
+>    Then run:
 >
 >    ```powershell
 >    docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7 auth
@@ -263,7 +292,13 @@ play. *No errors* is not evidence.
 
 **Commands**
 
-1. In your folder: `docker compose up -d`. Wait about 30 seconds (first start), then:
+1. In your folder:
+
+   ```powershell
+   docker compose up -d
+   ```
+
+   Wait about 30 seconds (first start), then:
 
    ```powershell
    curl.exe -s http://localhost:3010/api/health
@@ -300,8 +335,13 @@ play. *No errors* is not evidence.
 
 **If it differs**
 
-- `/api/health` fails to connect: wait 30 seconds (first start) and retry. Still failing: `docker logs
-  spotify-companion` names the cause. *MusicBrainz contact* means A5; *credentials* means A6.
+- `/api/health` fails to connect: wait 30 seconds (first start) and retry. Still failing, this names the cause:
+
+  ```powershell
+  docker logs spotify-companion
+  ```
+
+  *MusicBrainz contact* means A5; *credentials* means A6.
 - The Spotify indicator is not **●**: hover it; the reason is written there.
 - The played track is missing: a play is recorded when the track **ends**; wait for the next one and check again.
 
@@ -350,8 +390,25 @@ Do not print the full diagnostics output into a log instead.
 
 - **Back up first**: in the app, **Settings → Create backup**. Your listening history in `data/` **cannot be
   recreated**.
-- **Update to a newer release**: `docker compose down`; in `compose.yaml`, change the version in the `image:` line to
-  the new release; `docker compose up -d`.
-- **Stop**: `docker compose down` (your data stays). **Start again**: `docker compose up -d`. It also restarts by
-  itself after a reboot, once Rancher Desktop is running.
-- **Remove**: `docker compose down`, then delete the folder. ⚠️ Keep a backup if you may want your history.
+- **Update to a newer release**: stop it, change the version in the `image:` line of `compose.yaml` to the new
+  release, and start it again:
+
+  ```powershell
+  docker compose down
+  # now edit compose.yaml: change the version at the end of its image: line
+  docker compose up -d
+  ```
+
+- **Stop** (your data stays), and **start again**. It also restarts by itself after a reboot, once Rancher Desktop
+  is running:
+
+  ```powershell
+  docker compose down
+  docker compose up -d
+  ```
+
+- **Remove**: stop it, then delete the folder. ⚠️ Keep a backup if you may want your history.
+
+  ```powershell
+  docker compose down
+  ```

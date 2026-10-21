@@ -2,7 +2,8 @@
 
 This installs your own copy of Spotify Companion **from source**, with the tools to change and test it (to run
 just the app, use [`INSTALL-APP.md`](INSTALL-APP.md) instead), on your own machine, with **your own Spotify account and your own
-Spotify developer app**. Nothing is shared with anyone else's install.
+Spotify developer credentials** (a client id and secret, which S3 shows you how to get). Nothing is shared with anyone
+else's install.
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should
 see (**Expected**), and what to do if you see something else (**If it differs**). If a step does not match its
@@ -53,12 +54,25 @@ is the same on both.
 > 👤 **YOU DO THIS** — S1, Windows · needs: PowerShell **as administrator**, then a restart, then an ordinary
 > PowerShell window
 >
-> 1. **WSL** (Windows Subsystem for Linux, which Rancher Desktop runs on). Skip to 4 if `wsl --status` already prints
->    settings rather than *not installed*. Open **PowerShell as administrator**: Start menu → type `PowerShell` →
->    right-click **Windows PowerShell** → **Run as administrator** → **Yes**. In that window run:
->    `wsl --install --no-distribution`
+> 1. **WSL** (Windows Subsystem for Linux, which Rancher Desktop runs on). First check whether it is there already:
+>
+>    ```powershell
+>    wsl --status
+>    ```
+>
+>    If that prints settings rather than *not installed*, skip to 4. Otherwise open **PowerShell as administrator**:
+>    Start menu → type `PowerShell` → right-click **Windows PowerShell** → **Run as administrator** → **Yes**. In that
+>    window run:
+>
+>    ```powershell
+>    wsl --install --no-distribution
+>    ```
 > 2. When it finishes, **restart Windows**.
-> 3. After the restart, in an **ordinary** PowerShell window, run `wsl --status`.
+> 3. After the restart, in an **ordinary** PowerShell window, run:
+>
+>    ```powershell
+>    wsl --status
+>    ```
 > 4. In an ordinary PowerShell window, install whichever of these you do not have yet. Click **Yes** if Windows asks
 >    to allow changes. Run them **one at a time**:
 >
@@ -367,8 +381,11 @@ Test-Path data, state
 
 - `config/rules.json already exists — leaving it alone.`: it was created before. That is fine.
 - *Linux*: `id -u` prints something other than `1000`. The app inside the container runs as user id 1000 and must
-  be able to write `config`, `state` and `secrets/app`. Run
-  `sudo chown -R 1000:1000 config state secrets/app`. *(Not yet walked; to be confirmed on Linux.)*
+  be able to write `config`, `state` and `secrets/app`. Run *(not yet walked; to be confirmed on Linux)*:
+
+  ```bash
+  sudo chown -R 1000:1000 config state secrets/app
+  ```
 
 ---
 
@@ -494,9 +511,18 @@ records a play. *No errors* is not evidence. (Port `3010`, or the port you chose
 
 **If it differs**
 
-- `/api/health` prints `"status":"degraded"`: the app is running but its Spotify connection is not.
-  `docker logs spotify-companion` names the cause. Usually S4 is incomplete; redo it, then
-  `docker compose restart`.
+- `/api/health` prints `"status":"degraded"`: the app is running but its Spotify connection is not. This names the
+  cause:
+
+  ```powershell
+  docker logs spotify-companion
+  ```
+
+  Usually S4 is incomplete; redo it, then:
+
+  ```powershell
+  docker compose restart
+  ```
 - Connection refused: the container is not running (S7), or you are using the wrong port.
 - `/api/now-playing` shows `"isPlaying":false` while music plays: the music is playing on a **different Spotify
   account** from the one used in S3/S4.
@@ -547,19 +573,37 @@ start armed.
 
 ## Updating, stopping, removing
 
-- **Stop**: `docker compose down` (your data stays in `data/`).
-- **Start again**: `docker compose up -d`. It also restarts by itself after a reboot, once Rancher Desktop / Docker
-  is running.
-- **Update to a newer release**: `git fetch --tags`, then `git checkout <new tag>`, then `docker compose up -d --build`.
-  Take **Settings → Create backup** first.
+- **Stop** (your data stays in `data/`):
+
+  ```powershell
+  docker compose down
+  ```
+
+- **Start again**. It also restarts by itself after a reboot, once Rancher Desktop / Docker is running:
+
+  ```powershell
+  docker compose up -d
+  ```
+
+- **Update to a newer release**: take **Settings → Create backup** first. Then, replacing `<new tag>`:
+
+  ```powershell
+  git fetch --tags
+  git checkout <new tag>
+  docker compose up -d --build
+  ```
 - **Upgrading from `1.0.0-beta.4` or earlier** (once): since `1.0.0-beta.5` the two credential files live in
   **`secrets/app/`**, and only that folder is mounted into the container (so other tools' credentials in `secrets/`
   stay out of it). And from `1.0.0-beta.2` or earlier, the container was also renamed from `spotify-now-playing` to
   `spotify-companion`.
   1. **Settings → Create backup**.
-  2. `docker compose down` **before** you check out the new tag. The old `compose.yaml` is the only one that knows
-     the old container; once you have the new one, `down` leaves the old container running beside the new one, and
-     both would record into `data/`.
+  2. Stop it **before** you check out the new tag. The old `compose.yaml` is the only one that knows the old
+     container; once you have the new one, `down` leaves the old container running beside the new one, and both
+     would record into `data/`.
+
+     ```powershell
+     docker compose down
+     ```
   3. Move the two files:
 
      Windows (PowerShell):
@@ -572,13 +616,34 @@ start armed.
      ```bash
      mkdir -p secrets/app && mv secrets/spotify-config.json secrets/musicbrainz.json secrets/app/
      ```
-  4. `git fetch --tags`, `git checkout <new tag>`, `docker compose up -d --build`.
+  4. Update, replacing `<new tag>`:
+
+     ```powershell
+     git fetch --tags
+     git checkout <new tag>
+     docker compose up -d --build
+     ```
 
   **If the app will not start after the update** (`docker logs spotify-companion` says the MusicBrainz contact is
-  missing), step 3 was skipped: do it, then `docker compose up -d`.
+  missing), step 3 was skipped: do it, then:
 
-  **If you already checked out the new tag**: run `docker stop spotify-now-playing`, then `docker rm
-  spotify-now-playing`, then `docker compose up -d`. **If the Spotify indicator says the credentials are mounted as
+  ```powershell
+  docker compose up -d
+  ```
+
+  **If you already checked out the new tag**, remove the old container and start the new one:
+
+  ```powershell
+  docker stop spotify-now-playing
+  docker rm spotify-now-playing
+  docker compose up -d
+  ```
+
+  **If the Spotify indicator says the credentials are mounted as
   single files**, the old `compose.yaml` is in use with the new image: check out the new tag and start again.
-- **Remove**: `docker compose down`, then delete the folder. ⚠️ `data/` holds your play history and **nothing can
-  recreate it**. Keep a backup if you may want it.
+- **Remove**: stop it, then delete the folder. ⚠️ `data/` holds your play history and **nothing can recreate it**.
+  Keep a backup if you may want it.
+
+  ```powershell
+  docker compose down
+  ```

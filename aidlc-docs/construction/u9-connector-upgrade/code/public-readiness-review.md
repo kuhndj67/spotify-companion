@@ -106,4 +106,6 @@ names) absent from `main` and the open PR's tip. Every disclosure class now has 
    removed, SECURITY's *until then* paragraph removed, the `compose.app.yaml` pull note removed (it ships in the image
    from beta.7). The owner changes visibility **when merging it**, so the documents and the repository change together.
 4. Release and publish the next beta; then walk 3 of `INSTALL-APP.md`, now with no token.
+   ✅ 2026-10-21: step 3 done (PR #13 merged with the switch; settings read back, access probed anonymously);
+   `1.0.0-beta.7` released and published. ✅ Walk 3 by the owner (installed and ran; A2 finding fixed); U9 closed.
 

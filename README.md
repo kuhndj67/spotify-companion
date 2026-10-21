@@ -24,21 +24,23 @@ quality product with AI doing all the coding.
 ## What it is not (at the moment; some of this will change when I get to it)
 
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
-  developer app** and account. Nothing is shared between installs.
+  account and developer credentials**. Nothing is shared between installs.
 - **Not reachable from other machines.** The app answers only on `localhost`.
 
 ## Status
 
-Beta. The install routine has been walked end to end by an AI agent on a clean Windows machine; a walk by a person
-comes next. The running version is in **Settings** (and in `package.json`). Automated skipping ships **off** and stays
+Beta. Both install routes have been walked end to end on Windows with Rancher Desktop. The development install was
+walked by its owner, by hand and with an AI agent. The app-only install was walked by AI agents on a clean Windows
+machine and by its owner, and installed and ran each time. Linux and macOS are written for but not yet walked. The running version is in **Settings** (and in `package.json`). Automated skipping ships **off** and stays
 off until you arm it.
 
 ## Install
 
-Each install runs on your own machine, with your own Spotify account and your own Spotify developer app.
+Each install runs on your own machine, with your own Spotify account and your own Spotify developer credentials (a
+client id and secret; the install steps show you how to get them).
 
 - **Just the app** (most people): [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md). Docker and a prebuilt image; no
-  source code or development tools. ⚠️ *Coming soon*: its steps are being walked cold before this label comes off.
+  source code or development tools.
 - **Full development environment** (to change the code): [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md). Then
   `npm ci` and `npm run verify` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 

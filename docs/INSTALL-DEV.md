@@ -2,7 +2,8 @@
 
 This installs your own copy of Spotify Companion **from source**, with the tools to change and test it (to run
 just the app, use [`INSTALL-APP.md`](INSTALL-APP.md) instead), on your own machine, with **your own Spotify account and your own
-Spotify developer app**. Nothing is shared with anyone else's install.
+Spotify developer credentials** (a client id and secret, which S3 shows you how to get). Nothing is shared with anyone
+else's install.
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should
 see (**Expected**), and what to do if you see something else (**If it differs**). If a step does not match its

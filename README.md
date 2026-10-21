@@ -24,7 +24,7 @@ quality product with AI doing all the coding.
 ## What it is not (at the moment; some of this will change when I get to it)
 
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
-  developer app** and account. Nothing is shared between installs.
+  account and developer credentials**. Nothing is shared between installs.
 - **Not reachable from other machines.** The app answers only on `localhost`.
 
 ## Status
@@ -35,7 +35,8 @@ off until you arm it.
 
 ## Install
 
-Each install runs on your own machine, with your own Spotify account and your own Spotify developer app.
+Each install runs on your own machine, with your own Spotify account and your own Spotify developer credentials (a
+client id and secret; the install steps show you how to get them).
 
 - **Just the app** (most people): [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md). Docker and a prebuilt image; no
   source code or development tools. ⚠️ *Coming soon*: its steps are being walked cold before this label comes off.

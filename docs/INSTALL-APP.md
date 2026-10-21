@@ -1,8 +1,8 @@
 # Install: the app only
 
 This installs **just the running app**, from its published container image: no source code and no development tools.
-It runs on your own machine, with **your own Spotify account and your own Spotify developer app**. Nothing is shared
-with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
+It runs on your own machine, with **your own Spotify account and your own Spotify developer credentials** (a client
+id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
 
 The current release is **`1.0.0-beta.7`**. The commands below use it.
 

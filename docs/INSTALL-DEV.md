@@ -585,6 +585,8 @@ start armed.
   docker compose up -d
   ```
 
+- **Know when there is a new release**: on GitHub, open the repository and choose **Watch → Custom → Releases**.
+  Each release is listed on the [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
 - **Update to a newer release**: take **Settings → Create backup** first. Then, replacing `<new tag>`:
 
   ```powershell

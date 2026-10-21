@@ -339,3 +339,20 @@ credentials…"*). After it: `auths: []`; `docker pull …:1.0.0-beta.7` ends *S
 (measured, no longer inferred), and A2's *If it differs* fix works as written. Still unexplained: the earlier pull with
 an empty `DOCKER_CONFIG` was also refused, so this Docker found the sign-in by another route; it does not change the
 document.
+
+---
+
+## 2026-10-21T21:00:00Z — Tracking stays as ratified (NFR-35 in U12); frameless mode logged as W-20
+
+Owner: *"things like work items, bugs, and feature requests now should go into github tools … this probably should
+include the remaining units?"* On checking: this is **Question 21 = A**, ratified as **NFR-35** (issues as the backlog,
+a W-id → issue pointer table), scheduled in **U12** and not yet done. Owner (question prompt): **keep it in U12**. On
+how bugs and features are kept apart, owner: *"'bugs, broken items, etc...' should be separate from feature requests.
+Not sure how these sort of things are usually tracked in github, I'm guessing they have a standard process for
+this?"* Explained: one tracker separated by the `bug`/`enhancement` labels and *Bug report*/*Feature request* issue
+forms (common for small projects), or bugs in Issues and ideas in GitHub Discussions (larger projects). Recommended
+the first; the owner's choice is open (and whether the two forms go in now, before U12, as the repository is public).
+
+Owner's UI idea, a **frameless app window that scales to fit**: *"This is a feature request not an issue... issues
+are bugs or problems, this is an enhancement."* Logged as **W-20** (enhancement) with the owner's words and the
+feasibility questions to probe; no UI unit exists, so it re-enters Inception when scheduled.

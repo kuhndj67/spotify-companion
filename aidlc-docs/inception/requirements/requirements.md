@@ -1077,6 +1077,29 @@ exists to break.**
 
 ---
 
+#### W-20 — Frameless app window that scales to fit (enhancement)
+
+**Raised 2026-10-21** by the owner. ⚠️ **Logged, not built**; an **enhancement**, not a defect. It re-enters
+Inception when scheduled; there is no UI unit yet. Migrates to an `enhancement` issue with the rest of §5.1 at U12
+(NFR-35).
+
+**Owner's description**: *"a frameless mode where the browser features are hidden unless you hover over the top edge
+of the app, and the browser frame is locked to the size of the app (and if the resize features are used it scales the
+whole application to fit as much as possible). Also browser features like tabs should be shut off so even when
+hovering the browser controls are compact."*
+
+**Feasibility to probe before design** (from knowledge of browsers, **not measured**):
+- A page cannot hide the browser's own controls or lock its window size; those belong to the browser.
+- The nearest real routes: an **installable app** (a web app manifest with `display: standalone`, or Chromium's
+  *window controls overlay* for a compact title bar), which opens in its own window with no tabs and no address bar;
+  or a launcher opening Chrome/Edge in app-window mode (`--app=http://localhost:3010`). Which of these work on
+  `http://localhost` without HTTPS is the first probe.
+- **Scale to fit** on resize is fully within the app (CSS).
+- **Controls shown only on hover** is not available to a page; the compact installed-app title bar is the closest.
+- Must fit the clean-primary-screen rule (controls on pop-ups, state as compact indicators).
+
+---
+
 #### W-19 — Structural items from the pre-public solution review
 
 **Raised 2026-10-21** by the pre-public solution review (`construction/u9-connector-upgrade/code/pre-public-solution-review.md`,

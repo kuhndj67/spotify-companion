@@ -1,7 +1,7 @@
 # U10 Functional Design Plan — Data Safety
 
 **Date**: 2026-10-21 · **Stage**: CONSTRUCTION — Functional Design, Unit **U10** (Phase 5)
-**Status**: Q1–Q6 **OPEN**.
+**Status**: Q1–Q6 answered 2026-10-21, **all A**. ▶ FD documents: `construction/u10-data-safety/functional-design/`.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U10 · requirements **FR-76…81** · Requirements Questions 29–36 · U6 as built (in-app
 backup, the one writer, restore at startup) · U8 (release script) · U9 (the *App only* image and its `setup`)
@@ -58,7 +58,7 @@ sending a Host header that claims to be `localhost`, and probably not at all on 
 | **B** | **`update` calls the running app** through `host.docker.internal` with a `localhost` Host header. Works on this machine (measured); expected to fail on Linux (not probed); and it relies on a request deliberately sending a header the guard exists to judge |
 | **C** | **`update` requires the app stopped**, proves it with FR-77's lock, and takes the backup itself through the folder's `data/` mount. Works anywhere; one more step for the user (stop, update, start) |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ---
 
@@ -70,7 +70,7 @@ sending a Host header that claims to be `localhost`, and probably not at all on 
 | **B** | **Both**: the CSV timer is fixed as FR-80 says, **and** before-change archives are kept. Two folders, two schedules; the daily one still cannot be restored |
 | **C** | **FR-80 as worded**: fix the CSV timer and its diagnostics only. Before-change archives are kept; no scheduled restorable backup |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ---
 
@@ -81,7 +81,7 @@ sending a Host header that claims to be `localhost`, and probably not at all on 
 | **A** | ⭐ **Every process that writes `history.db`**: the app (container or host) and the writing scripts (`db:restore`, `reclassify -- --apply`, the `repair-*` scripts, `db:backup`). The lock **replaces** their `docker ps` guard, which cannot see a host run or another machine. Read-only scripts (`hypothesis-gate`, `measure-confound`, `build-reporting-db`, `db:verify-backups`) take no lock |
 | **B** | **The app only.** Scripts keep `docker ps`, so a script run beside a host `npm start` stays unguarded |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ---
 
@@ -92,7 +92,7 @@ sending a Host header that claims to be `localhost`, and probably not at all on 
 | **A** | ⭐ **`npm start` only** (FR-78 as worded). Scripts keep `data/history.db`: they are deliberate owner tools that act on the real history (e.g. `db:backup` with the container down), and FR-77's lock (Q3) now refuses them while anything holds the database |
 | **B** | **Every host entry point** defaults to `data-dev/`; acting on `data/history.db` always needs `HISTORY_DB_PATH` set on purpose. Safest default; every owner command in CLAUDE.md and CONTRIBUTING gains a variable |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ---
 
@@ -103,7 +103,7 @@ sending a Host header that claims to be `localhost`, and probably not at all on 
 | **A** | ⭐ **Status, not a manager.** Settings shows the newest kept backup of each kind, its age and the folder path (`data/backups/`); diagnostics warns and fails as FR-80 says. Restoring stays *Restore backup* (choose the file from that folder). No new restore path |
 | **B** | **A list in Settings** with *Download* and *Restore* beside each kept backup. Easier for an *App only* user; a second restore entry point to design and test |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ---
 
@@ -114,15 +114,15 @@ sending a Host header that claims to be `localhost`, and probably not at all on 
 | **A** | ⭐ **One story, US-33**: *"As someone running the app (P1), an update never loses my listening history, and the app tells me when a newer version exists."* Acceptance = FR-76, FR-79, FR-80, FR-81. FR-77 and FR-78 are developer safety and get no story |
 | **B** | No story: U10 is tracked by FR-76…81 only |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-21, question prompt).
 
 ---
 
 ## 4. Plan — after the answers
 
-- [ ] Collect answers; ask follow-ups for anything ambiguous (rule Step 5). Amend FR-79/FR-56/FR-80 wording if Q1/Q2 change them (`requirements.md`, `audit.md`)
-- [ ] `construction/u10-data-safety/functional-design/business-logic-model.md`: startup order (lock → restore swap → backup if needed → migrate), the kept-backup store and its rotations, `update`, the release backup, the update check
-- [ ] `…/functional-design/business-rules.md`: BR-78… (lock acquisition, heartbeat, stale takeover without a race, the holder losing its lock; backup-before-change; retention per kind; `data-dev/`; `update` refusals; snapshot diagnostics; the update check's version comparison, its own User-Agent, silence on failure, the opt-out switch)
-- [ ] `…/functional-design/domain-entities.md`: lock record, kept backup (kind, version, time), update-check result, update preference
-- [ ] `…/functional-design/frontend-components.md`: Settings (version line and update notice, the opt-out switch and its sentence, kept-backup status), the status-bar update indicator (light and dark; colour never the only channel)
+- [x] Collect answers; ask follow-ups for anything ambiguous (rule Step 5). Amend FR-79/FR-56/FR-80 wording if Q1/Q2 change them (`requirements.md`, `audit.md`)
+- [x] `construction/u10-data-safety/functional-design/business-logic-model.md`: startup order (lock → restore swap → backup if needed → migrate), the kept-backup store and its rotations, `update`, the release backup, the update check
+- [x] `…/functional-design/business-rules.md`: BR-78… (lock acquisition, heartbeat, stale takeover without a race, the holder losing its lock; backup-before-change; retention per kind; `data-dev/`; `update` refusals; snapshot diagnostics; the update check's version comparison, its own User-Agent, silence on failure, the opt-out switch)
+- [x] `…/functional-design/domain-entities.md`: lock record, kept backup (kind, version, time), update-check result, update preference
+- [x] `…/functional-design/frontend-components.md`: Settings (version line and update notice, the opt-out switch and its sentence, kept-backup status), the status-bar update indicator (light and dark; colour never the only channel)
 - [ ] `HANDOFF.md`, `aidlc-state.md`, `audit.md` updated; completion message; owner approval

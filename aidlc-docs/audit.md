@@ -435,3 +435,30 @@ FR-79), Q2 one kind of kept backup, the verified archive in `data/backups/`, rot
 Q3 which processes take the lock, Q4 how far `data-dev/` reaches, Q5 kept backups in Settings, Q6 a story. FR-81 added
 to the U10 rows of `execution-plan.md` and `unit-of-work.md`. U10's `HANDOFF.md` created. Business rules start at
 BR-78 (BR-77 is taken).
+
+## 2026-10-22T00:30:00Z — U10 FD Q1–Q6 answered (all A); Functional Design written
+
+Owner (question prompt): **Q1 = A** the updated app backs up before its first run; **Q2 = A** one kind of kept
+backup, the restorable archive in `data/backups/`, rotated per kind, CSV timer retired; **Q3 = A** the lock covers the
+app and every writing script, replacing `docker ps`; **Q4 = A** `data-dev/` for `npm start` only; **Q5 = A** status in
+Settings, no list; **Q6 = A** US-33. Requirements amended to match, each marked in place: **FR-76(a)** (a version
+change also triggers the backup), **FR-79** (no call to the running app), **FR-80** (the archive, rotated per kind),
+**FR-56** (superseded by FR-80). US-33 added with its traceability row.
+
+FD written: `construction/u10-data-safety/functional-design/` (BR-78…BR-86). **Decisions the agent made, for the
+owner's review** (none is a security-posture change):
+- The startup lock **watches** the heartbeat for one stale window instead of judging the lock's age, because a
+  container that `docker compose up -d` just killed leaves a lock that looks fresh. Staleness never compares two
+  clocks. Takeover goes through an exclusive-create mutex and re-reads the token, closing the race the probe found.
+- The update check's startup request is **skipped when the last check was under an hour ago**: FR-81 says *once
+  shortly after start*, and a restart loop would make that a GitHub request (and a disclosure) per restart. A
+  refinement of FR-81, not a change of its intent.
+- `npm run release` **refuses** when the running app cannot be reached; `--app-is-down` overrides that one refusal,
+  since the new version still backs up before its first run.
+- **Five** before-change backups kept (configurable); scheduled keep stays `SNAPSHOT_KEEP` (14).
+- The last app version is stored **in the database** (a one-row table, by a new migration), because it belongs to
+  the database: a restored file brings its own.
+- A new **Settings → Version** section (the version appeared only inside a diagnostics run), and diagnostics gains a
+  **warn** level.
+Rejected: a list of kept backups with restore buttons (Q5 = B); judging lock staleness by age; reusing the MusicBrainz
+User-Agent (it carries the contact address).

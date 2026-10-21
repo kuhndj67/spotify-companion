@@ -16,8 +16,7 @@ there), and walk the changed steps again from a revert.
 
 ## 1. Before
 
-- **The published image**: `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.5` (published 2026-10-18; the app's credentials
-  live in `secrets/app/`, which README's steps now say).
+- **The published image**: the version README names (walk ① used `1.0.0-beta.5`; the re-walk uses `1.0.0-beta.6`).
 - **The documents**: `README.md` and `docs/INSTALL.md` from **`main`** after the U9 publish PR is merged (README's
   *App only* names the classic token since then). The walk tests those two files only.
 - **The token**: a **classic** GitHub token with **only** `read:packages`, 7 days (the fine-grained one cannot pull:
@@ -30,12 +29,15 @@ there), and walk the changed steps again from a revert.
 ## 2. The walk
 
 1. **Revert** Machine 1 to `clean`, then boot it.
-2. In Edge on Machine 1, signed in to GitHub (the repository is private), save **only** these two files from `main`
-   into a new folder `C:\walk\`, via *Raw* → *Save as*:
-   `https://github.com/kuhndj67/spotify-companion/blob/main/README.md` and
-   `https://github.com/kuhndj67/spotify-companion/blob/main/docs/INSTALL.md` (save it as `C:\walk\INSTALL.md`).
-   Then **sign out of GitHub** in Edge.
-3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and type exactly:
+2. In Edge on Machine 1, signed in to GitHub (the repository is private), save **only** these three files from `main`
+   into a new folder `C:\walk\`, via *Raw* → *Save as*: `README.md`, `docs/INSTALL.md` (as `C:\walk\INSTALL.md`) and
+   `docs/claude-start.md` (as `C:\walk\claude-start.md`). Then **sign out of GitHub** in Edge.
+3. Open VS Code on `C:\walk`, start a **new** Claude Code session, and type exactly what README tells a user to type
+   (since `1.0.0-beta.6`, after walk ①: the log rule now ships in `claude-start.md`):
+
+   > Read claude-start.md and install App only.
+
+   *(Walk ①'s longer prompt, kept for the record; no longer used:)*
 
    > Read README.md and install the app by following its "App only" section, step by step. INSTALL.md is here only
    > for the steps that README links to (S1 for Docker, S3 for the Spotify app). Do the steps you can; when a step

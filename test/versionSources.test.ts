@@ -59,6 +59,12 @@ describe('the compose image tags equal package.json (P-58)', () => {
     assert.deepEqual(composeTags('    image: ${VERIFY_IMAGE:-spotify-companion:0.1.0}\n'), ['0.1.0']);
   });
 
+  it('README.md: every ghcr.io image reference is the current version (App only, found by the walk 2026-10-21)', () => {
+    const refs = [...readFileSync(join(root, 'README.md'), 'utf8').matchAll(/ghcr\.io\/kuhndj67\/spotify-companion:([^\s`"]+)/g)].map((m) => m[1]);
+    assert.ok(refs.length > 0, 'README.md names no image version -- did App only change shape?');
+    assert.deepEqual(refs, refs.map(() => version));
+  });
+
   it('positive control: a stale tag is caught', () => {
     const stale = 'services:\n  app:\n    image: spotify-companion:0.1.0\n';
     assert.deepEqual(composeTags(stale), ['0.1.0']);

@@ -194,6 +194,18 @@ Owner: *"go"* (PR #8 merged). From `main` (`d0cd5d8`):
 5. `git push origin v1.0.0-beta.5` → run `39178339707`: all four jobs ✅; decision `publish 1.0.0-beta.5`, both
    licences, no user data, the scan as before (report only).
 
+## 13. App-only walk ① (2026-10-21) — ❌ NOT PASSED; four findings fixed in `1.0.0-beta.6`
+
+Record: [`walk-app-only-2026-10-21.md`](../u9-connector-upgrade/walks/walk-app-only-2026-10-21.md). The app installed and
+ran, but **F1** (no way to know the version: the agent guessed registry tags), **F2** (S1 installs Node and git too; the
+agent chose to skip their checks), **F3** (step 2's *Expected* incomplete) and **F4, a defect**: `setup` creates the
+folders as root, so `node` could not write **`/state`** (automation could not be armed) or **`/config`** (rules
+upload). F4 reproduced on the dev PC and fixed in the entrypoint; **valid control**: on fresh `setup` folders,
+`beta.5` → `EACCES` on both, the fix → writable on both. *(A first "control" on a folder the fixed image had already
+chowned was invalid, and is not counted.)* No install log was kept: the App-only path lacked `claude-start.md`'s logging
+rule; it now has an App-only route.
+
 ## Still to do (in order)
 
-11. Agent walk of README *App only* on Machine 1 (the classic token), on `1.0.0-beta.5`.
+11. Release and publish `1.0.0-beta.6`, then **re-walk** the changed steps on Machine 1 with the shipped prompt (S1
+    Docker parts, step 2, step 6 incl. arming automation and a rules upload), keeping `install-log.md`.

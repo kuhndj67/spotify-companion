@@ -73,6 +73,16 @@ if [ "$(id -u)" = "0" ]; then
     chown node:node "$SECRETS_DIR" 2>/dev/null || true
   fi
 
+  # U9 (found by the App-only walk, 2026-10-21): the rules folder and the automation-state folder, for the same reason
+  # as data/. An App-only folder is created by `setup` running as root, so these arrive root-owned 755 and `node` could
+  # not upload rules or arm automation. (A source install never saw it: its folders are created by the host user.)
+  # Mount points only, never recursive.
+  for dir in "$(dirname "${RULES_PATH:-/config/rules.json}")" "$(dirname "${AUTOMATION_STATE_PATH:-/state/automation-state.json}")"; do
+    if [ -d "$dir" ]; then
+      chown node:node "$dir" 2>/dev/null || true
+    fi
+  done
+
   # setpriv rather than su/sudo: no extra package, no intermediate shell, and the app keeps
   # PID 1 so SIGTERM reaches it directly — which matters, because the shutdown handler is what
   # flushes the in-progress play instead of losing it.

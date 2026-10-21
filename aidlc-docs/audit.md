@@ -332,3 +332,10 @@ App-only *coming soon* label is off. Carried forward: re-walk the steps changed 
 cover as written (A2's new check and text; INSTALL-DEV S2 and S7, which no walk has run since they changed). BR-62.2's
 walk by a person who did not write the documents remains the `1.0.0` trigger. Owed under W-18: the collaborator's
 `v*` tag push refused.
+
+**2026-10-21 — the side finding resolved.** The owner ran `docker logout ghcr.io` on this machine (*"removing
+credentials…"*). After it: `auths: []`; `docker pull …:1.0.0-beta.7` ends *Status: Downloaded newer image*;
+`docker image ls` shows one line, ID `b54d271261d6`, the digest CI published. So the stored sign-in **was** the cause
+(measured, no longer inferred), and A2's *If it differs* fix works as written. Still unexplained: the earlier pull with
+an empty `DOCKER_CONFIG` was also refused, so this Docker found the sign-in by another route; it does not change the
+document.

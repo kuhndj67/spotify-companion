@@ -237,3 +237,18 @@ also ticks `repo`. CONTRIBUTING now gives the preselecting link. Still owed: the
 removed; *Inherit access from repository (recommended)*: unticked (no overwrite warning appeared; the box stays
 unticked). My first instructions named an organisation-level setting and omitted the side-column *Package settings*
 link; corrected from GitHub's docs. Not readable by the API, so verified by the controls, not by a read-back.
+
+**2026-10-21T17:10Z — controls run (owner: *"yes... push"*).** Throwaway branch `publish-control` (one workflow,
+never merged; run 39640995752) and throwaway tag `v0.0.0-envcheck` on `a063cdf` (run 39640999459). Each read for its
+**reason**, not its colour:
+
+| Control | Expected | Seen |
+|---|---|---|
+| A branch job naming `release` | refused by GitHub | *"Branch "publish-control" is not allowed to deploy to release due to environment protection rules."* The job's own step never ran |
+| A branch job pushing with the workflow token (`packages: write`) | refused by the registry | `denied: permission_denied: write_package` |
+| A `v*` tag reaches `release`; the environment token logs in | login, then the decision refuses | `Login Succeeded`; the registry lookup answered (no *registry answer* line, printed only for `unknown`); `publishDecision: REFUSED (tag-mismatch)`; build and push skipped |
+| The owner creates and deletes a `v*` tag | allowed by the bypass | the push created it; the delete printed GitHub's rule notice *"Cannot delete this tag"* and the tag is gone (API 404): the deletion rule is live **and** bypassed for the owner |
+
+Package versions after: beta.4, beta.5, beta.6 only (nothing pushed). Branch and tag deleted. **Still owed**: James's
+own tag push refused (after he has access); that the environment token can **push** (not only log in and read), first
+shown by the beta.7 release.

@@ -98,8 +98,9 @@ rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.container
 - `docker version` shows `Client:` but then an error such as *cannot connect to the Docker daemon*, *the system
   cannot find the file specified*, *failed to read the response from the backend: unexpected EOF*, or *failed to
   connect to the backend: timed out dialing Hyper-V socket*: Rancher Desktop is not running yet (its first start
-  takes about a minute), or a setting from the 👤 box's step 5 was missed. Check the `rdctl` line's output, wait a
-  minute, and run `docker version` again.
+  takes a minute or more), or a setting from the 👤 box's step 5 was missed. Check the `rdctl` line's output, then
+  run `docker version` again **once a minute, for up to about three minutes**: on a first start the error can
+  change (*cannot find the file*, then *timed out dialing Hyper-V socket*) before it passes (walked 2026-10-21).
 - The `rdctl` line prints `kubernetes=True`, or an engine other than `moby`: in Rancher Desktop open **Preferences**,
   set **Container Engine** to **dockerd (moby)** and turn **Kubernetes off**, click **Apply**, wait for it to
   restart, and re-check.
@@ -228,7 +229,8 @@ edit and change only the address.
 > 👤 **YOU DO THIS** — A6 · needs: an ordinary PowerShell window in your folder, a web browser, and A4's Client ID and
 > Client secret
 >
-> 1. Run:
+> 1. In PowerShell, go to **your folder** from A3 (e.g. `cd C:\spotify-companion`): the command writes into the
+>    folder it is run in. Then run:
 >
 >    ```powershell
 >    docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.7 auth
@@ -240,7 +242,7 @@ edit and change only the address.
 > **You should see:** `✓ Tokens written to /work/secrets/app/spotify-config.json`.
 > **When done, tell the agent:** "A6 done".
 
-**Commands** (the check):
+**Commands** (the check, in your folder):
 
 ```powershell
 Test-Path secrets\app\spotify-config.json
@@ -265,7 +267,7 @@ play. *No errors* is not evidence.
 
 **Commands**
 
-1. In your folder: `docker compose up -d`. Then:
+1. In your folder: `docker compose up -d`. Wait about 30 seconds (first start), then:
 
    ```powershell
    curl.exe -s http://localhost:3010/api/health
@@ -296,7 +298,9 @@ play. *No errors* is not evidence.
 
 - `docker compose up -d` ends with the container `spotify-companion` **Started**.
 - `/api/health` prints `{"status":"ok","mcp":"connected","toolCount":` followed by a number and `}`.
-- `/api/history/recent` lists, first, the track that played to its end.
+- `/api/history/recent` lists, first, the track that played to its end. ⚠️ On its first start the app also imports
+  about 50 of your **earlier** plays from Spotify, so a full history proves nothing by itself: only that track, which
+  started after the app did, shows that recording works.
 
 **If it differs**
 

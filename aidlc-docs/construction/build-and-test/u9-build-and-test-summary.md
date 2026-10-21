@@ -233,6 +233,13 @@ docs; GitHub is case-sensitive).
 - Two texts inside the image named the old file (`auth`'s last line, sent App-only users to *"S5 of INSTALL.md"*; the
   credentials message), so this ships as **`1.0.0-beta.7`**, before the re-walk.
 
+## 16. App-only walk ② (2026-10-21, `1.0.0-beta.6`, the pre-split documents) — ❌ NOT PASSED; gaps fixed in PR #12
+
+Record: [`walk-app-only-2026-10-21-run2.md`](../u9-connector-upgrade/walks/walk-app-only-2026-10-21-run2.md). The log
+was kept (the shipped rule worked); the agent read only its three documents. Walk ①'s F1 and F3 matched as written.
+Seven gaps, five already closed by the split, three closed by additions to it: the first-start `docker version`
+retry (both documents), "run the sign-in in your folder", and the warning that the first start imports earlier plays.
+
 ## Still to do (in order)
 
 11. Release and publish `1.0.0-beta.7`, then **re-walk** `INSTALL-APP.md` on Machine 1 (a fresh walk: the document is

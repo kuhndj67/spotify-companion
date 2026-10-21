@@ -128,3 +128,14 @@ lines; `claude-start.md` routes by what the person types; duplicated passages he
 against the live app before writing: the diagnostics step names and the automation response; the redirect-URI error
 text copied from INSTALL-DEV's measured wording (my first draft had invented one). Image texts naming the old file
 mean a release: **1.0.0-beta.7**. The re-walk walks the new document from its start.
+
+---
+
+## 2026-10-21T16:00:00Z — App-only walk ② NOT PASSED (on the pre-split documents); gaps fixed in PR #12
+
+Owner: *"copied walk results to D:\walk-results\2026-10-21.Run2"*. The walk ran on `1.0.0-beta.6` with the
+documents before the split (PR #12 not yet merged). The agent kept `install-log.md` (the shipped rule worked) and read
+only `claude-start.md`, `README.md`, `INSTALL.md`. Installed and recording; F1 and F3 from walk ① fixed. Seven gaps:
+five closed by `INSTALL-APP.md`, three more added to it on PR #12 (first-start `docker version` retry up to about
+three minutes in both documents; sign-in in the install folder; the first-start import of earlier plays). Record:
+`construction/u9-connector-upgrade/walks/walk-app-only-2026-10-21-run2.md` (the agent's log, secret-checked).

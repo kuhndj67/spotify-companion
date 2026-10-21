@@ -111,8 +111,9 @@ rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.container
 - `docker version` shows `Client:` but then an error such as *cannot connect to the Docker daemon*, *the system
   cannot find the file specified*, *failed to read the response from the backend: unexpected EOF*, or *failed to
   connect to the backend: timed out dialing Hyper-V socket*: Rancher Desktop is not running yet (its first start
-  takes about a minute), or a setting from the 👤 box's step 5 was missed. Check the `rdctl` line's output, wait a
-  minute, and run `docker version` again.
+  takes a minute or more), or a setting from the 👤 box's step 5 was missed. Check the `rdctl` line's output, then
+  run `docker version` again **once a minute, for up to about three minutes**: on a first start the error can
+  change (*cannot find the file*, then *timed out dialing Hyper-V socket*) before it passes (walked 2026-10-21).
 - The `rdctl` line prints `kubernetes=True`, or an engine other than `moby`: step 5 of the 👤 box was missed or not
   saved. In Rancher Desktop open **Preferences**, set **Container Engine** to **dockerd (moby)** and turn
   **Kubernetes off**, click **Apply**, wait for it to restart, and re-check. Kubernetes left on makes Rancher Desktop's

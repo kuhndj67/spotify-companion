@@ -868,3 +868,69 @@ B) Fix the diagnostics only, so the gap is visible
 X) Other (please describe after [Answer]: tag below)
 
 [Answer]: **A** (owner, 2026-10-18, in this file).
+
+---
+
+# U10 amendment (2026-10-21) — telling a user a new version exists
+
+Raised by the owner on going public: *"how do users know a new version is available, and do we need an 'update'
+feature added that automates stepping up to new versions? (does this need to be a unit?)"* **Updating** is already
+**FR-79** (Question 32 = A). **Knowing** is covered nowhere. Decided at once (owner, *"Yes to both"*): every release
+gets a **GitHub Release** with notes, and the documents point at the Releases page (`audit.md`, 2026-10-21 20:30Z).
+These questions are about an **in-app** notice, added to U10's round so they are ratified with it, before U10's
+Functional Design. No new unit.
+
+**Measured 2026-10-21 (not reasoned)**, as an anonymous client:
+- ⚠️ `GET https://api.github.com/repos/kuhndj67/spotify-companion/releases/latest` → **404** while every release is a
+  pre-release. A check built on it would always say *up to date*: the *wrong request shape looks like absent data*
+  trap.
+- `GET …/releases?per_page=5` → `v1.0.0-beta.8`, `"prerelease": true`. The list includes pre-releases.
+- Anonymous limit: `X-RateLimit-Limit: 60` per hour, per IP address.
+
+⚠️ **Why this is the owner's decision**: it would be the app's first outbound call to a service that is neither Spotify
+nor MusicBrainz. GitHub learns the user's IP address and, from the timing, that they run the app. NFR-07's local-only
+posture does not forbid outbound calls (Spotify and MusicBrainz are outbound), but each one is a disclosure.
+
+## Question 34 — Should the app say when a newer version exists?
+
+A) **Yes, quietly**: one line in **Settings**, beside the version (*"1.0.0-beta.9 is available: what changed"*,
+linking to its Release page), and a small indicator in the status bar only when one exists. It never updates
+anything itself: updating stays FR-79's `update` command, which the line names ⭐ *recommended*
+
+B) **Settings only**, with no status-bar indicator
+
+C) **No**: the Releases page and *Watch → Releases* are enough (already documented)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+## Question 35 — Consent for the check
+
+A) **Off until the user turns it on** (opt-in) in Settings, with one sentence saying what is sent and to whom. A fresh
+install makes no call to GitHub ⭐ *recommended*, because it keeps the default install's outbound traffic to the two
+services it cannot work without
+
+B) **On by default**, with a Settings switch to turn it off (opt-out). More users would see updates; every install
+calls GitHub unless changed
+
+C) **Never in the background**: a *Check for updates* button in Settings, one call per click
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:
+
+## Question 36 — How the check is made
+
+A) **At most once a day, and once shortly after start**: one anonymous `GET …/releases?per_page=10` (the list, because
+`/latest` hides pre-releases; see above), no account and no identifiers beyond what any HTTP request carries
+(the User-Agent names the app and its version, as the MusicBrainz client's does). Pre-releases count while the
+running version is itself a pre-release; a stable install is told only of stable releases. A failed check is
+**silent**: Settings shows *"could not check (time)"*, and the status bar never shows an error for it. **Never
+touches the poll's Spotify budget** ⭐ *recommended*
+
+B) **Only at startup** (every restart, including each release, checks once)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]:

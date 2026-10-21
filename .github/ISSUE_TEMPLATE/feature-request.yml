@@ -1,0 +1,25 @@
+name: Feature request
+description: A new capability, or a change to how something works.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Something broken is a **Bug report**. A feature is designed before it is built, so describing the need matters
+        more than the solution (CONTRIBUTING.md, *Two paths for a change*).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to do, and what gets in the way
+      description: The need, in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: How it might look or behave. Rough is fine.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead (optional)

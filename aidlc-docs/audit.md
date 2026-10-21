@@ -392,3 +392,19 @@ Design must keep it next to the switch. Rejected: opt-in (A) and a manual button
 
 State correction: the *Current Stage* line still said `1.0.0-beta.7` live; `1.0.0-beta.8` is (container
 `spotify-companion:1.0.0-beta.8`, healthy, read 2026-10-21). Issue #14 is closed (19:32Z).
+
+## 2026-10-21T22:30:00Z — Bugs and feature requests kept apart: labels and two issue forms, added now
+
+Owner: *"If (bug/enhancement labels plus two issue forms) is a standard approach for this I'm ok with that."* It is:
+GitHub creates `bug` and `enhancement` in every repository (both present here; issue #14 already carries `bug`), and
+issue forms in `.github/ISSUE_TEMPLATE/` are its built-in mechanism. Owner (question prompt): add the forms **now**,
+not in U12, because the repository is public. Brought forward from NFR-39: the two forms only; the PR template,
+Dependabot, Discussions and NFR-35's W-item migration stay in U12.
+
+Added: *Bug report* (labels `bug`; asks for the *Version* line from Settings → Run diagnostics…, the install route,
+and the colour scheme, as issue #14 hid in light mode; warns against pasting credentials), *Feature request* (labels
+`enhancement`; asks for the need before the solution), and `config.yml` with **blank issues off** (the agent's
+choice, so every issue arrives labelled; reversible in one line) and a link to private vulnerability reporting
+(`enabled: true`, read 2026-10-21). CONTRIBUTING points to the chooser. Verified: the three files parse as YAML.
+⚠️ **Not verified**: GitHub's own form-schema check runs only once the files are on `main`; open
+`/issues/new/choose` after the merge.

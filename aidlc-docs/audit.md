@@ -232,3 +232,8 @@ environment; `gh secret list --env release` shows `GHCR_PUBLISH_TOKEN` (17:00:49
 repository-level secrets. My first instructions were wrong twice, caught by the owner and by GitHub's docs: the
 *Generate new token* button opened the fine-grained form from the classic page, and ticking `write:packages` by hand
 also ticks `repo`. CONTRIBUTING now gives the preselecting link. Still owed: the package settings, then the controls.
+
+**2026-10-21 — package settings (owner, on GitHub).** *Manage Actions access*: `spotify-companion` set to Read or
+removed; *Inherit access from repository (recommended)*: unticked (no overwrite warning appeared; the box stays
+unticked). My first instructions named an organisation-level setting and omitted the side-column *Package settings*
+link; corrected from GitHub's docs. Not readable by the API, so verified by the controls, not by a read-back.

@@ -141,3 +141,11 @@ allocated at NFR Design, not here.
   line; glyph and label as well as colour.
 - **86.4 Settings → Backup & restore** shows the newest kept backup of each kind and its age, and the folder path.
   Restoring stays *Restore backup*. No list, no second restore path.
+- **86.5 Status indicator** *(added 2026-10-22, NFR Q3)*. One status-bar indicator, **Status**, always visible: a
+  light **and** its text. ⚙️ Its level is the worst of its sources; U10's sources are backup health (BR-81.2), a
+  refused or lost lock (BR-78.8, 78.5) and a failed before-change backup (BR-79.3). Healthy → `ok`; otherwise `warn`
+  or `fail`, and its pop-up says *Check the Diagnostics page*. Later units add sources; it never takes the message
+  line.
+- **86.6 Diagnostics button** *(added 2026-10-22, NFR Q3c; amends FR-63)*. The header reads **Settings ·
+  Diagnostics · Rules**. *Diagnostics* opens the existing diagnostics pop-up, moved out of Settings with its ids and
+  test ids kept.

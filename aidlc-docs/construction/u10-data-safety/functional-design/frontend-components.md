@@ -54,6 +54,23 @@ colour alone. No list and no per-file buttons (Q5 = A).
 
 Never shown for `off`, `not-yet`, `current` or a failed check (BR-85.7).
 
+## 3a. Status bar → **Status** indicator, and the **Diagnostics** button *(added 2026-10-22, NFR Q3)*
+
+Owner: *"To keep the main screen clean … lets include a "Status" indicator light/text with "check diagnostics page"
+as the pop up text. also maybe we should promote "Diagnostics" to a button between settings and rules?"*
+
+| | |
+|---|---|
+| Shown | **always** |
+| Level | the worst of its sources (BR-86.5): backup health, the lock, a failed before-change backup |
+| Glyph · label | `ok`: `✓` · *Status* · `warn`: `⚠` · *Status* · `fail`: the existing fail glyph · *Status* |
+| Detail (on click) | healthy: *All checks OK*; otherwise the failing sources in words, then **Check the Diagnostics page** |
+| Message line | never (`inMessage: false`) |
+
+The header buttons become **Settings · Diagnostics · Rules**. *Diagnostics* opens the same pop-up as today (ids and
+`data-testid`s kept, so existing tests follow it); the *Diagnostics* section leaves Settings. Whether today's five
+indicators fold into *Status* is the UX/UI unit's decision, not U10's.
+
 ## 4. Existing elements whose words change
 
 - Diagnostics step **Snapshots** → **Backups**, with the new **warn** level (BR-81.2, 81.3).

@@ -462,3 +462,28 @@ owner's review** (none is a security-posture change):
   **warn** level.
 Rejected: a list of kept backups with restore buttons (Q5 = B); judging lock staleness by age; reusing the MusicBrainz
 User-Agent (it carries the contact address).
+
+## 2026-10-22T01:00:00Z — U10 Functional Design APPROVED (owner); NFR Design plan opened
+
+Owner, after the FD completion message: *"continue"*, read as approval to proceed to NFR Design (the message's
+*Continue to Next Stage*). The six agent decisions named in the 00:30Z entry stand as approved with it.
+NFR Requirements skipped, as for U1–U9. NFR Design plan: `construction/plans/u10-nfr-design-plan.md`.
+
+## 2026-10-22T02:00:00Z — U10 NFR Design written; Status light and Diagnostics button added (owner)
+
+Owner (question prompt): **Q1 = A** heartbeat 5 s, stale window 30 s; **Q2 = A** free-space check before each kept
+backup (2 × database + WAL + 100 MB; short → scheduled skipped and reported fail, before-change refused; nothing
+deleted to make room). **Q3 = X**: *"To keep the main screen clean (we're going to simplify it quite a bit when we get
+to UX/UI unit) lets include a "Status" indicator light/text with "check diagnostics page" as the pop up text. also
+maybe we should promote "Diagnostics" to a button between settings and rules?"* Follow-ups, all the recommended
+option: the Status light reacts to U10's conditions now and is extensible (whether today's five indicators fold into
+it is the UX/UI unit's call); it is **always visible**; Diagnostics becomes a header button **Settings · Diagnostics ·
+Rules** in U10. **FR-63 amended** in place; the approved FD gains **BR-86.5–86.6** and `frontend-components.md` §3a.
+
+Facts measured for the plan: a gzip of the database file is 3.0 MB with a further 4.1 MB in its WAL (so an archive is
+≈ 3–5 MB today); every request carrying an `Origin` is already checked, so the new write routes need no new defence;
+the writing scripts already import `src/` under `tsx`, so one lock module serves both.
+
+Written: `construction/u10-data-safety/nfr-design/` — **P-76…P-87**, **LC-69…LC-80**, **PBT-79…PBT-89**. Schema v7 →
+v8. Rejected: judging lock staleness by age (P-76); keeping `docker ps` beside the lock (P-79: two guards answering
+one question differently); a retry loop that reopens history mid-run (recovery stays a restart).

@@ -421,7 +421,7 @@ Rules: `construction/u6-data-lifecycle/functional-design/business-rules.md` (BR-
 | FR-60 | Credentials are **never** written into a backup, and restore **never** changes them | Must | ⬜ New |
 | FR-61 | The automation switch and halt latch are **never** written into a backup, and restore **never** changes them | Must | ⬜ New |
 | FR-62 | Backup and restore **leave no files behind** beyond the one previous history (FR-59), including after a failure or crash | Must | ⬜ New |
-| FR-63 | A **Settings** pop-up holds backup/restore, export and diagnostics; rules and the automation switch stay on the main screen | Should | ⬜ New |
+| FR-63 | A **Settings** pop-up holds backup/restore, export ~~and diagnostics~~; rules and the automation switch stay on the main screen. *(Amended 2026-10-22, U10 NFR Q3c: **Diagnostics** is its own header button, **Settings · Diagnostics · Rules**, the same pop-up; an always-visible **Status** indicator points to it)* | Should | ⬜ New |
 | FR-64 | **Every file the app accepts from outside** passes one shared admission path that validates it completely before it can affect anything | Must | ⬜ New |
 
 ⚠️ **FR-64 is written once here and reused by U7** (rules and credentials ingest). It is a requirement

@@ -2,7 +2,19 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-22) — Functional Design WRITTEN, awaiting owner approval
+## ▶ Current state (2026-10-22) — NFR Design WRITTEN, awaiting owner approval
+
+Plan [`construction/plans/u10-nfr-design-plan.md`](../plans/u10-nfr-design-plan.md): Q1 A (heartbeat 5 s, stale window
+30 s), Q2 A (free-space check: 2 × database + WAL + 100 MB), Q3 X: an always-visible **Status** light pointing to
+Diagnostics, and **Diagnostics** promoted to a header button (Settings · Diagnostics · Rules), amending **FR-63**;
+added to the FD as BR-86.5–86.6. Documents: [`nfr-design/`](nfr-design/), **P-76…P-87**, **LC-69…LC-80**,
+**PBT-79…PBT-89**. Schema v7 → v8 (one metadata table).
+
+**Next**: owner approval → **Infrastructure Design** (the live cross-mount lock probe, `data-dev/` ignores, the
+`update` entrypoint, migration 8 on a copy) → Code Generation. ⚠️ Until U10 ships, take **Settings → Create backup**
+by hand.
+
+### Earlier (2026-10-22) — Functional Design written; ✅ approved by the owner the same day
 
 Plan Q1–Q6 answered, **all A** ([`construction/plans/u10-functional-design-plan.md`](../plans/u10-functional-design-plan.md)).
 FD documents: [`functional-design/`](functional-design/) — `business-logic-model.md`, `business-rules.md`

@@ -31,7 +31,8 @@ quality product with AI doing all the coding.
 
 Beta. Both install routes have been walked end to end on Windows with Rancher Desktop. The development install was
 walked by its owner, by hand and with an AI agent. The app-only install was walked by AI agents on a clean Windows
-machine and by its owner, and installed and ran each time. Linux and macOS are written for but not yet walked. The running version is in **Settings** (and in `package.json`). Automated skipping ships **off** and stays
+machine and by its owner, and installed and ran each time. Linux and macOS are written for but not yet walked. The running version is in **Settings** (and in `package.json`).
+New versions are announced on the [Releases page](https://github.com/kuhndj67/spotify-companion/releases) (**Watch → Custom → Releases** to be notified). Automated skipping ships **off** and stays
 off until you arm it.
 
 ## Install

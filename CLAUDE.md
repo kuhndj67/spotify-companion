@@ -77,7 +77,7 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
   touching the live deployment still wait for the owner's go-ahead.
 - Commit messages end with the attribution line the session specifies.
 - **Versions**: SemVer, `package.json` is the one source (`src/version.ts` is its one reader; the compose image tags
-  are checked copies). Releases go through `npm run release`. An image tag is never overwritten.
+  are checked copies). Releases go through `npm run release`, then the tag push, then a GitHub Release with notes (how users hear of a new version). An image tag is never overwritten.
 
 ## The deployment (the owner's machine)
 

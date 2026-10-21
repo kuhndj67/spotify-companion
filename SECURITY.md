@@ -8,9 +8,6 @@ Use **GitHub's private vulnerability reporting**: the repository's **Security** 
 Say what you found, how to reproduce it, and which version (Settings shows it, as does `/api/diagnostics`). You will
 get an acknowledgement; this is a one-person project, so there is no response-time promise.
 
-⚠️ Private reporting is switched on when the repository becomes public. Until then the repository is private, and
-anyone who can read it is a collaborator: open a **private** conversation with the owner rather than an issue.
-
 ## What is in scope
 
 The app is a **single-user, local** web app: each person runs their own copy with their own Spotify account. These

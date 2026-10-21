@@ -101,5 +101,9 @@ names) absent from `main` and the open PR's tip. Every disclosure class now has 
    hardening as **W-18**, structural items as **W-19**. Code review 4.1 is part of step 3.
 3. **The switch** (owner's go-ahead): repository → public; GHCR package → public; private vulnerability reporting on;
    `INSTALL-APP.md` loses its token step (A2) and the *private repository* notes, README and SECURITY likewise.
+   ✅ 2026-10-21: step 1 done (PR #12 merged by the owner). The wording is PR `go-public`: code review 4.1's list,
+   with A2 became *Download the image* (numbering kept, so no reference to A3–A8 moves), INSTALL-DEV S2's sign-in box
+   removed, SECURITY's *until then* paragraph removed, the `compose.app.yaml` pull note removed (it ships in the image
+   from beta.7). The owner changes visibility **when merging it**, so the documents and the repository change together.
 4. Release and publish the next beta; then walk 3 of `INSTALL-APP.md`, now with no token.
 

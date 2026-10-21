@@ -188,12 +188,14 @@ describe('no 👤 box holds consecutive commands outside a code block', () => {
 describe('every 👤 box in INSTALL says what to see and what to report', () => {
   it('docs/INSTALL-DEV.md', () => {
     const install = read('docs/INSTALL-DEV.md');
-    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 8, 'expected the S1–S8 person boxes');
+    // 2026-10-21 (going public): S2's sign-in box is gone -- a public repository needs no sign-in.
+    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 7, 'expected the S1, S3–S5, S8 person boxes');
     assert.deepEqual(personBoxesMissingParts(install), []);
   });
   it('docs/INSTALL-APP.md', () => {
     const install = read('docs/INSTALL-APP.md');
-    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 6, 'expected the A1, A2, A4–A7 person boxes');
+    // 2026-10-21 (going public): A2 is now a plain download, with no token box.
+    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 5, 'expected the A1, A4–A7 person boxes');
     assert.deepEqual(personBoxesMissingParts(install), []);
   });
   it('positive control: a box without its hand-back line is reported', () => {

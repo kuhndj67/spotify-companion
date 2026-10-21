@@ -26,9 +26,6 @@ quality product with AI doing all the coding.
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
   developer app** and account. Nothing is shared between installs.
 - **Not reachable from other machines.** The app answers only on `localhost`.
-- **Not a public image yet.** A prebuilt image is published to GitHub's container registry, with the bundled Spotify
-  MCP server at its MIT-licensed version, but it is **private while this repository is** (see
-  [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md)).
 
 ## Status
 

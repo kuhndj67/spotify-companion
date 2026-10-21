@@ -1,8 +1,6 @@
 # App only (U9, FR-75, BR-74.2): the image-only compose file. The image's `setup` command writes this into a user's
 # folder as compose.yaml; nothing here builds anything. It mirrors compose.yaml's service minus `build:`, and
 # test/versionSources.test.ts keeps its image tag equal to package.json's version (a checked copy).
-#
-# Pull access: while the repository is private, `docker login ghcr.io` with a read token first (README, App only).
 
 services:
   spotify-companion:

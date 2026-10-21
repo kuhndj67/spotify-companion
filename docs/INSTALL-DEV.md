@@ -130,18 +130,7 @@ rdctl list-settings | ConvertFrom-Json | ForEach-Object { "engine=$($_.container
 **Purpose**: download the code at a **release tag**, so you are running a tested version and not whatever is on
 `main` today.
 
-If the repository is **private**, you need **read access**, and the sign-in must happen in a window where you can
-answer GitHub's prompt:
-
-> 👤 **YOU DO THIS** — S2 sign-in, only if the repository is private · needs: an ordinary PowerShell window you type in
->
-> 1. Run: `git ls-remote --tags https://github.com/kuhndj67/spotify-companion.git`
-> 2. When Git asks how to sign in, use the access you were given: choose **Token** and paste a token with read access
->    to this repository, or sign in with your own GitHub account.
->
-> **You should see:** a list of lines ending in `refs/tags/v…`. Git remembers the sign-in, so later `git` commands
-> (including an agent's) no longer ask.
-> **When done, tell the agent:** "S2 signed in", plus the tag you were told to install, if you were given one.
+The repository is public: no GitHub account or sign-in is needed to download it.
 
 **Commands**
 
@@ -170,10 +159,8 @@ answer GitHub's prompt:
 
 **If it differs**
 
-- *could not read Username* / *terminal prompts disabled* / *Cannot prompt*: the repository is private and nobody has
-  signed in yet. Do the 👤 box above, then repeat.
-- *Repository not found* or *Authentication failed*: the credential does not grant read access to this repository.
-  Get one that does, and repeat in a fresh folder.
+- *Repository not found*, or Git asks you to sign in: the address is mistyped (a public repository never asks).
+  Copy it exactly as written here, and repeat in a fresh folder.
 - *Remote branch … not found*: the tag name is wrong. Run step 1 again and copy a tag that is listed.
 
 **All later steps run inside the `spotify-companion` folder.**

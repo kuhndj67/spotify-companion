@@ -16,7 +16,8 @@ there), and walk the changed steps again from a revert.
 
 ## 1. Before
 
-- **The published image**: `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.4` (pushed and verified 2026-10-18).
+- **The published image**: `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.5` (published 2026-10-18; the app's credentials
+  live in `secrets/app/`, which README's steps now say).
 - **The documents**: `README.md` and `docs/INSTALL.md` from **`main`** after the U9 publish PR is merged (README's
   *App only* names the classic token since then). The walk tests those two files only.
 - **The token**: a **classic** GitHub token with **only** `read:packages`, 7 days (the fine-grained one cannot pull:

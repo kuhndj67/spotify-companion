@@ -139,3 +139,16 @@ only `claude-start.md`, `README.md`, `INSTALL.md`. Installed and recording; F1 a
 five closed by `INSTALL-APP.md`, three more added to it on PR #12 (first-start `docker version` retry up to about
 three minutes in both documents; sign-in in the install folder; the first-start import of earlier plays). Record:
 `construction/u9-connector-upgrade/walks/walk-app-only-2026-10-21-run2.md` (the agent's log, secret-checked).
+
+---
+
+## 2026-10-21T16:20:00Z — Going public: decisions; a code review by another model first
+
+Owner: *"before we start walk 3 lets make the project public so I can send a link to one of my dev's … we can tune
+the installation instructions for a public repo (especially the app only install probably shouldn't require a
+key)."* Re-checked on the day: gitleaks over all 238 commits, no leaks; redacted classes absent from the tips.
+Decisions (question prompt): listening history **accepted as is**; image **public** (*"Yes, public image
+(Recommended)"*); and *"please add a code review step before going public where I switch you to fable for the task
+(get a different model looking at the project)."* **Visibility not changed.** Sequence recorded in
+`public-readiness-review.md` §6: merge PR #12 → review by another model → the switch (repo, package, private
+reporting, token-free App-only docs) → next beta → walk 3.

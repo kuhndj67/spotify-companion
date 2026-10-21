@@ -60,7 +60,8 @@ itself (`audit.md` quotes tracks with dates) should not be public.
 | Email addresses | **Redact** → `<email address>` (tests use the obviously fake `listener@example.org`, since the code validates it) | ✅ 2026-10-18, current files. ⚠️ Still in **history**, and `<email address>` (the hotmail one) is the **author email of all 406 commit records**, which a public repository shows. Not changed by redacting files. `SECURITY.md` now points at **GitHub private vulnerability reporting** (owner, 2026-10-18; switched on when public). Commit-metadata email: **GitHub no-reply address from 2026-10-18** (global `user.email`); past commits keep the old address (accepted, no rewrite) |
 | Machine names | **Redact**: the walk VM → `Machine 1`, the NAS → `Machine 2` | ✅ 2026-10-18, current files (still in history) |
 | NAS IP address | **Accept**: a private network address | — |
-| Listening history (probe files, prose, fixtures) | Not yet decided | — |
+| Listening history (probe files, prose, fixtures) | **Accept** (owner, 2026-10-21) | — |
+| Container image | **Public** once the repository is (owner, 2026-10-21): *App only* then needs no token | at the switch |
 
 ## 3. Licence and image
 
@@ -84,3 +85,17 @@ itself (`audit.md` quotes tracks with dates) should not be public.
 
 When the owner has chosen A/B/C/D for each class in §2 and that choice is carried out. If C or D is chosen, it is
 done **before** the visibility switch, and best **after** PR #3 merges (so the rewrite is done once, on `main`).
+
+## 6. Go-public sequence (owner, 2026-10-21)
+
+Re-checked 2026-10-21: gitleaks 8.30.1 over **all 238 commits**: no leaks; the redacted classes (personal emails, machine
+names) absent from `main` and the open PR's tip. Every disclosure class now has the owner's decision (above).
+
+1. Merge PR #12 (the install-document split).
+2. **Code review by a different model** (owner: *"add a code review step before going public where I switch you to
+   fable for the task"*): the owner switches the session's model; the review covers the whole project with going public
+   in mind; its findings are fixed or logged before step 3. Record: `code/pre-public-code-review.md`.
+3. **The switch** (owner's go-ahead): repository → public; GHCR package → public; private vulnerability reporting on;
+   `INSTALL-APP.md` loses its token step (A2) and the *private repository* notes, README and SECURITY likewise.
+4. Release and publish the next beta; then walk 3 of `INSTALL-APP.md`, now with no token.
+

@@ -152,3 +152,31 @@ Decisions (question prompt): listening history **accepted as is**; image **publi
 (get a different model looking at the project)."* **Visibility not changed.** Sequence recorded in
 `public-readiness-review.md` §6: merge PR #12 → review by another model → the switch (repo, package, private
 reporting, token-free App-only docs) → next beta → walk 3.
+
+---
+
+## 2026-10-21T18:00:00Z — Pre-public review by another model: no blocker; triage and owner decisions
+
+Owner: *"the fable reviews generated two review documents with recommendations but with no blockers to going
+public."* Records: `construction/u9-connector-upgrade/code/pre-public-code-review.md` (file and line) and
+`pre-public-solution-review.md` (architecture), both by Claude Fable 5.1 at `fefd768`, changing no other file.
+
+Decisions (question prompt): **MCP**: *"Schedule removal unit"*, recorded as D1's changed premise and **W-17** (a unit
+before U11, numbered in the next Inception round). **arm64**: *"State untested (Recommended)"*, a line in
+INSTALL-APP; multi-arch publishing is in **W-19**. **Architecture page**: *"Yes, before switch"*. **Commit email
+history**: *"Keep: no rewrite"*, the 2026-10-18 decision reconfirmed against the review's numbers (205 of 239 commits'
+metadata).
+
+Done on `install-docs-split` (PR #12): `aidlc-state.md` current line (review 1.4: it was two betas stale; on checking,
+`1.0.0-beta.7` is the version in PR #12 but **not tagged**, so the line says so); INSTALL-DEV S7 no longer says no
+image is published (4.2) and checks the secrets **exist** instead of the pre-U9 file-versus-folder check (4.3);
+INSTALL-APP A8 prints only its two diagnostics steps, never the contact address (4.4; both the PowerShell and the
+`grep` variant run against the live app, two lines `ok`); `docs/ARCHITECTURE.md` from the solution review §2, each
+named test and path checked to exist (the review's `ingestGuard` test is `ingestPolicy.test.ts`), added to
+`test/docs.test.ts`'s documents and its no-counts check (**positive control**: a dead path and a hand-written count
+in the page each turned the test red; restored, green); `application-design.md` marked as the inception-time plan.
+
+Logged, not built: **W-18** (code hardening: next beta 2.1.1, 2.1.2, 2.1.3, 2.3.1, 3.1; **2.5.1, a tag ruleset,
+before any collaborator gets write access**; the rest backlog); **W-19** (job registry, release/deploy split,
+composition and browser tests, layering, trail retention, arm64, Node LTS). Review 4.1 (private-repository wording)
+is part of the switch itself. **Visibility not changed.**

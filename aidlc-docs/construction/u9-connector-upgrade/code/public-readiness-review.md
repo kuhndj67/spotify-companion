@@ -95,6 +95,10 @@ names) absent from `main` and the open PR's tip. Every disclosure class now has 
 2. **Code review by a different model** (owner: *"add a code review step before going public where I switch you to
    fable for the task"*): the owner switches the session's model; the review covers the whole project with going public
    in mind; its findings are fixed or logged before step 3. Record: `code/pre-public-code-review.md`.
+   ✅ **Done 2026-10-21** (Claude Fable 5.1): `code/pre-public-code-review.md` and `code/pre-public-solution-review.md`,
+   **no blocker**. Fixed before the switch: code review 1.4, 4.2, 4.3, 4.4; solution review §3.9 (`docs/ARCHITECTURE.md`)
+   and §3.8 (INSTALL-APP states amd64 only). Logged: MCP removal as **W-17** (owner: schedule a unit before U11), code
+   hardening as **W-18**, structural items as **W-19**. Code review 4.1 is part of step 3.
 3. **The switch** (owner's go-ahead): repository → public; GHCR package → public; private vulnerability reporting on;
    `INSTALL-APP.md` loses its token step (A2) and the *private repository* notes, README and SECURITY likewise.
 4. Release and publish the next beta; then walk 3 of `INSTALL-APP.md`, now with no token.

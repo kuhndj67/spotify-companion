@@ -46,7 +46,7 @@ This has three consequences that drive everything below:
 
 | # | Decision | Source |
 |---|---|---|
-| D1 | Hybrid data access — MCP for now-playing and playback control, Spotify Web API direct for enrichment | CQ1 = A |
+| D1 | Hybrid data access — MCP for now-playing and playback control, Spotify Web API direct for enrichment. ⚠️ **Premise changed** (owner, 2026-10-21): the app now calls one connector tool (`getNowPlaying`); everything else, skipping included, goes to the Web API directly. Removing the connector is **scheduled as a unit before U11** (**W-17**). D1 holds until that unit ships | CQ1 = A; W-17 |
 | D2 | MusicBrainz as the only external source, pulling **label / signed-vs-independent only** | CQ2 = B, narrowed |
 | D3 | Unit 1 delivers a **general rules engine** — user-authored rules over any known track field, applied to every new track in every context. The age rule is one instance, not the feature | CQ3 = C, clarified 2026-08-25 |
 | D4 | Persistence lands **now**, in Unit 1 | CQ4 = A |
@@ -1074,6 +1074,74 @@ trigger is **the end of U5**, when Phase 4 closes and BR-01…BR-43 are all back
 implementation. That is a process constraint rather than a technical one, and it is the entire point
 of the item — **it cannot be relaxed for convenience without becoming the co-generation problem it
 exists to break.**
+
+---
+
+#### W-19 — Structural items from the pre-public solution review
+
+**Raised 2026-10-21** by the pre-public solution review (`construction/u9-connector-upgrade/code/pre-public-solution-review.md`,
+by another model). ⚠️ **Logged, not built.** Each item is scoped when it is taken up; section numbers are the review's.
+
+| Item | Review § | Note |
+|---|---|---|
+| A job registry with overdue detection for every periodic job (snapshots, label backfill, liked refresh, rules poll, drain backstop) | §3.5 | the shape of FR-80; the review suggests doing it inside U10 |
+| Split `release` (tag, publish) from `deploy` (backup, migrate, health) | §3.8 | U10's FR-76 touches the release script anyway; the deploy half is FR-79's `update` |
+| Extract `composeApp` from `server.ts`; one in-process composition test; a browser smoke test | §3.2, §3.7 | the browser harness is a dependency decision for the owner |
+| Reverse the three import edges against the unit order (`history → playback`, `history → reporting`, `history → musicbrainz`), add a layering test, then split `SqliteHistoryRepository` by aggregate | §3.3 | mechanical |
+| A retention policy for observation trails, with a measured size projection; the schema compatibility rule (*additive and nullable, or a MAJOR version*) written as a BR | §3.4 | the retention amount is the owner's decision |
+| Publish `linux/arm64` beside `linux/amd64` | §3.8 | 2026-10-21: INSTALL-APP states amd64 only, ARM untested (owner: *state untested*) |
+| Plan the move off Node 22 (maintenance) to the current LTS line | §3.8 | its own unit |
+
+---
+
+#### W-18 — Hardening from the pre-public code review
+
+**Raised 2026-10-21** by the pre-public code review (`construction/u9-connector-upgrade/code/pre-public-code-review.md`,
+by another model; no blocker to going public). ⚠️ **Logged, not built.** These are fixes: each needs a test that is
+seen to **fail** on the bad input first. Finding numbers are the review's.
+
+**Next beta** (the review's recommendation):
+
+| Finding | What |
+|---|---|
+| 2.1.1 | `isAllowedOrigin` compares the hostname only: a page on **another loopback port** can read the WebSocket and send the two body-less POSTs. Require the Origin's host to equal `Host` |
+| 2.1.2 | Five state-changing POSTs (`/api/automation`, `/api/automation/acknowledge-halt`, `/api/backtest`, `/api/liked/refresh`, `/api/rules/reload`) are not behind `ingestGuard`; make `SECURITY.md`'s *same-origin `Origin` on anything that changes state* true |
+| 2.1.3 | No `Content-Security-Policy` / `frame-ancestors` / `nosniff`: the automation switch can be clickjacked |
+| 2.3.1 | `spotify-config.json` is created `0644` on Linux (`scripts/auth.mjs`, `atomicWrite` default); make it `0600` |
+| 3.1 | `GET /api/decisions?limit=-1` returns the whole log; `limit=0` → 100; a non-integer `cursor` → empty page instead of `400` |
+
+**Before any collaborator has write access**: **2.5.1**, a tag ruleset for `refs/tags/v*` (today any write-access
+account can publish an image by pushing a tag), applied by `npm run protect` and asserted by
+`test/rulesetMatchesWorkflow.test.ts`.
+
+**Backlog**: 2.3.2 (trim the OAuth scopes to those used; probe first), 2.4.1 and 4.5 (document the entrypoint's
+`chown` on Linux), 2.4.2 (anchor `check-image.sh`'s file-name patterns), 2.5.2 (confirm the fork-PR approval setting
+after the switch), 3.2 (credentials body cap reads `Content-Length`), 3.3, 4.6, 4.7.
+
+**Done before the switch** (2026-10-21): 1.4, 4.2, 4.3, 4.4. **4.1** (private-repository wording) is done in the
+switch commit itself.
+
+---
+
+#### W-17 — Replace the MCP connector with the Web API's currently-playing endpoint
+
+**Raised 2026-10-21** by the pre-public solution review §3.1. ✅ **Owner decision 2026-10-21: schedule removal as a
+unit before U11** (not before the switch). The unit is numbered and scoped in the next Inception round; requirements are
+ratified before its Functional Design.
+
+**Why**: the connector now serves one tool, `getNowPlaying` (`src/mcp/spotifyMcpClient.ts`). The Web API is already
+called directly for track lookup, follows, the liked set, recently played, skip and `GET /me/player/currently-playing`
+itself (`src/playback/playbackContext.ts`, for the context the connector omits). The research record's own case for
+MCP was learning it, or an LLM agent driving playback later; neither is in U10–U12. What the connector costs: a second
+refresher of the same token and a second writer of `spotify-config.json`, the build-time clone and one-line patch, the
+acceptance file `npm run release` enforces, the markdown wire format (R6, NFR-19) and its parser, and a runtime
+dependency.
+
+**What it would be**: one poll method on the existing Web API client mapped to the existing `NowPlaying` shape.
+⚠️ **Probe first**, don't reason: which fields the panel shows (device, volume, shuffle, repeat) come only from
+`GET /me/player`, and whether the 204-when-idle behaviour (probed 2026-08-25) still holds. ⚠️ It changes the
+**recording instrument**: the poll's payload and timing feed the observation trail, so the trail format must be shown
+unchanged, or versioned, before it ships.
 
 ---
 

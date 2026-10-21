@@ -49,6 +49,7 @@ Either can be done with you by Claude Code: see [`docs/claude-start.md`](docs/cl
 
 ## Getting started
 
+- **Architecture**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): the system as built, and the rules it rests on.
 - **Contribute**: [`CONTRIBUTING.md`](CONTRIBUTING.md): how a change gets in, and the traps worth knowing first.
 - **Security**: [`SECURITY.md`](SECURITY.md): report vulnerabilities privately.
 - **Design records**: [`aidlc-docs/`](aidlc-docs/), starting at

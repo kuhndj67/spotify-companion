@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = ['README.md', 'docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md', 'docs/claude-start.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
+const DOCS = ['README.md', 'docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md', 'docs/claude-start.md', 'docs/ARCHITECTURE.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
 const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
 
 const scripts = new Set(Object.keys((JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts));
@@ -117,6 +117,9 @@ describe('documents link only to things that exist (P-63 ②)', () => {
 describe('README holds no hand-written counts (P-63 ③)', () => {
   it('README.md', () => {
     assert.deepEqual(handWrittenCounts(read('README.md')), []);
+  });
+  it('docs/ARCHITECTURE.md', () => {
+    assert.deepEqual(handWrittenCounts(read('docs/ARCHITECTURE.md')), []);
   });
   it('positive control: the old README shape is caught', () => {
     assert.deepEqual(handWrittenCounts('1,565 tests passing · 977 plays · five units, 7 units'), ['1,565 tests', '977 plays', '7 units']);

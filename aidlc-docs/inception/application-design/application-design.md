@@ -5,6 +5,10 @@
 [`component-methods.md`](component-methods.md) · [`services.md`](services.md) ·
 [`component-dependency.md`](component-dependency.md)
 
+> ⚠️ **This is the inception-time plan** (2026-08-25). Some components here were never built under these names. The
+> system as built is in [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) (added 2026-10-21, pre-public
+> solution review §3.9).
+
 ---
 
 ## 1. Design decisions

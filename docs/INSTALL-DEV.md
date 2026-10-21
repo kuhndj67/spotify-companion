@@ -387,23 +387,23 @@ Test-Path data, state
 
 ## S7 — Build and start
 
-**Purpose**: build the app's container image from this source on your machine, and start it. No pre-built image is
-published, so every install builds its own. The build downloads the Spotify connector (`spotify-mcp-server`) from
+**Purpose**: build the app's container image from this source on your machine, and start it. This route builds
+from your checkout so that your own changes run; the app-only route ([`INSTALL-APP.md`](INSTALL-APP.md)) uses the
+published image instead. The build downloads the Spotify connector (`spotify-mcp-server`) from
 GitHub at a fixed version, so it needs internet access.
 
 **Commands**
 
-First check the two secrets are **files**, not folders. If either was missing when the container started, Docker
-creates a **folder** in its place:
+First check both secrets files exist in `secrets/app/` (S4 and S5 create them):
 
 ```powershell
 # Windows
-Get-Item secrets\app\spotify-config.json, secrets\app\musicbrainz.json | Select-Object Name, Mode
+Test-Path secrets\app\spotify-config.json, secrets\app\musicbrainz.json
 ```
 
 ```bash
 # Linux
-ls -ld secrets/app/spotify-config.json secrets/app/musicbrainz.json
+ls -l secrets/app/spotify-config.json secrets/app/musicbrainz.json
 ```
 
 Then build and start. The first build takes a few minutes:
@@ -420,16 +420,15 @@ docker inspect -f "{{.State.Health.Status}}" spotify-companion
 
 **Expected**
 
-- Both secrets are files: the `Mode` begins with `-a` on Windows, or the line begins with `-` on Linux. Neither is a
-  `d` (folder).
+- Both secrets files exist: `True` twice on Windows, or two lines beginning with `-` on Linux.
 - `docker compose up` ends with lines saying the container `spotify-companion` is **Started**, with no error.
   Lines from inside the build such as `debconf: unable to initialize frontend` or npm notices are normal.
 - `docker inspect` prints **`healthy`**.
 
 **If it differs**
 
-- A secret shows as a **folder** (`d`): delete that folder (`Remove-Item -Recurse secrets\app\<name>` /
-  `rm -r secrets/<name>`), redo S4 or S5 to create the file, run `docker compose down`, then repeat this step.
+- A secrets file is missing (`False`, or *No such file*): redo S4 (`spotify-config.json`) or S5
+  (`musicbrainz.json`), then repeat this step.
 - `docker inspect` prints `starting`: wait 30 seconds and run it again.
 - It prints `unhealthy`, or the container keeps restarting: run `docker logs spotify-companion`. A line naming
   `musicbrainz.json` means S5 is incomplete. A line naming `spotify-config.json` means S4 is incomplete. Fix the

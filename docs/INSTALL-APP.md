@@ -16,7 +16,8 @@ in, playing music. Each of those is a box that starts with **👤 YOU DO THIS**.
 just do every step, boxes included. To have Claude Code do it with you, see [`claude-start.md`](claude-start.md).
 
 **Platforms.** **Windows 10/11 with Rancher Desktop** · **Linux with Docker Engine** (written, not yet walked) ·
-macOS untested. On Windows, run commands in **PowerShell**; they are the same in a Linux shell unless both are shown.
+macOS untested. The image is published for **`linux/amd64`** (Intel and AMD processors) only. On an **ARM** machine
+(Apple Silicon Mac, Raspberry Pi, some NAS models) it has not been tested and may not run. On Windows, run commands in **PowerShell**; they are the same in a Linux shell unless both are shown.
 
 **While the repository is private**, pulling the image needs read access to it (A2).
 
@@ -318,16 +319,26 @@ This routine never turns automation on.
 
 **Commands**
 
+The second command prints only the two diagnostics steps this one checks. The full diagnostics output contains your
+MusicBrainz contact address, so it is not printed here.
+
 ```powershell
+# Windows
 curl.exe -s http://localhost:3010/api/automation
-curl.exe -s http://localhost:3010/api/diagnostics
+(curl.exe -s http://localhost:3010/api/diagnostics | ConvertFrom-Json).steps | Where-Object name -match '^(Automation state file|Rules directory writable)' | Format-Table name, status, detail -AutoSize -Wrap
+```
+
+```bash
+# Linux
+curl -s http://localhost:3010/api/automation
+curl -s http://localhost:3010/api/diagnostics | grep -oE '"name":"(Automation state file|Rules directory writable[^"]*)","status":"[a-z]+"'
 ```
 
 **Expected**
 
 - `/api/automation` begins `{"enabled":false,`.
-- In `/api/diagnostics`, the steps *Automation state file* and *Rules directory writable* both have `"status":"ok"`
-  (the detail of the first ends `· writable`).
+- Two lines, *Automation state file* and *Rules directory writable (config/)*, both with status `ok` (on Windows,
+  the detail of the first ends `· writable`).
 
 **What turning it on means.** Rules you write in the **Rules** pop-up decide which tracks match; the **Automated
 skipping** section there turns automation on and off. Once on, matching tracks are **skipped on your Spotify player
@@ -335,7 +346,8 @@ for real**, and a reboot resumes skipping. Built-in limits stop it after a run o
 you have watched match in the decision log while automation was off.
 
 **If it differs**: `"enabled":true` on a fresh install: stop and report it. Either diagnostics step `fail`: stop and
-report it (the app cannot save its settings).
+report it (the app cannot save its settings). Fewer than two lines: the step names have changed; stop and report it.
+Do not print the full diagnostics output into a log instead.
 
 ---
 

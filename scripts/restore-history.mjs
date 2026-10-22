@@ -57,7 +57,7 @@ import { copyFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assertNobodyElseHoldsIt } from './backup-history.mjs';
+import { holdWriterLock } from './backup-history.mjs';
 import { schemaVersionOf, tableCounts } from '../src/backup/manifest.js';
 // ⚠️ U6 (BR-47.1): verifyBackup and the verdict classifier MOVED to src/backup/verifier.ts — the app's
 // *Restore backup* imports the same copy. Re-exported for verify-all-backups.mjs. Runs under --import tsx.
@@ -73,7 +73,6 @@ const APPLY = argv.includes('--apply');
 const VERIFY_ONLY = argv.includes('--verify-only');
 const SELF_TEST = argv.includes('--self-test');
 const ALLOW_DOWNGRADE = argv.includes('--allow-schema-downgrade');
-const OVERRIDE = argv.includes('--i-have-stopped-the-container');
 const DIR = argv.find((a) => !a.startsWith('--'));
 
 function diagnose(result) {
@@ -140,7 +139,7 @@ function selfTest() {
   );
 }
 
-function main() {
+async function main() {
   if (SELF_TEST) {
     selfTest();
     if (!DIR) return;
@@ -204,7 +203,7 @@ function main() {
 
   // ── apply ───────────────────────────────────────────────────────────────────────────────────
   try {
-    if (existsSync(DB)) assertNobodyElseHoldsIt(DB, { override: OVERRIDE });
+    await holdWriterLock(DB, 'db-restore');
   } catch (error) {
     console.error(`\n✖ REFUSING TO RESTORE: ${error.message}\n`);
     process.exit(2);
@@ -247,5 +246,5 @@ function main() {
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href) {
-  main();
+  await main();
 }

@@ -117,6 +117,7 @@ if (!apply) {
   } else {
     console.log(`  would ACCEPT ${candidate} (previous release: ${d.previous ?? 'none'})`);
     console.log('  then: npm run verify');
+    console.log('        POST /api/backups on the running app (a before-change backup; --app-is-down skips it)');
     console.log('        docker compose build');
     console.log('        docker compose up -d');
     console.log(`        wait for ${CONTAINER} to be healthy`);
@@ -132,6 +133,21 @@ const d = decide({ ...facts, verifyPassed: verify.ok });
 if (!d.accept) {
   console.error(`REFUSED: ${d.reason} — ${d.detail}`);
   process.exit(1);
+}
+
+// U10 (FR-76b, BR-82, IN-U10-7): before anything is built, ask the RUNNING app to keep a before-change backup, and
+// go on only when the host can SEE that file. `--app-is-down` skips only this step: the new version still backs up
+// before its first run (BR-79).
+if (process.argv.includes('--app-is-down')) {
+  console.log('\n--app-is-down: no backup from the running app. The new version backs up before its first run.');
+} else {
+  const kept = await keepReleaseBackup(process.env.SPOTIFY_COMPANION_PORT ?? '3010', candidate);
+  if (!kept.ok) {
+    console.error(`\nREFUSED: no backup before this release — ${kept.reason}`);
+    console.error('If the app is not running on purpose, run again with --app-is-down (the new version backs up first).');
+    process.exit(1);
+  }
+  console.log(`\nBackup before release kept: data/backups/before-change/${kept.file}`);
 }
 
 // Check every exit code DIRECTLY -- a piped build once read as success here (CLAUDE.md).
@@ -167,3 +183,35 @@ if (!tag.ok) {
 }
 console.log(`\nReleased ${candidate}: ${d.imageTag} is live and healthy, tagged ${d.gitTag}.`);
 console.log(`Not pushed. To publish the tag: git push origin ${d.gitTag}`);
+
+/**
+ * U10 (BR-82): `POST /api/backups` on the running app, through `ingestGuard` (Origin + ingest header), retrying while
+ * it answers 409 (a backup or restore in progress) for up to 60 s. Succeeds only if the returned file exists under
+ * the host's `data/backups/before-change/`: a backup the host cannot see is not counted.
+ */
+async function keepReleaseBackup(port, version) {
+  const origin = `http://localhost:${port}`;
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    let res;
+    try {
+      res = await fetch(`${origin}/api/backups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: origin, 'x-spotify-companion-ingest': '1' },
+        body: JSON.stringify({ reason: `release ${version}` }),
+        signal: AbortSignal.timeout(120_000),
+      });
+    } catch (error) {
+      return { ok: false, reason: `the app at ${origin} could not be reached (${error instanceof Error ? error.message : String(error)})` };
+    }
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 409 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 5_000));
+      continue;
+    }
+    if (!res.ok) return { ok: false, reason: `the app answered ${res.status}: ${body.error ?? 'no reason given'}` };
+    const onHost = join(root, 'data', 'backups', 'before-change', String(body.file ?? ''));
+    if (!body.file || !existsSync(onHost)) return { ok: false, reason: `the app reported ${body.file ?? 'no file'}, but it is not visible at ${onHost}` };
+    return { ok: true, file: body.file };
+  }
+}

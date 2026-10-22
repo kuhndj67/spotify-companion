@@ -33,12 +33,13 @@
  * turned out to be wrong — they are rows that never corresponded to a distinct listening event.
  * Retaining them would mean every consumer had to learn to exclude them, forever.
  *
- *   node scripts/repair-backfill-timestamps.mjs            # dry run, writes nothing
- *   node scripts/repair-backfill-timestamps.mjs --apply    # backs up, then repairs
+ *   node --import tsx scripts/repair-backfill-timestamps.mjs            # dry run, writes nothing
+ *   node --import tsx scripts/repair-backfill-timestamps.mjs --apply    # backs up, then repairs (U10: under the writer lock)
  */
 
 import { DatabaseSync } from 'node:sqlite';
 import { copyFileSync, existsSync } from 'node:fs';
+import { holdWriterLock } from './backup-history.mjs';
 
 const DB_PATH = process.env.HISTORY_DB_PATH ?? 'data/history.db';
 const APPLY = process.argv.includes('--apply');
@@ -50,6 +51,9 @@ if (!existsSync(DB_PATH)) {
   console.error(`No database at ${DB_PATH}.`);
   process.exit(1);
 }
+
+// U10 (BR-78.7): this script WRITES with --apply and had no guard at all. It now holds the one writer lock.
+if (APPLY) await holdWriterLock(DB_PATH, 'repair-backfill-timestamps');
 
 if (APPLY) {
   const backup = `${DB_PATH}.backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;

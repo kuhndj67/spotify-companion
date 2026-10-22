@@ -113,12 +113,12 @@ own commit, so any step can be reviewed or reverted alone.
       `scripts/docker-entrypoint.sh` dispatches `update`.
 - [x] Tests: PBT-86, PBT-87 (every other byte kept; 0 or ≥ 2 lines → refusal); older → refuse ⭐.
 
-### Step 13 — Scripts *(BR-78.7, BR-82, P-79, IN-U10-7)*
-- [ ] `db:backup`, `db:restore`, `reclassify`, `repair-*` take `WriterLock` (`script:<name>`); `assertNobodyElseHoldsIt`
+### Step 13 — Scripts *(BR-78.7, BR-82, P-79, IN-U10-7)* — ✅ DONE · `holdWriterLock` replaces `assertNobodyElseHoldsIt` in `backup-history.mjs` (one import point kept). ⚠️ Found: `repair-backfill-timestamps.mjs` writes with `--apply` and had **no guard at all**; it now holds the lock and runs under `tsx` (smoke caught the loader change). Spawned-script refusals would cost 30 s each, so the guard test is in-process plus a structural check per script. ⚠️ Transition: the deployed beta.8 container does not take the lock; until beta.9 is live, "container down first" still applies. Positive control: removing one script's lock call fails the structural test
+- [x] `db:backup`, `db:restore`, `reclassify`, `repair-*` take `WriterLock` (`script:<name>`); `assertNobodyElseHoldsIt`
       and `--i-have-stopped-the-container` removed.
-- [ ] `scripts/release.mjs`: `POST /api/backups` before build, `409` retry ≤ 60 s, file visible on the host;
+- [x] `scripts/release.mjs`: `POST /api/backups` before build, `409` retry ≤ 60 s, file visible on the host;
       `--app-is-down`.
-- [ ] Tests: a held lock refuses **each** writing script ⭐ (released → proceeds).
+- [x] Tests: a held lock refuses **each** writing script ⭐ (released → proceeds).
 
 ### Step 14 — Infrastructure files *(IN-U10-3…5)*
 - [ ] `compose.yaml`, `compose.app.yaml`: `SNAPSHOT_DIR` removed; `compose.verify.yaml` unchanged.

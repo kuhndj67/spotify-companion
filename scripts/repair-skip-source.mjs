@@ -25,9 +25,9 @@
  * ## Safety
  *
  * - **Dry run by default.** `--apply` is required, and takes its own backup first.
- * - **Refuses while the container is up** — via `assertNobodyElseHoldsIt`, imported rather than
- *   re-implemented. ⚠️ SQLite's locks do not cross the Rancher Desktop bind mount, so `docker ps` is the
- *   only check that works.
+ * - **Refuses while anything else writes the database** — it holds the one writer lock (`holdWriterLock`,
+ *   U10), imported rather than re-implemented. ⚠️ SQLite's own locks do not cross the Rancher Desktop bind
+ *   mount; the lock file does (probed 2026-10-21).
  * - **Only ever writes `'rule'`**, and only where an attempt reached the player. It never writes `'user'`
  *   and never clears a value, so it cannot manufacture a rejection.
  */
@@ -36,12 +36,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { assertNobodyElseHoldsIt } from './backup-history.mjs';
+import { holdWriterLock } from './backup-history.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB = process.env.HISTORY_DB_PATH ?? join(root, 'data', 'history.db');
 const APPLY = process.argv.includes('--apply');
-const OVERRIDE = process.argv.includes('--i-have-stopped-the-container');
 
 /**
  * ⚠️ Kept in step with `RULE_SKIPPED_THIS_PLAY_SQL` in `src/playback/SqliteSkipAttemptRepository.ts`.
@@ -59,8 +58,8 @@ const CANDIDATES = `
                     AND sa.state IN ('fired', 'confirmed', 'unconfirmed'))
    ORDER BY p.id`;
 
-function main() {
-  assertNobodyElseHoldsIt(DB, { override: OVERRIDE });
+async function main() {
+  await holdWriterLock(DB, 'repair-skip-source');
 
   const db = new DatabaseSync(DB);
   const rows = db.prepare(CANDIDATES).all();
@@ -120,4 +119,4 @@ function main() {
   db.close();
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

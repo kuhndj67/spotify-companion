@@ -63,7 +63,6 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   'diagnostics.ts': 'only server.ts constructs it; the sweep itself is untested',
 
   // Reached only from server.ts. A timer that writes export snapshots to disk.
-  'export/SnapshotScheduler.ts': 'only server.ts constructs it; untested',
 
   // Reached only from server.ts. The MCP transport itself.
   'mcp/spotifyMcpClient.ts': 'only server.ts constructs it; untested',

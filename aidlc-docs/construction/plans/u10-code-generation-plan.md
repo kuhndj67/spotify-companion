@@ -69,16 +69,16 @@ own commit, so any step can be reviewed or reverted alone.
 
 ### Step 6 — Scheduler and settings *(BR-81.1, 81.4, P-83, LC-74, IN-U10-3)* — ✅ DONE · ⚠️ sequencing: `SnapshotScheduler`'s removal and the `SNAPSHOT_DIR` log line move to **Step 7** (its wiring and diagnostics' *Snapshots* step still use it; removing it here would break this step's build). Positive control: scheduling from process start fails 4 of 5 tests
 - [x] `src/backup/BackupScheduler.ts`: 15-minute check plus one at startup via `scheduledDue`.
-- [ ] *(moved to Step 7)* `src/export/SnapshotScheduler.ts` **removed** (knip confirms nothing imports it); `src/config.ts`:
+- [x] *(done in Step 7)* `src/export/SnapshotScheduler.ts` **removed** (knip confirms nothing imports it); `src/config.ts`:
       `BEFORE_CHANGE_KEEP` (default 5), `SNAPSHOT_DIR` ignored with one log line, `SNAPSHOT_*` keep their meaning.
 - [x] Tests: a restart loop within one interval takes at most one backup; a restart after the interval takes one.
 
-### Step 7 — Startup sequence and `data-dev/` *(BR-78.9, BR-79, BR-84, LC-71, LC-77)*
-- [ ] `src/config.ts`: host run with no `HISTORY_DB_PATH` → `data-dev/history.db`.
-- [ ] `src/server.ts`: path → lock → restore swap → open → `backupDue` → kept backup → migrate → record version;
+### Step 7 — Startup sequence and `data-dev/` *(BR-78.9, BR-79, BR-84, LC-71, LC-77)* — ✅ DONE · also took from Step 6 `SnapshotScheduler`'s removal and the `SNAPSHOT_DIR` log line, from Step 8 diagnostics' `warn` level and *Backups* step, and from Step 14 the `data-dev/` ignores (each needed for this commit to build or to be safe). The before-change logic is `src/history/prepareHistory.ts` (testable; `server.ts` is not importable). ⚠️ A **lost** lock goes through `shutdown(…, { touchDatabase: false })` and **exits** without flushing or closing (closing checkpoints the WAL: a write); under Docker the restart is then refused and runs display-only. Pins in `maintenanceWiring.test.ts`. Positive control: migrating before the backup fails 2 tests. Not yet run as a process: the `:3011` rehearsal (IN-U10-8) is where startup is first observed
+- [x] `src/config.ts`: host run with no `HISTORY_DB_PATH` → `data-dev/history.db`.
+- [x] `src/server.ts`: path → lock → restore swap → open → `backupDue` → kept backup → migrate → record version;
       a refusal or failure at any step → display-only with the reason (the existing degraded path); `lost` stops
       writes; shutdown releases the lock.
-- [ ] Tests: failed before-change backup leaves the database's bytes and schema unchanged ⭐; version change triggers
+- [x] Tests: failed before-change backup leaves the database's bytes and schema unchanged ⭐; version change triggers
       a backup, same version does not; the lock is taken before the restore swap.
 
 ### Step 8 — Status, diagnostics, reminder *(BR-81.2–81.3, 86.5, 87, P-84, P-85, LC-75, LC-81; PBT-85, PBT-90)*

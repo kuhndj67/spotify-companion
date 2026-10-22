@@ -22,7 +22,8 @@ import { readAppVersion } from './version.js';
 
 export interface DiagnosticStep {
   name: string;
-  status: 'ok' | 'fail' | 'skip';
+  /** U10 (BR-81.3): `warn` is a risk, not a fault — a run with warnings and no failure is not a failed run. */
+  status: 'ok' | 'warn' | 'fail' | 'skip';
   detail: string;
   durationMs: number;
 }
@@ -95,6 +96,15 @@ async function step(
   }
 }
 
+/**
+ * U10: a step whose level was already decided elsewhere (a pure rule), so diagnostics reports it rather than
+ * re-deriving it. `off` and a missing verdict are `skip`.
+ */
+function leveled(name: string, verdict: { level: 'ok' | 'warn' | 'fail' | 'off'; detail: string } | null): DiagnosticStep {
+  if (verdict === null) return { name, status: 'skip', detail: 'Skipped — prerequisite unavailable', durationMs: 0 };
+  return { name, status: verdict.level === 'off' ? 'skip' : verdict.level, detail: verdict.detail, durationMs: 0 };
+}
+
 /** U1 subsystems, passed in so diagnostics stays usable when history failed to start. */
 export interface HistoryDiagnosticsInput {
   repository: {
@@ -107,11 +117,8 @@ export interface HistoryDiagnosticsInput {
     degraded: boolean;
     lastRecordedAt: string | null;
   } | null;
-  snapshotStatus: {
-    lastRunAt: string | null;
-    lastRowCount: number | null;
-    lastError: string | null;
-  } | null;
+  /** U10 (BR-81.2): the scheduler's verdict on automatic backups; `null` when there is no scheduler. */
+  backupHealth: { level: 'ok' | 'warn' | 'fail' | 'off'; detail: string } | null;
   startupError: string | null;
   dbPath: string;
 }
@@ -503,15 +510,8 @@ export async function runDiagnostics(
       }),
     );
 
-    steps.push(
-      await step('Snapshots', async () => {
-        if (!history.snapshotStatus) return null;
-        if (history.snapshotStatus.lastError) throw new Error(history.snapshotStatus.lastError);
-        return history.snapshotStatus.lastRunAt
-          ? `last ${history.snapshotStatus.lastRunAt} · ${history.snapshotStatus.lastRowCount} row(s)`
-          : 'scheduled; none written yet';
-      }),
-    );
+    // U10 (BR-81.2, FR-80): was *Snapshots*, which said `ok` for "scheduled; none written yet" for 18 days.
+    steps.push(leveled('Backups', history.backupHealth));
   }
 
   // -- U2: label enrichment ---------------------------------------------------

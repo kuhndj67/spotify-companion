@@ -18,13 +18,17 @@ spotify-config.json
 .env
 .env.local
 
-# Listening history and its snapshots (U1).
+# Listening history and its automatic backups (U1, U10).
 #
 # NOTE: this directory holds the only data in the project that cannot be regenerated. Being
 # gitignored makes it invisible to git and therefore MORE exposed to `git clean -xdf`, not less.
-# Snapshots live here too, so database and backups share a single deletion event. Point
-# SNAPSHOT_DIR outside the project tree if that matters to you.
+# Automatic backups live here too (data/backups/), so the database and its backups share a single
+# deletion event (accepted, U10 IN-U10-2). Copy data/backups/ somewhere else if that matters to you.
 data/
+
+# U10 (FR-78): a host run (`npm start`, `npm run dev`) records here, never in data/. Same warning: it
+# cannot be regenerated either, if a developer has been listening through it.
+data-dev/
 
 # Rule definitions (U3). User-authored, and a fairly direct statement of listening
 # preference, so it is the user's data rather than project configuration. Same shape as

@@ -105,12 +105,17 @@ export const config = {
    * Where the listening-history database lives (NFR-11).
    *
    * In the container this is a bind-mounted directory so a rebuild never destroys history; on
-   * the host it defaults to `./data/`. The *directory* is mounted, not the file — SQLite's
+   * the host it defaults to `./data-dev/` (U10). The *directory* is mounted, not the file — SQLite's
    * `-wal` and `-shm` siblings must live beside the database or crash recovery breaks. Copying
    * the single-file `secrets/` mount pattern here would be a subtle and hard-to-diagnose
    * mistake.
    */
-  historyDbPath: process.env.HISTORY_DB_PATH ?? join(projectRoot, 'data', 'history.db'),
+  //
+  // U10 (FR-78, BR-84): a HOST run (`npm start`, `npm run dev`) defaults to `data-dev/`, never the container's
+  // `data/history.db`. Two processes on one history is the corruption this project has had before; the writer
+  // lock now refuses it, and this keeps a developer from ever asking. Running on the real history is a deliberate
+  // `HISTORY_DB_PATH=data/history.db`, with the container down (the lock enforces that half).
+  historyDbPath: process.env.HISTORY_DB_PATH ?? join(projectRoot, inContainer ? 'data' : 'data-dev', 'history.db'),
 
   /** Set false to run without recording. The display works either way. */
   historyEnabled: process.env.HISTORY_ENABLED !== 'false',
@@ -155,9 +160,11 @@ export const config = {
    */
   reportTimeZone: process.env.REPORT_TIME_ZONE ?? 'America/New_York',
 
-  // -- U1: export and snapshots (FR-56) ---------------------------------------
+  // -- U1: export; U10: automatic backups (FR-56 → FR-80) ---------------------
+  //
+  // The names are U1's, kept so an existing compose file needs no edit (IN-U10-3). They now govern the SCHEDULED
+  // kind of kept backup in `data/backups/scheduled/`; `SNAPSHOT_DIR` is no longer read (server.ts logs it once).
 
-  snapshotDir: process.env.SNAPSHOT_DIR ?? join(projectRoot, 'data', 'snapshots'),
   snapshotIntervalHours: int('SNAPSHOT_INTERVAL_HOURS', 24),
   snapshotKeep: int('SNAPSHOT_KEEP', 14),
   snapshotsEnabled: process.env.SNAPSHOTS_ENABLED !== 'false',

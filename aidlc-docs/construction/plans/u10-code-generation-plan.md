@@ -60,10 +60,10 @@ own commit, so any step can be reviewed or reverted alone.
 - [x] `test/keptBackupDecision.property.test.ts`: PBT-80…84, each with its positive control (PBT-84: no input with no
       backup yields `ok`).
 
-### Step 5 — Kept-backup store *(BR-80, P-81, P-82, LC-73)*
-- [ ] `src/backup/KeptBackupStore.ts`: free-space check (`fs.statfs`), U6's `createBackup` into `.work`, rename into
+### Step 5 — Kept-backup store *(BR-80, P-81, P-82, LC-73)* — ✅ DONE · `MaintenanceService.keepBackup` holds U6's busy lock (busy → 409); `createBackup` gains an optional `label` (default `in-app`, unchanged); same-second backups get `-2`. Positive control: a truncated archive is refused by *Restore backup* (2 tests fail)
+- [x] `src/backup/KeptBackupStore.ts`: free-space check (`fs.statfs`), U6's `createBackup` into `.work`, rename into
       `backups/<kind>/`, rotate after arrival, newest-of-each-kind, U6's busy lock.
-- [ ] Tests: arrival is whole (no partial file after an injected failure); rotation never crosses kinds and never
+- [x] Tests: arrival is whole (no partial file after an injected failure); rotation never crosses kinds and never
       touches other files (a planted CSV and an unrelated file survive); short space → no file, reason in words.
       ⭐ **Positive control**: a kept backup is accepted by *Restore backup*'s upload path (BR-80.1).
 

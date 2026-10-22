@@ -59,6 +59,8 @@ export interface CreateBackupDeps {
   rulesPath: string;
   appVersion: string;
   now: () => Date;
+  /** U10: the manifest label. *Create backup* leaves it `in-app`; a kept backup records its kind and reason. */
+  label?: string;
 }
 
 export type CreateBackupResult =
@@ -109,7 +111,7 @@ export async function createBackup(deps: CreateBackupDeps): Promise<CreateBackup
       manifest = {
         manifestSchema: MANIFEST_SCHEMA,
         source: 'app',
-        label: 'in-app',
+        label: deps.label ?? 'in-app',
         takenAt: deps.now().toISOString(),
         appVersion: deps.appVersion,
         schemaVersion: schemaVersionOf(copy),

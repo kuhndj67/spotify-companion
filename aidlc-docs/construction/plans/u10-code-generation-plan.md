@@ -125,13 +125,13 @@ own commit, so any step can be reviewed or reverted alone.
 - [x] `scripts/docker-entrypoint.sh`: `backups/` created and chowned instead of `SNAPSHOT_DIR`.
 - [x] `.gitignore`, `.dockerignore`: `data-dev/`; the `data/` note rewritten (backups share its deletion event).
 
-### Step 15 — Documents
-- [ ] `docs/INSTALL-APP.md`, `docs/INSTALL-DEV.md`: *Backups* (automatic, where, ⚠️ copy `data/backups/` elsewhere,
+### Step 15 — Documents — ✅ DONE · *Backups* sections added to both install guides; Settings' links fixed to `#updating-stopping-removing`
+- [x] `docs/INSTALL-APP.md`, `docs/INSTALL-DEV.md`: *Backups* (automatic, where, ⚠️ copy `data/backups/` elsewhere,
       the weekly reminder and when to turn it off), *Updating* (`update`), the update check and its switch;
       INSTALL-DEV: `data-dev/`.
-- [ ] `CONTRIBUTING.md` and `CLAUDE.md`: the lock replaces "container down first"; `data-dev/`; no hand-written counts
+- [x] `CONTRIBUTING.md` and `CLAUDE.md`: the lock replaces "container down first"; `data-dev/`; no hand-written counts
       (`test/docs.test.ts`).
-- [ ] `construction/u10-data-safety/code/code-summary.md`: what changed per step, deviations, screenshots.
+- [x] `construction/u10-data-safety/code/code-summary.md`: what changed per step, deviations, screenshots.
 
 ### Step 16 — Close
 - [ ] `npm run verify` green; ⚠️ the image built as `spotify-companion:candidate` (NOT `docker compose build`, which would overwrite the live `1.0.0-beta.8` tag, the rollback target), exit code checked directly; HANDOFF, state, audit; PR opened.

@@ -387,20 +387,45 @@ Do not print the full diagnostics output into a log instead.
 
 ---
 
+## Backups
+
+Your listening history in `data/` **cannot be recreated**. The app keeps backups for you, and one copy should live
+somewhere else.
+
+- **Automatic backups** (from `1.0.0-beta.9`): once a day, and before any update or database change, the app keeps a
+  backup in `data/backups/` (`scheduled/` keeps the newest 14, `before-change/` the newest 5). Each one can be
+  restored with **Settings → Restore backup**. **Settings → Backup & restore** shows the newest of each, and the
+  **Status** light turns yellow or red if they stop.
+- ⚠️ **They are on the same disk as your history.** Deleting the folder, or losing the disk, loses both. Keep a copy
+  elsewhere: **Settings → Create backup** downloads one, and you can also copy `data/backups/` to another drive or
+  cloud folder.
+- **The weekly reminder**: if no backup has been downloaded for a week, the **Status** light turns yellow and
+  **Diagnostics** says so. Turn it off in **Settings → Backup & restore** if the whole computer or server running the
+  app is already backed up.
+
+---
+
 ## Updating, stopping, removing
 
-- **Back up first**: in the app, **Settings → Create backup**. Your listening history in `data/` **cannot be
-  recreated**.
-- **Know when there is a new release**: on GitHub, open the repository and choose **Watch → Custom → Releases**.
-  Each release is listed on the [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
-- **Update to a newer release**: stop it, change the version in the `image:` line of `compose.yaml` to the new
-  release, and start it again:
+- **Know when there is a new release**: **Settings → Version** says when a newer version exists, and an **Update**
+  marker appears in the status bar. To do this, the app asks GitHub (`api.github.com`) once a day for this project's
+  list of releases; GitHub sees your IP address and the app's version, nothing else. Turn it off in
+  **Settings → Version**. On GitHub, **Watch → Custom → Releases** also tells you, and each release is listed on the
+  [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
+- **Update to a newer release**: in your folder, run the **new** version's `update` command, then start it. Replace
+  `<new version>` with the release, for example `1.0.0-beta.9`:
 
   ```powershell
-  docker compose down
-  # now edit compose.yaml: change the version at the end of its image: line
+  docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<new version> update
   docker compose up -d
   ```
+
+  `update` changes only the version on the `image:` line of `compose.yaml`, and refuses to move to an older version.
+  The new version **backs up your history before its first run** (into `data/backups/before-change/`). You do not
+  need to stop the app first.
+
+  **If `update` says there is no image line**, your `compose.yaml` was edited by hand: change the version at the end
+  of its `image:` line yourself, then `docker compose up -d`.
 
 - **Stop** (your data stays), and **start again**. It also restarts by itself after a reboot, once Rancher Desktop
   is running:

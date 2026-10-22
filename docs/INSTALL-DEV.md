@@ -571,6 +571,25 @@ start armed.
 
 ---
 
+## Backups
+
+Your listening history in `data/` **cannot be recreated**. The app keeps backups for you, and one copy should live
+somewhere else.
+
+- **Automatic backups** (from `1.0.0-beta.9`): once a day, and before any update or database change, the app keeps a
+  backup in `data/backups/` (`scheduled/` keeps the newest 14, `before-change/` the newest 5). Each one can be
+  restored with **Settings → Restore backup**. **Settings → Backup & restore** shows the newest of each, and the
+  **Status** light turns yellow or red if they stop.
+- ⚠️ **They are on the same disk as your history**, and `data/` is gitignored, so `git clean -xdf` deletes both. Keep
+  a copy elsewhere: **Settings → Create backup** downloads one, and you can also copy `data/backups/` to another drive.
+- **The weekly reminder**: if no backup has been downloaded for a week, the **Status** light turns yellow and
+  **Diagnostics** says so. Turn it off in **Settings → Backup & restore** if the whole machine is already backed up.
+- **Running the app on the host** (`npm start`, `npm run dev`) records into **`data-dev/`**, never the container's
+  `data/`. To run on the real history on purpose, stop the container and set `HISTORY_DB_PATH=data/history.db`; a
+  second process on the same database is refused by its lock file and names the one holding it.
+
+---
+
 ## Updating, stopping, removing
 
 - **Stop** (your data stays in `data/`):
@@ -585,15 +604,21 @@ start armed.
   docker compose up -d
   ```
 
-- **Know when there is a new release**: on GitHub, open the repository and choose **Watch → Custom → Releases**.
-  Each release is listed on the [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
-- **Update to a newer release**: take **Settings → Create backup** first. Then, replacing `<new tag>`:
+- **Know when there is a new release**: **Settings → Version** says when a newer version exists, and an **Update**
+  marker appears in the status bar. To do this, the app asks GitHub (`api.github.com`) once a day for this project's
+  list of releases; GitHub sees your IP address and the app's version, nothing else. Turn it off in
+  **Settings → Version**. On GitHub, **Watch → Custom → Releases** also tells you, and each release is listed on the
+  [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
+- **Update to a newer release**: replacing `<new tag>`:
 
   ```powershell
   git fetch --tags
   git checkout <new tag>
   docker compose up -d --build
   ```
+
+  From `1.0.0-beta.9` the new version **backs up your history before its first run** (into
+  `data/backups/before-change/`). Updating from an earlier version, take **Settings → Create backup** first.
 - **Upgrading from `1.0.0-beta.4` or earlier** (once): since `1.0.0-beta.5` the two credential files live in
   **`secrets/app/`**, and only that folder is mounted into the container (so other tools' credentials in `secrets/`
   stay out of it). And from `1.0.0-beta.2` or earlier, the container was also renamed from `spotify-now-playing` to

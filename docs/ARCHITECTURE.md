@@ -19,7 +19,7 @@ Browser ──HTTP + WebSocket (127.0.0.1 only)──▶ spotify-companion conta
                                                  │       └── getNowPlaying ──▶ Spotify Web API
                                                  ├── direct Web API client (enrichment, liked set, context, skip)
                                                  └── MusicBrainz client (rate-limited queue)
-                                               bind mounts: data/ (history.db, snapshots)   config/ (rules.json)
+                                               bind mounts: data/ (history.db, backups/)    config/ (rules.json)
                                                             state/ (automation kill switch)  secrets/app/ (credentials)
 ```
 
@@ -37,8 +37,8 @@ is on the app's path.
 | Enrichment | `src/spotify/` (Web API client, liked-set cache), `src/musicbrainz/` (`labelClassifier` (pure), request queue, label cache, backfill) | fails to `null`, never blocks the display |
 | Rules | `src/rules/` (`predicate`, `RuleEngine`, `fieldCatalogue`, `trackFacts` (pure); `RuleStore`, `RuleSetWatcher`, `EvaluationCoordinator`, `LoggingExecutor`) | tri-state: a rule over unknown data answers *unknown* |
 | Automation | `src/playback/` (`SkipExecutor`, `skipDrain`, `safetyCounters`, `AutomationStateStore`, `spotifyPlayerClient`) | two off switches; the only code that changes playback |
-| Lifecycle and configuration | `src/maintenance/` (in-app backup and restore, startup swap), `src/backup/` (verifier), `src/configuration/` (`RulesWriter`, `CredentialsWriter`, `atomicWrite`) | one writer per file; every write is temp-then-rename |
-| Export | `src/export/` (CSV/JSON export, snapshot scheduler, serialisers (pure)) | the output the analysis depends on |
+| Lifecycle and configuration | `src/maintenance/` (in-app backup and restore, startup swap), `src/backup/` (verifier, kept backups, their schedule, the download reminder), `src/lock/` (the one-writer lock), `src/update/` (the newer-version check), `src/configuration/` (`RulesWriter`, `CredentialsWriter`, `atomicWrite`) | one writer per file; every write is temp-then-rename |
+| Export | `src/export/` (CSV/JSON export, serialisers (pure)) | the output the analysis depends on |
 | Presentation | `src/ui/` (view models derived on the server), `public/` (vanilla JavaScript, no build step) | judgement lives in `src/`, the browser displays it |
 | Operations | `scripts/` (release, protect, auth, verification installs, `db:*`), `Dockerfile`, `scripts/docker-entrypoint.sh` | outside the test suite; `npm run smoke` proves they load |
 

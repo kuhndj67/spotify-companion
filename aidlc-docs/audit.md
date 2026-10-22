@@ -533,3 +533,34 @@ the first deploy is Build & Test's rehearsal (IN-U10-8). Approval prompt shown t
 
 Owner: *"approved plan, merge is marked as a draft... ready to move it forward?"* Plan approved as written; PR #22 (the
 designs) marked ready for review at the owner's request. Code begins on `u10-code-generation` once #22 merges.
+
+## 2026-10-22T05:30:00Z — U10 Code Generation done (16 steps); a fresh-install defect found and fixed
+
+All 16 steps of the approved plan, one commit each on `u10-code-generation`, `npm run verify` green after each (1,826
+pass, 0 fail at the end). Summary, deviations and verification: `construction/u10-data-safety/code/code-summary.md`.
+
+**Found by the work, not by review:**
+- 🔴 **A fresh install would never have recorded.** Running the BUILT app on an empty data folder: migration 0→8 made
+  a before-change backup due, and a backup of an empty database does not verify, so the app refused to migrate and
+  ran display-only. Every unit test had started from a v7 database. Fixed in its own commit: schema 0 means nothing to
+  protect. **BR-79.1 amended** in place.
+- A **weak property** (PBT-84): *none written yet* mutated to `ok` passed every test; a targeted property now fails.
+- `repair-backfill-timestamps.mjs` wrote with `--apply` and had **no guard at all**; it now holds the writer lock.
+- The plan's `docker compose build` would have **overwritten the live `1.0.0-beta.8` image tag**, the rollback target;
+  built as `spotify-companion:candidate` instead.
+- One step's commit went in with a test failing (the INSTALL-APP image-reference rule); fixed in the next commit.
+
+**Observed live** (the built app, isolated: scratch data, port 3027, no Spotify credentials; then the image): a stale
+lock taken over after a real crash, after the 30 s watch; the scheduled backup at startup; one real anonymous request
+to GitHub's release list answering *current* (`v1.0.0-beta.8`, page accepted); a completed download clearing the
+reminder; the new header, Status light, Settings and diagnostics in light and dark; the image's `update` rewriting
+from beta.7 (CRLF and comment kept), doing nothing at beta.8, refusing from beta.9.
+
+Deviations from the designs, each recorded in the plan's step headings: `compareSemVer` in `src/version.ts`;
+migrate-on-open kept as the default with `{ migrate: false }`; four lock verdicts; a lost lock exits without touching
+the database; `POST` switches and one `GET /api/settings/status`; the existing glyph set for Status; the version
+notice beside U8's existing line; header buttons grouped right.
+
+⚠️ **Transition**: the deployed `1.0.0-beta.8` container does not take the lock; until `1.0.0-beta.9` is live,
+`docker compose down` before any `db:*` script. Next: Build & Test, beginning with the `:3011` rehearsal, which needs
+the owner's **Settings → Create backup** first.

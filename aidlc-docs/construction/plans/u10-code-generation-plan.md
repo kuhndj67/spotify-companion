@@ -1,7 +1,7 @@
 # Code Generation Plan — U10: Data Safety
 
 **Date**: 2026-10-22 · **Stage**: CONSTRUCTION — Code Generation (Part 1, planning), Unit U10
-**Status**: ✅ approved 2026-10-22 (owner). In progress on `u10-code-generation`. This plan is the single source of truth for U10's Code Generation.
+**Status**: ✅ approved 2026-10-22 (owner). ✅ **All 16 steps done** on `u10-code-generation` (2026-10-22); awaiting owner review. Summary: `construction/u10-data-safety/code/code-summary.md`. This plan is the single source of truth for U10's Code Generation.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield (modify in place; never duplicate a file)
 **Inputs** (all approved 2026-10-22): FD BR-78…BR-87 · NFR P-76…P-87, LC-69…LC-81, PBT-79…PBT-90 · Infrastructure
 IN-U10-1…9 · requirements FR-76…82 (FR-56/63/76/79/80 amended) · story **US-33**
@@ -133,8 +133,8 @@ own commit, so any step can be reviewed or reverted alone.
       (`test/docs.test.ts`).
 - [x] `construction/u10-data-safety/code/code-summary.md`: what changed per step, deviations, screenshots.
 
-### Step 16 — Close
-- [ ] `npm run verify` green; ⚠️ the image built as `spotify-companion:candidate` (NOT `docker compose build`, which would overwrite the live `1.0.0-beta.8` tag, the rollback target), exit code checked directly; HANDOFF, state, audit; PR opened.
+### Step 16 — Close — ✅ DONE · U10's PBT-79…90 registered with `propertyObligations` (no gaps); image built as `spotify-companion:candidate` (exit 0; `1.0.0-beta.8` untouched); the image's `update` run against three scratch folders (rewrite from beta.7 keeping CRLF and the comment; nothing to do at beta.8; refusal from beta.9)
+- [x] `npm run verify` green; ⚠️ the image built as `spotify-companion:candidate` (NOT `docker compose build`, which would overwrite the live `1.0.0-beta.8` tag, the rollback target), exit code checked directly; HANDOFF, state, audit; PR opened.
 
 ---
 

@@ -58,6 +58,10 @@ import { appliedMessage, comparisonPanelView, rulesConfirmView, rulesFileStatusV
 import { musicbrainzSectionView, spotifySectionView } from './ui/credentialsPanel.js';
 import { CONFIRM_WORD, type MaintenanceService, type Refused } from './maintenance/MaintenanceService.js';
 import { comparisonView, statusView } from './ui/maintenancePanel.js';
+import { basename } from 'node:path';
+import type { BackupStatusView } from './backup/KeptBackupStore.js';
+import type { ReminderState, ReminderVerdict } from './backup/backupReminder.js';
+import type { UpdateCheckResult } from './update/UpdateChecker.js';
 import { MAJOR_ROOTS } from './musicbrainz/majorRootList.js';
 import { isrcPrefixVote } from './musicbrainz/isrcPrefix.js';
 import { LABEL_CLASSIFIER_VERSION } from './musicbrainz/LabelEnrichmentService.js';
@@ -158,6 +162,18 @@ export interface ApiDeps {
    * so the route is testable; absent reads as `unknown`, which the UI shows as `Version unknown`, never blank.
    */
   appVersion?: string;
+
+  // -- U10: data safety ----------------------------------------------------------
+  //
+  // All optional, so the U0–U9 test harnesses need not construct them.
+  /** FR-81: the update checker. */
+  updateChecker?: { result(): UpdateCheckResult; setEnabled(enabled: boolean): void } | null;
+  /** FR-82: the weekly download reminder. */
+  backupReminder?: { state: ReminderState; verdict(): ReminderVerdict; setEnabled(enabled: boolean): void } | null;
+  /** FR-80, BR-86.4: what Settings shows about kept backups. */
+  backupStatus?: (() => BackupStatusView) | null;
+  /** BR-87.1: called when a *Create backup* download has sent its LAST byte — not when it starts. */
+  onBackupDownloaded?: () => void;
 }
 
 /**
@@ -827,6 +843,9 @@ export function createApi(deps: ApiDeps): Router {
     const r = await deps.maintenance.backup();
     if (!r.ok) return void refuse(res, r);
     res.on('close', r.cleanup);
+    // U10 (BR-87.1): `finish` fires only once every byte has been handed to the connection; an abandoned download
+    // closes without it, and does not count as a copy kept elsewhere.
+    res.on('finish', () => deps.onBackupDownloaded?.());
     res.status(200);
     res.setHeader('Content-Type', 'application/gzip');
     res.setHeader('Content-Length', String(r.bytes));
@@ -840,6 +859,52 @@ export function createApi(deps: ApiDeps): Router {
    * with the cap counted as bytes arrive. ⚠️ `express.json` above does not consume it: it parses only JSON
    * bodies. Responds with the comparison and a staging token; nothing outside `data/.work/` has changed.
    */
+  // ── U10: kept backups, the update check, the backup reminder ───────────────────────────────────────────
+
+  /**
+   * FR-76(b), BR-82: `npm run release` asks the RUNNING app to keep a before-change backup before it builds. Behind
+   * `ingestGuard`, as every maintenance route. Answers with the file name, so the release script can check the host
+   * sees it under `data/backups/before-change/`.
+   */
+  router.post('/api/backups', ingestGuard, async (req, res) => {
+    if (!deps.maintenance) return void maintenanceUnavailable(res);
+    const reason = typeof (req.body as { reason?: unknown } | undefined)?.reason === 'string' ? String((req.body as { reason: string }).reason).slice(0, 120) : 'requested';
+    const r = await deps.maintenance.keepBackup('before-change', reason);
+    if (!r.ok) {
+      if ('status' in r) return void refuse(res, r);
+      return void res.status(503).json({ error: r.reason, spaceShort: r.spaceShort ?? null });
+    }
+    res.json({ ok: true, kind: 'before-change', file: basename(r.path), takenAt: r.takenAt, bytes: r.bytes });
+  });
+
+  /** BR-86: everything Settings shows for U10, in one read. */
+  router.get('/api/settings/status', (_req, res) => {
+    res.json({
+      appVersion: deps.appVersion ?? UNKNOWN_VERSION,
+      updateCheck: deps.updateChecker?.result() ?? null,
+      backupReminder: deps.backupReminder ? { ...deps.backupReminder.state, verdict: deps.backupReminder.verdict() } : null,
+      backups: deps.backupStatus?.() ?? null,
+    });
+  });
+
+  /** FR-81 (BR-85.1): the opt-out switch. A plain POST, as the automation switch: `localGuard` refuses cross-site. */
+  router.post('/api/update-check', (req, res) => {
+    const enabled = (req.body as { enabled?: unknown } | undefined)?.enabled;
+    if (!deps.updateChecker) return void res.status(503).json({ error: 'The update check is unavailable.' });
+    if (typeof enabled !== 'boolean') return void res.status(400).json({ error: '`enabled` must be true or false.' });
+    deps.updateChecker.setEnabled(enabled);
+    res.json(deps.updateChecker.result());
+  });
+
+  /** FR-82 (BR-87.5): the reminder switch. */
+  router.post('/api/backup-reminder', (req, res) => {
+    const enabled = (req.body as { enabled?: unknown } | undefined)?.enabled;
+    if (!deps.backupReminder) return void res.status(503).json({ error: 'The backup reminder is unavailable.' });
+    if (typeof enabled !== 'boolean') return void res.status(400).json({ error: '`enabled` must be true or false.' });
+    deps.backupReminder.setEnabled(enabled);
+    res.json({ ...deps.backupReminder.state, verdict: deps.backupReminder.verdict() });
+  });
+
   router.post('/api/maintenance/restore', ingestGuard, async (req, res) => {
     if (!deps.maintenance) return void maintenanceUnavailable(res);
     const r = await deps.maintenance.receiveUpload(req);

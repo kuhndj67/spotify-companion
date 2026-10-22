@@ -96,11 +96,11 @@ own commit, so any step can be reviewed or reverted alone.
       URL is the list endpoint, never `/releases/latest`; off → zero requests over a simulated day; a failure keeps
       the last good answer. No test calls the real GitHub.
 
-### Step 10 — API *(frontend-components §5)*
-- [ ] `src/api.ts`: `POST /api/backups { reason }` (`409` when busy), `PUT /api/update-check { enabled }`,
+### Step 10 — API *(frontend-components §5)* — ✅ DONE · ⚠️ adapted: the two switches are plain `POST` (the automation switch's precedent; `localGuard` refuses cross-site), not `PUT`; Settings reads one `GET /api/settings/status` instead of new WebSocket fields (the status bar's *Status* and *Update* already ride the snapshot). `POST /api/backups` is behind `ingestGuard`. Found: Settings already shows the version (U8, `#app-version`), so Step 11 puts the notice beside THAT line. Positive control: firing the reminder hook at the download's start fails the never-finishing-download test
+- [x] `src/api.ts`: `POST /api/backups { reason }` (`409` when busy), `PUT /api/update-check { enabled }`,
       `PUT /api/backup-reminder { enabled }`; snapshot fields `status`, `updateCheck`, `backupHealth`,
       `backupReminder`; *Create backup*'s response reports completion to the reminder.
-- [ ] Tests: each route's success and refusal; cross-site `Origin` refused (inherited guard, checked once per route).
+- [x] Tests: each route's success and refusal; cross-site `Origin` refused (inherited guard, checked once per route).
 
 ### Step 11 — Frontend *(BR-86, frontend-components §1–§6, LC-76)*
 - [ ] `public/index.html`, `app.js`, `styles.css`: header **Settings · Diagnostics · Rules** (pop-up moved, ids kept);

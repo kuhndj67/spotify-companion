@@ -57,6 +57,15 @@ export type KeepResult =
       readonly spaceShort?: { readonly freeBytes: number; readonly neededBytes: number };
     };
 
+/** BR-86.4: what Settings shows about kept backups (status, not a manager: FD Q5 = A). */
+export interface BackupStatusView {
+  readonly health: { readonly level: 'ok' | 'warn' | 'fail' | 'off'; readonly detail: string };
+  readonly scheduled: { readonly newestAt: string | null; readonly count: number };
+  readonly beforeChange: { readonly newestAt: string | null; readonly count: number };
+  /** As the user sees it: `data/backups/` (the host path; the container's `/data` is the same folder). */
+  readonly folder: string;
+}
+
 export interface NewestBackup {
   readonly name: string;
   readonly takenAtMs: number;

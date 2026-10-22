@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { config, CONTAINER_SECRETS_DIR } from './config.js';
 import { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import { SpotifyWebApiClient } from './spotify/webApiClient.js';
@@ -49,7 +49,7 @@ import { ExportService } from './export/ExportService.js';
 import { BackupScheduler } from './backup/BackupScheduler.js';
 import { BackupReminder } from './backup/backupReminder.js';
 import { UpdateChecker } from './update/UpdateChecker.js';
-import { KeptBackupStore } from './backup/KeptBackupStore.js';
+import { KeptBackupStore, type BackupStatusView } from './backup/KeptBackupStore.js';
 import { BeforeChangeBackupFailed, prepareHistory } from './history/prepareHistory.js';
 import { WriterLock } from './lock/WriterLock.js';
 import { RequestQueue } from './musicbrainz/RequestQueue.js';
@@ -1072,6 +1072,11 @@ app.use(
     credentials,
     labelsActive: labelUserAgent !== null,
     appVersion: readAppVersion(),
+    // U10 (FR-80…82): Settings' status, the two switches, the release backup and the download reminder.
+    updateChecker,
+    backupReminder,
+    backupStatus: () => backupStatusView(),
+    onBackupDownloaded: () => backupReminder.recordDownload(),
   }),
 );
 
@@ -1345,6 +1350,20 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
     automation: { ...automationIndicator(automationIndicatorState()), inMessage: false as const },
     health: statusIndicator(statusSources()),
     update: updateIndicator(updateChecker.result()),
+  };
+}
+
+/** U10 (BR-86.4): what Settings shows about kept backups. */
+function backupStatusView(): BackupStatusView {
+  const at = (kind: 'scheduled' | 'before-change') => {
+    const n = keptBackups.newest(kind);
+    return { newestAt: n === null ? null : new Date(n.takenAtMs).toISOString(), count: keptBackups.count(kind) };
+  };
+  return {
+    health: backupScheduler?.health() ?? { level: 'off', detail: 'History is not running, so no automatic backup is taken.' },
+    scheduled: at('scheduled'),
+    beforeChange: at('before-change'),
+    folder: config.inContainer ? 'data/backups/' : `${relative(process.cwd(), dirname(config.historyDbPath)) || '.'}/backups/`,
   };
 }
 

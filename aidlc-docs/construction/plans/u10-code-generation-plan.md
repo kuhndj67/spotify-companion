@@ -67,11 +67,11 @@ own commit, so any step can be reviewed or reverted alone.
       touches other files (a planted CSV and an unrelated file survive); short space → no file, reason in words.
       ⭐ **Positive control**: a kept backup is accepted by *Restore backup*'s upload path (BR-80.1).
 
-### Step 6 — Scheduler and settings *(BR-81.1, 81.4, P-83, LC-74, IN-U10-3)*
-- [ ] `src/backup/BackupScheduler.ts`: 15-minute check plus one at startup via `scheduledDue`.
-- [ ] `src/export/SnapshotScheduler.ts` **removed** (knip confirms nothing imports it); `src/config.ts`:
+### Step 6 — Scheduler and settings *(BR-81.1, 81.4, P-83, LC-74, IN-U10-3)* — ✅ DONE · ⚠️ sequencing: `SnapshotScheduler`'s removal and the `SNAPSHOT_DIR` log line move to **Step 7** (its wiring and diagnostics' *Snapshots* step still use it; removing it here would break this step's build). Positive control: scheduling from process start fails 4 of 5 tests
+- [x] `src/backup/BackupScheduler.ts`: 15-minute check plus one at startup via `scheduledDue`.
+- [ ] *(moved to Step 7)* `src/export/SnapshotScheduler.ts` **removed** (knip confirms nothing imports it); `src/config.ts`:
       `BEFORE_CHANGE_KEEP` (default 5), `SNAPSHOT_DIR` ignored with one log line, `SNAPSHOT_*` keep their meaning.
-- [ ] Tests: a restart loop within one interval takes at most one backup; a restart after the interval takes one.
+- [x] Tests: a restart loop within one interval takes at most one backup; a restart after the interval takes one.
 
 ### Step 7 — Startup sequence and `data-dev/` *(BR-78.9, BR-79, BR-84, LC-71, LC-77)*
 - [ ] `src/config.ts`: host run with no `HISTORY_DB_PATH` → `data-dev/history.db`.

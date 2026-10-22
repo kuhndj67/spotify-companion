@@ -161,6 +161,8 @@ export const config = {
   snapshotIntervalHours: int('SNAPSHOT_INTERVAL_HOURS', 24),
   snapshotKeep: int('SNAPSHOT_KEEP', 14),
   snapshotsEnabled: process.env.SNAPSHOTS_ENABLED !== 'false',
+  /** U10 (IN-U10-3): how many before-change backups `data/backups/before-change/` keeps. They cannot be turned off. */
+  beforeChangeKeep: int('BEFORE_CHANGE_KEEP', 5),
 
   // -- U2: label enrichment ---------------------------------------------------
 

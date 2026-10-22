@@ -48,11 +48,11 @@ own commit, so any step can be reviewed or reverted alone.
       released → acquired); stale → taken over; two takers → exactly one wins; foreign token → `lost`; release leaves
       a foreign lock alone.
 
-### Step 3 — Migration 8 and open/migrate split *(BR-79.4, P-80, LC-71)*
-- [ ] `src/history/migrations.ts`: migration **8**, `app_meta(key TEXT PRIMARY KEY, value TEXT)`.
-- [ ] `SqliteHistoryRepository`: the constructor opens only; `pendingMigrations()`, `migrate()`, `lastAppVersion()`,
+### Step 3 — Migration 8 and open/migrate split *(BR-79.4, P-80, LC-71)* — ✅ DONE · ⚠️ deviation: the constructor keeps migrate-on-open as the **default** and takes `{ migrate: false }` (76 test/tool call sites unchanged; `server.ts` is the only opener of the live database, `startupRestorer` only mentions it). Positive control: ignoring the option fails the test
+- [x] `src/history/migrations.ts`: migration **8**, `app_meta(key TEXT PRIMARY KEY, value TEXT)`.
+- [x] `SqliteHistoryRepository`: the constructor opens only (with `{ migrate: false }`); `pendingMigrations()`, `migrate()`, `lastAppVersion()`,
       `recordAppVersion()`. Every existing caller (tests, `server.ts`) calls `migrate()` explicitly.
-- [ ] Tests: v7 → v8 on a fixture database; a v8 database opened by v7 code (the U4 rollback check) still opens.
+- [x] Tests: v7 → v8 on a fixture database; a v8 database opened by v7 code (the U4 rollback check) still opens.
 
 ### Step 4 — Backup decisions *(LC-72; PBT-80…84)*
 - [ ] `src/backup/keptBackupDecision.ts` (⚙️ pure): `backupDue`, `scheduledDue`, `enoughSpace`, `rotationDeletes`,

@@ -685,6 +685,22 @@ export const MIGRATIONS: readonly Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    description: 'U10 data safety: app_meta (the last app version to open this database)',
+    up(db) {
+      db.exec(`
+        -- U10 (BR-79.4). The version that last opened THIS database, so startup can tell a version change --
+        -- an update, a rollback, or a restore from an older backup -- and back up before anything is written.
+        -- It lives in the database, not beside it, because it belongs to the file: a restored database brings
+        -- its own. Additive only (BR-37.4): an older image ignores the table.
+        CREATE TABLE app_meta (
+          key   TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 /**
@@ -692,6 +708,12 @@ export const MIGRATIONS: readonly Migration[] = [
  * plays that have an ISRC and no label; without the index that is a full table scan over a
  * growing table, repeated for every batch.
  */
+
+/** U10 (BR-79.1): the versions `migrate()` would apply to this database, ascending. Reads only. */
+export function pendingVersions(db: DatabaseSync, migrations: readonly Migration[] = MIGRATIONS): number[] {
+  const from = currentVersion(db);
+  return migrations.map((m) => m.version).filter((v) => v > from).sort((a, b) => a - b);
+}
 
 export function currentVersion(db: DatabaseSync): number {
   db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL, applied_at TEXT NOT NULL)');

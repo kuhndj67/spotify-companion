@@ -20,7 +20,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { HistoryRepository } from './HistoryRepository.js';
-import { migrate, type MigrationReport } from './migrations.js';
+import { currentVersion, migrate, pendingVersions, type MigrationReport } from './migrations.js';
 import type {
   ArtistSnapshot,
   LabelCoverage,
@@ -191,7 +191,14 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   #db: DatabaseSync;
   #migration: MigrationReport;
 
-  constructor(path: string) {
+  /**
+   * Opens the database and, by default, migrates it at once (every test and tool).
+   *
+   * U10 (BR-79, P-80): startup passes `{ migrate: false }`, so it can ask `pendingMigrations` and
+   * `lastAppVersion`, take a before-change backup through THIS connection, and only then call `migrate()`.
+   * Until `migrate()` runs, nothing may write: a half-migrated schema must never take data.
+   */
+  constructor(path: string, options: { migrate?: boolean } = {}) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
 
     this.#db = new DatabaseSync(path);
@@ -200,7 +207,42 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
     this.#db.exec('PRAGMA foreign_keys = ON');
 
     // Before any write. A half-migrated schema must never take data.
-    this.#migration = migrate(this.#db);
+    if (options.migrate === false) {
+      const at = currentVersion(this.#db);
+      this.#migration = { from: at, to: at, applied: [] };
+    } else {
+      this.#migration = migrate(this.#db);
+    }
+  }
+
+  /** U10 (BR-79.1): schema versions not yet applied. Empty once `migrate()` has run. */
+  get pendingMigrations(): number[] {
+    return pendingVersions(this.#db);
+  }
+
+  /** Applies pending migrations (idempotent). The report keeps the version this connection OPENED at. */
+  migrate(): MigrationReport {
+    const report = migrate(this.#db);
+    this.#migration = { from: this.#migration.from, to: report.to, applied: [...this.#migration.applied, ...report.applied] };
+    return this.#migration;
+  }
+
+  /**
+   * U10 (BR-79.4): the app version that last opened this database, or `null` (never recorded, or a schema
+   * older than v8). Reads only, so it is safe before the backup.
+   */
+  lastAppVersion(): string | null {
+    const table = this.#db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_meta'").get();
+    if (!table) return null;
+    const row = this.#db.prepare("SELECT value FROM app_meta WHERE key = 'last_app_version'").get() as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  /** U10 (BR-79.4): written AFTER a successful migration, never before the backup. */
+  recordAppVersion(version: string): void {
+    this.#db
+      .prepare("INSERT INTO app_meta (key, value) VALUES ('last_app_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(version);
   }
 
   get migrationReport(): MigrationReport {

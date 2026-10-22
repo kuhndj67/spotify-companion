@@ -528,3 +528,8 @@ cannot roll them back; the reminder is **warn**, never fail. Next: Code Generati
 positive control), then shells, wiring, UI, scripts, infrastructure files and documents; one commit per step on
 `u10-code-generation`, branched from `main` after PR #22 (the designs) merges. Nothing deploys in Code Generation;
 the first deploy is Build & Test's rehearsal (IN-U10-8). Approval prompt shown to the owner at this timestamp.
+
+## 2026-10-22T04:15:00Z — U10 Code Generation plan APPROVED (owner)
+
+Owner: *"approved plan, merge is marked as a draft... ready to move it forward?"* Plan approved as written; PR #22 (the
+designs) marked ready for review at the owner's request. Code begins on `u10-code-generation` once #22 merges.

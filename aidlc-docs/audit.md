@@ -487,3 +487,23 @@ the writing scripts already import `src/` under `tsx`, so one lock module serves
 Written: `construction/u10-data-safety/nfr-design/` — **P-76…P-87**, **LC-69…LC-80**, **PBT-79…PBT-89**. Schema v7 →
 v8. Rejected: judging lock staleness by age (P-76); keeping `docker ps` beside the lock (P-79: two guards answering
 one question differently); a retry loop that reopens history mid-run (recovery stays a restart).
+
+## 2026-10-22T03:00:00Z — U10 NFR Design APPROVED (owner); Infrastructure Design written
+
+Owner, after the NFR completion message: *"continue"*, read as approval. Infrastructure Design plan:
+`construction/plans/u10-infrastructure-design-plan.md`.
+
+Facts measured: three compose files each mount `./data` and `./state` as directories; existing *App only* folders keep
+their compose file (only the image line changes), so U10 must run with no new variable; the entrypoint creates and
+chowns `SNAPSHOT_DIR`; `.gitignore` names `SNAPSHOT_DIR` as the way to keep copies elsewhere; `verify:up` starts with no
+history; `npm run release` waits 180 s for health.
+
+Owner (question prompt): **Q1 = B**, backups **always** in `data/backups/`, *against the recommendation* (an optional
+`BACKUP_DIR`). ⚠️ **Residual risk accepted**: the database and its backups share one deletion event (`git clean -xdf`,
+a lost disk); the documents will tell users to copy `data/backups/` elsewhere. **Q2 = A**, the first U10 deploy is
+rehearsed on `:3011` with a restored copy of the owner's backup, including the live cross-mount lock probe.
+
+Written: `construction/u10-data-safety/infrastructure-design/` — **IN-U10-1…8**. Agent decisions: `SNAPSHOT_DIR`
+retired (ignored with one log line if an old folder sets it; CSV files untouched); `SNAPSHOT_INTERVAL_HOURS`,
+`SNAPSHOT_KEEP`, `SNAPSHOTS_ENABLED` keep their names for the scheduled kind; before-change backups cannot be turned
+off; `BEFORE_CHANGE_KEEP` optional (default 5); `data-dev/` ignored by git and the image build.

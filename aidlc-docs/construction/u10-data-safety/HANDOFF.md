@@ -2,7 +2,17 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-22) — NFR Design WRITTEN, awaiting owner approval
+## ▶ Current state (2026-10-22) — Infrastructure Design WRITTEN, awaiting owner approval
+
+Plan [`construction/plans/u10-infrastructure-design-plan.md`](../plans/u10-infrastructure-design-plan.md): **Q1 B**
+backups always in `data/backups/` (⚠️ residual risk accepted: database and backups share one deletion event; the
+documents tell users to copy `data/backups/` elsewhere), **Q2 A** rehearse the first deploy on `:3011` with a restored
+copy of the owner's backup. Documents: [`infrastructure-design/`](infrastructure-design/), **IN-U10-1…8**.
+`SNAPSHOT_DIR` retired (ignored if an old folder sets it); `BEFORE_CHANGE_KEEP` optional (default 5).
+
+**Next**: owner approval → **Code Generation** plan. ⚠️ Until U10 ships, take **Settings → Create backup** by hand.
+
+### Earlier (2026-10-22) — NFR Design written; ✅ approved by the owner the same day
 
 Plan [`construction/plans/u10-nfr-design-plan.md`](../plans/u10-nfr-design-plan.md): Q1 A (heartbeat 5 s, stale window
 30 s), Q2 A (free-space check: 2 × database + WAL + 100 MB), Q3 X: an always-visible **Status** light pointing to

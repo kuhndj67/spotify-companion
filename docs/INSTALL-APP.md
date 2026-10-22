@@ -412,11 +412,11 @@ somewhere else.
   list of releases; GitHub sees your IP address and the app's version, nothing else. Turn it off in
   **Settings → Version**. On GitHub, **Watch → Custom → Releases** also tells you, and each release is listed on the
   [Releases page](https://github.com/kuhndj67/spotify-companion/releases) with what changed.
-- **Update to a newer release**: in your folder, run the **new** version's `update` command, then start it. Replace
-  `<new version>` with the release, for example `1.0.0-beta.9`:
+- **Update to a newer release**: in your folder, run the **new** version's `update` command, then start it. The
+  command below names the current release (the top of this file says which); it is the version you move to:
 
   ```powershell
-  docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<new version> update
+  docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.8 update
   docker compose up -d
   ```
 

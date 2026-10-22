@@ -54,10 +54,10 @@ own commit, so any step can be reviewed or reverted alone.
       `recordAppVersion()`. Every existing caller (tests, `server.ts`) calls `migrate()` explicitly.
 - [x] Tests: v7 → v8 on a fixture database; a v8 database opened by v7 code (the U4 rollback check) still opens.
 
-### Step 4 — Backup decisions *(LC-72; PBT-80…84)*
-- [ ] `src/backup/keptBackupDecision.ts` (⚙️ pure): `backupDue`, `scheduledDue`, `enoughSpace`, `rotationDeletes`,
+### Step 4 — Backup decisions *(LC-72; PBT-80…84)* — ✅ DONE · ⚠️ the positive control **caught a weak property**: with "none written yet" mutated to `ok`, all tests still passed (the generator rarely produced *uptime < interval, nothing failed*). Strengthened with a targeted property and biased uptime; the mutation now fails 2 tests. Kept names sort by parsed stamp and suffix (`…Z-2` sorts before `…Z` by name). Health has an `off` level for `SNAPSHOTS_ENABLED=false`
+- [x] `src/backup/keptBackupDecision.ts` (⚙️ pure): `backupDue`, `scheduledDue`, `enoughSpace`, `rotationDeletes`,
       `backupHealth`.
-- [ ] `test/keptBackupDecision.property.test.ts`: PBT-80…84, each with its positive control (PBT-84: no input with no
+- [x] `test/keptBackupDecision.property.test.ts`: PBT-80…84, each with its positive control (PBT-84: no input with no
       backup yields `ok`).
 
 ### Step 5 — Kept-backup store *(BR-80, P-81, P-82, LC-73)*

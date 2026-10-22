@@ -48,7 +48,7 @@ import {
   reclassify,
 } from '../src/history/outcomeClassifier.js';
 // ⚠️ ONE admission rule, imported rather than copied — see the guard comment below.
-import { assertNobodyElseHoldsIt } from './backup-history.mjs';
+import { holdWriterLock } from './backup-history.mjs';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB = process.env.HISTORY_DB_PATH ?? join(projectRoot, 'data', 'history.db');
@@ -83,10 +83,9 @@ const T = DEFAULT_TOLERANCES;
 // thing it guards is not a guard"* — here, **a guard that cannot observe the condition it guards** —
 // and it is worse than no guard, because it produced a green light and a reassuring docstring.
 //
-// ✅ v3 delegates to `assertNobodyElseHoldsIt`, which checks **`docker ps`** for the container AND
-// keeps the lock probe for a host writer like `npm start`. Neither check sees the other's writer, so
-// both are needed; the lock probe was incomplete, not useless. It **fails closed**: if `docker`
-// cannot be reached the answer is *unknown*, and unknown refuses.
+// ✅ v4 (U10) holds the ONE writer lock (`holdWriterLock`): a lock file beside the database that the app
+// and every writing script take, exclusive across the bind mount in both directions (probed 2026-10-21).
+// It replaced v3's `docker ps` check, which could not see a host `npm start` or another machine.
 //
 // ⚠️ It is imported rather than re-implemented deliberately. **One admission rule, invoked twice,
 // never written twice** — this project has already shipped a divergence of exactly that shape, where
@@ -94,7 +93,7 @@ const T = DEFAULT_TOLERANCES;
 // page load returned 200 while every handshake returned 403 with all 411 tests passing.
 if (APPLY) {
   try {
-    assertNobodyElseHoldsIt(DB, { override: argv.includes('--i-have-stopped-the-container') });
+    await holdWriterLock(DB, 'reclassify');
   } catch (error) {
     console.error(
       `\n✖ REFUSING TO APPLY: ${error instanceof Error ? error.message : String(error)}\n` +

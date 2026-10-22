@@ -40,7 +40,7 @@ allocated at NFR Design, not here.
 
 - **79.1 Triggers.** At startup, after the lock and the restore swap and before migrating: a backup is due when
   **(a)** a migration is pending, or **(b)** the database's recorded *last app version* differs from the running
-  version, or is absent. ⚙️ `due(pending, lastVersion, runningVersion)`.
+  version, or is absent. ⚙️ `due(pending, lastVersion, runningVersion)`. ⚠️ *Amended 2026-10-22 (Code Generation, found by running the app on an empty data folder):* **never for a brand-new, empty database** (schema 0). There is nothing to protect, and a backup of an empty file does not verify, so the rule as first written stopped every fresh install from ever recording; every unit test had started from an existing v7 database.
 - **79.2 Through the app's own connection**, before migrating: U6's `createBackup`, into the store (BR-80), kind
   `before-change`, the reason in the manifest's label (e.g. *migration 7→8*, *version 1.0.0-beta.8→1.0.0-beta.9*).
 - **79.3 Refuse on failure.** If the backup fails for any reason, the app does **not** migrate and does **not**

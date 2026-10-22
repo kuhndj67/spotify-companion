@@ -454,6 +454,54 @@ export function automationIndicator(state: AutomationIndicatorState): Indicator 
   return indicator('ok', 'Decided', 'Decided on complete facts.');
 }
 
+// ── U10: the Status light (BR-86.5, P-85, NFR Q3) ─────────────────────────────────────────────────────────
+
+/** One thing the Status light watches, already judged (backups, the lock, the before-change backup, the reminder). */
+export interface StatusSource {
+  readonly level: 'ok' | 'warn' | 'fail';
+  /** One sentence, the same words diagnostics shows for it (P-86). */
+  readonly sentence: string;
+}
+
+export const CHECK_DIAGNOSTICS = 'Check the Diagnostics page.';
+
+/**
+ * Owner, 2026-10-22: *"lets include a "Status" indicator light/text with "check diagnostics page" as the pop up
+ * text"*. Always shown; its level is the WORST of its sources; at warn or fail the detail lists each problem and
+ * ends with {@link CHECK_DIAGNOSTICS}. A later unit adds a source by adding one entry, never by changing this rule.
+ * Never takes the message line. ⚙️ PURE (PBT-85).
+ */
+export function statusIndicator(sources: readonly StatusSource[]): Indicator & { readonly inMessage: false } {
+  const failing = sources.filter((s) => s.level === 'fail');
+  const warning = sources.filter((s) => s.level === 'warn');
+  if (failing.length === 0 && warning.length === 0) {
+    return { ...indicator('ok', 'Status', 'All checks OK.'), inMessage: false };
+  }
+  const level = failing.length > 0 ? 'fail' : 'warn';
+  const detail = [...failing, ...warning].map((s) => s.sentence).join(' ');
+  return { ...indicator(level, 'Status', `${detail} ${CHECK_DIAGNOSTICS}`), inMessage: false };
+}
+
+/**
+ * U10 (BR-86.3, FR-81): shown ONLY when a newer version exists — news, not a fault, so level `ok` with its own
+ * arrow glyph. Never for off, not-yet, current or a failed check (BR-85.7). Never takes the message line. ⚙️ PURE.
+ */
+export function updateIndicator(check: {
+  readonly status: 'off' | 'not-yet' | 'current' | 'newer';
+  readonly newest: { readonly version: string } | null;
+  readonly lastSuccessAt: string | null;
+}): (Indicator & { readonly inMessage: false }) | null {
+  if (check.status !== 'newer' || check.newest === null) return null;
+  const when = check.lastSuccessAt ? ` (checked ${check.lastSuccessAt.slice(0, 16).replace('T', ' ')} UTC)` : '';
+  return {
+    level: 'ok',
+    label: 'Update',
+    glyph: '↑',
+    detail: `${check.newest.version} is available${when}. Settings → Version.`,
+    inMessage: false,
+  };
+}
+
 export interface StatusBarState {
   readonly recording: RecordingState;
   readonly rules: RulesState;

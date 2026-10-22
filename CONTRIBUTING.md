@@ -178,16 +178,18 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
 - **Never retry a skip.** A `Retry-After` honoured on the skip path means *skip whatever is playing in 30 seconds*.
   Anything whose landing is unknown counts as landed.
 - **The BR-35 safety thresholds are not environment variables**, or the obvious fix becomes raising them.
-- **One writer.** Backup and restore run inside the app on its own connection. A second writer reintroduces the
-  cross-machine guard problem.
+- **One writer.** Backup and restore run inside the app on its own connection, and since U10 a **lock file** beside
+  the database (`data/history.db.lock`) refuses any second process, app or script, naming the holder. It is judged
+  by watching its heartbeat, never by its age. Do not add a second guard beside it.
 - **Every uploaded file goes through one admission path** (FR-64). Do not add a second.
 
 ### Operations
 
 - **The deployment is the container on `http://localhost:3010`.** Port 3000 on the owner's machine is a different
   app.
-- **Never run the container and `npm start` together**: both poll Spotify and both write `data/history.db`.
-  `docker compose down` first.
+- **Never run the container and `npm start` together**: both poll Spotify. Since U10 a host run records into
+  `data-dev/`, and the lock refuses two processes on one database. ⚠️ Until `1.0.0-beta.9` is deployed, the running
+  container does not take the lock: `docker compose down` first.
 - **`data/` is the only thing that cannot be regenerated**, and being gitignored makes it *more* exposed to `git
   clean -xdf`. **Verify a backup the day you take it.** Row counts are not verification: a corrupt snapshot with
   plausible counts is kept as the negative control.
@@ -205,7 +207,7 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
   everything to `spotify-companion`; upgrading from `1.0.0-beta.2` stops the old container first
   (`docs/INSTALL-DEV.md`, *Updating*), and `npm run release` refuses while it runs.
 - **Check build exit codes directly.** `docker compose build | tail` reports the pipe's exit code.
-- **The owner's host is UTC−4.** Check `ls --time-style=full-iso data/snapshots/` before reasoning about any file
+- **The owner's host is UTC−4.** Check `ls --time-style=full-iso data/backups/scheduled/` before reasoning about any file
   time. A WAL mtime is the last write, never a heartbeat.
 - **The autostart chain is proven for reboot, not for a WSL update during Modern Standby**, which has taken the
   engine down twice. `restart: unless-stopped` does not restart a container someone explicitly stopped.

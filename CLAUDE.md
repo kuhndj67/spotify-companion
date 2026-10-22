@@ -83,19 +83,20 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 
 - **The container is the deployment**: `docker compose up -d` → `http://localhost:3010`. ⚠️ `localhost:3000` is a
   **different app**.
-- ⚠️ **Never run the container and `npm start` together.** Both poll Spotify and both write `data/history.db`. Assume
-  the container is running, and `docker compose down` first.
+- ⚠️ **Never run the container and `npm start` together.** Both poll Spotify. A host run records into `data-dev/`, and
+  the writer lock (`data/history.db.lock`) refuses a second process on one database. Until `1.0.0-beta.9` is live the
+  container does not take the lock: assume it is running, and `docker compose down` first.
 - **`data/` cannot be regenerated** (months of plays). It is gitignored, which makes it *more* exposed to `git clean
   -xdf`. Never delete play rows to tidy anything.
-- Mounts: `./data` (history), `./state` (automation kill switch: **never** in `data/` or `config/`), `./config` (rules,
+- Mounts: `./data` (history, and its automatic backups in `backups/`: same disk, so copy them elsewhere), `./state` (automation kill switch, update-check and reminder switches: **never** in `data/` or `config/`), `./config` (rules,
   written only by `RulesWriter`), `./secrets/app` (credentials, a **directory** mount at `/app/secrets` since U9, the app's subfolder only; never in
   a backup, never in a response).
 - **The connector** (`spotify-mcp-server`, MIT) is pinned by SHA in `compose.yaml` and patched in one line at build
   (CONTRIBUTING.md *Operations*). Moving the pin needs an acceptance `pass` first, or `npm run release` refuses.
 - **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (public). Pushing a tag is the owner's act.
 - Automation ships **off** (`SKIP_EXECUTOR_ENABLED`, plus the UI kill switch). Never arm it on the owner's behalf.
-- Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and need
-  the container down.
+- Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and hold
+  the writer lock (container down until `1.0.0-beta.9` is live).
 
 ## Commands
 
@@ -116,7 +117,7 @@ npm run rules:init      # create config/rules.json from the template (refuses to
 npm run release         # plan a release (read-only); `-- --apply` builds, deploys, health-checks and tags (no push)
 npm run protect         # diff the committed rulesets against GitHub (read-only); `-- --apply` writes them
 
-npm run db:backup -- --label <why>                  # container DOWN first
+npm run db:backup -- --label <why>                  # holds the writer lock; container DOWN first
 npm run db:restore -- <dir> --verify-only           # read-only; verify a backup the day you take it
 npm run db:restore -- --self-test                   # proves the verifier can FAIL (corrupt snapshot kept on purpose)
 npm run db:verify-backups                           # read-only sweep over data/

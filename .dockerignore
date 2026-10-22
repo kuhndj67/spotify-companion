@@ -11,6 +11,8 @@ dist
 
 # ⚠️ The irreplaceable artefact. It is bind-mounted at runtime, never copied in.
 data
+# U10 (FR-78): a developer's host-run history. Never in an image.
+data-dev
 
 # Mounted at runtime (compose.yaml), never built in. U9 (BR-69.8, NFR-28): an image may now be PUBLISHED, so
 # nothing a user owns -- credentials, rules, the automation switch, a verification copy -- may enter the context.

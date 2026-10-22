@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { config, CONTAINER_SECRETS_DIR } from './config.js';
 import { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
 import { SpotifyWebApiClient } from './spotify/webApiClient.js';
@@ -36,14 +36,22 @@ import {
   recordingIndicator,
   rulesIndicator,
   spotifyIndicator,
+  statusIndicator,
+  updateIndicator,
   type Indicator,
+  type StatusSource,
 } from './ui/statusBar.js';
 import type { AutomationIndicatorState } from './ui/statusBar.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
 import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
 import { ExportService } from './export/ExportService.js';
-import { SnapshotScheduler } from './export/SnapshotScheduler.js';
+import { BackupScheduler } from './backup/BackupScheduler.js';
+import { BackupReminder } from './backup/backupReminder.js';
+import { UpdateChecker } from './update/UpdateChecker.js';
+import { KeptBackupStore, type BackupStatusView } from './backup/KeptBackupStore.js';
+import { BeforeChangeBackupFailed, prepareHistory } from './history/prepareHistory.js';
+import { WriterLock } from './lock/WriterLock.js';
 import { RequestQueue } from './musicbrainz/RequestQueue.js';
 import { MusicBrainzClient } from './musicbrainz/MusicBrainzClient.js';
 import { LabelCache } from './musicbrainz/LabelCache.js';
@@ -107,8 +115,40 @@ const nowPlaying = new NowPlayingService(spotify, enrichment);
 let repository: SqliteHistoryRepository | null = null;
 let observer: PlayObserver | null = null;
 let exportService: ExportService | null = null;
-let snapshots: SnapshotScheduler | null = null;
+let backupScheduler: BackupScheduler | null = null;
 let historyStartupError: string | null = null;
+
+/** U7/U10: the rules file. Here, not with the rules engine, because a kept backup copies it from the first start. */
+const RULES_PATH = process.env['RULES_PATH'] ?? '/config/rules.json';
+const APP_VERSION = readAppVersion();
+
+// ── U10: one writer per database (FR-77, BR-78) — FIRST, before the restore swap below, which is a write ──
+//
+// A refused lock means another process (the container, a host `npm start`, a writing script) holds the database
+// and its heartbeat is moving: this process runs display-only and says why. A lock LOST later (taken over while
+// this process slept past the stale window) ends the process without touching the database (BR-78.5).
+let writerLock: WriterLock | null = null;
+let historyAllowed = config.historyEnabled;
+if (config.historyEnabled) {
+  writerLock = new WriterLock({
+    databasePath: config.historyDbPath,
+    kind: 'app',
+    appVersion: APP_VERSION,
+    onLost: (detail) => shutdown(`[lock] ${detail}`, { touchDatabase: false }),
+  });
+  const outcome = await writerLock.acquire();
+  if (outcome.ok) {
+    writerLock.startHeartbeat();
+  } else {
+    historyAllowed = false;
+    historyStartupError = outcome.detail;
+    console.error(`[history] unavailable; running display-only: ${outcome.detail}`);
+  }
+}
+
+if (process.env['SNAPSHOT_DIR']) {
+  console.log('[backup] SNAPSHOT_DIR is no longer used (U10); automatic backups are kept in data/backups/. Old CSV snapshots are left untouched.');
+}
 
 // ── U6: apply a staged restore, then sweep leftovers — BEFORE the database is opened (P-38, LC-37/38) ──
 //
@@ -119,7 +159,7 @@ let historyStartupError: string | null = null;
 let startupRestore: RestoreOutcome = { kind: 'none' };
 let startupSwept = 0;
 const historyDataDir = dirname(config.historyDbPath);
-if (config.historyEnabled) {
+if (historyAllowed) {
   try {
     startupRestore = applyPendingRestore(historyDataDir);
     startupSwept = sweepLeftovers(historyDataDir);
@@ -136,27 +176,47 @@ if (config.historyEnabled) {
   }
 }
 
+/** U10 (LC-73): kept backups, beside the database (IN-U10-2). */
+const keptBackups = new KeptBackupStore({
+  databasePath: config.historyDbPath,
+  rulesPath: RULES_PATH,
+  appVersion: APP_VERSION,
+  now: () => new Date(),
+  keep: { scheduled: config.snapshotKeep, 'before-change': config.beforeChangeKeep },
+});
+
+/** U10 (BR-79, P-80): back up before a migration or a version change, then migrate (`prepareHistory.ts`). */
+const prepare = (repo: SqliteHistoryRepository) =>
+  prepareHistory(repo, APP_VERSION, (reason) => keptBackups.keep(repo.database, 'before-change', reason));
+
 /**
  * Open the history database. ⚠️ If a restore was applied at THIS start and the restored file will not open or
- * migrate, put the previous database back and open that instead (BR-48.6) — never start empty.
+ * migrate, put the previous database back and open that instead (BR-48.6) — never start empty. A failed
+ * before-change backup is NOT a reason to revert: nothing was changed, and the restore itself stands.
  */
-function openHistory(): SqliteHistoryRepository {
+async function openHistory(): Promise<SqliteHistoryRepository> {
+  let repo: SqliteHistoryRepository | null = null;
   try {
-    return new SqliteHistoryRepository(config.historyDbPath);
+    repo = new SqliteHistoryRepository(config.historyDbPath, { migrate: false });
+    await prepare(repo);
+    return repo;
   } catch (error) {
-    if (startupRestore.kind === 'applied' && revertToPrevious(historyDataDir)) {
+    repo?.close();
+    if (!(error instanceof BeforeChangeBackupFailed) && startupRestore.kind === 'applied' && revertToPrevious(historyDataDir)) {
       const reason = error instanceof Error ? error.message : String(error);
       startupRestore = { kind: 'failed', reason: `the restored database would not open (${reason}); your previous history was put back` };
       console.error(`[restore] ${startupRestore.reason}`);
-      return new SqliteHistoryRepository(config.historyDbPath);
+      const previous = new SqliteHistoryRepository(config.historyDbPath, { migrate: false });
+      await prepare(previous);
+      return previous;
     }
     throw error;
   }
 }
 
-if (config.historyEnabled) {
+if (historyAllowed) {
   try {
-    repository = openHistory();
+    repository = await openHistory();
     // Probe rather than assume: bind-mount permission problems otherwise surface at the first
     // play boundary, minutes after startup, behind a healthy-looking UI.
     repository.verifyWritable();
@@ -201,15 +261,6 @@ if (config.historyEnabled) {
       },
     );
     exportService = new ExportService(repository);
-
-    if (config.snapshotsEnabled) {
-      snapshots = new SnapshotScheduler(
-        exportService,
-        config.snapshotDir,
-        config.snapshotIntervalHours,
-        config.snapshotKeep,
-      );
-    }
   } catch (error) {
     historyStartupError = error instanceof Error ? error.message : String(error);
     console.error('[history] unavailable; running display-only:', historyStartupError);
@@ -572,7 +623,6 @@ function toPlaybackSample(snapshot: Snapshot): PlaybackSample | null {
  * app recording: the play records are the artefact that cannot be regenerated, and rules are
  * text that can be retyped (BR-20.10).
  */
-const RULES_PATH = process.env['RULES_PATH'] ?? '/config/rules.json';
 const RULES_POLL_INTERVAL_MS = Number(process.env['RULES_POLL_INTERVAL_MS'] ?? 5_000);
 
 /**
@@ -640,6 +690,15 @@ const liveFacts = new LiveFactSource(labelEnrichment !== null);
 const upstreamMetrics = new UpstreamMetrics();
 
 const automationState = new AutomationStateStore(AUTOMATION_STATE_PATH);
+
+/** U10 (FR-82, BR-87): the weekly download reminder, in `state/` beside the kill switch so a restore never rolls it back. */
+const backupReminder = new BackupReminder(join(dirname(AUTOMATION_STATE_PATH), 'backup-reminder.json'));
+
+/**
+ * U10 (FR-81, BR-85): asks GitHub once a day whether a newer version exists. ⚠️ On by default (owner, Q35 = B): the
+ * Settings switch, and the sentence beside it, are the user's notice of the call. Off → no request at all.
+ */
+const updateChecker = new UpdateChecker({ path: join(dirname(AUTOMATION_STATE_PATH), 'update-check.json'), runningVersion: APP_VERSION });
 
 /**
  * ⚠️ **A PROBE, not an inference from `compose.yaml`**, and it runs whether or not automation is
@@ -916,8 +975,25 @@ const maintenance: MaintenanceService | null = config.historyEnabled
       // U7 (BR-59.1, BR-59.4): one comparison, one hash — the rules writer's.
       rulesCandidate: (text) => rulesWriter.compareCandidate(text),
       currentRulesHash: () => rulesWriter.download()?.hash ?? null,
+      // U10 (LC-73): kept backups share the busy lock with Create backup and Restore.
+      keptBackups,
     })
   : null;
+
+/**
+ * U10 (LC-74, FR-80): scheduled backups from the newest on disk. Built even when history is off, so diagnostics
+ * can say so; it only ever keeps a backup through `maintenance` (the one writer, the busy lock).
+ */
+if (maintenance) {
+  backupScheduler = new BackupScheduler({
+    enabled: config.snapshotsEnabled && repository !== null,
+    intervalMs: Math.max(1, config.snapshotIntervalHours) * 3_600_000,
+    newestAtMs: () => keptBackups.newest('scheduled')?.takenAtMs ?? null,
+    keep: () => maintenance.keepBackup('scheduled', 'scheduled'),
+    now: () => Date.now(),
+    startedAtMs: Date.now(),
+  });
+}
 
 /**
  * U7 — Spotify credentials and the MusicBrainz contact from Settings (LC-44). The poll loop, the MCP client and the
@@ -996,6 +1072,11 @@ app.use(
     credentials,
     labelsActive: labelUserAgent !== null,
     appVersion: readAppVersion(),
+    // U10 (FR-80…82): Settings' status, the two switches, the release backup and the download reminder.
+    updateChecker,
+    backupReminder,
+    backupStatus: () => backupStatusView(),
+    onBackupDownloaded: () => backupReminder.recordDownload(),
   }),
 );
 
@@ -1014,7 +1095,8 @@ async function runDiagnosticsReport() {
     {
       repository,
       observerStats: observer?.stats ?? null,
-      snapshotStatus: snapshots?.status ?? null,
+      backupHealth: backupScheduler?.health() ?? null,
+      backupReminder: backupReminder.verdict(),
       startupError: historyStartupError,
       dbPath: config.historyDbPath,
     },
@@ -1230,6 +1312,10 @@ interface StatusIndicators {
    * skip failed*, and the user would not know whether to open their rules file or their decision log.
    */
   automation: Indicator;
+  /** U10 (BR-86.5): the always-visible Status light. */
+  health: Indicator;
+  /** U10 (BR-86.3): present only when a newer version exists. */
+  update: Indicator | null;
 }
 
 function statusIndicators(snapshot: Snapshot): StatusIndicators {
@@ -1262,7 +1348,38 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
     // ⚠️ `inMessage: false` (2026-10-11): the automation dot never takes the red line above the bar — app.js assembles
     // the bar from these, and honours the flag exactly as statusBar() does.
     automation: { ...automationIndicator(automationIndicatorState()), inMessage: false as const },
+    health: statusIndicator(statusSources()),
+    update: updateIndicator(updateChecker.result()),
   };
+}
+
+/** U10 (BR-86.4): what Settings shows about kept backups. */
+function backupStatusView(): BackupStatusView {
+  const at = (kind: 'scheduled' | 'before-change') => {
+    const n = keptBackups.newest(kind);
+    return { newestAt: n === null ? null : new Date(n.takenAtMs).toISOString(), count: keptBackups.count(kind) };
+  };
+  return {
+    health: backupScheduler?.health() ?? { level: 'off', detail: 'History is not running, so no automatic backup is taken.' },
+    scheduled: at('scheduled'),
+    beforeChange: at('before-change'),
+    folder: config.inContainer ? 'data/backups/' : `${(relative(process.cwd(), dirname(config.historyDbPath)) || '.').replaceAll('\\', '/')}/backups/`,
+  };
+}
+
+/**
+ * U10 (BR-86.5, P-85): what the Status light watches. Each source's sentence is the one diagnostics shows (P-86).
+ * A later unit adds a source here.
+ */
+function statusSources(): StatusSource[] {
+  const sources: StatusSource[] = [];
+  // The lock refused, a before-change backup failed, or history would not open: recording is off.
+  if (config.historyEnabled && historyStartupError !== null) sources.push({ level: 'fail', sentence: `Recording is off: ${historyStartupError}.` });
+  const backups = backupScheduler?.health();
+  if (backups && backups.level !== 'off') sources.push({ level: backups.level, sentence: backups.detail });
+  const reminder = backupReminder.verdict();
+  if (reminder.level !== 'off') sources.push({ level: reminder.level, sentence: reminder.detail });
+  return sources;
 }
 
 /**
@@ -1467,7 +1584,8 @@ server.listen(config.port, config.host, () => {
   }
 
   nowPlaying.start();
-  snapshots?.start();
+  backupScheduler?.start();
+  updateChecker.start();
 
   // -- U2 background work ----------------------------------------------------
   //
@@ -1534,14 +1652,27 @@ let shuttingDown = false;
  * closed cleanly, or the swap at the next start would move aside a database with an unflushed WAL.
  * Exits 0; under Docker, `restart: unless-stopped` brings the app back (probed 2026-10-07).
  */
-function shutdown(why: string): void {
+function shutdown(why: string, options: { touchDatabase?: boolean } = {}): void {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`\n${why}, shutting down.`);
   nowPlaying.stop();
-  snapshots?.stop();
+  backupScheduler?.stop();
+  updateChecker.stop();
   if (backfillTimer !== null) clearInterval(backfillTimer);
 
+  // U10 (BR-78.5): a LOST lock means another process now writes this database. Touch nothing: no flush, no close
+  // (closing checkpoints the WAL into the main file, which is a write), no release (the lock is not ours).
+  if (options.touchDatabase !== false) closeHistory();
+
+  for (const client of wss.clients) client.close();
+  // U7: `close()` now waits for the MCP child to EXIT (P-49) and rejects past its bound — so exit regardless, or a
+  // child that will not die would turn a shutdown into a hang. ⚠️ It also adds ~2 s (P-U7-2) to a restart.
+  server.close(() => void spotify.close().catch((error: unknown) => console.warn('[shutdown] MCP child:', error)).finally(() => process.exit(0)));
+}
+
+/** The database half of `shutdown`: flush, close, then release the lock. */
+function closeHistory(): void {
   // Flush the in-progress play as `unknown` rather than discarding it (BR-2.6). Discarding
   // would lose a real listening event; asserting completed or skipped would claim something
   // unobserved. `unknown` records what actually happened: a play occurred, and its ending was
@@ -1558,11 +1689,8 @@ function shutdown(why: string): void {
   } catch (error) {
     console.error('[history] shutdown flush failed:', error);
   }
-
-  for (const client of wss.clients) client.close();
-  // U7: `close()` now waits for the MCP child to EXIT (P-49) and rejects past its bound — so exit regardless, or a
-  // child that will not die would turn a shutdown into a hang. ⚠️ It also adds ~2 s (P-U7-2) to a restart.
-  server.close(() => void spotify.close().catch((error: unknown) => console.warn('[shutdown] MCP child:', error)).finally(() => process.exit(0)));
+  // U10 (BR-78.6): after the database is closed, and only if the lock is still ours.
+  writerLock?.release();
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

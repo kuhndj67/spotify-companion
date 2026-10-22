@@ -123,6 +123,10 @@ const PURE_MODULES = [
   'ui/credentialsPanel.ts',
   // ⚠️ What the surface that can REPLACE the corpus says. app.js cannot be tested; this can, so it decides.
   'ui/maintenancePanel.ts',
+  // ─── U10 ─────────────────────────────────────────────────────────────────────────────────────
+  // ⚠️ DECIDES whether another process is alive (P-76). A clock read here would judge the lock by age — the
+  // exact mistake the pattern exists to avoid: a just-killed container's lock looks fresh.
+  'lock/lockDecision.ts',
 ];
 
 /**

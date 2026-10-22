@@ -40,7 +40,6 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,6 +47,8 @@ import { fileURLToPath } from 'node:url';
 // ⚠️ U6 (BR-47.1): the manifest helpers MOVED to src/backup/manifest.ts so the app's in-app backup and this
 // script compute a manifest the same way. Re-exported so restore-history.mjs's imports keep working.
 // This is why `db:backup` now runs under `node --import tsx`.
+import { WriterLock } from '../src/lock/WriterLock.js';
+import { readAppVersion } from '../src/version.js';
 import { MANIFEST_NAME, MANIFEST_SCHEMA, maxIds, schemaVersionOf, sha256, tableCounts } from '../src/backup/manifest.js';
 export { MANIFEST_NAME, MANIFEST_SCHEMA, maxIds, schemaVersionOf, sha256, tableCounts };
 
@@ -61,7 +62,6 @@ function flag(name, fallback) {
 }
 
 const LABEL = flag('label');
-const OVERRIDE = argv.includes('--i-have-stopped-the-container');
 const OUT_DIR = flag('out', join(projectRoot, 'data'));
 
 // ── ONE naming convention, and the label is required ─────────────────────────────────────────
@@ -75,86 +75,33 @@ function stamp(now) {
   return `${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '')}Z`;
 }
 
-export const CONTAINER_NAME = process.env.SPOTIFY_CONTAINER_NAME ?? 'spotify-companion';
-
 /**
- * Is the recording container running?
+ * U10 (FR-77, BR-78.7, P-79): hold the ONE writer lock for as long as this script runs.
  *
- * ⚠️ THIS CHECK EXISTS BECAUSE THE EXCLUSIVE-LOCK GUARD CANNOT SEE THE CONTAINER. Probed
- * 2026-09-27: with `spotify-now-playing` up, healthy and actively recording, a host process
- * **successfully acquired `BEGIN EXCLUSIVE`** on `data/history.db`. SQLite's locks do not cross the
- * Rancher Desktop bind mount between the Windows host and the Linux VM, so a host-side lock probe
- * is blind to the one writer that matters.
+ * Replaces the `docker ps` guard (`assertNobodyElseHoldsIt`), which could see only a container on THIS machine and
+ * not a host `npm start`, and whose SQLite lock probe could not see the container at all (locks do not cross the
+ * Rancher bind mount, probed 2026-09-27). The lock file is exclusive across the mount in both directions (probed
+ * 2026-10-21), and the app takes the same lock, so one rule now answers *is anyone else writing?*
  *
- * ⚠️ That makes the docstring in `reclassify-unobserved-tails.mjs` — *"This script refuses to apply
- * if it can see the app holding the database"* — **false against the real deployment**, which the
- * container has been since 2026-09-05. It also explains the U4 corruption incident mechanically:
- * the guard passed, so two writers hit one file. A guard that cannot observe the condition it guards
- * is the same family as *"a guard computed the same way as the thing it guards is not a guard"*.
+ * A held lock is watched for one stale window (30 s) before any verdict: a live holder refuses this script, naming
+ * itself; a dead one is taken over. Released on exit.
  *
- * ⚠️ FAILS CLOSED. If `docker` is missing or errors, the answer is **unknown**, and unknown is not
- * `false` — this project's rule end to end. Unknown refuses, and `--i-have-stopped-the-container`
- * is the deliberate override.
+ * ⚠️ Until `1.0.0-beta.9` is deployed, the running container does not take this lock: stop it first
+ * (`docker compose down`), as before.
  */
-export function containerState() {
-  const r = spawnSync('docker', ['ps', '--filter', `name=^${CONTAINER_NAME}$`, '--format', '{{.Names}}'], {
-    encoding: 'utf8',
-  });
-  if (r.error || r.status !== 0) return { known: false, running: null, detail: r.error?.message ?? `docker exited ${r.status}` };
-  return { known: true, running: r.stdout.trim().length > 0, detail: r.stdout.trim() };
+export async function holdWriterLock(dbPath, script, timings = {}) {
+  // `timings` exists for the tests (heartbeat and stale window in milliseconds); the scripts never pass it.
+  const lock = new WriterLock({ databasePath: dbPath, kind: `script:${script}`, appVersion: readAppVersion(), ...timings });
+  const outcome = await lock.acquire();
+  if (!outcome.ok) {
+    throw new Error(`${outcome.detail}. Stop it first (docker compose down, or end npm start), then run this again.`);
+  }
+  lock.startHeartbeat();
+  process.on('exit', () => lock.release());
+  return lock;
 }
 
-/**
- * Refuse while anything might be writing the database. TWO checks, because they see different
- * writers and neither sees both:
- *
- *   - the container, via `docker ps`     — the deployment since 2026-09-05, invisible to locking
- *   - another HOST process, via a lock   — e.g. `npm start`, or a second maintenance script
- *
- * ⚠️ The lock probe is kept even though it missed the container. It is not useless, it is
- * *incomplete*: it still catches the `npm start` case that CLAUDE.md warns about. Deleting it
- * because it failed once would remove the half that works.
- *
- * ⚠️ The obvious third guard — "does `history.db-wal` exist?" — does NOT work, and its failure mode
- * is a false positive: any read-only open recreates the WAL, so the check fires after every
- * inspection tool and then gets routinely overridden. A guard that refuses on the normal case is not
- * protecting anything.
- */
-export function assertNobodyElseHoldsIt(dbPath, { override = false } = {}) {
-  const c = containerState();
-  if (!override) {
-    if (!c.known) {
-      throw new Error(
-        `cannot tell whether the ${CONTAINER_NAME} container is running (${c.detail}). ` +
-          `Unknown is not "no" — refusing. Pass --i-have-stopped-the-container if you are certain.`,
-      );
-    }
-    if (c.running) {
-      throw new Error(
-        `the ${CONTAINER_NAME} container is RUNNING and holds this database open. ` +
-          `Run \`docker compose down\` first. ` +
-          `⚠️ Note the lock probe below CANNOT see it — SQLite locks do not cross the bind mount.`,
-      );
-    }
-  }
-
-  let probe;
-  try {
-    probe = new DatabaseSync(dbPath);
-    probe.exec('PRAGMA locking_mode = EXCLUSIVE');
-    probe.exec('BEGIN EXCLUSIVE'); // the lock is only taken on first write
-    probe.exec('ROLLBACK');
-  } catch (error) {
-    throw new Error(
-      `could not take an exclusive lock on ${dbPath} — another HOST process holds it, ` +
-        `most likely \`npm start\`. (${error instanceof Error ? error.message : String(error)})`,
-    );
-  } finally {
-    probe?.close();
-  }
-}
-
-function main() {
+async function main() {
   if (!LABEL) {
     console.error(
       '\n✖ --label is required.\n' +
@@ -173,7 +120,7 @@ function main() {
   }
 
   try {
-    assertNobodyElseHoldsIt(DB, { override: OVERRIDE });
+    await holdWriterLock(DB, 'db-backup');
   } catch (error) {
     console.error(`\n✖ REFUSING TO BACK UP: ${error.message}\n`);
     process.exit(2);
@@ -258,5 +205,5 @@ function main() {
 
 // Importable for tests; only runs when invoked directly.
 if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href) {
-  main();
+  await main();
 }

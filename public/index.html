@@ -16,7 +16,8 @@
         <header class="card-head">
           <p class="status" id="status">Connecting&hellip;</p>
           <!--
-            U6 (FR-63): Export and Diagnostics moved INTO Settings, keeping their ids and data-testids.
+            U6 (FR-63): Export moved INTO Settings. U10 (FR-63 amended, NFR Q3c): Diagnostics came back OUT, as its
+            own button between Settings and Rules, because the Status light points to it. Same id and data-testid.
             ⚠️ Rules stays here: it holds the automation kill switch, which must be one click from where
             the skip is heard (BR-51.2).
           -->
@@ -26,6 +27,12 @@
             type="button"
             data-testid="settings-open-button"
           >Settings</button>
+          <button
+            id="diag-open"
+            class="ghost"
+            type="button"
+            data-testid="diagnostics-open-button"
+          >Diagnostics</button>
           <button
             id="rules-open"
             class="ghost"
@@ -248,6 +255,15 @@
       <section class="diag-section" aria-labelledby="backup-heading">
         <h3 id="backup-heading">Backup &amp; restore</h3>
         <p id="backup-last" class="maintenance-last" role="status" hidden></p>
+        <!-- U10 (BR-86.4): status, not a manager (FD Q5 = A). Restoring a kept backup is Restore backup, below. -->
+        <p id="backups-status" class="backups-status" data-testid="backups-status" role="status"></p>
+        <!-- U10 (FR-82, BR-87.5): the weekly download reminder and when turning it off makes sense. -->
+        <label class="setting-switch">
+          <input type="checkbox" id="backup-reminder-switch" data-testid="backup-reminder-switch" />
+          Remind me to download a backup every week
+        </label>
+        <p class="muted setting-note">Turn this off if the whole computer or server running the app is already backed up.</p>
+        <p class="muted setting-note" id="backup-reminder-last"></p>
         <div class="maintenance-row">
           <button id="backup-create" class="primary" type="button" data-testid="backup-create-button">Create backup</button>
           <p class="muted" id="backup-note"></p>
@@ -304,18 +320,31 @@
         >Export history&hellip;</button>
       </section>
 
-      <section class="diag-section">
-        <h3>Diagnostics</h3>
-        <button
-          id="diag-open"
-          class="ghost"
-          type="button"
-          data-testid="diagnostics-open-button"
-        >Run diagnostics&hellip;</button>
+      <!--
+        U10 (FR-81, BR-86.1–86.2): the version, a newer one when there is one, and the update-check switch with the
+        sentence that is the user's only notice of the call to GitHub. U8's #app-version line is kept, id and all.
+      -->
+      <section class="diag-section" aria-labelledby="version-heading">
+        <h3 id="version-heading">Version</h3>
+        <p id="app-version" class="app-version" data-testid="app-version">Version &hellip;</p>
+        <p id="update-available" class="update-available" data-testid="update-available" hidden>
+          <a id="update-link" target="_blank" rel="noopener noreferrer"></a>
+        </p>
+        <p id="update-how" class="muted" hidden>
+          To update, see <em>Updating</em> in the install guide
+          (<a href="https://github.com/kuhndj67/spotify-companion/blob/main/docs/INSTALL-APP.md#updating-stopping-removing" target="_blank" rel="noopener noreferrer">App only</a>
+          or <a href="https://github.com/kuhndj67/spotify-companion/blob/main/docs/INSTALL-DEV.md#updating-stopping-removing" target="_blank" rel="noopener noreferrer">development</a>).
+        </p>
+        <label class="setting-switch">
+          <input type="checkbox" id="update-check-switch" data-testid="update-check-switch" />
+          Check GitHub for new versions
+        </label>
+        <p class="muted setting-note">
+          Once a day the app asks GitHub (api.github.com) for this project's list of releases. GitHub sees your IP
+          address and this app's version. Nothing else is sent.
+        </p>
+        <p class="muted setting-note" id="update-checked" role="status"></p>
       </section>
-
-      <!-- U8 (LC-57): the app version, from package.json via the server. Never blank: "Version unknown" if unreadable. -->
-      <p id="app-version" class="muted app-version" data-testid="app-version">Version &hellip;</p>
     </dialog>
 
     <!-- Diagnostics: exercises the full connect / auth / query cycle on demand. -->

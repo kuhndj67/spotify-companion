@@ -27,7 +27,6 @@ const OLD_NAME_ALLOWED: Record<string, { readonly count: number; readonly why: s
   'scripts/lib/releaseDecision.ts': { count: 6, why: 'names the image it replaced, and the crossing guard refuses while the old container runs' },
   'scripts/release.mjs': { count: 2, why: 'the crossing guard asks Docker whether the old container is running, and says so' },
   'docs/INSTALL-DEV.md': { count: 3, why: 'the upgrade note names the old container, to stop it' },
-  'scripts/backup-history.mjs': { count: 1, why: 'history: the 2026-09-27 incident, as it happened' },
   'scripts/reclassify-unobserved-tails.mjs': { count: 1, why: 'history: the 2026-09-27 incident, as it happened' },
 };
 

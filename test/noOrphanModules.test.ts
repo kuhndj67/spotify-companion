@@ -51,6 +51,7 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   // U9 (LC-68): the image's `setup` command. Three lines naming /work and the templates directory; the behaviour is
   // `runSetup` in appOnly/setup.ts, which test/appOnlySetup.property.test.ts drives against real folders.
   'appOnly/setupCli.ts': "entry point: the image's setup command, a wrapper over the tested runSetup",
+  'appOnly/updateCli.ts': "entry point: the image's update command, a wrapper over the tested runUpdate",
 
   // Reached only from server.ts. Its report shape is asserted through the /api/diagnostics route
   // (api.test.ts), but the sweep itself — which hits MCP, the Web API and MusicBrainz — is not
@@ -63,7 +64,6 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   'diagnostics.ts': 'only server.ts constructs it; the sweep itself is untested',
 
   // Reached only from server.ts. A timer that writes export snapshots to disk.
-  'export/SnapshotScheduler.ts': 'only server.ts constructs it; untested',
 
   // Reached only from server.ts. The MCP transport itself.
   'mcp/spotifyMcpClient.ts': 'only server.ts constructs it; untested',

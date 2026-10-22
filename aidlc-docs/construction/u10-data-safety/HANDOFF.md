@@ -2,7 +2,21 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-22) — Code Generation PLAN written, awaiting owner approval
+## ▶ Current state (2026-10-22) — Code Generation DONE, awaiting owner review (PR from `u10-code-generation`)
+
+All 16 plan steps done, one commit each, `npm run verify` green after every step. What was built, the deviations,
+the defects the work found and what is and is not yet verified: [`code/code-summary.md`](code/code-summary.md).
+
+- 🔴 **Found and fixed**: a fresh install would never have recorded (an empty database's backup does not verify;
+  BR-79.1 amended). Found only by running the built app.
+- Built as `spotify-companion:candidate` (the live `1.0.0-beta.8` tag untouched); the image's `update` exercised.
+- ⚠️ **Transition**: the deployed beta.8 container does not take the writer lock. Until beta.9 is live,
+  `docker compose down` before any `db:*` script, as before.
+
+**Next: Build & Test**, starting with the rehearsal on `:3011` (IN-U10-8). It needs the owner's **Settings → Create
+backup** of the live app first. Then the version bump to `1.0.0-beta.9` and `npm run release -- --apply` (owner).
+
+### Earlier (2026-10-22) — Code Generation plan written; ✅ approved by the owner the same day
 
 ✅ Infrastructure Design approved; **FR-82** (weekly backup-download reminder, owner) added across the designs
 (BR-87, LC-81, PBT-90, IN-U10-9). Plan: [`construction/plans/u10-code-generation-plan.md`](../plans/u10-code-generation-plan.md),

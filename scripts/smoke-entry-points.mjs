@@ -96,7 +96,7 @@ const ENTRY_POINTS = [
   },
   { file: 'verify-all-backups.mjs', args: [], tsx: true },
   { file: 'reclassify-unobserved-tails.mjs', args: [], tsx: true },
-  { file: 'repair-backfill-timestamps.mjs', args: [] },
+  { file: 'repair-backfill-timestamps.mjs', args: [], tsx: true }, // U10: imports the writer lock from src/
   // Dry run by default; `--apply` is required. Refuses while the container is up.
   { file: 'repair-skip-source.mjs', args: [], tsx: true },
   { file: 'hypothesis-gate.mjs', args: [] },
@@ -132,7 +132,7 @@ const ENTRY_POINTS = [
     skip:
       'it has NO read-only mode -- taking the backup IS the operation, and the `--dry-run` a previous ' +
       'draft of this file passed does not exist. Its module body is still evaluated here, because ' +
-      'restore-history.mjs and reclassify-unobserved-tails.mjs both import assertNobodyElseHoldsIt ' +
+      'restore-history.mjs and reclassify-unobserved-tails.mjs both import holdWriterLock ' +
       'from it, so the load check is not lost.',
   },
   {

@@ -56,3 +56,26 @@ describe('server.ts — U6 wiring', () => {
     assert.match(CODE, /maintenance\?\.status\(\)/, 'runDiagnostics(..., maintenance?.status())');
   });
 });
+
+describe('server.ts — U10 wiring (BR-78.9, BR-79, P-80)', () => {
+  it('⭐ takes the writer lock BEFORE the restore swap (the swap renames history.db: a write)', () => {
+    assert.ok(at('await writerLock.acquire()') < at('applyPendingRestore(historyDataDir)'));
+  });
+
+  it('⭐ every construction of the repository opens WITHOUT migrating, and goes through prepare (backup first)', () => {
+    const opens = [...CODE.matchAll(/new SqliteHistoryRepository\(([^)]*)\)/g)];
+    assert.ok(opens.length >= 1);
+    for (const m of opens) assert.match(m[1]!, /\{ migrate: false \}/, `opened with migration: ${m[0]}`);
+    assert.match(CODE, /await prepare\(repo\)/);
+    assert.match(CODE, /await prepare\(previous\)/);
+  });
+
+  it('a lost lock shuts down without touching the database; an orderly one releases the lock after closing', () => {
+    assert.match(CODE, /onLost: \(detail\) => shutdown\([^\n]*\{ touchDatabase: false \}\)/);
+    assert.match(CODE, /if \(options\.touchDatabase !== false\) closeHistory\(\);/);
+    const fn = at('function closeHistory(');
+    const close = CODE.indexOf('repository?.close()', fn);
+    const release = CODE.indexOf('writerLock?.release()', fn);
+    assert.ok(close > fn && release > close, 'close the database, then release the lock');
+  });
+});

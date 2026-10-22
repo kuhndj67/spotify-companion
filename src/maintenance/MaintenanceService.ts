@@ -34,6 +34,7 @@ import { MANIFEST_NAME, MANIFEST_SCHEMA, maxIds, schemaVersionOf, sha256, tableC
 import { verdictOf, verifyBackup, type VerifyResult } from '../backup/verifier.js';
 import { readArchive } from '../ingest/archive.js';
 import { EXPANDED_CAP_BYTES, UPLOAD_CAP_BYTES, type IngestRefusal } from '../ingest/types.js';
+import type { BackupKind, KeepResult, KeptBackupStore } from '../backup/KeptBackupStore.js';
 import { WORK_DIR_NAME, backupCapability, createBackup, type CreateBackupResult } from './onlineBackup.js';
 import { PENDING_DIR, PREVIOUS_DIR, READY_MARKER, STAGE_FILE, type MovedRecord, type RestoreOutcome } from './startupRestorer.js';
 
@@ -100,6 +101,8 @@ export interface MaintenanceDeps {
   rulesCandidate?: (text: string) => { ok: true; comparison: RulesComparison } | { ok: false; errors: readonly string[] };
   /** U7 (BR-59.4/59.6): the current rules' hash, recorded at confirm. */
   currentRulesHash?: () => string | null;
+  /** U10 (LC-73): where kept backups go. Absent → `keepBackup` refuses (tests that predate U10). */
+  keptBackups?: KeptBackupStore;
 }
 
 export type Refused = { ok: false; status: 400 | 409 | 413 | 422 | 503; reason: string; rule?: string };
@@ -182,6 +185,25 @@ export class MaintenanceService {
     } catch (e) {
       release();
       return { ok: false, status: 503, reason: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  // ── kept backup (U10: FR-76b, FR-80, BR-80.5) ────────────────────────────────────────────────────────────
+
+  /**
+   * Take a backup and KEEP it in `data/backups/<kind>/`, under the same one-operation-at-a-time lock as *Create
+   * backup* and *Restore* (BR-51.3): busy → `409`, and the scheduler simply tries again at its next check.
+   */
+  async keepBackup(kind: BackupKind, reason: string): Promise<KeepResult | Refused> {
+    const store = this.#deps.keptBackups;
+    if (!store) return { ok: false, status: 503, reason: 'Kept backups are not configured.' };
+    const live = this.#deps.liveDb();
+    if (live === null) return { ok: false, status: 503, reason: 'History is not available, so there is nothing to back up.' };
+    if (!this.#acquire('backup')) return this.#busyRefusal();
+    try {
+      return await store.keep(live, kind, reason);
+    } finally {
+      this.#busy = null;
     }
   }
 

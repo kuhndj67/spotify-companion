@@ -22,7 +22,6 @@ services:
       SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
       HISTORY_DB_PATH: /data/history.db
       COMPLETION_THRESHOLD: "0.90"
-      SNAPSHOT_DIR: /data/snapshots
       SNAPSHOT_INTERVAL_HOURS: 24
       SNAPSHOT_KEEP: 14
       LABEL_TTL_UNKNOWN_DAYS: 30

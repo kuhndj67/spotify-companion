@@ -448,7 +448,8 @@ function muted(text) {
 
 // -- Diagnostics ------------------------------------------------------------
 
-const STATUS_MARK = { ok: '✓', fail: '✗', skip: '–' };
+// U10 (BR-81.3): `warn` is a risk, not a fault. Its own mark, so colour is never the only channel.
+const STATUS_MARK = { ok: '✓', warn: '◐', fail: '✗', skip: '–' };
 
 async function runDiagnostics() {
   ui.diagBody.innerHTML = '<p class="muted">Running…</p>';
@@ -747,6 +748,7 @@ el('settings-open').addEventListener('click', () => {
   el('settings').showModal();
   void refreshMaintenance();
   void refreshCredentials();
+  void refreshSettingsStatus();
 });
 el('settings-close').addEventListener('click', () => el('settings').close());
 
@@ -1532,6 +1534,10 @@ function renderStatusBar() {
     // FC-U5-1 (U5). ⚠️ Omitted entirely when the server does not send it, rather than drawn as
     // `unknown`: a deployment without U5 has no automation to be unknown about.
     ...(server?.automation ? [server.automation] : []),
+    // U10 (BR-86.5): the Status light, always sent; its detail ends "Check the Diagnostics page." at warn/fail.
+    ...(server?.health ? [server.health] : []),
+    // U10 (BR-86.3): only when a newer version exists.
+    ...(server?.update ? [server.update] : []),
   ];
 
   dots.replaceChildren();
@@ -2440,3 +2446,88 @@ function connect() {
 
 requestAnimationFrame(paintProgress);
 connect();
+
+// -- U10: Settings → Version and Backup & restore (FR-80…82, BR-86) -----------
+//
+// ⚠️ DOM WIRING ONLY: every judgement (is a version newer, is a page URL this repository's, is a reminder due)
+// is made on the server and arrives decided. Text from GitHub is only ever set as textContent.
+
+function shortTime(iso) {
+  return iso ? `${iso.slice(0, 16).replace('T', ' ')} UTC` : '';
+}
+
+function renderUpdateCheck(check) {
+  const available = el('update-available');
+  const link = el('update-link');
+  const newer = check?.status === 'newer' && check.newest;
+  available.hidden = !newer;
+  el('update-how').hidden = !newer;
+  if (newer) {
+    link.textContent = `${check.newest.version} is available: what changed`;
+    if (check.newest.pageUrl) link.href = check.newest.pageUrl;
+    else link.removeAttribute('href');
+  }
+  el('update-check-switch').checked = check ? check.status !== 'off' : false;
+  el('update-check-switch').disabled = !check;
+  const parts = [];
+  if (check?.status === 'current') parts.push(`Up to date (checked ${shortTime(check.lastSuccessAt)}).`);
+  else if (check?.status === 'not-yet') parts.push('Not checked yet.');
+  else if (check?.status === 'newer') parts.push(`Checked ${shortTime(check.lastSuccessAt)}.`);
+  if (check && check.status !== 'off' && check.lastFailureAt && (!check.lastSuccessAt || check.lastFailureAt > check.lastSuccessAt)) {
+    parts.push(`Could not check (${shortTime(check.lastFailureAt)}).`);
+  }
+  el('update-checked').textContent = parts.join(' ');
+}
+
+function renderBackups(backups, reminder) {
+  const status = el('backups-status');
+  if (backups) {
+    const age = (iso) => (iso ? new Date(iso).toLocaleString() : 'none yet');
+    status.dataset.level = backups.health.level;
+    status.textContent =
+      `Automatic backups: newest ${age(backups.scheduled.newestAt)} (${backups.scheduled.count} kept) · before a change: ` +
+      `${age(backups.beforeChange.newestAt)} (${backups.beforeChange.count} kept). Kept in ${backups.folder}; to restore one, ` +
+      `choose it with Restore backup.` +
+      (backups.health.level === 'warn' || backups.health.level === 'fail' ? ` ${backups.health.level === 'fail' ? '✕' : '◐'} ${backups.health.detail}` : '');
+  } else {
+    status.textContent = '';
+  }
+  const sw = el('backup-reminder-switch');
+  sw.disabled = !reminder;
+  sw.checked = reminder ? reminder.enabled : false;
+  el('backup-reminder-last').textContent = reminder
+    ? (reminder.verdict.level === 'warn' ? `◐ ${reminder.verdict.detail}` : reminder.lastDownloadAt ? `Last downloaded ${reminder.lastDownloadAt.slice(0, 10)}.` : 'No backup downloaded yet.')
+    : '';
+}
+
+async function refreshSettingsStatus() {
+  try {
+    const body = await (await fetch('/api/settings/status')).json();
+    el('app-version').textContent = `Version ${body.appVersion ?? 'unknown'}`;
+    renderUpdateCheck(body.updateCheck);
+    renderBackups(body.backups, body.backupReminder);
+  } catch (error) {
+    el('update-checked').textContent = `Could not reach the app: ${error}`;
+  }
+}
+
+async function postSwitch(path, enabled) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+}
+
+el('update-check-switch').addEventListener('change', async (event) => {
+  try {
+    await postSwitch('/api/update-check', event.target.checked);
+  } finally {
+    void refreshSettingsStatus();
+  }
+});
+
+el('backup-reminder-switch').addEventListener('change', async (event) => {
+  try {
+    await postSwitch('/api/backup-reminder', event.target.checked);
+  } finally {
+    void refreshSettingsStatus();
+  }
+});

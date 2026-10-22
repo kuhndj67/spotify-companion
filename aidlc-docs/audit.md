@@ -408,3 +408,128 @@ choice, so every issue arrives labelled; reversible in one line) and a link to p
 (`enabled: true`, read 2026-10-21). CONTRIBUTING points to the chooser. Verified: the three files parse as YAML.
 ⚠️ **Not verified**: GitHub's own form-schema check runs only once the files are on `main`; open
 `/issues/new/choose` after the merge.
+
+## 2026-10-21T23:30:00Z — U10 Functional Design plan opened (Q1–Q6); issue forms seen live
+
+Owner, after PR #21 merged: *"looks good... I see issue and feature options."* The two issue forms render on GitHub,
+so GitHub's form-schema check passed (the one item the 22:30Z entry left unverified).
+
+**U10 FD plan** (`construction/plans/u10-functional-design-plan.md`). Measured for it, not reasoned:
+- The scheduled snapshots (FR-56/FR-80) are **CSV exports**, one flattened row per play, with no decision log,
+  skip attempts, trails or rules; *Restore backup* accepts only the archive. Built as worded, FR-80 would restore
+  nothing.
+- *Create backup* streams its archive to the browser and deletes it: **no backup is kept on disk**, which FR-76's
+  "bounded number kept" assumes.
+- From a throwaway container (what FR-79's `update` is), `host.docker.internal:3010` → **`403 Invalid Host or
+  Origin`**; with a `localhost` Host header → **`200`**. Not a defect: the peer check is off in the container
+  deployment by design (`TRUST_PUBLISHED_PORT`, 2026-09-05) and the `127.0.0.1` publish is the boundary, which admits
+  any process on this machine, containers included. Recorded so it is not rediscovered as a breach. Not probed: the
+  same on Linux (U11's NAS).
+- FR-77's lock file: exclusive create refused with **`EEXIST`** in both directions across the Rancher bind mount
+  (throwaway container and scratch folder; `data/` untouched); heartbeat visible; clocks within 1 s. Stale takeover by
+  unlink-and-create can race between two takers; the rules must close it.
+- The MusicBrainz User-Agent carries the user's contact address (NFR-14); FR-81's GitHub request must not reuse it.
+
+Questions: Q1 how `update` gets its backup (recommended: the updated app backs up on its first start, rewording
+FR-79), Q2 one kind of kept backup, the verified archive in `data/backups/`, rotated per kind (rewording FR-56/80),
+Q3 which processes take the lock, Q4 how far `data-dev/` reaches, Q5 kept backups in Settings, Q6 a story. FR-81 added
+to the U10 rows of `execution-plan.md` and `unit-of-work.md`. U10's `HANDOFF.md` created. Business rules start at
+BR-78 (BR-77 is taken).
+
+## 2026-10-22T00:30:00Z — U10 FD Q1–Q6 answered (all A); Functional Design written
+
+Owner (question prompt): **Q1 = A** the updated app backs up before its first run; **Q2 = A** one kind of kept
+backup, the restorable archive in `data/backups/`, rotated per kind, CSV timer retired; **Q3 = A** the lock covers the
+app and every writing script, replacing `docker ps`; **Q4 = A** `data-dev/` for `npm start` only; **Q5 = A** status in
+Settings, no list; **Q6 = A** US-33. Requirements amended to match, each marked in place: **FR-76(a)** (a version
+change also triggers the backup), **FR-79** (no call to the running app), **FR-80** (the archive, rotated per kind),
+**FR-56** (superseded by FR-80). US-33 added with its traceability row.
+
+FD written: `construction/u10-data-safety/functional-design/` (BR-78…BR-86). **Decisions the agent made, for the
+owner's review** (none is a security-posture change):
+- The startup lock **watches** the heartbeat for one stale window instead of judging the lock's age, because a
+  container that `docker compose up -d` just killed leaves a lock that looks fresh. Staleness never compares two
+  clocks. Takeover goes through an exclusive-create mutex and re-reads the token, closing the race the probe found.
+- The update check's startup request is **skipped when the last check was under an hour ago**: FR-81 says *once
+  shortly after start*, and a restart loop would make that a GitHub request (and a disclosure) per restart. A
+  refinement of FR-81, not a change of its intent.
+- `npm run release` **refuses** when the running app cannot be reached; `--app-is-down` overrides that one refusal,
+  since the new version still backs up before its first run.
+- **Five** before-change backups kept (configurable); scheduled keep stays `SNAPSHOT_KEEP` (14).
+- The last app version is stored **in the database** (a one-row table, by a new migration), because it belongs to
+  the database: a restored file brings its own.
+- A new **Settings → Version** section (the version appeared only inside a diagnostics run), and diagnostics gains a
+  **warn** level.
+Rejected: a list of kept backups with restore buttons (Q5 = B); judging lock staleness by age; reusing the MusicBrainz
+User-Agent (it carries the contact address).
+
+## 2026-10-22T01:00:00Z — U10 Functional Design APPROVED (owner); NFR Design plan opened
+
+Owner, after the FD completion message: *"continue"*, read as approval to proceed to NFR Design (the message's
+*Continue to Next Stage*). The six agent decisions named in the 00:30Z entry stand as approved with it.
+NFR Requirements skipped, as for U1–U9. NFR Design plan: `construction/plans/u10-nfr-design-plan.md`.
+
+## 2026-10-22T02:00:00Z — U10 NFR Design written; Status light and Diagnostics button added (owner)
+
+Owner (question prompt): **Q1 = A** heartbeat 5 s, stale window 30 s; **Q2 = A** free-space check before each kept
+backup (2 × database + WAL + 100 MB; short → scheduled skipped and reported fail, before-change refused; nothing
+deleted to make room). **Q3 = X**: *"To keep the main screen clean (we're going to simplify it quite a bit when we get
+to UX/UI unit) lets include a "Status" indicator light/text with "check diagnostics page" as the pop up text. also
+maybe we should promote "Diagnostics" to a button between settings and rules?"* Follow-ups, all the recommended
+option: the Status light reacts to U10's conditions now and is extensible (whether today's five indicators fold into
+it is the UX/UI unit's call); it is **always visible**; Diagnostics becomes a header button **Settings · Diagnostics ·
+Rules** in U10. **FR-63 amended** in place; the approved FD gains **BR-86.5–86.6** and `frontend-components.md` §3a.
+
+Facts measured for the plan: a gzip of the database file is 3.0 MB with a further 4.1 MB in its WAL (so an archive is
+≈ 3–5 MB today); every request carrying an `Origin` is already checked, so the new write routes need no new defence;
+the writing scripts already import `src/` under `tsx`, so one lock module serves both.
+
+Written: `construction/u10-data-safety/nfr-design/` — **P-76…P-87**, **LC-69…LC-80**, **PBT-79…PBT-89**. Schema v7 →
+v8. Rejected: judging lock staleness by age (P-76); keeping `docker ps` beside the lock (P-79: two guards answering
+one question differently); a retry loop that reopens history mid-run (recovery stays a restart).
+
+## 2026-10-22T03:00:00Z — U10 NFR Design APPROVED (owner); Infrastructure Design written
+
+Owner, after the NFR completion message: *"continue"*, read as approval. Infrastructure Design plan:
+`construction/plans/u10-infrastructure-design-plan.md`.
+
+Facts measured: three compose files each mount `./data` and `./state` as directories; existing *App only* folders keep
+their compose file (only the image line changes), so U10 must run with no new variable; the entrypoint creates and
+chowns `SNAPSHOT_DIR`; `.gitignore` names `SNAPSHOT_DIR` as the way to keep copies elsewhere; `verify:up` starts with no
+history; `npm run release` waits 180 s for health.
+
+Owner (question prompt): **Q1 = B**, backups **always** in `data/backups/`, *against the recommendation* (an optional
+`BACKUP_DIR`). ⚠️ **Residual risk accepted**: the database and its backups share one deletion event (`git clean -xdf`,
+a lost disk); the documents will tell users to copy `data/backups/` elsewhere. **Q2 = A**, the first U10 deploy is
+rehearsed on `:3011` with a restored copy of the owner's backup, including the live cross-mount lock probe.
+
+Written: `construction/u10-data-safety/infrastructure-design/` — **IN-U10-1…8**. Agent decisions: `SNAPSHOT_DIR`
+retired (ignored with one log line if an old folder sets it; CSV files untouched); `SNAPSHOT_INTERVAL_HOURS`,
+`SNAPSHOT_KEEP`, `SNAPSHOTS_ENABLED` keep their names for the scheduled kind; before-change backups cannot be turned
+off; `BEFORE_CHANGE_KEEP` optional (default 5); `data-dev/` ignored by git and the image build.
+
+## 2026-10-22T03:30:00Z — U10 Infrastructure Design APPROVED (owner); FR-82 backup reminder added
+
+Owner: *"continue to next step but because of the change to "user is responsible for backing up their db" I'd like to
+add a diagnostic warning (yellow) that asserts if the user has not downloaded a backup in more than a week. (unless
+they opt-out by shutting it off, which would make sense if the entire hosting environment is automatically backed up
+for instance)."* Read as approval of Infrastructure Design plus a new requirement from the owner, ratified as stated:
+**FR-82** (`requirements.md` §3.10). Folded into the approved designs as additions, each marked *added 2026-10-22*:
+**BR-87** (and BR-86.5's sources, BR-86.7), `frontend-components.md` §6, **LC-81**, **PBT-90**, **IN-U10-9**; US-33
+gains an acceptance line and FR-82.
+
+Agent decisions, for review: only a **completed** *Create backup* download counts (not a click, not kept backups,
+which share the disk); a fresh install's week starts at its **first run**; the dates live in `state/` so a restore
+cannot roll them back; the reminder is **warn**, never fail. Next: Code Generation plan.
+
+## 2026-10-22T04:00:00Z — U10 Code Generation plan written; approval requested
+
+`construction/plans/u10-code-generation-plan.md`: 16 steps, pure decisions first (each with its property test and
+positive control), then shells, wiring, UI, scripts, infrastructure files and documents; one commit per step on
+`u10-code-generation`, branched from `main` after PR #22 (the designs) merges. Nothing deploys in Code Generation;
+the first deploy is Build & Test's rehearsal (IN-U10-8). Approval prompt shown to the owner at this timestamp.
+
+## 2026-10-22T04:15:00Z — U10 Code Generation plan APPROVED (owner)
+
+Owner: *"approved plan, merge is marked as a draft... ready to move it forward?"* Plan approved as written; PR #22 (the
+designs) marked ready for review at the owner's request. Code begins on `u10-code-generation` once #22 merges.

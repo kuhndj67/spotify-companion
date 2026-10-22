@@ -119,6 +119,8 @@ export interface HistoryDiagnosticsInput {
   } | null;
   /** U10 (BR-81.2): the scheduler's verdict on automatic backups; `null` when there is no scheduler. */
   backupHealth: { level: 'ok' | 'warn' | 'fail' | 'off'; detail: string } | null;
+  /** U10 (FR-82, BR-87.4): the weekly download reminder; `off` is skipped. Optional for callers that predate it. */
+  backupReminder?: { level: 'ok' | 'warn' | 'off'; detail: string } | null;
   startupError: string | null;
   dbPath: string;
 }
@@ -512,6 +514,7 @@ export async function runDiagnostics(
 
     // U10 (BR-81.2, FR-80): was *Snapshots*, which said `ok` for "scheduled; none written yet" for 18 days.
     steps.push(leveled('Backups', history.backupHealth));
+    steps.push(leveled('Copy elsewhere', history.backupReminder ?? null));
   }
 
   // -- U2: label enrichment ---------------------------------------------------

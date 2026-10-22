@@ -81,13 +81,13 @@ own commit, so any step can be reviewed or reverted alone.
 - [x] Tests: failed before-change backup leaves the database's bytes and schema unchanged ⭐; version change triggers
       a backup, same version does not; the lock is taken before the restore swap.
 
-### Step 8 — Status, diagnostics, reminder *(BR-81.2–81.3, 86.5, 87, P-84, P-85, LC-75, LC-81; PBT-85, PBT-90)*
-- [ ] `src/diagnostics.ts`: step type gains `warn` (a run with warnings is not failed); *Snapshots* → *Backups*;
+### Step 8 — Status, diagnostics, reminder *(BR-81.2–81.3, 86.5, 87, P-84, P-85, LC-75, LC-81; PBT-85, PBT-90)* — ✅ DONE · Status uses the existing glyph set (`●` `◐` `✕`), not the FD sketch's `✓`/`⚠`: one geometric set keeps the row from jumping. Sources: history off (lock, failed before-change backup, open failure), backup health, the reminder. The *Update* indicator moves to Step 9 with its checker; the completed-download hook to Step 10 with the route. Positive control: Status taking the first source's level fails PBT-85
+- [x] `src/diagnostics.ts`: step type gains `warn` (a run with warnings is not failed); *Snapshots* → *Backups*;
       new *Copy elsewhere* step.
-- [ ] `src/ui/statusBar.ts`: `status(sources)` and the *Status* indicator; `update` indicator; one sentence per source
+- [x] `src/ui/statusBar.ts`: `status(sources)` and the *Status* indicator; `update` indicator; one sentence per source
       shared with diagnostics.
-- [ ] `src/backup/backupReminder.ts`: `reminderLevel` (⚙️), `state/backup-reminder.json`, the completed-download hook.
-- [ ] Tests: PBT-85, PBT-90; an aborted download does not count, a completed one does ⭐.
+- [x] `src/backup/backupReminder.ts`: `reminderLevel` (⚙️), `state/backup-reminder.json`, the completed-download hook.
+- [x] Tests: PBT-85, PBT-90; an aborted download does not count, a completed one does ⭐.
 
 ### Step 9 — Update checker *(BR-85, P-87, LC-80; PBT-88, PBT-89)*
 - [ ] `src/update/UpdateChecker.ts`: preference (absent = on), timing with the one-hour rule, the bounded request

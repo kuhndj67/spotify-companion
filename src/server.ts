@@ -36,7 +36,9 @@ import {
   recordingIndicator,
   rulesIndicator,
   spotifyIndicator,
+  statusIndicator,
   type Indicator,
+  type StatusSource,
 } from './ui/statusBar.js';
 import type { AutomationIndicatorState } from './ui/statusBar.js';
 import { SqliteHistoryRepository } from './history/SqliteHistoryRepository.js';
@@ -44,6 +46,7 @@ import { PlayObserver, type PlaybackSample } from './history/PlayObserver.js';
 import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
 import { ExportService } from './export/ExportService.js';
 import { BackupScheduler } from './backup/BackupScheduler.js';
+import { BackupReminder } from './backup/backupReminder.js';
 import { KeptBackupStore } from './backup/KeptBackupStore.js';
 import { BeforeChangeBackupFailed, prepareHistory } from './history/prepareHistory.js';
 import { WriterLock } from './lock/WriterLock.js';
@@ -136,7 +139,7 @@ if (config.historyEnabled) {
     writerLock.startHeartbeat();
   } else {
     historyAllowed = false;
-    historyStartupError = `history is off: ${outcome.detail}`;
+    historyStartupError = outcome.detail;
     console.error(`[history] unavailable; running display-only: ${outcome.detail}`);
   }
 }
@@ -686,6 +689,9 @@ const upstreamMetrics = new UpstreamMetrics();
 
 const automationState = new AutomationStateStore(AUTOMATION_STATE_PATH);
 
+/** U10 (FR-82, BR-87): the weekly download reminder, in `state/` beside the kill switch so a restore never rolls it back. */
+const backupReminder = new BackupReminder(join(dirname(AUTOMATION_STATE_PATH), 'backup-reminder.json'));
+
 /**
  * ⚠️ **A PROBE, not an inference from `compose.yaml`**, and it runs whether or not automation is
  * enabled — because the answer has to be known *before* the user reaches for the kill switch, not at
@@ -1077,6 +1083,7 @@ async function runDiagnosticsReport() {
       repository,
       observerStats: observer?.stats ?? null,
       backupHealth: backupScheduler?.health() ?? null,
+      backupReminder: backupReminder.verdict(),
       startupError: historyStartupError,
       dbPath: config.historyDbPath,
     },
@@ -1292,6 +1299,8 @@ interface StatusIndicators {
    * skip failed*, and the user would not know whether to open their rules file or their decision log.
    */
   automation: Indicator;
+  /** U10 (BR-86.5): the always-visible Status light. */
+  health: Indicator;
 }
 
 function statusIndicators(snapshot: Snapshot): StatusIndicators {
@@ -1324,7 +1333,23 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
     // ⚠️ `inMessage: false` (2026-10-11): the automation dot never takes the red line above the bar — app.js assembles
     // the bar from these, and honours the flag exactly as statusBar() does.
     automation: { ...automationIndicator(automationIndicatorState()), inMessage: false as const },
+    health: statusIndicator(statusSources()),
   };
+}
+
+/**
+ * U10 (BR-86.5, P-85): what the Status light watches. Each source's sentence is the one diagnostics shows (P-86).
+ * A later unit adds a source here.
+ */
+function statusSources(): StatusSource[] {
+  const sources: StatusSource[] = [];
+  // The lock refused, a before-change backup failed, or history would not open: recording is off.
+  if (config.historyEnabled && historyStartupError !== null) sources.push({ level: 'fail', sentence: `Recording is off: ${historyStartupError}.` });
+  const backups = backupScheduler?.health();
+  if (backups && backups.level !== 'off') sources.push({ level: backups.level, sentence: backups.detail });
+  const reminder = backupReminder.verdict();
+  if (reminder.level !== 'off') sources.push({ level: reminder.level, sentence: reminder.detail });
+  return sources;
 }
 
 /**

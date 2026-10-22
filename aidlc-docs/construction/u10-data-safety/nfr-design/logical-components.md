@@ -65,3 +65,16 @@ visible on the host, `--app-is-down` override. A change inside the existing scri
 - No retry loop to reopen history after a refusal: recovery is a restart (FD), and *Status* says so.
 - No list of kept backups and no second restore path (FD Q5 = A).
 - No change to *Create backup* (the download), *Export* or the local-access guard.
+
+## Added 2026-10-22 — the backup reminder (FR-82, BR-87)
+
+| ID | Component | Where | Kind | Patterns / rules |
+|---|---|---|---|---|
+| **LC-81** | **Backup reminder**: `reminderLevel` (⚙️ pure); `state/backup-reminder.json` read and written temp-then-rename; the completed-download hook on *Create backup*'s response; a *Status* source and a diagnostics step; `PUT /api/backup-reminder` | `src/backup/backupReminder.ts`, `src/api.ts` | ⚙️ pure + impure | P-85 · BR-87 |
+
+| ID | Property | Covers |
+|---|---|---|
+| **PBT-90** | `reminderLevel`: never `fail`; off → none; on → `warn` iff now − max(lastDownloadAt, firstRunAt) > 7 days; a download at any time resets it to `ok` (positive control) | LC-81 · BR-87.2 |
+
+Guard test: a download aborted mid-stream does **not** update `lastDownloadAt`; a completed one does (each seen to
+fail once with the hook moved to the request's start).

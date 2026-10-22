@@ -84,3 +84,16 @@ indicators fold into *Status* is the UX/UI unit's decision, not U10's.
 | `GET` status (existing WebSocket snapshot) | status bar, Settings | gains `updateCheck` and `backupHealth`, pre-derived, as the indicators already are |
 | `PUT /api/update-check` `{ enabled }` | Settings switch | writes `state/update-check.json` (BR-85.9) |
 | `POST /api/backups` `{ reason }` | `npm run release` only (BR-82) | keeps a before-change backup; `409` when busy; local-only like every route |
+
+## 6. Backup reminder *(added 2026-10-22, FR-82, BR-87)*
+
+Settings → *Backup & restore*, under the status lines of §2:
+
+```
+☑ Remind me to download a backup every week
+  Turn this off if the whole computer or server running the app is already backed up.
+  Last downloaded: 2026-10-14 (8 days ago)
+```
+
+The switch → `PUT /api/backup-reminder { enabled }`. At warn, the *Status* light (§3a) is yellow (`⚠`, the word
+*Status*), and its pop-up lists *No backup downloaded in 8 days* above *Check the Diagnostics page*.

@@ -2,7 +2,13 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-22) — Infrastructure Design WRITTEN, awaiting owner approval
+## ▶ Current state (2026-10-22) — Code Generation PLAN written, awaiting owner approval
+
+✅ Infrastructure Design approved; **FR-82** (weekly backup-download reminder, owner) added across the designs
+(BR-87, LC-81, PBT-90, IN-U10-9). Plan: [`construction/plans/u10-code-generation-plan.md`](../plans/u10-code-generation-plan.md),
+16 steps on branch `u10-code-generation` after PR #22 merges.
+
+### Earlier (2026-10-22) — Infrastructure Design written; ✅ approved by the owner the same day
 
 Plan [`construction/plans/u10-infrastructure-design-plan.md`](../plans/u10-infrastructure-design-plan.md): **Q1 B**
 backups always in `data/backups/` (⚠️ residual risk accepted: database and backups share one deletion event; the

@@ -507,3 +507,24 @@ Written: `construction/u10-data-safety/infrastructure-design/` — **IN-U10-1…
 retired (ignored with one log line if an old folder sets it; CSV files untouched); `SNAPSHOT_INTERVAL_HOURS`,
 `SNAPSHOT_KEEP`, `SNAPSHOTS_ENABLED` keep their names for the scheduled kind; before-change backups cannot be turned
 off; `BEFORE_CHANGE_KEEP` optional (default 5); `data-dev/` ignored by git and the image build.
+
+## 2026-10-22T03:30:00Z — U10 Infrastructure Design APPROVED (owner); FR-82 backup reminder added
+
+Owner: *"continue to next step but because of the change to "user is responsible for backing up their db" I'd like to
+add a diagnostic warning (yellow) that asserts if the user has not downloaded a backup in more than a week. (unless
+they opt-out by shutting it off, which would make sense if the entire hosting environment is automatically backed up
+for instance)."* Read as approval of Infrastructure Design plus a new requirement from the owner, ratified as stated:
+**FR-82** (`requirements.md` §3.10). Folded into the approved designs as additions, each marked *added 2026-10-22*:
+**BR-87** (and BR-86.5's sources, BR-86.7), `frontend-components.md` §6, **LC-81**, **PBT-90**, **IN-U10-9**; US-33
+gains an acceptance line and FR-82.
+
+Agent decisions, for review: only a **completed** *Create backup* download counts (not a click, not kept backups,
+which share the disk); a fresh install's week starts at its **first run**; the dates live in `state/` so a restore
+cannot roll them back; the reminder is **warn**, never fail. Next: Code Generation plan.
+
+## 2026-10-22T04:00:00Z — U10 Code Generation plan written; approval requested
+
+`construction/plans/u10-code-generation-plan.md`: 16 steps, pure decisions first (each with its property test and
+positive control), then shells, wiring, UI, scripts, infrastructure files and documents; one commit per step on
+`u10-code-generation`, branched from `main` after PR #22 (the designs) merges. Nothing deploys in Code Generation;
+the first deploy is Build & Test's rehearsal (IN-U10-8). Approval prompt shown to the owner at this timestamp.

@@ -143,9 +143,29 @@ allocated at NFR Design, not here.
   Restoring stays *Restore backup*. No list, no second restore path.
 - **86.5 Status indicator** *(added 2026-10-22, NFR Q3)*. One status-bar indicator, **Status**, always visible: a
   light **and** its text. ⚙️ Its level is the worst of its sources; U10's sources are backup health (BR-81.2), a
-  refused or lost lock (BR-78.8, 78.5) and a failed before-change backup (BR-79.3). Healthy → `ok`; otherwise `warn`
+  refused or lost lock (BR-78.8, 78.5), a failed before-change backup (BR-79.3) and, added 2026-10-22, the backup reminder (BR-87). Healthy → `ok`; otherwise `warn`
   or `fail`, and its pop-up says *Check the Diagnostics page*. Later units add sources; it never takes the message
   line.
 - **86.6 Diagnostics button** *(added 2026-10-22, NFR Q3c; amends FR-63)*. The header reads **Settings ·
   Diagnostics · Rules**. *Diagnostics* opens the existing diagnostics pop-up, moved out of Settings with its ids and
   test ids kept.
+- **86.7 Backup reminder** *(added 2026-10-22, FR-82)*. See BR-87.
+
+## BR-87 — A reminder to keep a copy elsewhere (FR-82; added 2026-10-22, owner)
+
+- **87.1 What counts.** Only a *Create backup* download whose response **completed** (every byte sent). A refused,
+  failed or abandoned download does not count; kept backups in `data/backups/` do not count (they share the
+  database's disk, IN-U10-2). The app cannot know the user kept the file, so the words say *downloaded*, never
+  *saved*.
+- **87.2 The clock.** ⚙️ `reminderLevel(enabled, lastDownloadAt, firstRunAt, now)`: off → nothing; otherwise **warn**
+  when the latest of the last completed download and the first run is more than **7 days** ago, else **ok**. A fresh
+  install is therefore not warned in its first week. Never **fail**: a missing off-machine copy is a risk, not a
+  fault.
+- **87.3 Where it is kept.** `state/backup-reminder.json` (`enabled`, `lastDownloadAt`, `firstRunAt`), not `data/`:
+  restoring an older database must not roll the date back. Absent file → enabled, `firstRunAt` = now (written once).
+- **87.4 Where it shows.** A diagnostics step *Copy elsewhere* (warn: *No backup downloaded since &lt;date&gt; (N
+  days)*), and a source of the **Status** light (BR-86.5), so the light turns yellow (warn) with *Check the
+  Diagnostics page*.
+- **87.5 Opt-out.** Settings → *Backup & restore*: a switch *Remind me to download a backup every week*, with the
+  sentence *Turn this off if the whole computer or server running the app is already backed up.* Off → no step
+  level, no Status source.

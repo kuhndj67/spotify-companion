@@ -704,11 +704,12 @@ version exists, **so that** staying current never costs me months of plays I can
       if that backup fails
 - [ ] Backups are kept automatically on a schedule, and each one can be restored with *Restore backup*
 - [ ] Settings tells me the truth about my backups: when the newest was made, and a warning when they have stopped
+- [ ] Unless I turn it off, the app reminds me when I have not downloaded a backup for a week
 - [ ] An *App only* install updates with one command that never moves me to an older version
 - [ ] Settings tells me when a newer version exists and links to what changed; I can turn the check off, and Settings
       says what it sends and to whom
 
-*Covers FR-76, FR-79, FR-80, FR-81 · Persona P1 · Source: U10 FD Q6 = A (2026-10-21). FR-77 and FR-78 are developer
+*Covers FR-76, FR-79, FR-80, FR-81, FR-82 · Persona P1 · Source: U10 FD Q6 = A (2026-10-21). FR-77 and FR-78 are developer
 safety and have no story*
 
 ---
@@ -751,7 +752,7 @@ safety and have no story*
 | | | FR-65 | US-30 |
 | | | NFR-28, 30–33 | US-31 |
 | | | FR-74, 75 | US-32 |
-| | | FR-76, 79, 80, 81 | US-33 |
+| | | FR-76, 79, 80, 81, 82 | US-33 |
 
 **All in-scope functional requirements are covered.** FR-55 was withdrawn on 2026-08-25 and moved
 to the wishlist (§5.1, W-1); US-27 is retained as a **deferred** story documenting why, and is

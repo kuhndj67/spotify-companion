@@ -82,3 +82,9 @@ returned file exists under the host's `data/backups/before-change/`. `--app-is-d
    - *Status* and the Diagnostics button in light and dark.
 5. `npm run verify:down` (proves the live install unchanged), then `npm run release -- --apply` on the live install
    (its own before-change backup, BR-82, and the first start's, BR-79).
+
+## IN-U10-9 — The backup reminder's file (FR-82; added 2026-10-22)
+
+`state/backup-reminder.json` · `/state/backup-reminder.json`, in the existing `./state` directory mount, written
+temp-then-rename. Not in `data/`, so a restore never rolls it back, and never in a backup. No new setting: the switch
+lives in Settings.

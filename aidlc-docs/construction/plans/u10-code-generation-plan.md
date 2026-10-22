@@ -102,11 +102,11 @@ own commit, so any step can be reviewed or reverted alone.
       `backupReminder`; *Create backup*'s response reports completion to the reminder.
 - [x] Tests: each route's success and refusal; cross-site `Origin` refused (inherited guard, checked once per route).
 
-### Step 11 — Frontend *(BR-86, frontend-components §1–§6, LC-76)*
-- [ ] `public/index.html`, `app.js`, `styles.css`: header **Settings · Diagnostics · Rules** (pop-up moved, ids kept);
+### Step 11 — Frontend *(BR-86, frontend-components §1–§6, LC-76)* — ✅ DONE · checked by running the BUILT app isolated (scratch data, port 3027, Spotify credentials absent) in light and dark: header Settings · Diagnostics · Rules (grouped right); Status `●`/`◐` with its pop-up; Settings → Version (U8's line kept), switch and sentence; Backup & restore status and reminder switch; diagnostics *Backups* ✓ and *Copy elsewhere* `◐` warn. **Running it found a real defect** (fresh installs refused to record; fixed in its own commit, BR-79.1 amended) and observed live: stale-lock takeover after a crash (30 s watch), the scheduled backup at startup, one real anonymous GitHub request answering *current* (`v1.0.0-beta.8`, page accepted), and a completed download clearing the reminder. Not seen: the *newer* state (no newer release exists; covered by tests)
+- [x] `public/index.html`, `app.js`, `styles.css`: header **Settings · Diagnostics · Rules** (pop-up moved, ids kept);
       *Status* light; *Update* indicator; Settings → *Version* (line, update notice, switch and sentence); *Backup &
       restore* status lines and reminder switch.
-- [ ] Checked in the browser on the dev server, **light and dark** (screenshots in the code summary).
+- [x] Checked in the browser on the built app, **light and dark** (screenshots in the code summary).
 
 ### Step 12 — `update` command *(BR-83, LC-78, LC-79; PBT-86, PBT-87)*
 - [ ] `src/appOnly/update.ts` (⚙️ `decideUpdate`, the one-line rewrite), `src/appOnly/updateCli.ts`;

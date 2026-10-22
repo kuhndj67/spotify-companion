@@ -1363,7 +1363,7 @@ function backupStatusView(): BackupStatusView {
     health: backupScheduler?.health() ?? { level: 'off', detail: 'History is not running, so no automatic backup is taken.' },
     scheduled: at('scheduled'),
     beforeChange: at('before-change'),
-    folder: config.inContainer ? 'data/backups/' : `${relative(process.cwd(), dirname(config.historyDbPath)) || '.'}/backups/`,
+    folder: config.inContainer ? 'data/backups/' : `${(relative(process.cwd(), dirname(config.historyDbPath)) || '.').replaceAll('\\', '/')}/backups/`,
   };
 }
 

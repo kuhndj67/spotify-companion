@@ -6,6 +6,8 @@
   --line: #e3e3e0;
   --accent: #1db954;
   --danger: #c0392b;
+  /* U10: a risk, not a fault (diagnostics `warn`, backups, the reminder). Dark enough to read on white. */
+  --warn: #a15c07;
 }
 
 
@@ -21,6 +23,7 @@
     --text: #f2f3f5;
     --muted: #9aa0a8;
     --line: #2a2d31;
+    --warn: #fbbf24;
   }
 }
 
@@ -129,10 +132,12 @@ body {
 .card-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  /* U10: three buttons now (Settings · Diagnostics · Rules). Grouped at the right; the status text takes the slack. */
+  gap: 0.5rem;
   margin-bottom: 1.25rem;
 }
+
+.card-head .status { margin-right: auto; }
 
 .status {
   margin: 0;
@@ -262,7 +267,15 @@ dd[data-flag="no"] { color: var(--muted); }
 
 .muted { color: var(--muted); font-size: 0.85rem; }
 /* U8: the same 1.25rem inset as .diag-section -- first drawn flush to the edge and CLIPPED (seen in the click-test). */
-.app-version { margin: 0; padding: 0.5rem 1.25rem 1rem; font-size: 0.75rem; text-align: right; }
+.app-version { margin: 0 0 0.25rem; font-size: 0.85rem; }
+
+/* U10: Settings → Version and Backup & restore (BR-86). */
+.update-available { margin: 0 0 0.25rem; font-weight: 600; }
+.setting-switch { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; font-size: 0.9rem; }
+.setting-note { margin: 0.15rem 0 0; font-size: 0.78rem; }
+.backups-status { margin: 0 0 0.5rem; font-size: 0.82rem; color: var(--muted); }
+.backups-status[data-level="warn"] { color: var(--warn); }
+.backups-status[data-level="fail"] { color: var(--danger); }
 
 .warn {
   margin: 0.8rem 0 0;
@@ -331,6 +344,7 @@ dd { margin: 0.15rem 0 0; font-size: 0.9rem; overflow-wrap: anywhere; }
 .diag-row[data-status="ok"] .diag-mark { color: var(--accent); }
 .diag-row[data-status="fail"] .diag-mark { color: var(--danger); }
 .diag-row[data-status="skip"] .diag-mark { color: var(--muted); }
+.diag-row[data-status="warn"] .diag-mark { color: var(--warn); }
 
 .diag-name { margin: 0; font-size: 0.85rem; font-weight: 500; }
 
@@ -342,6 +356,7 @@ dd { margin: 0.15rem 0 0; font-size: 0.9rem; overflow-wrap: anywhere; }
 }
 
 .diag-row[data-status="fail"] .diag-detail { color: var(--danger); }
+.diag-row[data-status="warn"] .diag-detail { color: var(--warn); }
 
 .diag-time {
   font-size: 0.72rem;

@@ -76,6 +76,18 @@ describe('prepareHistory', () => {
     assert.equal(repo.lastAppVersion(), '1.0.0-beta.9');
   });
 
+  it('⭐ a fresh install (empty database) is not backed up and records from its first start', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'u10-fresh-'));
+    dirs.push(dir);
+    const repo = new SqliteHistoryRepository(join(dir, 'history.db'), { migrate: false });
+    repos.push(repo);
+    let calls = 0;
+    await prepareHistory(repo, '1.0.0-beta.9', async () => (calls++, { ok: false, reason: 'the backup did not verify (incomplete)' }));
+    assert.equal(calls, 0, 'no backup is attempted for an empty database');
+    assert.equal(repo.schemaVersion, 8);
+    assert.equal(repo.lastAppVersion(), '1.0.0-beta.9');
+  });
+
   it('the same version again: no backup; another version: a backup naming both', async () => {
     const { repo } = v7();
     await prepareHistory(repo, '1.0.0-beta.9', async () => kept);

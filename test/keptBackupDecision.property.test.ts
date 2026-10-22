@@ -32,7 +32,7 @@ describe('PBT-80 — backupDue', () => {
         version,
         (schemaVersion, pending, last, running) => {
           const d = backupDue({ schemaVersion, pendingMigrations: pending, lastAppVersion: last, runningVersion: running });
-          assert.equal(d.due, pending.length > 0 || last === null || last !== running);
+          assert.equal(d.due, schemaVersion > 0 && (pending.length > 0 || last === null || last !== running));
           if (d.due) assert.ok(d.reason.length > 0);
         },
       ),
@@ -45,6 +45,10 @@ describe('PBT-80 — backupDue', () => {
         assert.deepEqual(backupDue({ schemaVersion: s, pendingMigrations: [], lastAppVersion: v, runningVersion: v }), { due: false }),
       ),
     );
+  });
+
+  it('⚠️ a brand-new empty database (schema 0) is never due: nothing to protect, and its backup would not verify', () => {
+    assert.deepEqual(backupDue({ schemaVersion: 0, pendingMigrations: [1, 2, 3, 4, 5, 6, 7, 8], lastAppVersion: null, runningVersion: '1.0.0-beta.9' }), { due: false });
   });
 
   it('names the migration and the version change in words', () => {

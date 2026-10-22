@@ -21,8 +21,15 @@ export interface ChangeFacts {
 
 export type BackupDue = { readonly due: false } | { readonly due: true; readonly reason: string };
 
-/** Due when a migration is pending, or the database was last opened by another (or an unrecorded) version. */
+/**
+ * Due when a migration is pending, or the database was last opened by another (or an unrecorded) version.
+ *
+ * ⚠️ **Never for a brand-new, empty database** (schema 0): there is nothing to protect, and a backup of an empty
+ * file does not verify, so requiring one would stop every fresh install from ever recording. Found by running the
+ * app on an empty data folder, 2026-10-22; every unit test had started from an existing v7 database.
+ */
 export function backupDue(f: ChangeFacts): BackupDue {
+  if (f.schemaVersion === 0) return { due: false };
   const reasons: string[] = [];
   if (f.pendingMigrations.length > 0) {
     reasons.push(`migration ${f.schemaVersion}→${Math.max(...f.pendingMigrations)}`);

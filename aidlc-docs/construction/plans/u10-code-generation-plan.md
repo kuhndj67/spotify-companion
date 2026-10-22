@@ -39,12 +39,12 @@ own commit, so any step can be reviewed or reverted alone.
 - [x] Move `compareSemVer` from `scripts/lib/releaseDecision.ts` to `src/version/semver.ts`; `releaseDecision.ts`
       imports it (one copy). Existing `releaseDecision` tests stay green unchanged.
 
-### Step 2 — Writer lock *(BR-78, P-76…P-79, LC-69, LC-70, PBT-79)*
-- [ ] `src/lock/lockDecision.ts` (⚙️ pure): verdict from two observations; is-ours.
-- [ ] `src/lock/WriterLock.ts`: acquire by exclusive create; watch for the stale window; takeover under the mutex
+### Step 2 — Writer lock *(BR-78, P-76…P-79, LC-69, LC-70, PBT-79)* — ✅ DONE · verdicts `alive`/`stale`/`changed`/`gone` (the plan's *restart* split in two); heartbeat reads back **before** touching, so it never refreshes another holder's lock; positive control: a verdict mutated to judge by age fails 3 tests
+- [x] `src/lock/lockDecision.ts` (⚙️ pure): verdict from two observations; is-ours.
+- [x] `src/lock/WriterLock.ts`: acquire by exclusive create; watch for the stale window; takeover under the mutex
       with token re-check; 5 s heartbeat (`unref`) with self-check → `lost`; release-if-ours; injected clock, sleep
       and timings so tests run in milliseconds; one log line per event.
-- [ ] `test/lockDecision.property.test.ts` (PBT-79 ⭐). `test/writerLock.test.ts`: held → refused (positive control:
+- [x] `test/lockDecision.property.test.ts` (PBT-79 ⭐). `test/writerLock.test.ts`: held → refused (positive control:
       released → acquired); stale → taken over; two takers → exactly one wins; foreign token → `lost`; release leaves
       a foreign lock alone.
 

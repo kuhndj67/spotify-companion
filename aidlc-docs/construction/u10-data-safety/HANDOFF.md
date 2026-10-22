@@ -2,7 +2,16 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-22) — Code Generation DONE, awaiting owner review (PR from `u10-code-generation`)
+## ▶ Current state (2026-10-22) — Build & Test: ✅ `:3011` rehearsal PASSED on the owner's real history; release next (owner)
+
+[`build-and-test/u10-build-and-test-summary.md`](../build-and-test/u10-build-and-test-summary.md): the owner's backup
+(1,594 plays, 1,853 decisions, v7) restored on `:3011`; startup took the lock, swapped, kept a before-change backup
+(which itself restores) and migrated to v8 with identical counts; the lock refused in both directions across the
+real mount and took over after `docker kill`; the Status light showed *Recording is off* while refused. Live
+untouched (`verify:down`'s proof). **Next**: version bump to `1.0.0-beta.9`, then `npm run release -- --apply`
+(owner). ⚠️ Until then, `docker compose down` before any `db:*` script.
+
+### Earlier (2026-10-22) — Code Generation done (PR #23, merged by the owner)
 
 All 16 plan steps done, one commit each, `npm run verify` green after every step. What was built, the deviations,
 the defects the work found and what is and is not yet verified: [`code/code-summary.md`](code/code-summary.md).

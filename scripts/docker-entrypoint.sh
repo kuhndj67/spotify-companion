@@ -30,13 +30,14 @@ set -e
 #
 #   docker run --rm -v "${PWD}:/work" <image> setup                              write compose.yaml, secrets/, config/…
 #   docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 <image> auth    the Spotify sign-in
+#   docker run --rm -v "${PWD}:/work" <new image> update                        U10: rewrite compose.yaml's image line
 #
 # Both run as the OWNER of /work (Infrastructure Q4 = A): on a Linux host the files then belong to the user, not to
 # root. On Windows/Rancher the mount reports root, and running as root there does no harm. Anything else starts the
 # app, as before.
 # ---------------------------------------------------------------------------------------------------------------
 case "${1:-}" in
-  setup|auth)
+  setup|auth|update)
     command="$1"; shift
     if [ ! -d /work ]; then
       echo "Mount the folder to set up at /work, e.g.:  docker run --rm -v \"\${PWD}:/work\" <image> $command" >&2
@@ -44,6 +45,10 @@ case "${1:-}" in
     fi
     if [ "$command" = setup ]; then
       set -- node /app/dist/appOnly/setupCli.js
+    elif [ "$command" = update ]; then
+      # U10 (BR-83): one line of /work/compose.yaml, nothing else. No backup here: the updated app takes one before
+      # its first run (BR-79), because a throwaway container cannot reach the running app.
+      set -- node /app/dist/appOnly/updateCli.js
     else
       export SPOTIFY_CONFIG_PATH=/work/secrets/app/spotify-config.json AUTH_BIND_HOST=0.0.0.0 AUTH_NO_BROWSER=1
       set -- node /app/scripts/auth.mjs

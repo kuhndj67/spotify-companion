@@ -108,10 +108,10 @@ own commit, so any step can be reviewed or reverted alone.
       restore* status lines and reminder switch.
 - [x] Checked in the browser on the built app, **light and dark** (screenshots in the code summary).
 
-### Step 12 — `update` command *(BR-83, LC-78, LC-79; PBT-86, PBT-87)*
-- [ ] `src/appOnly/update.ts` (⚙️ `decideUpdate`, the one-line rewrite), `src/appOnly/updateCli.ts`;
+### Step 12 — `update` command *(BR-83, LC-78, LC-79; PBT-86, PBT-87)* — ✅ DONE · registered as an entry point in `knip.jsonc` and the orphan allow-list (as `setupCli.ts`). CRLF files keep their endings. Positive control: a rewrite that drops the rest of the line fails PBT-87. Not yet run inside the image (Build & Test)
+- [x] `src/appOnly/update.ts` (⚙️ `decideUpdate`, the one-line rewrite), `src/appOnly/updateCli.ts`;
       `scripts/docker-entrypoint.sh` dispatches `update`.
-- [ ] Tests: PBT-86, PBT-87 (every other byte kept; 0 or ≥ 2 lines → refusal); older → refuse ⭐.
+- [x] Tests: PBT-86, PBT-87 (every other byte kept; 0 or ≥ 2 lines → refusal); older → refuse ⭐.
 
 ### Step 13 — Scripts *(BR-78.7, BR-82, P-79, IN-U10-7)*
 - [ ] `db:backup`, `db:restore`, `reclassify`, `repair-*` take `WriterLock` (`script:<name>`); `assertNobodyElseHoldsIt`

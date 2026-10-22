@@ -15,7 +15,8 @@
   //
   // U9 (LC-68): `src/appOnly/setupCli.ts` IS an entry point -- the image's `setup` command, run by
   // scripts/docker-entrypoint.sh as `node /app/dist/appOnly/setupCli.js`. Nothing imports it; that is its job.
-  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts"],
+  // U10 (LC-79): `src/appOnly/updateCli.ts` likewise -- the image's `update` command.
+  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts", "src/appOnly/updateCli.ts"],
 
   "project": ["src/**/*.ts", "scripts/**/*.mjs", "scripts/**/*.ts", "test/**/*.ts"],
 

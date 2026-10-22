@@ -89,10 +89,10 @@ own commit, so any step can be reviewed or reverted alone.
 - [x] `src/backup/backupReminder.ts`: `reminderLevel` (⚙️), `state/backup-reminder.json`, the completed-download hook.
 - [x] Tests: PBT-85, PBT-90; an aborted download does not count, a completed one does ⭐.
 
-### Step 9 — Update checker *(BR-85, P-87, LC-80; PBT-88, PBT-89)*
-- [ ] `src/update/UpdateChecker.ts`: preference (absent = on), timing with the one-hour rule, the bounded request
+### Step 9 — Update checker *(BR-85, P-87, LC-80; PBT-88, PBT-89)* — ✅ DONE · pure choice in `src/update/releaseChoice.ts`; the *Update* indicator (`↑`, only when newer) wired here with its checker. Positive controls: `/releases/latest` fails the URL test; a stable install hearing of pre-releases fails PBT-88
+- [x] `src/update/UpdateChecker.ts`: preference (absent = on), timing with the one-hour rule, the bounded request
       (10 s, 1 MB, redirects within `api.github.com`, own User-Agent), `newestRelease`, URL acceptance, silent failure.
-- [ ] Tests: PBT-88, PBT-89; ⭐ with a MusicBrainz contact configured, the captured request does not contain it; the
+- [x] Tests: PBT-88, PBT-89; ⭐ with a MusicBrainz contact configured, the captured request does not contain it; the
       URL is the list endpoint, never `/releases/latest`; off → zero requests over a simulated day; a failure keeps
       the last good answer. No test calls the real GitHub.
 

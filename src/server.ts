@@ -37,6 +37,7 @@ import {
   rulesIndicator,
   spotifyIndicator,
   statusIndicator,
+  updateIndicator,
   type Indicator,
   type StatusSource,
 } from './ui/statusBar.js';
@@ -47,6 +48,7 @@ import { RecentlyPlayedBackfill } from './history/RecentlyPlayedBackfill.js';
 import { ExportService } from './export/ExportService.js';
 import { BackupScheduler } from './backup/BackupScheduler.js';
 import { BackupReminder } from './backup/backupReminder.js';
+import { UpdateChecker } from './update/UpdateChecker.js';
 import { KeptBackupStore } from './backup/KeptBackupStore.js';
 import { BeforeChangeBackupFailed, prepareHistory } from './history/prepareHistory.js';
 import { WriterLock } from './lock/WriterLock.js';
@@ -693,6 +695,12 @@ const automationState = new AutomationStateStore(AUTOMATION_STATE_PATH);
 const backupReminder = new BackupReminder(join(dirname(AUTOMATION_STATE_PATH), 'backup-reminder.json'));
 
 /**
+ * U10 (FR-81, BR-85): asks GitHub once a day whether a newer version exists. ⚠️ On by default (owner, Q35 = B): the
+ * Settings switch, and the sentence beside it, are the user's notice of the call. Off → no request at all.
+ */
+const updateChecker = new UpdateChecker({ path: join(dirname(AUTOMATION_STATE_PATH), 'update-check.json'), runningVersion: APP_VERSION });
+
+/**
  * ⚠️ **A PROBE, not an inference from `compose.yaml`**, and it runs whether or not automation is
  * enabled — because the answer has to be known *before* the user reaches for the kill switch, not at
  * the moment they need it.
@@ -1301,6 +1309,8 @@ interface StatusIndicators {
   automation: Indicator;
   /** U10 (BR-86.5): the always-visible Status light. */
   health: Indicator;
+  /** U10 (BR-86.3): present only when a newer version exists. */
+  update: Indicator | null;
 }
 
 function statusIndicators(snapshot: Snapshot): StatusIndicators {
@@ -1334,6 +1344,7 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
     // the bar from these, and honours the flag exactly as statusBar() does.
     automation: { ...automationIndicator(automationIndicatorState()), inMessage: false as const },
     health: statusIndicator(statusSources()),
+    update: updateIndicator(updateChecker.result()),
   };
 }
 
@@ -1555,6 +1566,7 @@ server.listen(config.port, config.host, () => {
 
   nowPlaying.start();
   backupScheduler?.start();
+  updateChecker.start();
 
   // -- U2 background work ----------------------------------------------------
   //
@@ -1627,6 +1639,7 @@ function shutdown(why: string, options: { touchDatabase?: boolean } = {}): void 
   console.log(`\n${why}, shutting down.`);
   nowPlaying.stop();
   backupScheduler?.stop();
+  updateChecker.stop();
   if (backfillTimer !== null) clearInterval(backfillTimer);
 
   // U10 (BR-78.5): a LOST lock means another process now writes this database. Touch nothing: no flush, no close

@@ -482,6 +482,26 @@ export function statusIndicator(sources: readonly StatusSource[]): Indicator & {
   return { ...indicator(level, 'Status', `${detail} ${CHECK_DIAGNOSTICS}`), inMessage: false };
 }
 
+/**
+ * U10 (BR-86.3, FR-81): shown ONLY when a newer version exists — news, not a fault, so level `ok` with its own
+ * arrow glyph. Never for off, not-yet, current or a failed check (BR-85.7). Never takes the message line. ⚙️ PURE.
+ */
+export function updateIndicator(check: {
+  readonly status: 'off' | 'not-yet' | 'current' | 'newer';
+  readonly newest: { readonly version: string } | null;
+  readonly lastSuccessAt: string | null;
+}): (Indicator & { readonly inMessage: false }) | null {
+  if (check.status !== 'newer' || check.newest === null) return null;
+  const when = check.lastSuccessAt ? ` (checked ${check.lastSuccessAt.slice(0, 16).replace('T', ' ')} UTC)` : '';
+  return {
+    level: 'ok',
+    label: 'Update',
+    glyph: '↑',
+    detail: `${check.newest.version} is available${when}. Settings → Version.`,
+    inMessage: false,
+  };
+}
+
 export interface StatusBarState {
   readonly recording: RecordingState;
   readonly rules: RulesState;

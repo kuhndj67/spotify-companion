@@ -71,9 +71,8 @@ services:
       # Changing this does not rewrite existing verdicts — stored trails allow the change to be
       # applied retroactively via reclassification rather than only going forward.
       COMPLETION_THRESHOLD: "0.90"
-      # FR-56: automatic dated snapshots. Listening history is the only artefact here that
-      # cannot be regenerated, and relying on remembering to export fails silently.
-      SNAPSHOT_DIR: /data/snapshots
+      # FR-80 (U10): automatic backups, kept in /data/backups/scheduled/ (restorable archives, rotated). The
+      # names are U1's, kept so existing folders need no edit. SNAPSHOT_DIR is no longer read.
       SNAPSHOT_INTERVAL_HOURS: 24
       SNAPSHOT_KEEP: 14
 

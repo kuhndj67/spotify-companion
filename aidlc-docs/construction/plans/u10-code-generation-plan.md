@@ -120,10 +120,10 @@ own commit, so any step can be reviewed or reverted alone.
       `--app-is-down`.
 - [x] Tests: a held lock refuses **each** writing script ⭐ (released → proceeds).
 
-### Step 14 — Infrastructure files *(IN-U10-3…5)*
-- [ ] `compose.yaml`, `compose.app.yaml`: `SNAPSHOT_DIR` removed; `compose.verify.yaml` unchanged.
-- [ ] `scripts/docker-entrypoint.sh`: `backups/` created and chowned instead of `SNAPSHOT_DIR`.
-- [ ] `.gitignore`, `.dockerignore`: `data-dev/`; the `data/` note rewritten (backups share its deletion event).
+### Step 14 — Infrastructure files *(IN-U10-3…5)* — ✅ DONE · ignores were done in Step 7
+- [x] `compose.yaml`, `compose.app.yaml`: `SNAPSHOT_DIR` removed; `compose.verify.yaml` unchanged.
+- [x] `scripts/docker-entrypoint.sh`: `backups/` created and chowned instead of `SNAPSHOT_DIR`.
+- [x] `.gitignore`, `.dockerignore`: `data-dev/`; the `data/` note rewritten (backups share its deletion event).
 
 ### Step 15 — Documents
 - [ ] `docs/INSTALL-APP.md`, `docs/INSTALL-DEV.md`: *Backups* (automatic, where, ⚠️ copy `data/backups/` elsewhere,
@@ -134,7 +134,7 @@ own commit, so any step can be reviewed or reverted alone.
 - [ ] `construction/u10-data-safety/code/code-summary.md`: what changed per step, deviations, screenshots.
 
 ### Step 16 — Close
-- [ ] `npm run verify` green; `docker compose build` exit code checked directly; HANDOFF, state, audit; PR opened.
+- [ ] `npm run verify` green; ⚠️ the image built as `spotify-companion:candidate` (NOT `docker compose build`, which would overwrite the live `1.0.0-beta.8` tag, the rollback target), exit code checked directly; HANDOFF, state, audit; PR opened.
 
 ---
 

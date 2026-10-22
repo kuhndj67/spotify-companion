@@ -65,10 +65,11 @@ esac
 DATA_DIR="$(dirname "${HISTORY_DB_PATH:-/data/history.db}")"
 
 if [ "$(id -u)" = "0" ]; then
-  mkdir -p "$DATA_DIR" "${SNAPSHOT_DIR:-/data/snapshots}"
+  # U10 (IN-U10-4): kept backups live in $DATA_DIR/backups/ (SNAPSHOT_DIR is no longer used).
+  mkdir -p "$DATA_DIR" "$DATA_DIR/backups"
 
   # Only the mount points, never a recursive pass over application code.
-  chown node:node "$DATA_DIR" "${SNAPSHOT_DIR:-/data/snapshots}" 2>/dev/null || true
+  chown node:node "$DATA_DIR" "$DATA_DIR/backups" 2>/dev/null || true
 
   # U9 (IN-U9-1): the credentials DIRECTORY, not a file. The connector refreshes its token, and CredentialsWriter
   # saves Settings, by writing a temp file IN THIS DIRECTORY and renaming it over the original, so `node` must be

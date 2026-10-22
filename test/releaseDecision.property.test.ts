@@ -10,7 +10,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import './fc-config.js';
-import { compareSemVer, decide, type ReleaseFacts } from '../scripts/lib/releaseDecision.js';
+import { decide, type ReleaseFacts } from '../scripts/lib/releaseDecision.js';
+import { compareSemVer } from '../src/version.js';
 
 const n = fc.nat({ max: 30 });
 const pre = fc.option(

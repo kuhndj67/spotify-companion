@@ -26,6 +26,49 @@ export function isSemVer(value: unknown): value is string {
   return typeof value === 'string' && SEMVER.test(value);
 }
 
+/**
+ * U10 (LC-78): one comparison for the release script, the image's `update` and the update check. Moved here from
+ * `scripts/lib/releaseDecision.ts`, unchanged.
+ *
+ * SemVer 2.0.0 precedence (§11). Both arguments must be valid SemVer; build metadata is ignored. */
+export function compareSemVer(a: string, b: string): number {
+  const [aMain = '', aPre] = splitPre(a);
+  const [bMain = '', bPre] = splitPre(b);
+  const am = aMain.split('.').map(Number);
+  const bm = bMain.split('.').map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    const d = (am[i] ?? 0) - (bm[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  if (aPre === undefined && bPre === undefined) return 0;
+  if (aPre === undefined) return 1; // a release outranks its pre-releases
+  if (bPre === undefined) return -1;
+  const ai = aPre.split('.');
+  const bi = bPre.split('.');
+  for (let i = 0; i < Math.max(ai.length, bi.length); i += 1) {
+    const x = ai[i];
+    const y = bi[i];
+    if (x === undefined) return -1; // fewer identifiers = lower, when all before are equal
+    if (y === undefined) return 1;
+    const xn = /^\d+$/.test(x);
+    const yn = /^\d+$/.test(y);
+    if (xn && yn) {
+      const d = Number(x) - Number(y);
+      if (d !== 0) return Math.sign(d);
+    } else if (xn !== yn) {
+      return xn ? -1 : 1; // numeric identifiers rank below alphanumeric ones
+    } else if (x !== y) {
+      return x < y ? -1 : 1; // ASCII order
+    }
+  }
+  return 0;
+}
+
+function splitPre(v: string): [string, string | undefined] {
+  const noBuild = v.split('+')[0] ?? '';
+  const dash = noBuild.indexOf('-');
+  return dash < 0 ? [noBuild, undefined] : [noBuild.slice(0, dash), noBuild.slice(dash + 1)];
+}
 /** Pure: the `version` of a `package.json` text, or `'unknown'`. */
 export function parseAppVersion(packageJsonText: string): string {
   try {

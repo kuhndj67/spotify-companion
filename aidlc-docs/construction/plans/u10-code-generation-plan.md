@@ -1,7 +1,7 @@
 # Code Generation Plan — U10: Data Safety
 
 **Date**: 2026-10-22 · **Stage**: CONSTRUCTION — Code Generation (Part 1, planning), Unit U10
-**Status**: written, **awaiting owner approval**. This plan is the single source of truth for U10's Code Generation.
+**Status**: ✅ approved 2026-10-22 (owner). In progress on `u10-code-generation`. This plan is the single source of truth for U10's Code Generation.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield (modify in place; never duplicate a file)
 **Inputs** (all approved 2026-10-22): FD BR-78…BR-87 · NFR P-76…P-87, LC-69…LC-81, PBT-79…PBT-90 · Infrastructure
 IN-U10-1…9 · requirements FR-76…82 (FR-56/63/76/79/80 amended) · story **US-33**
@@ -35,8 +35,8 @@ own commit, so any step can be reviewed or reverted alone.
 
 ## Steps
 
-### Step 1 — Shared SemVer *(LC-78; BR-83.2, 85.5)*
-- [ ] Move `compareSemVer` from `scripts/lib/releaseDecision.ts` to `src/version/semver.ts`; `releaseDecision.ts`
+### Step 1 — Shared SemVer *(LC-78; BR-83.2, 85.5)* — ✅ DONE · placed in `src/version.ts` beside `isSemVer` (not `src/version/semver.ts`: a folder beside `version.ts` invites confusion); importers point there, no re-export
+- [x] Move `compareSemVer` from `scripts/lib/releaseDecision.ts` to `src/version/semver.ts`; `releaseDecision.ts`
       imports it (one copy). Existing `releaseDecision` tests stay green unchanged.
 
 ### Step 2 — Writer lock *(BR-78, P-76…P-79, LC-69, LC-70, PBT-79)*

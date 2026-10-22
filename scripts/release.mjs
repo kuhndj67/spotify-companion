@@ -19,8 +19,8 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
-import { isSemVer, readAppVersion } from '../src/version.js';
-import { compareSemVer, decide } from './lib/releaseDecision.js';
+import { compareSemVer, isSemVer, readAppVersion } from '../src/version.js';
+import { decide } from './lib/releaseDecision.js';
 import { acceptedPins, parseAcceptance, pinFromCompose } from './lib/connectorAcceptance.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');

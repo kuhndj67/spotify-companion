@@ -23,8 +23,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { closeSync, openSync, readFileSync, statSync, unlinkSync, utimesSync, writeSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, utimesSync, writeSync } from 'node:fs';
 import { hostname } from 'node:os';
+import { dirname } from 'node:path';
 
 import { isOurs, lockVerdict, type LockObservation } from './lockDecision.js';
 
@@ -112,6 +113,9 @@ export class WriterLock {
   }
 
   async acquire(): Promise<AcquireOutcome> {
+    // The database's folder may not exist yet (a first host run's `data-dev/`): the repository used to create it on
+    // open, and the lock now comes first. Found 2026-10-23 running the built app on a fresh folder.
+    mkdirSync(dirname(this.#path), { recursive: true });
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
       if (this.#tryCreate()) {
         this.#state = 'held';

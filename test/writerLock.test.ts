@@ -36,6 +36,11 @@ afterEach(() => {
 });
 
 describe('WriterLock', () => {
+  it('⭐ creates the database folder when it does not exist yet (a first host run)', async () => {
+    db = join(dir, 'not-yet', 'data-dev', 'history.db');
+    assert.deepEqual(await lock('app').acquire(), { ok: true });
+  });
+
   it('acquires a free lock and records who holds it', async () => {
     const a = lock('app');
     assert.deepEqual(await a.acquire(), { ok: true });

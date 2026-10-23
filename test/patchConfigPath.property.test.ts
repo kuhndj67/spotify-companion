@@ -6,6 +6,7 @@
  */
 
 import { describe, it } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -71,7 +72,10 @@ describe('patchConfigPath (LC-58)', () => {
   const upstream = join(process.cwd(), '.mcp-server', 'src', 'utils.ts');
   it('patches the real upstream src/utils.ts at the pinned commit', (t) => {
     if (!existsSync(upstream)) return t.skip('.mcp-server/src/utils.ts absent: run `npm run mcp:setup`');
-    const result = patchConfigPath(readFileSync(upstream, 'utf8'));
+    // ⚠️ Upstream's COMMITTED file, not the working copy: since 2026-10-23 `npm run mcp:setup` patches the host
+    // checkout too, so the working file already carries the patched line.
+    const committed = execFileSync('git', ['show', 'HEAD:src/utils.ts'], { cwd: join(process.cwd(), '.mcp-server'), encoding: 'utf8' });
+    const result = patchConfigPath(committed);
     assert.equal(result.ok, true, result.ok ? '' : result.reason);
   });
 });

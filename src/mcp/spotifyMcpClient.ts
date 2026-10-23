@@ -55,7 +55,8 @@ export class CredentialsDirectoryError extends Error {
  * ⚠️ `SPOTIFY_CONFIG_PATH` must be passed EXPLICITLY: the SDK's stdio transport gives the child only
  * `getDefaultEnvironment()` (HOME, PATH, ...) plus this `env` -- it does not inherit (checked in the installed SDK,
  * 2026-10-18). Without it the patched connector falls back to its own directory, where in the container the write
- * either fails or lands somewhere the host never sees. On the host the checkout is unpatched and ignores it.
+ * either fails or lands somewhere the host never sees. On the host the checkout is patched too (`npm run mcp:setup`,
+ * since 2026-10-23), so a host run reads exactly the path it is given; an unpatched one is refused (`hostConnector.ts`).
  */
 export function connectorSpawnParams(cfg: {
   readonly mcpServerEntrypoint: string;

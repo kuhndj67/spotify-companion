@@ -206,6 +206,10 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
 - **Renaming a compose service orphans the old container**, and `up`/`down` leave an orphan running. U9 renamed
   everything to `spotify-companion`; upgrading from `1.0.0-beta.2` stops the old container first
   (`docs/INSTALL-DEV.md`, *Updating*), and `npm run release` refuses while it runs.
+- **Spotify's limit is per Spotify APP, not per install.** Every install, walk VM or test run using the same client ID
+  shares one budget (rolling 30-second windows, number unpublished). Since 2026-10-23 the poll backs off on a refusal
+  (NFR-17) instead of retrying every 3 s. **A host run uses only the credentials it is given**: `npm run mcp:setup`
+  patches the host connector as the image's is and keeps no copy of the credentials; an unpatched one is refused.
 - **Check build exit codes directly.** `docker compose build | tail` reports the pipe's exit code.
 - **The owner's host is UTC−4.** Check `ls --time-style=full-iso data/backups/scheduled/` before reasoning about any file
   time. A WAL mtime is the last write, never a heartbeat.

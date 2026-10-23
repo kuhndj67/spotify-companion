@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { config, CONTAINER_SECRETS_DIR } from './config.js';
 import { SpotifyMcpClient } from './mcp/spotifyMcpClient.js';
+import { hostConnectorMessage } from './mcp/hostConnector.js';
 import { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
@@ -72,7 +73,7 @@ import {
 import type { ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
 import { CredentialsWriter } from './configuration/CredentialsWriter.js';
 import { RulesWriter } from './configuration/RulesWriter.js';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { NewPlayRecord } from './history/types.js';
 import { MaintenanceService } from './maintenance/MaintenanceService.js';
 import {
@@ -101,7 +102,12 @@ const credentialsDirectoryText = credentialsDirectoryMessage(
   config.inContainer ? CONTAINER_SECRETS_DIR : dirname(config.spotifyConfigPath),
 );
 if (credentialsDirectoryText !== null) console.error(`[credentials] ${credentialsDirectoryText}`);
-const spotify = new SpotifyMcpClient({ blockedBecause: () => credentialsDirectoryText });
+// 2026-10-23: on the HOST, an unpatched connector would read its own copy of the real credentials, not the path this
+// app passes it. Refuse to start it rather than let a run use credentials it was not given (`hostConnector.ts`).
+const connectorUtils = join(config.mcpServerCwd, 'src', 'utils.ts');
+const hostConnectorText = hostConnectorMessage(config.inContainer, existsSync(connectorUtils) ? readFileSync(connectorUtils, 'utf8') : null);
+if (hostConnectorText !== null) console.error(`[connector] ${hostConnectorText}`);
+const spotify = new SpotifyMcpClient({ blockedBecause: () => credentialsDirectoryText ?? hostConnectorText });
 const webApi = new SpotifyWebApiClient();
 const enrichment = new EnrichmentService(webApi);
 const nowPlaying = new NowPlayingService(spotify, enrichment);

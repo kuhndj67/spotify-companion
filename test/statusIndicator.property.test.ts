@@ -27,7 +27,6 @@ describe('PBT-85 — statusIndicator', () => {
         const worst = sources.reduce<StatusSource['level']>((w, s) => (rank[s.level] > rank[w] ? s.level : w), 'ok');
         assert.equal(ind.level, worst);
         assert.equal(ind.label, 'Status');
-        assert.equal(ind.inMessage, false);
         if (worst !== 'ok') {
           assert.ok(ind.detail.endsWith(CHECK_DIAGNOSTICS));
           for (const s of sources.filter((x) => x.level !== 'ok')) assert.ok(ind.detail.includes(s.sentence));
@@ -102,14 +101,13 @@ describe('BackupReminder (state/backup-reminder.json)', () => {
 });
 
 describe('updateIndicator (BR-86.3)', () => {
-  it('appears only for a newer version, and never takes the message line', async () => {
+  it('appears only for a newer version', async () => {
     const { updateIndicator } = await import('../src/ui/statusBar.js');
     for (const status of ['off', 'not-yet', 'current'] as const) {
       assert.equal(updateIndicator({ status, newest: { version: '9.9.9' }, lastSuccessAt: null }), null, status);
     }
     const shown = updateIndicator({ status: 'newer', newest: { version: '1.0.0-beta.9' }, lastSuccessAt: '2026-10-22T14:02:00.000Z' });
     assert.ok(shown);
-    assert.equal(shown.inMessage, false);
     assert.equal(shown.label, 'Update');
     assert.match(shown.detail, /^1\.0\.0-beta\.9 is available \(checked 2026-10-22 14:02 UTC\)\. Settings → Version\.$/);
   });

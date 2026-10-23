@@ -5,6 +5,7 @@
  * central defect wearing a UI hat. Most of what follows asserts that something is NOT green.
  */
 
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -167,36 +168,26 @@ describe('the bar as a whole', () => {
     // ⚠️ FOUR, not five: `automation: null` omits the U5 dot entirely rather than drawing it as
     // `unknown`. A deployment without U5 has no automation to be unknown about.
     assert.equal(bar.indicators.length, 4);
-    assert.equal(bar.message, null, 'no message when everything is fine');
   });
 
-  /**
-   * ⚠️ Recording comes first in the list, so when several things fail at once the message is
-   * about the only subsystem whose failure loses something that cannot be recreated.
-   */
-  it('surfaces the recording failure when several things fail at once', () => {
+  it('⭐ (owner, 2026-10-23) has NO message: only labels show; a detail appears on click', () => {
+    // Every indicator failing at once still produces no text beyond the labels.
     const bar = statusBar({
       recording: recording({ repositoryOpen: false }),
       rules: rules({ state: 'rejected', rejectionErrors: ['bad'] }),
       connection: 'closed',
       spotify: { snapshotError: 'down', hasSnapshot: true },
-      automation: null,
+      automation: automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
     });
-
-    assert.match(bar.message!, /NOT being saved/);
+    assert.deepEqual(Object.keys(bar), ['indicators']);
+    for (const i of bar.indicators) assert.ok(!('inMessage' in i));
   });
 
-  it('shows one message, not a list', () => {
-    const bar = statusBar({
-      recording: recording(),
-      rules: rules(),
-      connection: 'closed',
-      spotify: { snapshotError: 'down', hasSnapshot: true },
-      automation: null,
-    });
-
-    assert.equal(typeof bar.message, 'string');
-    assert.ok(!bar.message!.includes('\n'), 'a bar showing three problems reads as broken');
+  it('⭐ the page has no message element and the client renders none (the copy that used to exist)', () => {
+    const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+    assert.doesNotMatch(html, /statusbar-message/);
+    assert.doesNotMatch(app, /statusbar-message|MESSAGE_LEVELS/);
   });
 
   /** ⚠️ Colour is never the only channel — ~8% of men have red-green colour deficiency. */
@@ -382,10 +373,9 @@ describe('⭐ FC-U5-1 — the `failed` state, which a test MUST be able to reach
     assert.equal(freshUnconfirmedSkip(null, at(0)), null);
   });
 
-  it('⭐ (2026-10-11) the automation dot NEVER takes the red message line — the dot and its detail suffice', () => {
+  it('⭐ (2026-10-11) an unconfirmed skip shows on the automation dot, and its detail on click', () => {
     const bar = statusBar({ recording: recording(), rules: rules(), connection: 'open', spotify: { snapshotError: null, hasSnapshot: true }, automation: automation({ unconfirmedSkipAt: '2026-10-11T19:56:40.298Z' }) });
     assert.equal(bar.indicators.at(-1)!.level, 'fail', 'the dot still shows it');
-    assert.equal(bar.message, null, 'but no paragraph above the bar');
   });
 
   it('⚠️ is NOT sticky — a later confirmed attempt clears it', () => {
@@ -497,7 +487,7 @@ describe('⭐ the bar with automation present', () => {
     assert.match(bar.indicators[4]!.label, /Automation/);
   });
 
-  it('⭐ ⚠️ a standing halt produces NO message — the dot carries it instead', () => {
+  it('⭐ ⚠️ a standing halt is carried by the dot', () => {
     // Changed 2026-10-04 at the user's direction. The primary screen stays visible for hours and a halt
     // stands until acknowledged, so a halt here would park a paragraph indefinitely -- noise, and a
     // hiding place for the next real fault. The DOT still says `Automation HALTED`.
@@ -508,31 +498,7 @@ describe('⭐ the bar with automation present', () => {
       spotify: { snapshotError: null, hasSnapshot: true },
       automation: automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
     });
-    assert.equal(bar.message, null, 'no banner text on the primary screen');
     assert.match(bar.indicators[4]!.label, /HALTED/, 'but the dot is unmistakable');
     assert.equal(bar.indicators[4]!.level, 'halted');
-  });
-
-  it('⚠️ and a real `fail` still takes the slot while halted', () => {
-    // Withholding the halt's prose must not cost the message slot to something that IS broken.
-    const bar = statusBar({
-      recording: recording({ repositoryOpen: false }),
-      rules: rules(),
-      connection: 'open',
-      spotify: { snapshotError: null, hasSnapshot: true },
-      automation: automation({ halt: { trigger: 'consecutive', observedCount: 3, threshold: 3 } }),
-    });
-    assert.match(bar.message!, /NOT being saved/, 'recording loses what cannot be recreated');
-  });
-
-  it('an idle automation dot produces no message', () => {
-    const bar = statusBar({
-      recording: recording(),
-      rules: rules(),
-      connection: 'open',
-      spotify: { snapshotError: null, hasSnapshot: true },
-      automation: automation(),
-    });
-    assert.equal(bar.message, null);
   });
 });

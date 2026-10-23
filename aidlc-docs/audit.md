@@ -611,3 +611,20 @@ stop host runs using credentials they were not given.
   unaffected (its entrypoint creates `/data`; App-only `setup` creates `data/`). Fixed: the lock creates its folder;
   a test fails without it.
 The live container stays stopped until the owner says to restart it.
+
+## 2026-10-23T21:00:00Z — No persistent message in the status bar (owner direction)
+
+Owner: *"the bottom status bar has a light red text message that spotify is not answering... there is ALSO a red
+message at the top of the screen … AND if I click on the spotify status indicator it pops up a THIRD message saying
+the same thing. Let's remove ANY persistent error/warning text pop ups in the bottom status bar. The only text that
+should automatically display are the labels for the led's … and then if one of the indicators are clicked it's OK for
+the pop up message to turn on/off with subsequent clicks. No persistent message in the bottom bar though."*
+
+Removed the status bar's message line in both places that produced it (`statusBar()` and the client's second copy,
+`MESSAGE_LEVELS`), its element and style, and the `inMessage` flag that only existed to keep indicators out of it.
+`statusBarPrecedence.test.ts` deleted with its subject; a structural test now fails if the element or the client copy
+returns (seen to fail with the element put back). Supersedes the 2026-10-04 and 2026-10-11 directions, which had
+already removed the halt and the unconfirmed skip from that line. Checked in the browser with Spotify in `fail`:
+labels only; a click shows the detail, a second click hides it. The message at the top of the card is unchanged
+(not part of the direction). Also 1.0.0-beta.9: tag pushed by the owner; CI published (`publish 1.0.0-beta.9`,
+anonymous manifest HTTP 200).

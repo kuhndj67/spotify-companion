@@ -2,7 +2,16 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-22) — Build & Test: ✅ `:3011` rehearsal PASSED on the owner's real history; release next (owner)
+## ▶ Current state (2026-10-23) — ✅ `1.0.0-beta.9` live and published
+
+Released (owner-approved) with `npm run release -- --apply --app-is-down`: the live container had been stopped on
+purpose during the Spotify rate-limit incident (audit 2026-10-23), so the release's own backup step could not run; a
+verified developer backup was taken first. The first start ran the U10 sequence on the real database: lock,
+before-change backup (`migration 7→8`, 2.9 MB), migration 8, first scheduled backup; the backfill recovered 20 plays
+from the outage. The poll's new backoff is visibly working (30 s → 60 s → 2 min → 5 min → 10 min). Remaining: the
+GitHub Release notes (owner), and closing U10 once Spotify answers the poll again.
+
+### Earlier (2026-10-22) — Build & Test: ✅ `:3011` rehearsal PASSED on the owner's real history
 
 [`build-and-test/u10-build-and-test-summary.md`](../build-and-test/u10-build-and-test-summary.md): the owner's backup
 (1,594 plays, 1,853 decisions, v7) restored on `:3011`; startup took the lock, swapped, kept a before-change backup

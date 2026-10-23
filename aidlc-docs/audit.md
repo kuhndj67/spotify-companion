@@ -565,6 +565,21 @@ notice beside U8's existing line; header buttons grouped right.
 `docker compose down` before any `db:*` script. Next: Build & Test, beginning with the `:3011` rehearsal, which needs
 the owner's **Settings → Create backup** first.
 
+## 2026-10-22T23:10:00Z — U10 Code Generation merged (PR #23, owner); `:3011` rehearsal PASSED on real history
+
+Owner: *"backup taken... retry"*, after merging PR #23. Rehearsal (IN-U10-8), every result in
+`construction/build-and-test/u10-build-and-test-summary.md`:
+- the owner's backup (1,594 plays, 1,853 decisions, schema v7) restored into `:3011` through *Restore backup*;
+- the startup sequence on real data, from the log: lock released by the orderly shutdown, re-acquired, restore swap,
+  **before-change backup** (`migration 7→8 · first run with version tracking`, 2.9 MB, 1.6 s), migration 8;
+- that backup accepted by *Restore backup* (1,594 / 1,853, v7) while the live database read 1,594 / 1,853, v8;
+- the writer lock across the real `D:` mount: a host `db:backup` REFUSED after 31 s naming the container; after
+  `docker kill` (no auto-restart: Docker treats it as a manual stop) a host run took over after 30 s; the restarted
+  container REFUSED, naming the host process, ran display-only, and its Status light read *fail: Recording is off …
+  Check the Diagnostics page.*;
+- `verify:down` proved the live deployment unchanged.
+Not covered: the *newer version* display (no newer release exists yet) and the release's own backup request, which the
+release exercises. Next: version bump to `1.0.0-beta.9` and the release, the owner's.
 ## 2026-10-23T15:00:00Z — Spotify rate-limited the app; the poll did not back off; my host test runs used real credentials
 
 Owner: *"We have a spotify error "app has exceeded its rate limits". Do we have a log of activity that will tell us if

@@ -57,15 +57,8 @@ export interface Indicator {
   readonly label: string;
   /** A distinct glyph per level, for the same reason. */
   readonly glyph: string;
-  /** Shown on click. Includes the age of the answer where there is one. */
+  /** Shown ONLY on click, never on its own (owner, 2026-10-23). Includes the age of the answer where there is one. */
   readonly detail: string;
-  /**
-   * `false` keeps this indicator OUT of the single message line above the bar. The automation dot sets it: its
-   * states are explained by the dot itself and its click-detail (user direction 2026-10-04 for the halt, and
-   * 2026-10-11 for an unconfirmed skip — *"the Skip unconfirmed status text with the white pop-up text for more
-   * information is sufficient"*). Absent means it may take the line.
-   */
-  readonly inMessage?: false;
 }
 
 /**
@@ -469,28 +462,28 @@ export const CHECK_DIAGNOSTICS = 'Check the Diagnostics page.';
  * Owner, 2026-10-22: *"lets include a "Status" indicator light/text with "check diagnostics page" as the pop up
  * text"*. Always shown; its level is the WORST of its sources; at warn or fail the detail lists each problem and
  * ends with {@link CHECK_DIAGNOSTICS}. A later unit adds a source by adding one entry, never by changing this rule.
- * Never takes the message line. ⚙️ PURE (PBT-85).
+ * ⚙️ PURE (PBT-85).
  */
-export function statusIndicator(sources: readonly StatusSource[]): Indicator & { readonly inMessage: false } {
+export function statusIndicator(sources: readonly StatusSource[]): Indicator {
   const failing = sources.filter((s) => s.level === 'fail');
   const warning = sources.filter((s) => s.level === 'warn');
   if (failing.length === 0 && warning.length === 0) {
-    return { ...indicator('ok', 'Status', 'All checks OK.'), inMessage: false };
+    return indicator('ok', 'Status', 'All checks OK.');
   }
   const level = failing.length > 0 ? 'fail' : 'warn';
   const detail = [...failing, ...warning].map((s) => s.sentence).join(' ');
-  return { ...indicator(level, 'Status', `${detail} ${CHECK_DIAGNOSTICS}`), inMessage: false };
+  return indicator(level, 'Status', `${detail} ${CHECK_DIAGNOSTICS}`);
 }
 
 /**
  * U10 (BR-86.3, FR-81): shown ONLY when a newer version exists — news, not a fault, so level `ok` with its own
- * arrow glyph. Never for off, not-yet, current or a failed check (BR-85.7). Never takes the message line. ⚙️ PURE.
+ * arrow glyph. Never for off, not-yet, current or a failed check (BR-85.7). ⚙️ PURE.
  */
 export function updateIndicator(check: {
   readonly status: 'off' | 'not-yet' | 'current' | 'newer';
   readonly newest: { readonly version: string } | null;
   readonly lastSuccessAt: string | null;
-}): (Indicator & { readonly inMessage: false }) | null {
+}): Indicator | null {
   if (check.status !== 'newer' || check.newest === null) return null;
   const when = check.lastSuccessAt ? ` (checked ${check.lastSuccessAt.slice(0, 16).replace('T', ' ')} UTC)` : '';
   return {
@@ -498,7 +491,6 @@ export function updateIndicator(check: {
     label: 'Update',
     glyph: '↑',
     detail: `${check.newest.version} is available${when}. Settings → Version.`,
-    inMessage: false,
   };
 }
 
@@ -511,15 +503,17 @@ export interface StatusBarState {
   readonly automation: AutomationIndicatorState | null;
 }
 
+/**
+ * The bar: indicators only.
+ *
+ * ⚠️ **No message line** (owner, 2026-10-23): *"Let's remove ANY persistent error/warning text pop ups in the bottom
+ * status bar. The only text that should automatically display are the labels for the led's … and then if one of the
+ * indicators are clicked it's OK for the pop up message to turn on/off with subsequent clicks."* The bar had a red
+ * line showing the worst failure's detail; with the Spotify rate limit it said the same thing as the card above it
+ * and the click-detail, three times at once. Each indicator's detail is shown ONLY on its click.
+ */
 export interface StatusBar {
   readonly indicators: readonly Indicator[];
-  /**
-   * The single message shown in the error field, or `null`.
-   *
-   * ⚠️ One message, not a list: a bar that shows three problems at once is read as broken
-   * rather than as informative, and the most serious one is what needs acting on.
-   */
-  readonly message: string | null;
 }
 
 export function statusBar(state: StatusBarState): StatusBar {
@@ -530,30 +524,8 @@ export function statusBar(state: StatusBarState): StatusBar {
     spotifyIndicator(state.spotify),
     // ⚠️ LAST, and omitted entirely when U5 is absent. The order is read left to right as a
     // priority order, and automation is the only one of the five that cannot lose data.
-    // ⚠️ `inMessage: false` — the automation dot never takes the message line (see `Indicator.inMessage`).
-    ...(state.automation === null ? [] : [{ ...automationIndicator(state.automation), inMessage: false as const }]),
+    ...(state.automation === null ? [] : [automationIndicator(state.automation)]),
   ];
 
-  /*
-   * ⚠️ Recording first, always. It is the only subsystem whose failure loses something that cannot be
-   * recreated; the others lose a view of data that is still being collected.
-   *
-   * ⚠️ **`halted` DELIBERATELY DOES NOT TAKE THE MESSAGE SLOT** — changed 2026-10-04 at the user's
-   * direction, after the first live halt put a paragraph of prose on the primary screen.
-   *
-   * It was in here on the reasoning that a halt is the one thing the user must act on. That reasoning
-   * holds and the conclusion did not: the DOT already says `Automation HALTED`, with its own glyph,
-   * colour, badge and pulse. What belongs beside the two buttons that can clear it is the explanation,
-   * and that is the Rules pop-up.
-   *
-   * ⚠️ **The primary screen is a display, not a console.** It stays visible for hours, and a halt
-   * stands until someone acknowledges it — so a halt here would park a paragraph indefinitely, which is
-   * both noise and a hiding place for the next real fault.
-   */
-  const worst = indicators.find((i) => i.level === 'fail' && i.inMessage !== false) ?? null;
-
-  return {
-    indicators,
-    message: worst === null ? null : worst.detail,
-  };
+  return { indicators };
 }

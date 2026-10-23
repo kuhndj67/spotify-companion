@@ -1489,11 +1489,6 @@ function refreshStats(trackId, artistId, artistName) {
 
 const CONNECTION_GLYPH = { ok: '●', warn: '◐', fail: '✕', unknown: '○' };
 
-/** Levels that produce the one status message, most serious first. ⚠️ Mirrors `statusBar.ts`. */
-// ⚠️ `halted` is NOT here (2026-10-04, user direction). The dot says `Automation HALTED`; the
-// explanation lives on the Rules pop-up beside the buttons that can clear it. A standing halt would
-// otherwise park a paragraph on the primary screen until someone acknowledged it.
-const MESSAGE_LEVELS = ['fail'];
 
 let connectionState = null;
 let lastServerStatus = null;
@@ -1522,7 +1517,6 @@ function connectionIndicatorView() {
 
 function renderStatusBar() {
   const dots = el('statusbar-dots');
-  const message = el('statusbar-message');
   if (!dots) return;
 
   const server = lastServerStatus;
@@ -1575,27 +1569,7 @@ function renderStatusBar() {
       dots.append(detail);
     }
   }
-
-  // ⚠️ One message, not a list. A bar showing three problems at once reads as broken rather
-  // than informative, and the most serious one is what needs acting on.
-  //
-  // ⚠️ MESSAGE_LEVELS IS A SECOND COPY of the precedence in `statusBar.ts`, and it exists only
-  // because the Connection dot is client-side, so this file has to assemble the array itself.
-  // `test/statusBarPrecedence.test.ts` reads both files and fails if the two lists disagree --
-  // because one admission rule implemented twice, with the copies diverging, is exactly how the
-  // WebSocket 403 happened.
-  //
-  // ⚠️ `fail` outranks `halted` regardless of position: a halt is the system working as designed and
-  // clears only on a deliberate acknowledgement, so it can stand for days. Accepting either in one
-  // pass would let it permanently occupy the single message slot and hide every later fault.
-  // ⚠️ `inMessage === false` (the automation dot) never takes the line — same rule as statusBar.ts (2026-10-11).
-  const worst = MESSAGE_LEVELS.map((level) => indicators.find((i) => i.level === level && i.inMessage !== false)).find(
-    (i) => i !== undefined,
-  );
-  if (message) {
-    message.hidden = worst === undefined;
-    message.textContent = worst === undefined ? '' : worst.detail;
-  }
+  // Owner, 2026-10-23: NO persistent message under the bar. A detail appears only while its indicator is clicked.
 }
 
 function setConnectionState(state) {

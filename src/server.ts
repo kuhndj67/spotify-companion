@@ -1351,9 +1351,8 @@ function statusIndicators(snapshot: Snapshot): StatusIndicators {
       hasSnapshot: true,
       snapshotError: 'error' in snapshot ? String(snapshot.error) : null,
     }),
-    // ⚠️ `inMessage: false` (2026-10-11): the automation dot never takes the red line above the bar — app.js assembles
-    // the bar from these, and honours the flag exactly as statusBar() does.
-    automation: { ...automationIndicator(automationIndicatorState()), inMessage: false as const },
+    // Owner, 2026-10-23: the bar shows labels only; every detail appears on click, none persistently.
+    automation: automationIndicator(automationIndicatorState()),
     health: statusIndicator(statusSources()),
     update: updateIndicator(updateChecker.result()),
   };

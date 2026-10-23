@@ -312,3 +312,51 @@ describe('NowPlayingService', () => {
     assert.ok(true);
   });
 });
+
+describe('NFR-17 — the poll backs off while Spotify refuses it (2026-10-23)', () => {
+  const REFUSAL = 'Error getting current track: The app has exceeded its rate limits.';
+
+  function counting(responses: () => NowPlaying | null | Error, steps: readonly number[]) {
+    let calls = 0;
+    const mcp = {
+      async getNowPlaying() {
+        calls++;
+        const r = responses();
+        if (r instanceof Error) throw r;
+        return r;
+      },
+    } as unknown as SpotifyMcpClient;
+    const enrichmentService = { get: () => undefined, fetch: async () => enrichment() } as unknown as EnrichmentService;
+    const service = new NowPlayingService(mcp, enrichmentService, { rateLimitStepsMs: steps });
+    return { service, calls: () => calls };
+  }
+
+  it('⭐ refused: one request per wait, not one per interval; the indicator says so', async () => {
+    const s = counting(() => new McpToolError('getNowPlaying', REFUSAL), [10_000]);
+    s.service.start();
+    await settle(POLL_MS * 30);
+    s.service.stop();
+    assert.equal(s.calls(), 1, 'a 10 s wait allows no second request in 150 ms');
+    const current = s.service.current as { error: string; detail: string };
+    assert.match(current.error, /Spotify is limiting this app's requests\. Next try in 10 s\./);
+    assert.equal(current.detail, REFUSAL);
+  });
+
+  it('positive control: an ordinary error still polls at the normal interval', async () => {
+    const s = counting(() => new McpToolError('getNowPlaying', 'Not found'), [10_000]);
+    s.service.start();
+    await settle(POLL_MS * 30);
+    s.service.stop();
+    assert.ok(s.calls() > 5, `expected many polls, got ${s.calls()}`);
+  });
+
+  it('recovers: after the refusals stop, polling returns to the normal interval at once', async () => {
+    let n = 0;
+    const s = counting(() => (n++ < 2 ? new McpToolError('getNowPlaying', REFUSAL) : null), [20, 20]);
+    s.service.start();
+    await settle(POLL_MS * 40);
+    s.service.stop();
+    assert.ok(s.calls() > 8, `expected the normal cadence after recovery, got ${s.calls()} calls`);
+    assert.deepEqual(s.service.current, { playing: false });
+  });
+});

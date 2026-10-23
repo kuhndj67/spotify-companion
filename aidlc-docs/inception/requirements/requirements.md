@@ -572,7 +572,7 @@ Postgres substitutes behind the same interface.
 | NFR-14 | Send a compliant `User-Agent` identifying the app to MusicBrainz, as their policy requires |
 | NFR-15 | Never exceed ~1 request/second to MusicBrainz; serialise through a single queue |
 | NFR-16 | MusicBrainz latency must never delay the now-playing display — enrich asynchronously |
-| NFR-17 | Handle Spotify 429 with `Retry-After`, and 401 with a single token-refresh retry |
+| NFR-17 | Handle Spotify 429 with `Retry-After`, and 401 with a single token-refresh retry. ⚠️ *2026-10-23: the now-playing POLL did not: it polled every 3 s straight through two rate-limit bursts (live). Fixed (`src/pollBackoff.ts`): 30 s, 60 s, 2 min, 5 min, then 10 min per try, or a longer `Retry-After` when Spotify gives one; any other outcome returns to 3 s at once* |
 | NFR-18 | Treat every upstream failure as partial data, never as a fatal error |
 
 ### 4.4 Reliability, testing, operability

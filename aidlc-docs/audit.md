@@ -564,3 +564,35 @@ notice beside U8's existing line; header buttons grouped right.
 ⚠️ **Transition**: the deployed `1.0.0-beta.8` container does not take the lock; until `1.0.0-beta.9` is live,
 `docker compose down` before any `db:*` script. Next: Build & Test, beginning with the `:3011` rehearsal, which needs
 the owner's **Settings → Create backup** first.
+
+## 2026-10-23T15:00:00Z — Spotify rate-limited the app; the poll did not back off; my host test runs used real credentials
+
+Owner: *"We have a spotify error "app has exceeded its rate limits". Do we have a log of activity that will tell us if
+we were doing something abnormal?"* The live log: two bursts, **10-22 22:00:30Z → 22:10:40Z (195 refusals)** and
+**10-23 13:40:44Z → 14:22Z (713+; still going when stopped)**, each refusal one 3-second poll, after a routine token
+refresh, with no other activity logged. Owner: the walk environment was likely running with the same Spotify app in
+those periods (now shut down and restored to clean), which explains crossing the limit; *"we need to have an effective
+response to the error even so."* Owner approved all three of: stop the live container now; make the poll back off;
+stop host runs using credentials they were not given.
+
+- **Stopped** the live container at 14:22:27Z (`docker compose down`), owner-approved. `data/` untouched.
+- ⚠️ **Correction, mine**: the host test runs of 2026-10-22 (≈02:25Z for ~3 min on `:3027`; 23:04Z for ~2 min on
+  `:3028`) were described as making no Spotify calls. They did: the host connector (`.mcp-server`) was unpatched,
+  ignored the `SPOTIFY_CONFIG_PATH` I set, and used its own copy of the real credentials (same client ID and refresh
+  token as live); both runs refreshed a token and polled every 3 s. U9's code summary recorded that the host checkout
+  ignores the variable; I did not apply it. Neither run precedes a burst (20 h before; 1 h after the first ended), so
+  they are unlikely to be the trigger, but they were extra traffic, and a second poller, which CLAUDE.md forbids.
+- **NFR-17 was not met on the poll path** (a ratified requirement, so this is a fix): the refusal arrives as text
+  from the connector, the `Retry-After` header is not visible, and the loop retried every 3 s. Fixed on branch
+  `fix-poll-backoff` (`src/pollBackoff.ts`): 30 s, 60 s, 2 min, 5 min, then 10 min per try (or a longer
+  `Retry-After` when present); any other outcome returns to 3 s at once; the indicator says *"Spotify is limiting
+  this app's requests. Next try in N s."* Positive control: the loop with the backoff ignored fails the test.
+- **Host isolation**: `npm run mcp:setup` now patches the host connector exactly as the Dockerfile does and deletes
+  the credentials copy (run on this machine: patched, rebuilt, copy removed); the app refuses an unpatched host
+  connector, naming `npm run mcp:setup`. Seen live both ways: unpatched → *"…It was not started"*, no Spotify call;
+  patched with no credentials → *"configuration file not found at <the given path>"*, **0 token refreshes**.
+- 🔴 **A U10 defect found by that run**: the writer lock crashed at startup when the database's folder did not exist
+  (`ENOENT`), so the first `npm start` on a machine without `data-dev/` would have crashed. The container is
+  unaffected (its entrypoint creates `/data`; App-only `setup` creates `data/`). Fixed: the lock creates its folder;
+  a test fails without it.
+The live container stays stopped until the owner says to restart it.

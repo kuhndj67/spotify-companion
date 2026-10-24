@@ -760,3 +760,10 @@ anonymous manifest HTTP 200).
 - **Cleaned up** (agent): the probe stopped; `client.json` (the probe application's secret) and the callback files
   deleted from the session scratchpad. Owner to delete the *Spotify Companion probe* application in SSO Server. The
   test CA and certificate stay until the real CA replaces them.
+
+## 2026-10-24T15:15:00Z — U11: probe application deleted; Q4a written
+
+- **Owner** deleted the *Spotify Companion probe* application in SSO Server (*"done"*).
+- **Q4a** added to the FD plan as Q4's follow-up: what carries the session past the 180 s ID token. A (proxy signs
+  forwarded requests; unverified feature), ⭐ B (the app is the OIDC client with its own signed session cookie, no
+  proxy; amends NFR-29), C (repeat sign-in; measured not to work cleanly). Security posture: the owner's.

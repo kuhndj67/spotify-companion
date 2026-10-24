@@ -161,14 +161,32 @@ Synology MCP server) is an open security-posture item, recorded in `audit.md` 20
 | **B** | **DSM's built-in reverse proxy** for TLS, with the app running the OIDC sign-in itself. ⚠️ Contradicts NFR-29 as ratified ("the app never handles passwords" is kept, but the app then runs the sign-in flow and holds a client secret, which the ratified shape put in the proxy) and would need a requirements change |
 | **C** | **A proxy that has sign-in built in** (e.g. Caddy or Traefik with a forward-auth plugin, or the Q3 = B provider's own proxy mode). Same shape as A, different product; chosen only if Q3 = B makes it simpler |
 
-⚠️ *Added 2026-10-24 after the token probe* (`research-findings.md`): SSO Server's ID tokens live **180 s** and come with
-**no refresh token**, so option A as written (the app verifies the provider's ID token on every request) would hold
-for 3 minutes. The FD must choose between: the proxy re-running a silent sign-in every few minutes (breaks background
-requests and the WebSocket unless handled), the app verifying the ID token **once** and then trusting a session the
-proxy signs (moves trust to the proxy, which NFR-29's shape avoided), or the app running its own short session after
-one verified token (the app then holds a session secret). This may need a follow-up question before Q4 is answered.
+⚠️ **Superseded by Q4a below** (2026-10-24): the token probes showed option A as written cannot work. Answer Q4a instead.
 
-[Answer]:
+[Answer]: *see Q4a*
+
+---
+
+### Q4a — What the app checks after the first three minutes (follow-up to Q4, from the token probes)
+
+⚠️ **Security posture: the owner's decision.** Measured (`research-findings.md`, *Machine 2's SSO Server*): SSO
+Server's ID tokens live **180 s** with **no refresh token**; a silent re-sign-in works only while SSO Server's own
+session lives, and without one it shows a **sign-in page** instead of a clean refusal; a sign-in that starts from an
+application's link has **looped** (twice) or landed on SSO Server's portal (once). So "verify the provider's token on
+every request" holds for 3 minutes. Something must carry the session after that.
+
+| | Option |
+|---|---|
+| **A** | **The proxy keeps the session and signs what it forwards.** `oauth2-proxy` (a container in front of the app) verifies the ID token once at sign-in, keeps its own session cookie (its lifetime is configurable), and adds a **signature** to every request it forwards, made with a key the proxy and the app share; `decideAccess` checks it, HTTP and WebSocket upgrade alike. The app's port is not published, so the proxy is the only way in. ⚠️ Trust moves from the provider to the proxy's key. ⚠️ **Not verified**: that the current `oauth2-proxy` still offers request signing (documented as `signature_key`), and that it signs WebSocket upgrades. One more service to keep updated |
+| **B** | ⭐ **The app is the sign-in client and keeps its own session.** The app runs the OIDC sign-in itself (authorization code with PKCE, as the probe did), verifies the ID token **once** (signature with SSO Server's keys, `iss`, `aud`, `nonce`, `exp`, the allowed account from Q6), then sets **its own signed session cookie** with a lifetime the owner chooses. `decideAccess` checks that cookie on every HTTP request and on the WebSocket upgrade (a browser sends cookies with the upgrade), so there is still **one** rule. The app serves HTTPS itself with the Q5 certificate: **no proxy at all**. ⚠️ **Amends NFR-29**: the sign-in moves from a proxy into the app. Still true: the app never sees a password (SSO Server does), and a request without a valid signed session is refused. The app then holds the probe application's equivalent: a client secret and a session key, both under `secrets/app/` (never in a backup or a response). The loop seen in the probes must be retested through the app's own flow before the design is final |
+| **C** | **The proxy repeats the sign-in every few minutes.** Keeps the provider's token as the only proof. **Measured not to work cleanly**: after SSO Server's session ends, background requests and the WebSocket would meet a hidden sign-in page. Listed so the rejection is on record |
+
+Why ⭐ **B**: it keeps a *signed* check in the app, on the one rule, with the fewest moving parts (no second service,
+no shared proxy key), and the app owns the session lifetime and the handling of SSO Server's quirks, which were seen
+in the probes and would otherwise sit inside a proxy's configuration. Its cost is sign-in code in the app, built
+with an established library rather than by hand, and a requirements change. **A** keeps NFR-29's original shape if
+its unverified signing feature is confirmed by a probe.
+
 
 ---
 

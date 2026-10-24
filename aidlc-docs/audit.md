@@ -800,3 +800,9 @@ anonymous manifest HTTP 200).
   x86-64, so the published `amd64` image fits and no `arm64` build is needed. Not measured: whether the image's Node
   runtime starts on a CPU without AVX; the trial checks it first. Still open (none blocks the FD): Container Manager
   version, the data volume and its file system, free RAM.
+
+## 2026-10-24T17:51:00Z — U11: Section 3 filled
+
+- **Owner**: Container Manager 24.0.2-1535 (Docker Inc., published by Synology), on Volume 1. Volume 1: RAID 6,
+  14.7 TB formatted, 6.2 TB free. RAM 24 % in use of 8 GB. The volume's file system was not given; not blocking, since
+  the proposed startup WAL check measures WAL on the real volume.

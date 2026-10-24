@@ -177,12 +177,9 @@ The owner's devices must trust the HTTPS certificate, and the OIDC provider redi
 
 *Added 2026-10-24, from the NAS* (owner): SSO Server's account type is *Domain/LDAP/local* (the only choice; the
 domain/LDAP part greyed out). Its default **Server URL** is `https://<Machine 2's name>:5001`. Probed from this
-machine: that name resolves (Windows name resolution, both the bare name and `.local`) to a **global IPv6 address**
-(`2606:…`), not to `192.168.0.223`, and `https://<name>:5001/` answers `200`. ⚠️ Two consequences, not yet measured:
-(1) a container on the NAS may not resolve a name that this PC resolves by local-network discovery, and the app must
-reach the issuer to fetch its keys; (2) a global IPv6 address is reachable from the internet unless the router's
-IPv6 firewall blocks inbound connections. The "private, non-forwarding LAN" in `unit-of-work.md` was written for IPv4.
-Whether it holds for IPv6 is a security-posture question for the owner (raised 2026-10-24).
+machine: the name resolves to `192.168.0.223` (and also to an IPv6 address), and `https://<name>:5001/` answers
+`200`. ⚠️ Not yet measured: whether a container **on the NAS** resolves that name. The app must reach the issuer to
+fetch its keys (Q5).
 
 *Added 2026-10-24*: with Q3 = A, SSO Server's own **Server URL** (General Settings) is the token issuer. The browser
 signs in there, and the app fetches its keys from there, so the Q5 name and certificate cover **both** SSO Server's

@@ -707,3 +707,10 @@ anonymous manifest HTTP 200).
 - **Raised to the owner, not decided** (security posture): whether inbound IPv6 from the internet reaches Machine 2.
   The LAN's "non-forwarding" description covers IPv4 port forwarding; IPv6 has no NAT, and reachability depends on
   the router's IPv6 firewall. Not tested (needs a vantage point outside the LAN).
+
+## 2026-10-24T15:15:00Z — Correction to 15:00Z: Machine 2's name does resolve to 192.168.0.223
+
+- The 15:00Z entry said the name resolves "not to `192.168.0.223`". **Wrong**: the probe printed only the **first**
+  record returned. Listing all of them, the name has an `A` record (`192.168.0.223`) and an `AAAA` record. Found by
+  the owner (`ping` showed IPv4). The posture question raised there is withdrawn as outside U11 (owner). Plan
+  Section 4 Q5 note corrected.

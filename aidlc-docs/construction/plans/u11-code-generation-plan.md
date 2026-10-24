@@ -87,12 +87,12 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [x] `test/accessConfig.property.test.ts`: PBT-91, PBT-92. Positive control: a validator that stops at the first
       problem fails PBT-92.
 
-### Step 2 — Session codec and key store *(LC-84, LC-85; BR-91, BR-95.2; P-91, P-92; PBT-96)*
-- [ ] `src/access/session.ts` (⚙️ pure): `signSession`, `verifySession`, in the `v1.` format, using `timingSafeEqual`
+### Step 2 — Session codec and key store *(LC-84, LC-85; BR-91, BR-95.2; P-91, P-92; PBT-96)* — ✅ DONE · `verifySession` also checks the subject (BR-91.5) and revocation (BR-94.1), so admission has one session call. ⚠️ `session.ts` is deterministic but not in `purity.test.ts`'s list, which forbids `node:crypto` as a whole. Key stored as hex text, mode 600; `replace()` of a deleted key creates it by exclusive create (keeps mode 600). Positive control: dropping the MAC comparison fails 4 tests
+- [x] `src/access/session.ts` (⚙️ pure): `signSession`, `verifySession`, in the `v1.` format, using `timingSafeEqual`
       after a length check. The payload is parsed only after the MAC matches.
-- [ ] `src/access/SessionKeyStore.ts`: create the key by exclusive create if it is absent; read it; replace it (write a
+- [x] `src/access/SessionKeyStore.ts`: create the key by exclusive create if it is absent; read it; replace it (write a
       temporary file, then rename it inside the directory mount).
-- [ ] Tests: PBT-96. Key store: a second creator does not overwrite the first; after a replacement, the old key
+- [x] Tests: PBT-96. Key store: a second creator does not overwrite the first; after a replacement, the old key
       verifies nothing. Positive control: a verifier that parses the payload before the comparison fails a tampering
       case.
 

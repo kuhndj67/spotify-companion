@@ -907,3 +907,24 @@ anonymous manifest HTTP 200).
   refinement (the Step 1 build includes the full admission rule) is approved with the plan.
 - Code starts on `u11-code-generation`, branched from `u11-functional-design` because the design pull request is not
   yet opened (it waits for the owner's go-ahead); it is rebased onto `main` once that is merged.
+
+## 2026-10-24T23:15:00Z — U11 Code Generation: Part A (Steps 1–9) done; Step 10 is the owner's
+
+- Branch `u11-code-generation` (from `u11-functional-design`; the design pull request is not opened). One commit per
+  step, `npm run verify` green after each; details and deviations in the plan, per step.
+- **Found by positive controls and the fake provider** (each fixed, each now failing a test if undone):
+  `openid-client` 6.8.8 does not verify the ID token's signature for a token from the token endpoint unless
+  `enableNonRepudiationChecks` is applied (a tampered signature and an unpublished key were admitted); it does not
+  refuse a future `iat`; PBT-99 was too weak to see a store that kept consumed entries or had no cap; Steps 4–5's pure
+  modules were never registered with `purity.test.ts` (an unasserted text replace on a CRLF file).
+- **Found in the design's gaps**: `ingestGuard` used the loopback origin rule, which would refuse every save in server
+  mode; the image `HEALTHCHECK` asked plain HTTP on loopback, which server mode refuses. Both fixed.
+- **Deviations** (recorded in the plan): an unknown `ACCESS_MODE` stops serving rather than starting (BR-91.6 over
+  BR-88.1); `/auth/signed-out` is an open route; the scripted-player guard test is replaced by file-level tests of
+  `configureAccess` and a pin on `server.ts`'s order; the `openid-client` pin moved from Step 1 to Step 5; `jose` held
+  at 6.2.12 (6.2.13 is four days old).
+- **Candidate image** `spotify-companion:candidate-u11-signin` (`sha256:d61fd8d4…`, from `18da3ff`) run isolated on
+  this PC in server mode, with a refused configuration, and in local mode; every admission result as designed. Not
+  observed: plays recorded while not serving (no Spotify credentials in an isolated run). Saved as an image file
+  (Q1 = A). The live `1.0.0-beta.9` container was not touched.
+- Next: Step 10, the deployment by hand and the sign-in retest, by the owner with guidance.

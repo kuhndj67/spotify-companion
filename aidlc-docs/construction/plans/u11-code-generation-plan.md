@@ -148,11 +148,11 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [x] Tests: the existing setup property test also covers the server file list. `versionSources` checks the new
       template's image tag.
 
-### Step 9 — Step 1 candidate image *(Q1)*
-- [ ] `npm run verify` green. Build the image as `spotify-companion:candidate-u11-signin`. Check the build's exit code
+### Step 9 — Step 1 candidate image *(Q1)* — ✅ DONE · built from `18da3ff` (clean tree) as `spotify-companion:candidate-u11-signin` (`sha256:d61fd8d4…`, amd64; exit 0; `1.0.0-beta.9` still `8e0132e8`). Run isolated on this PC (scratch folders, no Spotify credentials, labels and automation off), against a throwaway CA for `localhost` made by the image's own tool. **Server mode**: one HTTPS listener; `/auth/problem` 200; `/` navigation 302 to `/auth/sign-in?return=%2F`; `/api/health` 401; a forged cookie 401; a WebSocket upgrade without a session 401; a wrong Host 403; `/auth/sign-in` 503 (provider unreachable, as configured); plain HTTP refused; without the CA, TLS refused (control); session key created; healthcheck *healthy*. **Refused configuration** (`OIDC_CLIENT_ID` removed): no listener (`ECONNREFUSED` inside), the problem logged by name, **polling and the scheduled backup ran**, no session key made, healthcheck fails. ⚠️ Not observed: plays actually recorded while not serving (no Spotify credentials in an isolated run; Machine 2 will have none either until the exit test). **Local mode**: `/api/health` 200, every `/auth/*` 404, healthy. `setup --server` and `certs` work in the image (`openssl` 3.0.22; constraint control passes; an install folder refused). Image file (Q1 = A) in the session scratchpad, SHA-256 `7a65e45f…0d22`, 94 MB
+- [x] `npm run verify` green. Build the image as `spotify-companion:candidate-u11-signin`. Check the build's exit code
       directly. Run it on this PC in server mode with a throwaway CA for `localhost` and **no Spotify credentials**.
       Expected: it starts, `/auth/problem` is served, and every other route is refused without a session.
-- [ ] Deliver it as Q1 decides. With A, I save the image file in the scratchpad and give you its full path.
+- [x] Deliver it as Q1 decides. With A, I save the image file in the scratchpad and give you its full path.
 
 ### Step 10 — ⛔ Gate: the deployment by hand and the retest (P-95)
 - [ ] You, with my guidance, follow deployment-architecture §4 steps 1–4:

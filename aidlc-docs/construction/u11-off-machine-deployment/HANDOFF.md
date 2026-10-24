@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ · Infrastructure Design ✅ · Code Generation plan ✅ APPROVED; Part A in progress
+## ▶ Current state (2026-10-24) — Code Generation Part A Steps 1–9 ✅ on `u11-code-generation`; ⛔ Step 10 (the deployment by hand and the sign-in retest) waits for the owner
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -77,5 +77,14 @@ Found while planning: the runtime image has no `openssl` program (measured), so 
 **Code Generation plan approved** (owner, 2026-10-24): Q1 = A (image file copied by hand), Q2 = A (the image gains
 `certs`, with `openssl`), the P-95 refinement accepted. Code on `u11-code-generation`.
 
-**Next**: Part A, Step 1. The design pull request waits for the owner's go-ahead. Nothing is installed or changed on
-the NAS without the owner's go-ahead.
+**Part A, Steps 1–9 done** (2026-10-24, branch `u11-code-generation`, one commit per step, `npm run verify` green;
+details per step in the plan). Found and fixed on the way: `openid-client` does not verify an ID token's signature
+unless `enableNonRepudiationChecks` is applied, and does not refuse a future `iat`; `ingestGuard` used the loopback
+origin rule (would refuse every save in server mode); the image `HEALTHCHECK` could not reach a server-mode app.
+Candidate image `spotify-companion:candidate-u11-signin` built and run isolated in all three cases (server,
+refused configuration, local); saved as an image file in the session scratchpad (Q1 = A).
+
+**Next**: ⛔ **Step 10, the owner's**: deployment-architecture §4 steps 1–4 with the candidate image (no Spotify
+registration on Machine 2), then at least five sign-ins recorded in `research-findings.md`. A persistent loop stops
+Code Generation and returns FD plan Q3. Not yet pushed: `u11-code-generation` (and the design pull request) wait for
+the owner's go-ahead. Nothing is installed or changed on the NAS by an agent.

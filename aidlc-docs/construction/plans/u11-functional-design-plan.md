@@ -1,7 +1,7 @@
 # U11 Functional Design Plan — Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Functional Design, Unit **U11** (Phase 5)
-**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3 filled. **FD documents written** (2026-10-24), awaiting owner approval.
+**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3 filled. **FD documents written and ✅ APPROVED** (owner, 2026-10-24).
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U11 (and its *Carried into its design plan*: U9-a, U9-b, U9-c, WAL, WebSocket, CPU
 architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Restore backup*, the one writer) · U7

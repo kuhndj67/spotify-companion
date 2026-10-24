@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — Functional Design WRITTEN, awaiting owner approval
+## ▶ Current state (2026-10-24) — Functional Design ✅ APPROVED · NFR Design plan OPEN
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -49,4 +49,8 @@ proposed **7-day** session lifetime (BR-91.3). Carried to later stages: the OIDC
 app's port, CA key custody and renewal, the deploy user (Infrastructure Design); the sign-in loop retest (before Code
 Generation is accepted).
 
-**Next**: owner approval of the FD; then NFR Requirements. Nothing is installed or changed on the NAS without the owner's go-ahead.
+**FD approved** (owner, 2026-10-24, *"continue"*), as written, including the proposed 7-day session lifetime.
+NFR Requirements skipped, as for U1–U10. **NFR Design plan open**: [`plans/u11-nfr-design-plan.md`](../plans/u11-nfr-design-plan.md),
+Q1–Q6 (library, session signing, tests, when the loop is retested, certificate renewal, repeated sign-ins).
+
+**Next**: the owner's answers; then `nfr-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

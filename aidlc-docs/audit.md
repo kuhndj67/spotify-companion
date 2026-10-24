@@ -824,3 +824,15 @@ anonymous manifest HTTP 200).
   a plain-HTTP listener in server mode; storing the provider's tokens.
 - **Carried**: the OIDC library (NFR Design); name, port, CA key custody and renewal, the deploy user (Infrastructure
   Design); the sign-in loop retest (before Code Generation is accepted; if it persists, Q3 returns).
+
+## 2026-10-24T18:04:00Z — U11: Functional Design approved; NFR Design plan open
+
+- **Owner**: *"continue"*, in reply to the FD completion message, read as approval of the Functional Design **as
+  written**, including the proposed 7-day session lifetime (BR-91.3) and `SameSite=Lax` (BR-91.4).
+- NFR Requirements skipped, as for U1–U10. NFR Design plan written: `construction/plans/u11-nfr-design-plan.md`,
+  Q1 (OIDC library: ⭐ `openid-client` 6.8.8, MIT, measured on npm today), Q2 (session MAC: ⭐ HMAC-SHA256 on
+  `node:crypto`), Q3 (tests: ⭐ in-process fake provider plus one live acceptance), Q4 (loop retest: ⭐ Code
+  Generation's step 1), Q5 (certificate renewal: ⭐ restart), Q6 (repeated sign-ins: ⭐ bounded pending set only).
+  Allocates P-88, LC-82, PBT-91 onward.
+- Still awaiting the owner: what to do about Machine 2's name in pushed commit `015e836` (redaction committed
+  locally, not pushed).

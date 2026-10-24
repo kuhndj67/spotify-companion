@@ -628,3 +628,20 @@ already removed the halt and the unconfirmed skip from that line. Checked in the
 labels only; a click shows the detail, a second click hides it. The message at the top of the card is unchanged
 (not part of the direction). Also 1.0.0-beta.9: tag pushed by the owner; CI published (`publish 1.0.0-beta.9`,
 anonymous manifest HTTP 200).
+
+## 2026-10-24T12:30:00Z — Spotify's lockout measured and waited out; U10 closed
+
+- **Measured** (2026-10-23 21:04:55Z, owner-approved, one direct request outside the connector, printing status and
+  rate-limit headers only): `currently-playing` → `429`, `Retry-After: 5348` (≈ 1.5 h, until ≈ 22:34Z), body reason
+  `QUOTA_EXCEEDED`. The connector hides all three and says only *"The app has exceeded its rate limits"*, which is why
+  the poll's backoff (NFR-17 fix) could not use the real wait. Advised the owner **not** to recreate the Spotify app.
+- **Stopped** the live container at 21:07:09Z (owner: *"yea stop the container"*) so the poll would not extend the
+  lockout.
+- **Filed** (owner direction): issue #29, *"if spotify is returning an error where extended information would be useful
+  we should get it... and we might also recommend pausing as a way to minimize the outage period"*; issue #30, a pause
+  in Diagnostics. Both `enhancement`, linked, awaiting a requirements round. Nothing built.
+- **Restarted** 2026-10-24 12:26Z (owner: *"lets restart the app"*) after the same request returned `204` and an
+  unchanged refresh token: lock acquired, schema v8, backfill 18 inserted / 32 known, a live decision recorded,
+  `/api/health` ok, no refusal in the log. Not seen: the *"Spotify is answering again"* line, since no refusal occurred
+  to recover from.
+- **U10 closed** by the owner (*"do it"*). CLAUDE.md's "until beta.9 is live" transition notes removed.

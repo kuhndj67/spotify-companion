@@ -881,3 +881,20 @@ anonymous manifest HTTP 200).
 
 - **Owner**, Q7: *"This machine (windows 11) will be used for now..."*. The install guide covers Windows (current-user
   trusted root; Firefox's own store noted); other devices, and the `.local` check on a phone, when they are used.
+
+## 2026-10-24T19:05:00Z — U11: Infrastructure Design approved; Code Generation plan written
+
+- **Owner**: *"approved"*, in reply to the Infrastructure Design completion message.
+- Plan written: `construction/plans/u11-code-generation-plan.md`, 17 steps. **Part A** (1–9) builds only what the
+  sign-in loop needs, ending in a candidate image; **Step 10 is the P-95 gate**: the first deployment by hand
+  (deployment-architecture §4 steps 1–4, no Spotify registration on Machine 2) and at least five recorded sign-ins.
+  A persistent loop stops Code Generation and returns FD plan Q3. **Part B** (11–16): live connections and sign-out,
+  frontend, Diagnostics and WAL, structural and secrets guards, documents. **Part C** (17): the restricted deploy
+  path, probed first.
+- Refinement of P-95, stated in the plan: the Step 1 build includes the full admission rule (Step 3), so a completed
+  sign-in lands on the app itself rather than on a page written only for the test. With no Spotify registration,
+  Machine 2 shows no data.
+- **Found while planning** (measured): `node:22.23-bookworm-slim` has no `openssl` program, so the certificate tool
+  as designed (IN-U11-4, `scripts/`) needs a clone that an App-only install does not have. Put to the owner as **Q2**.
+- Open for the owner: **Q1** (Step 1 build to Machine 2: image file by hand ⭐ / pre-release tag), **Q2** (image
+  `certs` command with `openssl` ⭐ / repository script only). Awaiting answers and approval of the plan.

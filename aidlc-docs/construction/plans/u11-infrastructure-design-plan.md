@@ -1,7 +1,7 @@
 # Infrastructure Design Plan — U11: Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Infrastructure Design, Unit U11
-**Status**: Q1–Q6, Q8–Q10 **A** (owner, 2026-10-24); Q7: this PC (Windows 11) for now. Deliverables: `infrastructure-design/infrastructure-design.md` (**IN-U11-1…IN-U11-10**), `infrastructure-design/deployment-architecture.md`.
+**Status**: ✅ **APPROVED** (owner, 2026-10-24). Q1–Q6, Q8–Q10 **A**; Q7: this PC (Windows 11) for now. Deliverables: `infrastructure-design/infrastructure-design.md` (**IN-U11-1…IN-U11-10**), `infrastructure-design/deployment-architecture.md`.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: U11 Functional Design (approved 2026-10-24; amended BR-88.4, 88.6, 91.6) · U11 NFR Design (**approved
 2026-10-24**): P-88…P-101, LC-82…LC-96 · FD plan Q5 (own CA; open: name, port, CA key custody, renewal), Q8 (B, with
@@ -145,4 +145,4 @@ failures, not deletion, corruption or loss of the box.
 - [x] Collect Q1–Q10; follow-ups for anything ambiguous
 - [x] `construction/u11-off-machine-deployment/infrastructure-design/infrastructure-design.md`: the services a host must provide; the server compose (ports, mounts, `extra_hosts`, settings); certificates and the CA; the deploy path
 - [x] `…/infrastructure-design/deployment-architecture.md`: Machine 2's layout (SSO Server 9443, the app, folders, devices), the trial beside this machine's deployment, the move
-- [ ] `HANDOFF.md`, `aidlc-state.md`, `audit.md` updated; completion message; owner approval
+- [x] `HANDOFF.md`, `aidlc-state.md`, `audit.md` updated; completion message; owner approval (2026-10-24, *"approved"*)

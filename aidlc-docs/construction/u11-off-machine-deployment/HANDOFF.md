@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ · Infrastructure Design WRITTEN, awaiting owner approval
+## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ · Infrastructure Design ✅ · Code Generation plan WRITTEN, awaiting owner approval
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -66,4 +66,14 @@ off-disk copies).
 (IN-U11-1…10). ⚠️ To probe when the deploy path is built: whether DSM lets a non-administrator use SSH. The sign-in
 loop retest must run **on Machine 2** (the CA covers only its names).
 
-**Next**: owner approval of Infrastructure Design; then the Code Generation plan. Code Generation's step 1 is the sign-in loop retest (P-95). Nothing is installed or changed on the NAS without the owner's go-ahead.
+**Infrastructure Design approved** (owner, 2026-10-24, *"approved"*). **Code Generation plan written**:
+[`plans/u11-code-generation-plan.md`](../plans/u11-code-generation-plan.md), 17 steps in three parts. Part A (Steps
+1–9) builds what the sign-in loop needs; Step 10 is the **gate** (the deployment by hand and the retest on Machine 2,
+P-95); Part B (11–16) the rest; Part C (17) the restricted deploy path after the first deployment. Open for the owner:
+**Q1** (how the Step 1 build reaches Machine 2: an image file copied by hand ⭐, or a pre-release tag) and **Q2** (the
+certificate tool for an App-only install: the image gains `certs` with `openssl` ⭐, or the repository script only).
+Found while planning: the runtime image has no `openssl` program (measured), so IN-U11-4's script needs a clone.
+
+**Next**: the owner's answers to Q1–Q2 and approval of the plan; then the design pull request (owner's go-ahead),
+merged before `u11-code-generation` branches from `main`. Nothing is installed or changed on the NAS without the
+owner's go-ahead.

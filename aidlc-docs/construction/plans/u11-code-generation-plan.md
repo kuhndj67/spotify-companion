@@ -1,0 +1,246 @@
+# Code Generation Plan — U11: Off-machine Deployment
+
+**Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Code Generation (Part 1, planning), Unit U11
+**Status**: written, Q1–Q2 open, awaiting owner approval. This plan is the single source of truth for U11's Code Generation.
+**Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield (modify in place; never duplicate a file)
+**Inputs** (all approved 2026-10-24): FD BR-88…BR-99 · NFR Design P-88…P-101, LC-82…LC-96, PBT-91…PBT-100 ·
+Infrastructure IN-U11-1…10 · requirements NFR-29 (amended, ratified) · story **US-34**
+
+---
+
+## Unit context
+
+| | |
+|---|---|
+| **Story** | US-34 (NFR-29) |
+| **Depends on** | U6 (`localGuard`, `decideAccess`, `ingestGuard`), U9 (image entrypoint, `setup`, the `secrets/app` directory mount), U10 (writer lock, kept backups, Diagnostics) |
+| **Owns** | `src/access/`; `ACCESS_MODE` and the server settings; `secrets/app/session.key`, `secrets/app/oidc-client-secret`, `secrets/app/tls/`; `config/ca/`; the server compose template; the certificate tool; `/auth/*` |
+| **Interfaces added** | `/auth/sign-in`, `/auth/callback`, `/auth/problem`, `/auth/sign-out`, `/auth/sign-out-everywhere`, the session status read (all absent, `404`, in local mode) · WebSocket close code **4401** · `setup --server` |
+| **Branch** | `u11-code-generation`, from `main` **after the design pull request (this branch, `u11-functional-design`) is merged**; one commit per step; pull request to `main`, the owner merges |
+
+### ⚠️ What must not move
+
+- **Local mode is the default and is unchanged** (BR-92.6): the existing `localGuard` tests pass untouched, and
+  PBT-100 compares local mode with a frozen copy of today's rule.
+- **Recording never depends on access** (BR-91.6, P-96): history opens and polling starts before access is configured;
+  nothing on the poll and record path imports `src/access/`.
+- `data/` is never written by a test or a step. The live container on this PC keeps running `1.0.0-beta.9`; images
+  are built under a **candidate** tag, never by `docker compose build` (which would overwrite the rollback target).
+- Nothing on Machine 2 is changed by an agent. What happens in DSM is done by the owner, with my guidance.
+- No secret (client secret, private keys, session key, cookie values) goes into chat, the repository or a log.
+
+## Ordering principle
+
+As for U10: pure decisions first, each with its property test and a positive control; then the impure parts around
+them; then wiring; then UI; then documents. Every step ends with `npm run verify` green and its own commit.
+
+U11 adds one **gate**: P-95. Everything the sign-in loop needs is built first (Part A) and tried on Machine 2 against
+SSO Server (Step 10). **Nothing else is built on SSO Server until that result is in.** A loop that persists stops Code
+Generation and sends the FD plan's Q3 back to the owner with the facts.
+
+---
+
+## Questions (before approval)
+
+### Q1 — How the Step 1 build gets to Machine 2
+
+The retest must run on Machine 2: the CA covers only its names (deployment-architecture §4).
+
+| | Option |
+|---|---|
+| **A** | ⭐ **An image file copied by hand.** I build the candidate image on this PC and save it to a file (`docker save`). You copy the file to the NAS and import it (*For Synology deployment*: Container Manager → Image → Add → Add from file). Nothing is published. The image is `amd64`, which suits the Atom C2538 |
+| **B** | **A pre-release tag you push** (for example `1.0.0-beta.10`). CI publishes it to the public `ghcr.io` package, and the NAS pulls it. The build is incomplete: sign-out, the live connection closing at expiry, and the Access pages are not built yet. Anyone could still pull it as a release |
+
+[Answer]:
+
+### Q2 — How someone with the App-only install gets the certificate tool
+
+IN-U11-4 puts the certificate tool under `scripts/`, so you need the repository to run it. A person with the App-only
+install has no clone. Measured today: the runtime image's base (`node:22.23-bookworm-slim`) has **no `openssl`
+program**, and Node cannot create X.509 certificates by itself.
+
+| | Option |
+|---|---|
+| **A** | ⭐ **The image offers `certs`**, like `setup` and `update`. `openssl` is added to the runtime image (Debian's package, a few MB). You run it **on your PC** with Docker (`docker run --rm -v "<folder>:/work" … certs …`). The CA key is written to that folder on your PC, never to the server. It refuses a folder that holds an install (`compose.yaml` or `secrets/`). The same pure checks back the `npm run` script for a source install. One path for both install types, and the install walks test it |
+| **B** | **The `scripts/` tool only.** An App-only server install either clones the repository or follows a written OpenSSL procedure that nothing checks. The image stays as it is |
+
+⚠️ Option A adds a program to the published image. Nothing in the app calls it, and only `certs` uses it.
+
+[Answer]:
+
+---
+
+## Part A — the sign-in loop, then the retest (P-95)
+
+⚖️ **A refinement of P-95, for you at approval.** P-95 says the Step 1 build admits nothing beyond the sign-in pages.
+If it did, a completed sign-in would return to a refused page and go round again, which is the very loop being tested
+for. So the Step 1 build includes the full admission rule (Step 3), and a completed sign-in lands on the app itself.
+Machine 2 has no Spotify registration during the retest, so the app there shows no data. Not yet built at that point:
+sign-out, and the live connection closing at expiry (Step 11).
+
+### Step 1 — Dependency and access configuration *(LC-82; BR-88; P-89; PBT-91, PBT-92)*
+- [ ] `package.json`: `openid-client` **6.8.8** pinned exactly in `dependencies`; `package-lock.json` locks `jose` and
+      `oauth4webapi`. Before pinning, check that the version is at least two weeks old, and record its licence.
+- [ ] `src/access/accessConfig.ts` (⚙️ pure): `parseMode`, `validateServerConfig` (reports every problem at once), the
+      derived redirect URI. `src/config.ts` reads `ACCESS_MODE`, `PUBLIC_ORIGIN`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
+      `OIDC_ALLOWED_SUBJECT`, `SESSION_LIFETIME` (1 h–90 d, default 7 d) and the secret and certificate paths.
+- [ ] `test/accessConfig.property.test.ts`: PBT-91, PBT-92. Positive control: a validator that stops at the first
+      problem fails PBT-92.
+
+### Step 2 — Session codec and key store *(LC-84, LC-85; BR-91, BR-95.2; P-91, P-92; PBT-96)*
+- [ ] `src/access/session.ts` (⚙️ pure): `signSession`, `verifySession`, in the `v1.` format, using `timingSafeEqual`
+      after a length check. The payload is parsed only after the MAC matches.
+- [ ] `src/access/SessionKeyStore.ts`: create the key by exclusive create if it is absent; read it; replace it (write a
+      temporary file, then rename it inside the directory mount).
+- [ ] Tests: PBT-96. Key store: a second creator does not overwrite the first; after a replacement, the old key
+      verifies nothing. Positive control: a verifier that parses the payload before the comparison fails a tampering
+      case.
+
+### Step 3 — Admission *(LC-83; BR-92; P-88, P-92; PBT-93, PBT-94, PBT-100)*
+- [ ] `src/localGuard.ts`: `decideAccess(request, policy, verifySession, now)` gains the server policy (Host and
+      Origin checked against the public origin, then the route class, then the session). Add one shared
+      `AccessRequest` builder. The middleware and `server.ts`'s upgrade handler both use it.
+- [ ] Tests: PBT-93, PBT-94, PBT-100 (with the frozen pre-U11 rule in the test). The existing `localGuard` tests are
+      unchanged. Positive controls: a session verifier stub that throws is refused (P-92); an admission rule that
+      skips Host when a session is valid fails PBT-94.
+
+### Step 4 — Sign-ins in progress *(LC-87; BR-89; P-99; PBT-95, PBT-99)*
+- [ ] `src/access/pendingSignIns.ts` (at most 32 entries, 10 minutes each, the oldest evicted first, each consumed
+      once) and `src/access/returnPath.ts` (`safeReturnPath`).
+- [ ] Tests: PBT-95, PBT-99. Positive control: a store that does not remove an entry when it is consumed fails PBT-99.
+
+### Step 5 — Fake provider, provider client, sign-in routes *(LC-95, LC-86, LC-88; BR-89, BR-90; P-90, P-94)*
+- [ ] `test/support/fakeOidcProvider.ts`: HTTPS on a random port, a test CA generated for each run, and switches that
+      make it misbehave (P-94's list).
+- [ ] `src/access/ProviderClient.ts`: the **only** importer of `openid-client`. RS256 only; 60 s clock tolerance;
+      discovery with retry; the key set fetched again for an unknown `kid`, at most once a minute. It returns
+      `VerifiedIdentity | reason`. Library errors are mapped to a reason and an error **name** only.
+- [ ] `src/access/authRoutes.ts`, mounted in `src/api.ts`: `/auth/sign-in`, `/auth/callback`, `/auth/problem` and the
+      session status read. Sign-out comes in Step 11. A successful callback issues the session and redirects to the
+      safe return path.
+- [ ] Tests: one refusal for each BR-90 switch, through the real routes. Positive control: an identity check that
+      accepts any `sub` fails the other-account case. In local mode every `/auth/*` route returns `404`.
+
+### Step 6 — HTTPS listener and startup order *(LC-90; BR-88.4, BR-96.1; P-89, P-96, P-100)*
+- [ ] `src/server.ts`: in server mode the one listener is `node:https`, with the configured certificate and key.
+      Express and the `ws` upgrade attach to it. History opens and polling starts **before** access is configured. A
+      refused configuration opens no listener, logs every problem, and logs an hourly *not serving* line. Recording
+      continues.
+- [ ] Tests: server mode with each required value removed in turn → no port is open, and a scripted player's plays are
+      recorded ⭐. With an `http://` origin, no listener opens. A certificate whose key does not match is reported by
+      name.
+
+### Step 7 — Certificate tool *(IN-U11-4, IN-U11-5; Q2)*
+- [ ] `src/certs/certPolicy.ts` (⚙️ pure): name and IP validation, the 825-day cap, and the refusal of a destination
+      inside the repository or an install folder.
+- [ ] The tool: `scripts/certs.mjs` (with `npm run certs`), and, if Q2 = A, the image's `certs` command through
+      `scripts/docker-entrypoint.sh`. Actions: make a CA, issue a certificate, and verify after each action.
+- [ ] Tests: the pure checks (each refusal seen to fire). The verify action's positive control is built into the
+      tool: a throwaway certificate for a name outside the constraint is issued, and verification **must reject
+      it**. If it does not, the tool exits non-zero. I run it once on this PC with throwaway names, in the scratchpad.
+
+### Step 8 — Server template and `setup --server` *(IN-U11-2, IN-U11-3)*
+- [ ] `compose.server.yaml`, beside `compose.app.yaml`. It differs from `compose.app.yaml` only as IN-U11-2 lists:
+      the LAN-address publish on 3443, `extra_hosts`, the server settings as placeholders, and
+      `NODE_EXTRA_CA_CERTS`.
+- [ ] `src/appOnly/setup.ts`: `--server` writes that template as `compose.yaml` and also creates `config/ca/` and
+      `secrets/app/tls/`. It writes all of it or none (`decideSetup`). It never creates a key.
+- [ ] Tests: the existing setup property test also covers the server file list. `versionSources` checks the new
+      template's image tag.
+
+### Step 9 — Step 1 candidate image *(Q1)*
+- [ ] `npm run verify` green. Build the image as `spotify-companion:candidate-u11-signin`. Check the build's exit code
+      directly. Run it on this PC in server mode with a throwaway CA for `localhost` and **no Spotify credentials**.
+      Expected: it starts, `/auth/problem` is served, and every other route is refused without a session.
+- [ ] Deliver it as Q1 decides. With A, I save the image file in the scratchpad and give you its full path.
+
+### Step 10 — ⛔ Gate: the deployment by hand and the retest (P-95)
+- [ ] You, with my guidance, follow deployment-architecture §4 steps 1–4:
+      1. Make the real CA on this PC and issue the two certificates. Move the CA key offline.
+      2. Import SSO Server's certificate in DSM. Register the app in SSO Server.
+      3. Install `ca-cert.pem` on this PC.
+      4. Create the project on Machine 2 with the candidate image. **No Spotify registration is added**, so nothing
+         records on Machine 2.
+- [ ] Trial check, step 5 (first part): the container starts on the Atom C2538. This answers whether Node runs
+      without AVX. The *WAL* row comes in Step 13.
+- [ ] The retest, from this PC: **at least five sign-ins** in a fresh browser profile, each started from a different
+      state (no SSO Server session, a live one, an expired app session, a deep link, after SSO Server's own
+      sign-out). Each is recorded as *completed*, *looped* or *landed on the portal*, in `research-findings.md`.
+- [ ] **All completed → Part B. A persistent loop → stop**; the FD plan's Q3 goes back to you with the records.
+
+## Part B — after the retest
+
+### Step 11 — Live connections and sign-out *(LC-89, LC-88; BR-93, BR-94; P-93)*
+- [ ] `src/server.ts`: a registry of sockets by session id. Each socket gets a timer at its session's expiry and is
+      closed with **4401**. Timers are cleared on close.
+- [ ] `/auth/sign-out` (revokes this session and closes its sockets) and `/auth/sign-out-everywhere` (replaces
+      `session.key` and closes every socket). Both are state-changing and refused from another site (BR-92.4).
+- [ ] Tests: the WebSocket upgrade refuses each bad session with `401`, and a valid one is admitted. Sign out
+      everywhere: two sessions are refused afterwards, on HTTP and on WebSocket. A 2 s lifetime closes the socket with
+      4401.
+
+### Step 12 — Frontend *(LC-94; frontend-components §2–§5; PBT-97)*
+- [ ] `public/`: the *Sign-in problem* and *Signed out* pages; Settings → *Access* (server mode only); the connection
+      indicator's *Signed out* state; `onClose` (⚙️, PBT-97).
+- [ ] Checked in the browser on the built app, in **light and dark**, against the fake provider. Screenshots go in the
+      code summary. Primary screen: state only as a compact indicator; colour never the only signal.
+
+### Step 13 — Diagnostics, WAL, corpus comparison *(LC-91, LC-92, LC-93; BR-96.2, BR-97, BR-98; P-98, P-101; PBT-98)*
+- [ ] `src/history/SqliteHistoryRepository.ts`: read back `journal_mode`. Anything but `wal` makes the app
+      display-only, with the reason, before migration.
+- [ ] `src/diagnostics.ts`: the *Access* row (mode, public origin, certificate expiry: a warning 30 days ahead, a
+      failure after it), the *WAL* row, and *Table counts and rules hash*. `src/maintenance/corpusFingerprint.ts`:
+      `compareCorpora`.
+- [ ] Tests: PBT-98. Positive control (P-101): an in-memory database answers `memory`, which leads to display-only and
+      a failed row that names `memory`.
+
+### Step 14 — Structural guards and secrets in output *(LC-96; P-88, P-96, P-97)*
+- [ ] `test/accessStructure.test.ts`: no session cookie or verifier access outside LC-83 and LC-88; no module on the
+      poll and record path imports `src/access/`; `openid-client` imported only by `ProviderClient.ts`.
+- [ ] `test/accessSecrets.test.ts`: a full sign-in, a sign-out and a failed sign-in. Every log line and response body
+      is searched for the code, both tokens, the cookie value, the verifier, `state`, `nonce`, the client secret and
+      the session key.
+- [ ] Positive controls: each guard is seen to fail once, on a deliberate violation that is then reverted (recorded in
+      the code summary).
+
+### Step 15 — Documents *(IN-U11-1…7, 9, 10; FD plan Q9)*
+- [ ] `docs/INSTALL-APP.md`: a server part. Each step says what any host needs, with a *For Synology deployment*
+      subsection where Machine 2 needs something specific. It covers the name, the certificates and the offline CA key,
+      installing the root on Windows (with the Firefox note), registering the app with the provider, `setup --server`,
+      the secrets files, renewal, copying data off the disk (restore from `data/backups/`, never from a copied
+      `history.db`), monitoring, and **one recorder at a time**.
+- [ ] `docs/INSTALL-DEV.md` (server mode for development), `CONTRIBUTING.md` (traps: one admission rule, recording
+      independent of access) and `CLAUDE.md` (`src/access/` in *Where things are*). No hand-written counts; every
+      `npm run` and path must resolve (`test/docs.test.ts`). Never Machine 2's name.
+- [ ] `construction/u11-off-machine-deployment/code/code-summary.md`: what changed in each step, deviations,
+      screenshots.
+
+### Step 16 — Close Part B
+- [ ] Register PBT-91…PBT-100 with `propertyObligations` (no gaps). `npm run verify` green. Build the candidate image.
+      Update HANDOFF, state and audit. Open a pull request (with your go-ahead). Build & Test then runs the trial, the
+      exit test and the move (BLM §8).
+
+## Part C — after the first deployment by hand (FD plan Q8; Infrastructure plan Q9 = A)
+
+### Step 17 — The restricted deploy path *(IN-U11-8; BR-99)*
+- [ ] **Probe first, with you**: whether DSM 7.2 lets a non-administrator sign in over SSH. If it does not, IN-U11-8
+      comes back to you with that fact before anything is built.
+- [ ] The deploy script's argument check as a POSIX `sh` function, and a suite test of each accepted and refused form.
+      The privileged script (`deploy`, `rollback`, `status`, `logs`), the forced-command `authorized_keys` line and the
+      `sudo` rule, written as files plus install steps. You install them on Machine 2.
+- [ ] U11 closes when a release has gone out that way.
+
+---
+
+## Story traceability
+
+| US-34 acceptance | Steps |
+|---|---|
+| Sign in from another device through the provider; then the whole app works, live updates included | 1, 2, 3, 5, 10, 11 |
+| Without signing in, or as another account, nothing but a page saying why | 3, 5, 12 |
+| The session ends at the chosen lifetime; sign out here or everywhere | 1, 2, 11, 12 |
+| HTTPS with a certificate the devices trust | 6, 7, 8, 10 |
+| A local deployment works exactly as before, with no sign-in | 3 (PBT-100), 5 (`404`) |
+| The real history moves with every table's count unchanged (exit test) | 13 (`compareCorpora`); run in Build & Test |
+
+Not a US-34 criterion, but held throughout: recording continues whatever access does (BR-91.6): Steps 6 and 14.

@@ -181,6 +181,13 @@ machine: the name resolves to `192.168.0.223` (and also to an IPv6 address), and
 `200`. ⚠️ Not yet measured: whether a container **on the NAS** resolves that name. The app must reach the issuer to
 fetch its keys (Q5).
 
+*Observed on the NAS 2026-10-24* (owner): the Server URL shown is only a placeholder. *Service* refuses to enable
+OIDC until one is saved, and saving `https://<Machine 2's name>:5001` is refused: *"use a domain name that can be
+accessed over https and has a valid tls certificate. you can create one at control panel>security>certificate"*. The
+NAS holds two certificates: the factory `synology.com` (default) and one used by *Active Backup for Business*. So **Q5
+must be answered before SSO Server can be turned on.** Not yet known: what DSM counts as *valid* (a certificate that
+covers the name, or one from a publicly trusted authority).
+
 *Added 2026-10-24*: with Q3 = A, SSO Server's own **Server URL** (General Settings) is the token issuer. The browser
 signs in there, and the app fetches its keys from there, so the Q5 name and certificate cover **both** SSO Server's
 address and the app's.

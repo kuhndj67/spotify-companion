@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ APPROVED · Infrastructure Design plan OPEN
+## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ · Infrastructure Design WRITTEN, awaiting owner approval
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -62,4 +62,8 @@ stops serving, not recording), BR-91.6 added. **NFR Design written**: Q1–Q6 al
 port, certificates, **CA key custody** (security posture), issuing script, devices, `setup --server`, deploy path,
 off-disk copies).
 
-**Next**: the owner's answers; then `infrastructure-design/`. Code Generation's step 1 is the sign-in loop retest (P-95). Nothing is installed or changed on the NAS without the owner's go-ahead.
+**Infrastructure Design written** (Q1–Q6, Q8–Q10 = A; Q7, which devices, open): [`infrastructure-design/`](infrastructure-design/)
+(IN-U11-1…10). ⚠️ To probe when the deploy path is built: whether DSM lets a non-administrator use SSH. The sign-in
+loop retest must run **on Machine 2** (the CA covers only its names).
+
+**Next**: owner approval of Infrastructure Design and Q7's answer; then the Code Generation plan. Code Generation's step 1 is the sign-in loop retest (P-95). Nothing is installed or changed on the NAS without the owner's go-ahead.

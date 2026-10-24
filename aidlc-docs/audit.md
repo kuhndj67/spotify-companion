@@ -863,3 +863,18 @@ anonymous manifest HTTP 200).
   fixed host entry resolves it regardless.
 - Plan written: `construction/plans/u11-infrastructure-design-plan.md`, Q1–Q10. Q5 (CA key custody) is a
   security-posture decision, the owner's. Q7 is a fact (which devices).
+
+## 2026-10-24T18:43:00Z — U11: Infrastructure Design written
+
+- **Owner**: *"accept recommendations for all questions"*: Q1–Q6 and Q8–Q10 = A. **Q7** (which devices open the app)
+  is a fact with no recommendation, so it stays open as a follow-up; the design covers Windows, macOS, iOS and
+  Android until then.
+- Written: `infrastructure-design/infrastructure-design.md` (**IN-U11-1…IN-U11-10**: host services, the server
+  compose with `extra_hosts` and the LAN-address-only publish on 3443, `setup --server`, the certificate script and
+  renewal, CA key offline, provider registration, secrets files, the deploy path, off-disk copies, monitoring) and
+  `deployment-architecture.md`.
+- Found while designing: (1) a file-level host backup of `history.db` taken while the app writes may be
+  inconsistent; the archives in `data/backups/` are the copies to restore from (IN-U11-9). (2) The sign-in loop
+  retest must run on Machine 2, since the CA is constrained to its names; how the step-1 build gets there is for the
+  Code Generation plan. (3) DSM may allow SSH only to administrators (believed, not measured); if so, the deploy
+  path (IN-U11-8) returns.

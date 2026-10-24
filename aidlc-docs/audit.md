@@ -690,3 +690,10 @@ anonymous manifest HTTP 200).
   lower the *credential* risk of an agent holding DSM administrator access (the credential's reach, and an agent
   acting on content it reads). Offered: walk-through for the one-time SSO Server setup; a limited account or MCP only
   if a later task needs repeated NAS changes.
+
+## 2026-10-24T14:45:00Z — U11: SSO Server configured by hand
+
+- **Owner**: *"we can start with manual configuration."* SSO Server is installed and configured by the owner,
+  walked through step by step; the agent reads results only from this machine, unauthenticated (the discovery
+  document). No DSM credential is given to an agent. A limited account or a Synology MCP server stays possible later
+  and is a separate decision.

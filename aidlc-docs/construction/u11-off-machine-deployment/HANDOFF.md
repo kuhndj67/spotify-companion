@@ -20,8 +20,8 @@ Secure SignIn installed; SSO Server not installed) and would rather not touch th
 the four kinds of access and says which tool serves which; Q3's recommendation moved to **B** (an identity provider
 in a container, DSM untouched).
 
-**Q3 = A** (owner, 2026-10-24): DSM's SSO Server, subject to the probe. Open: how it is configured (walk-through,
-limited DSM access, or a Synology MCP server); the owner is taking a full NAS backup first.
+**Q3 = A** (owner, 2026-10-24): DSM's SSO Server, subject to the probe. Configured **by hand**, walked through (owner, 2026-10-24); no DSM credential for an agent. The owner is taking a
+full NAS backup first.
 
 **Next**: the remaining answers, the owner installs SSO Server, then the probe of it, then the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

@@ -99,6 +99,7 @@ COPY LICENSE ./LICENSE
 # U9 (BR-74.2/74.3, LC-68): what the *App only* commands need. `setup` copies these templates into the user's folder;
 # `auth` is the same sign-in script a source install runs with `npm run auth` (dependency-free by design).
 COPY compose.app.yaml /app/app-only/compose.app.yaml
+COPY compose.server.yaml /app/app-only/compose.server.yaml
 COPY secrets/musicbrainz.example.json /app/app-only/musicbrainz.example.json
 COPY config/rules.example.json /app/app-only/rules.example.json
 COPY scripts/auth.mjs /app/scripts/auth.mjs
@@ -130,7 +131,10 @@ EXPOSE 3000
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
+# U11: the check follows the access mode (src/health/healthTarget.ts). In server mode the listener is HTTPS and admits
+# only the public Host, so the old `http://127.0.0.1/api/health` would report a working server as unhealthy. With no
+# listener (a refused server configuration, BR-88.4) it is unhealthy, which is the truth: the app is not serving.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD ["node", "/app/dist/health/healthcheckCli.js"]
 
 CMD ["node", "dist/server.js"]

@@ -47,7 +47,7 @@ describe('the compose image tags equal package.json (P-58)', () => {
     assert.ok(isSemVer(version), `package.json version is ${version}`);
   });
 
-  for (const file of ['compose.yaml', 'compose.verify.yaml', 'compose.app.yaml']) {
+  for (const file of ['compose.yaml', 'compose.verify.yaml', 'compose.app.yaml', 'compose.server.yaml']) {
     it(`${file}: image tag is ${version}`, () => {
       const tags = composeTags(readFileSync(join(root, file), 'utf8'));
       assert.ok(tags.length > 0, `no spotify-companion image line found in ${file} -- did its format change?`);

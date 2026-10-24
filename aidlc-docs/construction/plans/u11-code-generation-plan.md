@@ -139,13 +139,13 @@ sign-out, and the live connection closing at expiry (Step 11).
       tool: a throwaway certificate for a name outside the constraint is issued, and verification **must reject
       it**. If it does not, the tool exits non-zero. I run it once on this PC with throwaway names, in the scratchpad.
 
-### Step 8 — Server template and `setup --server` *(IN-U11-2, IN-U11-3)*
-- [ ] `compose.server.yaml`, beside `compose.app.yaml`. It differs from `compose.app.yaml` only as IN-U11-2 lists:
+### Step 8 — Server template and `setup --server` *(IN-U11-2, IN-U11-3)* — ✅ DONE · `compose.server.yaml`; `setup --server` (`runSetup(…, 'server')`, the entrypoint now passes `setup`'s option through); the template is in the image. A drift test holds the server template to compose.app.yaml except IN-U11-2's differences (positive control: one volume changed fails it). ⚠️ **Also**: the image's `HEALTHCHECK` now follows the mode (`src/health/healthTarget.ts`, pure, tested; `healthcheckCli.ts` in the image): server mode asks `https://127.0.0.1/auth/auth.css` with the public Host and does not check the certificate (liveness over loopback only); a refused configuration is *unhealthy*, which is true. ⚠️ Not yet run in a built image (Step 9)
+- [x] `compose.server.yaml`, beside `compose.app.yaml`. It differs from `compose.app.yaml` only as IN-U11-2 lists:
       the LAN-address publish on 3443, `extra_hosts`, the server settings as placeholders, and
       `NODE_EXTRA_CA_CERTS`.
-- [ ] `src/appOnly/setup.ts`: `--server` writes that template as `compose.yaml` and also creates `config/ca/` and
+- [x] `src/appOnly/setup.ts`: `--server` writes that template as `compose.yaml` and also creates `config/ca/` and
       `secrets/app/tls/`. It writes all of it or none (`decideSetup`). It never creates a key.
-- [ ] Tests: the existing setup property test also covers the server file list. `versionSources` checks the new
+- [x] Tests: the existing setup property test also covers the server file list. `versionSources` checks the new
       template's image tag.
 
 ### Step 9 — Step 1 candidate image *(Q1)*

@@ -46,7 +46,8 @@ case "${1:-}" in
       exit 2
     fi
     if [ "$command" = setup ]; then
-      set -- node /app/dist/appOnly/setupCli.js
+      # U11 (IN-U11-3): `setup --server` passes its option through.
+      set -- node /app/dist/appOnly/setupCli.js "$@"
     elif [ "$command" = certs ]; then
       # U11 (IN-U11-4, Q2 = A): the only user of the image's `openssl`. Its arguments pass through unchanged.
       set -- node /app/dist/certs/certsCli.js "$@"

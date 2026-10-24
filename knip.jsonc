@@ -17,7 +17,8 @@
   // scripts/docker-entrypoint.sh as `node /app/dist/appOnly/setupCli.js`. Nothing imports it; that is its job.
   // U10 (LC-79): `src/appOnly/updateCli.ts` likewise -- the image's `update` command.
   // U11 (IN-U11-4): `src/certs/certsCli.ts` (the image's `certs` command) needs no entry here: `npm run certs` names it.
-  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts", "src/appOnly/updateCli.ts"],
+  // U11: `src/health/healthcheckCli.ts` IS one -- the image's HEALTHCHECK runs it; nothing imports it.
+  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts", "src/appOnly/updateCli.ts", "src/health/healthcheckCli.ts"],
 
   "project": ["src/**/*.ts", "scripts/**/*.mjs", "scripts/**/*.ts", "test/**/*.ts"],
 

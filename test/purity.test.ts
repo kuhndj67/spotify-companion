@@ -139,6 +139,8 @@ const PURE_MODULES = [
   'access/authPages.ts',
   // The certificate tool's rules (IN-U11-4/5): which names, how long, and where the CA key may never go.
   'certs/certPolicy.ts',
+  // What the image's HEALTHCHECK asks for, from the environment it is HANDED (never reads it itself).
+  'health/healthTarget.ts',
 ];
 
 /**

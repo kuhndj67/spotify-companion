@@ -96,11 +96,11 @@ sign-out, and the live connection closing at expiry (Step 11).
       verifies nothing. Positive control: a verifier that parses the payload before the comparison fails a tampering
       case.
 
-### Step 3 — Admission *(LC-83; BR-92; P-88, P-92; PBT-93, PBT-94, PBT-100)*
-- [ ] `src/localGuard.ts`: `decideAccess(request, policy, verifySession, now)` gains the server policy (Host and
+### Step 3 — Admission *(LC-83; BR-92; P-88, P-92; PBT-93, PBT-94, PBT-100)* — ✅ DONE · `decideAccess(request, policy, verifySession?)`: the key, clock, allowed account and revocations are bound into the verifier by the caller (one parameter, not three). `accessRequestFrom` is the one builder (middleware and upgrade). `serverGuard` maps reasons to responses (BR-92.5) and hands the session and the mode's origin rule on in `res.locals.access`. ⚠️ **Found**: `ingestGuard` checked `Origin` with the loopback rule, which would refuse every save in server mode; it now takes the origin rule from admission (falls back to loopback when absent). ⚠️ Deviation from BR-92.3: `/auth/signed-out` is an open route (Sign out redirects there with no session). Positive controls: checking the session before Host fails 6 tests; admitting when the verifier throws fails P-92's test
+- [x] `src/localGuard.ts`: `decideAccess(request, policy, verifySession, now)` gains the server policy (Host and
       Origin checked against the public origin, then the route class, then the session). Add one shared
       `AccessRequest` builder. The middleware and `server.ts`'s upgrade handler both use it.
-- [ ] Tests: PBT-93, PBT-94, PBT-100 (with the frozen pre-U11 rule in the test). The existing `localGuard` tests are
+- [x] Tests: PBT-93, PBT-94, PBT-100 (with the frozen pre-U11 rule in the test). The existing `localGuard` tests are
       unchanged. Positive controls: a session verifier stub that throws is refused (P-92); an admission rule that
       skips Host when a session is valid fails PBT-94.
 

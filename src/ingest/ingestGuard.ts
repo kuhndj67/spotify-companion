@@ -14,14 +14,19 @@
 
 import type { RequestHandler } from 'express';
 
-import { isAllowedOrigin } from '../localGuard.js';
+import { isAllowedOrigin, type AdmittedAccess } from '../localGuard.js';
 import { admitIngest } from './admitIngest.js';
 import { INGEST_HEADER } from './types.js';
 
 export const ingestGuard: RequestHandler = (req, res, next) => {
+  // U11 (BR-92.4): the origin rule of the mode admission used, handed on by it. In server mode the loopback rule
+  // would refuse the app's own pages. Absent (a route mounted without admission, as some tests do) → the loopback
+  // rule, the stricter default.
+  const access = res.locals.access as AdmittedAccess | undefined;
+  const originAllowed = access?.originAllowed ?? isAllowedOrigin;
   const verdict = admitIngest(
     { method: req.method, origin: req.headers.origin, ingestHeader: req.get(INGEST_HEADER) },
-    isAllowedOrigin,
+    originAllowed,
   );
   if (!verdict.ok) {
     res.status(403).json({ error: verdict.detail, rule: verdict.rule });

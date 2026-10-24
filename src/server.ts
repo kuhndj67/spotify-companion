@@ -12,7 +12,7 @@ import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
 import { runDiagnostics } from './diagnostics.js';
 import type { AutomationDiagnosticsInput } from './diagnostics.js';
-import { localGuard, decideAccess } from './localGuard.js';
+import { localGuard, decideAccess, accessRequestFrom } from './localGuard.js';
 import { createApi, type DisplayLiked } from './api.js';
 import { BackTestService } from './rules/BackTestService.js';
 import { EvaluationCoordinator } from './rules/EvaluationCoordinator.js';
@@ -1198,15 +1198,11 @@ const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  const decision = decideAccess(
-    {
-      // The upgrade socket is typed as Duplex, but for an HTTP server it is always a net.Socket.
-      remoteAddress: (socket as import('node:net').Socket).remoteAddress,
-      host: request.headers.host,
-      origin: request.headers.origin,
-    },
-    { localOnly: config.localOnly, trustPublishedPort: config.trustPublishedPort },
-  );
+  // U11 (P-88): the request is built by the SAME helper the middleware uses (`accessRequestFrom`).
+  const decision = decideAccess(accessRequestFrom(request), {
+    localOnly: config.localOnly,
+    trustPublishedPort: config.trustPublishedPort,
+  });
 
   if (!decision.ok || request.url !== '/ws') {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');

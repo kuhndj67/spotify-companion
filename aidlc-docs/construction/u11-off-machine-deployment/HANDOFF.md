@@ -27,6 +27,10 @@ full NAS backup first.
 CA generated on this machine (in the session scratchpad, which is temporary; the CA key never went to the NAS). Q5
 answered: our own CA. Probe results: `research-findings.md`, *Machine 2's SSO Server*.
 
-**Next**: register a test application in SSO Server and sign in once, to read a real ID token (claims, lifetime,
-second factor); the remaining answers (Q1, Q2, Q4, Q6–Q11, Section 3); then the FD documents
+**Token probes done** (2026-10-24, `research-findings.md`): RS256 tokens verify; `sub` = the DSM user name; no `amr`;
+**180 s ID tokens, no refresh token**; silent re-sign-in works only while SSO Server's session lives, and without one
+`prompt=none` shows a sign-in page; sign-ins started from an authorize link can loop or land on the portal. Probe
+secret deleted; the owner deletes the probe application. **Q4 must be re-asked** with these facts.
+
+**Next**: Q4 rewritten as a follow-up question; the remaining answers (Q1, Q2, Q4, Q6–Q11, Section 3); then the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

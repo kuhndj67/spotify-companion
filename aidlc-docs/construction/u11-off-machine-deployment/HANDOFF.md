@@ -10,10 +10,15 @@ package and its state, the data volume, free RAM). Q3 (identity provider) and Q8
 **security-posture decisions**: the owner's.
 
 Measured for the plan (unauthenticated, read-only, from this machine): Machine 2 answers on 80/443/5000/5001, SSH
-(22) is off; DSM 7 with Container Manager and an OAuth service; the OIDC discovery document is **not reachable**
+on **222** (owner; accepts keys and passwords); DSM 7 with Container Manager and an OAuth service; the OIDC discovery document is **not reachable**
 (`403`, or a redirect page that is not the document); DSM's certificate is the factory default; the published image is
 `amd64` only. Found: the app sets WAL mode without checking the result, and SQLite does not throw when it refuses
 (measured), so a volume without WAL would go unnoticed. Proposed as a business rule.
+
+**2026-10-24, later**: the owner listed DSM's security tools (SSO Client, OAuth Service, Secure SignIn installed;
+SSO Server not installed) and would rather not touch the primary NAS environment. Plan Section 2a now separates
+the four kinds of access and says which tool serves which; Q3's recommendation moved to **B** (an identity provider
+in a container, DSM untouched).
 
 **Next**: the owner's answers, then (if Q3 = A) a probe of DSM's SSO Server once it is enabled, then the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

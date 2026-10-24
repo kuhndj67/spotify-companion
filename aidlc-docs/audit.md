@@ -664,3 +664,17 @@ anonymous manifest HTTP 200).
   proxy, address and certificate, who is admitted, what a signed-in browser may do, deploy path, install document,
   exit-test counts, story) and six DSM values for the owner. Q3 and Q8 are security posture: options written, not
   decided. Noted in Q8: the repository is public, so U9-c's read-only GitHub deploy key is no longer needed.
+
+## 2026-10-24T14:00:00Z — U11 FD plan: the NAS's security tools; Q3's recommendation revised
+
+- **Owner**: SSH is on **port 222**; *SSO Client* (Security tab) available, not configured; *OAuth Service* installed,
+  no apps; *Secure SignIn* installed, 2FA in use for DSM; *SSO Server* available, **not installed**. *"Ideally I'd
+  like to avoid needing access to the primary NAS environment for this work but it may be needed"* … *"I'm guessing
+  we need a level of access for dev and (possibly different) level of access for the running app."*
+- **Probed** port 222 with an unauthenticated connection: SSH offers `publickey,password`.
+- **Plan Section 2a added**: four kinds of access (signing in to the app; the running app, which needs **no** NAS
+  account; deploying; one-time setup by the owner) and what each DSM tool does (Synology's documented behaviour,
+  **not probed**): only *SSO Server* provides OIDC; *OAuth Service* (DSM resource grants) and *SSO Client* (DSM's own
+  sign-in) are not needed. The `403` on discovery is consistent with SSO Server not being installed.
+- **Q3's recommendation revised** from "probe A (DSM SSO Server) first" to **B** (identity provider in a container,
+  DSM untouched), following the owner's stated preference. Still the owner's decision.

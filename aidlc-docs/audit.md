@@ -777,3 +777,15 @@ anonymous manifest HTTP 200).
   shared key); C (repeat sign-in; measured not to work cleanly past SSO Server's session).
 - **Consequence**: NFR-29 as written ("behind a proxy … trusted-proxy mode … identity token on every request") no
   longer fits. Amended wording proposed in the FD plan's Q4a answer; **not yet ratified**, so FD does not start on it.
+## 2026-10-24T17:28:00Z — U11: owner answers Q1, Q2, Q6–Q11
+
+- **Q1 = A** (trial, then the move), with the owner's addition: the app must support **both** a simple local-only
+  deployment (today's "only this machine" protection) **and** the server deployment this unit develops. Consistent
+  with NFR-29's "local-only stays the default mode".
+- **Q2 = A** (the NAS gets its own Spotify registration) · **Q6 = A** (exactly one identity) · **Q7 = A** (everything
+  the local app can do) · **Q8 = B, with A for the first deployment** · **Q10 = A** (every table counted) ·
+  **Q11 = A** (US-34).
+- **Q9** (neither A nor B as written): the install instructions target **any container host** with the needed services
+  (an OIDC provider among them), and do not assume Synology; host-specific steps go in labelled subsections
+  (*For Synology deployment*) inside each step, so other hosts can be added later. Q3's answer gained the same note.
+- Still open: ratification of the proposed NFR-29 wording; Section 3's DSM values.

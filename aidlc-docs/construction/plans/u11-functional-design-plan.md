@@ -1,7 +1,7 @@
 # U11 Functional Design Plan — Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Functional Design, Unit **U11** (Phase 5)
-**Status**: plan OPEN. **Q3 = A** (2026-10-24); Q1, Q2, Q4–Q11 awaiting the owner. Section 3 lists values only the owner can read from DSM.
+**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a). Awaiting: the NFR-29 amendment's ratification and Section 3's values.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U11 (and its *Carried into its design plan*: U9-a, U9-b, U9-c, WAL, WebSocket, CPU
 architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Restore backup*, the one writer) · U7
@@ -111,6 +111,7 @@ These need a DSM sign-in, which this plan does not have. Each is one line in DSM
 | **C** | **Two permanent deployments**, this machine and the NAS, each recording. ⚠️ Two corpora of one person's listening that never merge: R1's data splits in two, and Q2 becomes a permanent cost |
 
 [Answer]:
+A - but we need the app to support both a simple "local only" deployment with similar security to what we currently have (basic "only this machine can access" approach) AND a separate server deployment with the process we develop in this unit.
 
 ---
 
@@ -126,6 +127,7 @@ refresh token.
 | **C** | **One registration, both running.** Halves the quota for both during the trial. Not recommended after 2026-10-23 |
 
 [Answer]:
+A
 
 ---
 
@@ -150,6 +152,8 @@ already active update process"*). Conditional on the probe: once the owner has i
 document, keys, ID-token algorithm and claims, and whether it asks for the second factor are probed before the
 design relies on them. If it fails, Q3 returns. **How it gets configured** (a walk-through, limited DSM access, or a
 Synology MCP server) is an open security-posture item, recorded in `audit.md` 2026-10-24.
+
+Note - Our documentation (for deploying to a container host) shouldn't assume a specific server (synology nas container host in this case) but rather identifies the services needed and leaves the configuration of those services to the user. 
 
 ---
 
@@ -250,6 +254,7 @@ discovery; not yet tested on a phone or inside a container), and the app's own p
 | **B** | **Anyone the provider signs in.** The provider's account list is the guest list. Simpler to configure; a second NAS account (a family member's) would reach the owner's history and its controls |
 
 [Answer]:
+A
 
 ---
 
@@ -264,6 +269,7 @@ Question 11 is decided", and it now is. The exit test needs *Restore backup* fro
 | **B** | **Everything except the writes that replace data** (*Restore backup*, credentials). Those stay reachable only from the NAS itself, which has no browser: they would need SSH and `curl`. The exit test then runs that way instead of through *Restore backup* |
 
 [Answer]:
+A
 
 ---
 
@@ -283,6 +289,7 @@ root-equivalent (a container can mount the host). SSH is **on, port 222**, and a
 write after one deployment has been done by hand.
 
 [Answer]:
+B with A for first deployment 
 
 ---
 
@@ -296,6 +303,7 @@ The deployment is performed by following U8's routine (the walk is U11's verific
 | **B** | **A separate `docs/INSTALL-NAS.md`**. Keeps INSTALL-APP short; two install documents to keep consistent (`test/docs.test.ts` covers both) |
 
 [Answer]:
+The fact that we're deploying to a synology nas ideally is irrelevant... these instructions should allow deployment to any remote server that provides docker hosting and has the needed other features (sso support). So the overall installation instructions should reflect that. If there are specific (to this particular server environment) instructions, they should be done with a clear identifier... "For Synology Deployment" in a subsection of each instruction step (and presumably we would add others as more targets are deployed to)
 
 ---
 
@@ -307,6 +315,7 @@ The deployment is performed by following U8's routine (the walk is U11's verific
 | **B** | **Plays and decisions only**, the two counts U6 and U10's rehearsals used |
 
 [Answer]:
+A
 
 ---
 
@@ -318,6 +327,7 @@ The deployment is performed by following U8's routine (the walk is U11's verific
 | **B** | No story: U11 is tracked by NFR-29 and the exit criterion |
 
 [Answer]:
+A
 
 ---
 

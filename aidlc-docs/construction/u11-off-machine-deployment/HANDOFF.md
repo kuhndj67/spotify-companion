@@ -35,5 +35,11 @@ secret deleted; the owner deletes the probe application. **Q4 must be re-asked**
 **Q4a = B** (owner, 2026-10-24): the app is the OIDC client with its own signed session cookie; no proxy. This
 **amends NFR-29**: proposed wording is in the plan's Q4a answer, awaiting the owner's ratification in `requirements.md`.
 
-**Next**: ratify the NFR-29 amendment; the remaining answers (Q1, Q2, Q6–Q11, Section 3); then the FD documents
+**Q1–Q11 answered** (owner, 2026-10-24): Q1 = A, and **both modes stay supported** (local-only, as today, and the
+server mode this unit builds); Q2 = A; Q6 = A; Q7 = A; Q8 = B, with A (by hand) for the first deployment; Q9: the
+install instructions are **host-agnostic**, naming the services a container host must provide, with host-specific
+steps in clearly labelled subsections (*For Synology deployment*) inside each step; Q10 = A; Q11 = A (US-34). Q3's
+note says the same as Q9: the documents must not assume Synology.
+
+**Next**: ratify the NFR-29 amendment; Section 3's values; then the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

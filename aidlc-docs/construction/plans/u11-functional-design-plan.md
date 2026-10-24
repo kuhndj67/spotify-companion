@@ -192,7 +192,16 @@ covers the name, or one from a publicly trusted authority).
 signs in there, and the app fetches its keys from there, so the Q5 name and certificate cover **both** SSO Server's
 address and the app's.
 
-[Answer]:
+[Answer]: **Our own certificate authority** (owner, 2026-10-24), an amended **A**. **B** (Let's Encrypt) was ruled out
+by the owner: DSM's Let's Encrypt, even with a Synology DDNS name, needs a public address. A single self-signed
+certificate was rejected in favour of a CA, so renewals never touch the devices. The owner prefers not to issue
+certificates by hand: DSM 7's *Create certificate* on this NAS has **no** self-signed option (the 2020 guide the owner
+found describes an older DSM), so the CA is generated off the NAS and imported (*private key, certificate,
+intermediate*). **Tested** with a throwaway CA: name-constrained to Machine 2's names and address (seen to refuse
+another name), server certificate ≤ 825 days (Apple's limit), served by SSO Server on its own port **9443**
+(`research-findings.md`). DSM's own pages keep their certificate. **Open for the FD**: where the real CA's key lives
+(never on the NAS, never in the repo), the renewal procedure, the name (`<name>.local` resolves here by local-network
+discovery; not yet tested on a phone or inside a container), and the app's own port.
 
 ---
 

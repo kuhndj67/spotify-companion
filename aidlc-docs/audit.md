@@ -725,3 +725,13 @@ anonymous manifest HTTP 200).
 - **Probed**: discovery `200`, issuer derived from the Server URL, one RS256 key, claims include `sub`, `aud`,
   `groups`. ⚠️ Port 5001 still serves the factory certificate. Saving the Server URL did **not** prove the
   certificate is served (owner's doubt, confirmed by measurement). Details: `research-findings.md`.
+
+## 2026-10-24T14:45:00Z — U11: SSO Server on port 9443 with the test certificate; Q5 answered
+
+- **Owner** (DSM, by hand): Let's Encrypt ruled out (*"needs a public address"*); own CA chosen (*"option A does sound
+  like the best way to go"*). DSM's *Create certificate* had no self-signed option. SSO Server moved to its own
+  HTTPS port (`5443` refused as reserved; `9443` accepted); test certificate assigned to `ssoserver-9443` only;
+  Server URL `https://<name>.local:9443`.
+- **Probed**: 9443 serves the test certificate, verified against the test CA alone; controls refused without it
+  (curl and Node). Issuer moved to 9443, same signing key. 5001 keeps DSM's factory certificate.
+- **Q5 = own CA** recorded in the plan, with what is still open (key custody, renewal, the name, the app's port).

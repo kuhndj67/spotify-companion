@@ -23,5 +23,10 @@ in a container, DSM untouched).
 **Q3 = A** (owner, 2026-10-24): DSM's SSO Server, subject to the probe. Configured **by hand**, walked through (owner, 2026-10-24); no DSM credential for an agent. The owner is taking a
 full NAS backup first.
 
-**Next**: the remaining answers, the owner installs SSO Server, then the probe of it, then the FD documents
+**SSO Server is installed and serving OIDC** on its own port 9443 with a **test** certificate from a name-constrained
+CA generated on this machine (in the session scratchpad, which is temporary; the CA key never went to the NAS). Q5
+answered: our own CA. Probe results: `research-findings.md`, *Machine 2's SSO Server*.
+
+**Next**: register a test application in SSO Server and sign in once, to read a real ID token (claims, lifetime,
+second factor); the remaining answers (Q1, Q2, Q4, Q6–Q11, Section 3); then the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

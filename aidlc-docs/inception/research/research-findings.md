@@ -730,6 +730,20 @@ Server URL to `https://<Machine 2's name>.local:5001` and enabled OIDC. Before e
 | Client authentication | `client_secret_basic`, `client_secret_post` |
 | ⚠️ TLS | Port 5001 still **presents DSM's factory certificate** (`CN = synology.com`) for `<Machine 2's name>.local`, so the test certificate was accepted by the Server URL check but is **not being served**. DSM's "valid certificate" check therefore did not verify what is served (inference: it checks that a certificate covering the name exists in its store) |
 
+**Then, the same day: SSO Server on its own port, with the test certificate served.** *Login Portal → Applications →
+Synology SSO → customized HTTPS port* (`5443` refused, *"reserved for system use only"*; `9443` accepted), the test
+certificate assigned to the new `ssoserver-9443` entry under *Certificate → Settings*, Server URL set to
+`https://<name>.local:9443`. Measured:
+
+| | |
+|---|---|
+| TLS on 9443 | presents `CN = <name>.local`, issued by the test CA; `openssl s_client -verify_hostname` → `0 (ok)` |
+| Positive controls | `curl` with system trust only → `SEC_E_UNTRUSTED_ROOT`; Node without the CA → `SELF_SIGNED_CERT_IN_CHAIN`. Both connect when given only the test CA (`--cacert`; `NODE_EXTRA_CA_CERTS`) |
+| ⚠️ Windows `curl` (Schannel) | also needs `--ssl-no-revoke`: the test CA publishes no revocation list (`CERT_TRUST_REVOCATION_STATUS_UNKNOWN`). Node and OpenSSL do not require one |
+| Issuer | `https://<name>.local:9443/webman/sso`; all endpoints moved to 9443; the **signing key is unchanged** (same `kid`) |
+| Port 5001 | still DSM's factory certificate (DSM's own pages untouched); the SSO paths there now answer `400 unknown endpoint`. **SSO Server answers on one Server URL only** |
+| Before the Server URL moved | 9443 answered `400 unknown endpoint` too: same rule |
+
 **Not yet measured** (needs a registered application and a sign-in): the claims an ID token **actually** carries
 and their values (`sub` stable? `aud` = the application ID?), the token lifetime, whether sign-in asks for the second
 factor, and whether a redirect URI on another port of the same name is accepted.

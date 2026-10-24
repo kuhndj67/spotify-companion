@@ -1,7 +1,7 @@
 # U11 Functional Design Plan — Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Functional Design, Unit **U11** (Phase 5)
-**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3 filled (the volume's file system not given; not blocking).
+**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3 filled.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U11 (and its *Carried into its design plan*: U9-a, U9-b, U9-c, WAL, WebSocket, CPU
 architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Restore backup*, the one writer) · U7
@@ -95,7 +95,7 @@ These need a DSM sign-in, which this plan does not have. Each is one line in DSM
 | 2 | **DSM version** | same page: *DSM version* | **DSM 7.2-64570 Update 4** (owner, 2026-10-24) |
 | 3 | **Container Manager version** | Package Center → Installed → Container Manager | **Container Manager 24.0.2-1535** (Docker Inc., published by Synology), installed on Volume 1 (owner, 2026-10-24) |
 | 4 | **What the SSO/OAuth package is called and its state** | Package Center → Installed | **Answered** (owner, 2026-10-24): *SSO Client* (Control Panel, Security tab): available, not configured · *OAuth Service* package: installed, no apps configured · *Secure SignIn* package: installed, 2FA in use for DSM sign-in · *SSO Server* package: available, **not installed**. See Section 2a |
-| 5 | **Which volume would hold the app's data**, and its file system | Storage Manager: e.g. *Volume 1, Btrfs* | **Volume 1**: RAID 6, 14.7 TB formatted, 6.2 TB free (owner, 2026-10-24). File system not given (*Btrfs* or *ext4*); either supports WAL on a local volume, and the startup WAL check measures it regardless |
+| 5 | **Which volume would hold the app's data**, and its file system | Storage Manager: e.g. *Volume 1, Btrfs* | **Volume 1**: RAID 6, 14.7 TB formatted, 6.2 TB free (owner, 2026-10-24). **Btrfs** (owner, 2026-10-24). WAL on it is not yet measured; the startup WAL check measures it on the real volume |
 | 6 | **Free RAM** | Resource Monitor → Memory | 8 GB installed, **24 % in use** (owner, 2026-10-24) |
 
 ---

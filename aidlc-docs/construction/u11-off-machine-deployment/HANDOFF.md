@@ -41,7 +41,7 @@ install instructions are **host-agnostic**, naming the services a container host
 steps in clearly labelled subsections (*For Synology deployment*) inside each step; Q10 = A; Q11 = A (US-34). Q3's
 note says the same as Q9: the documents must not assume Synology.
 
-**Machine 2** (owner, 2026-10-24): DS1517+, Intel Atom C2538 (x86-64: the `amd64` image fits), 8 GB (24 % in use), DSM 7.2-64570 Update 4, Container Manager 24.0.2-1535; data on Volume 1 (RAID 6, 6.2 TB free).
+**Machine 2** (owner, 2026-10-24): DS1517+, Intel Atom C2538 (x86-64: the `amd64` image fits), 8 GB (24 % in use), DSM 7.2-64570 Update 4, Container Manager 24.0.2-1535; data on Volume 1 (Btrfs, RAID 6, 6.2 TB free).
 
 **Next**: the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

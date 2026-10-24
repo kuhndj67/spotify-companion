@@ -806,3 +806,5 @@ anonymous manifest HTTP 200).
 - **Owner**: Container Manager 24.0.2-1535 (Docker Inc., published by Synology), on Volume 1. Volume 1: RAID 6,
   14.7 TB formatted, 6.2 TB free. RAM 24 % in use of 8 GB. The volume's file system was not given; not blocking, since
   the proposed startup WAL check measures WAL on the real volume.
+
+- **Owner**: Volume 1 is **Btrfs**. WAL on it is still measured by the startup check, not assumed.

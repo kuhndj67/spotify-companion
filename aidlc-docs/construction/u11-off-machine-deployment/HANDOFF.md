@@ -62,8 +62,8 @@ stops serving, not recording), BR-91.6 added. **NFR Design written**: Q1–Q6 al
 port, certificates, **CA key custody** (security posture), issuing script, devices, `setup --server`, deploy path,
 off-disk copies).
 
-**Infrastructure Design written** (Q1–Q6, Q8–Q10 = A; Q7, which devices, open): [`infrastructure-design/`](infrastructure-design/)
+**Infrastructure Design written** (Q1–Q6, Q8–Q10 = A; Q7: this PC, Windows 11, for now): [`infrastructure-design/`](infrastructure-design/)
 (IN-U11-1…10). ⚠️ To probe when the deploy path is built: whether DSM lets a non-administrator use SSH. The sign-in
 loop retest must run **on Machine 2** (the CA covers only its names).
 
-**Next**: owner approval of Infrastructure Design and Q7's answer; then the Code Generation plan. Code Generation's step 1 is the sign-in loop retest (P-95). Nothing is installed or changed on the NAS without the owner's go-ahead.
+**Next**: owner approval of Infrastructure Design; then the Code Generation plan. Code Generation's step 1 is the sign-in loop retest (P-95). Nothing is installed or changed on the NAS without the owner's go-ahead.

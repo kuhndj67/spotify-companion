@@ -878,3 +878,6 @@ anonymous manifest HTTP 200).
   retest must run on Machine 2, since the CA is constrained to its names; how the step-1 build gets there is for the
   Code Generation plan. (3) DSM may allow SSH only to administrators (believed, not measured); if so, the deploy
   path (IN-U11-8) returns.
+
+- **Owner**, Q7: *"This machine (windows 11) will be used for now..."*. The install guide covers Windows (current-user
+  trusted root; Firefox's own store noted); other devices, and the `.local` check on a phone, when they are used.

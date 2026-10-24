@@ -1,7 +1,7 @@
 # U11 Infrastructure Design — Off-machine Deployment
 
 **Unit**: U11 · **Date**: 2026-10-24 · **Plan**: [`u11-infrastructure-design-plan.md`](../../plans/u11-infrastructure-design-plan.md)
-— Q1–Q6, Q8–Q10 all A; Q7 (which devices) open, a fact
+— Q1–Q6, Q8–Q10 all A; Q7: this PC (Windows 11) for now
 **Allocates**: **IN-U11-1…IN-U11-10** · Machine 2's layout in [`deployment-architecture.md`](deployment-architecture.md)
 
 Host-agnostic first (FD plan Q9): each item says what **any** container host needs, then *For Synology deployment*
@@ -86,9 +86,10 @@ certificates → import SSO Server's in DSM → copy the app's pair into `secret
 (P-98; recording resumes, backfill covers the gap) → return the CA key offline. The CA itself lasts ten years;
 devices are not touched at renewal.
 
-**Devices** (Q7, open): the install guide covers installing `ca-cert.pem` as a trusted root on Windows, macOS, iOS
-(install the profile, then enable it under *Certificate Trust Settings*) and Android (*Install a certificate → CA
-certificate*), and is cut to the kinds the owner names.
+**Devices** (Q7: this PC, Windows 11, for now): the install guide covers installing `ca-cert.pem` in Windows'
+*Trusted Root Certification Authorities* store (for the current user), which Edge and Chrome use. ⚠️ Firefox keeps its
+own store unless its *enterprise roots* setting is on; the guide says so. Other kinds of device (macOS, iOS, Android)
+get their own step when they are used, and a phone also needs the `.local` name measured (deployment-architecture §3).
 
 ## IN-U11-5 — The CA key stays offline (Q5 = A; security posture, the owner's)
 

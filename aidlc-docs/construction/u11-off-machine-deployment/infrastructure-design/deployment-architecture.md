@@ -56,7 +56,7 @@ guide states it.
 | Name | Resolved by | Measured |
 |---|---|---|
 | `<Machine 2's name>.local` on the owner's PC | local-network discovery | yes |
-| on the owner's phone | local-network discovery | **no**: the trial checks it (Q7 names the devices) |
+| on a phone | local-network discovery | **no**; not needed yet (Q7: this PC only, for now) |
 | inside the app container | `extra_hosts` | the mechanism, on Docker Desktop here; on Machine 2, in the trial |
 
 ## 4. Sequence of the first deployment (by hand, Q8 = A)
@@ -64,7 +64,7 @@ guide states it.
 1. On this PC: make the real CA; issue SSO Server's and the app's certificates (IN-U11-4); move the CA key offline.
 2. DSM: import SSO Server's certificate and assign it to `ssoserver-9443`; register the app in SSO Server
    (IN-U11-6).
-3. Each device: install `ca-cert.pem` as a trusted root.
+3. This PC (Q7): install `ca-cert.pem` as a trusted root (Windows, current user).
 4. Machine 2: a project folder; `setup --server` (through Container Manager or SSH); fill in the placeholders; place
    the certificate files and the client secret; create the Container Manager project from `compose.yaml`; start it.
 5. **First trial check**: the container starts on the Atom C2538 (no AVX; not yet measured) and Diagnostics' *WAL* row

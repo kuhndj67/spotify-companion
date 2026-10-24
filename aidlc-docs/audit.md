@@ -714,3 +714,14 @@ anonymous manifest HTTP 200).
   record returned. Listing all of them, the name has an `A` record (`192.168.0.223`) and an `AAAA` record. Found by
   the owner (`ping` showed IPv4). The posture question raised there is withdrawn as outside U11 (owner). Plan
   Section 4 Q5 note corrected.
+
+## 2026-10-24T14:40:00Z — U11: SSO Server serves OIDC (test certificate); recorded in research-findings
+
+- **Owner** (DSM, by hand): imported a **test** certificate for `<Machine 2's name>.local` from a CA generated on this machine
+  (name-constrained to Machine 2's names and address; the constraint **seen to refuse** a `www.google.com`
+  certificate signed by the same CA, `openssl verify`: `permitted subtree violation`; that certificate deleted).
+  The CA's key stayed off the NAS. Server URL `https://<name>.local:5001` saved; OIDC enabled (a first attempt was
+  not saved: the endpoint still said `not enabled`).
+- **Probed**: discovery `200`, issuer derived from the Server URL, one RS256 key, claims include `sub`, `aud`,
+  `groups`. ⚠️ Port 5001 still serves the factory certificate. Saving the Server URL did **not** prove the
+  certificate is served (owner's doubt, confirmed by measurement). Details: `research-findings.md`.

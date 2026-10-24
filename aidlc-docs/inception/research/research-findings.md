@@ -711,6 +711,29 @@ second as the **treatment**. They should be stored as **separate fields**, never
 **Cost**: 2 requests per *artist* (URL join + release browse), and artists repeat heavily across a
 listening history — so a per-artist cache is far more effective than a per-track one.
 
+## Machine 2's SSO Server as an OIDC provider (U11, 2026-10-24)
+
+Probed from this machine, unauthenticated, after the owner installed *SSO Server*, imported a **test** certificate
+for `<Machine 2's name>.local` (a CA generated on this machine, name-constrained; no private key of the CA on the NAS), set the
+Server URL to `https://<Machine 2's name>.local:5001` and enabled OIDC. Before enabling, the same address returned
+`400 {"error":"not enabled"}`; before installing, `403`.
+
+| | Measured |
+|---|---|
+| Discovery | `GET /webman/sso/.well-known/openid-configuration` → `200` JSON |
+| **Issuer** | `https://<name>.local:5001/webman/sso`: **derived from the Server URL**, so changing that URL changes the issuer every token carries |
+| Keys | `jwks_uri` `…/webman/sso/openid-jwks.json` → `200`: **one RSA 2048-bit key, `alg RS256`, `use sig`**, with a `kid` |
+| ID-token signing | `RS256` only |
+| Claims offered | `aud`, `email`, `exp`, `groups`, `iat`, `iss`, `sub`, `username` |
+| Scopes | `openid`, `email`, `groups` |
+| Flows | `authorization_code` and `implicit`; response types include `code`; PKCE `S256` **and `plain`** |
+| Client authentication | `client_secret_basic`, `client_secret_post` |
+| ⚠️ TLS | Port 5001 still **presents DSM's factory certificate** (`CN = synology.com`) for `<Machine 2's name>.local`, so the test certificate was accepted by the Server URL check but is **not being served**. DSM's "valid certificate" check therefore did not verify what is served (inference: it checks that a certificate covering the name exists in its store) |
+
+**Not yet measured** (needs a registered application and a sign-in): the claims an ID token **actually** carries
+and their values (`sub` stable? `aud` = the application ID?), the token lifetime, whether sign-in asks for the second
+factor, and whether a redirect URI on another port of the same name is accepted.
+
 ## Sources
 
 - [Spotify: Introducing some changes to our Web API (Nov 2024)](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)

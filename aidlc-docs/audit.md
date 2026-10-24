@@ -735,3 +735,14 @@ anonymous manifest HTTP 200).
 - **Probed**: 9443 serves the test certificate, verified against the test CA alone; controls refused without it
   (curl and Node). Issuer moved to 9443, same signing key. 5001 keeps DSM's factory certificate.
 - **Q5 = own CA** recorded in the plan, with what is still open (key custody, renewal, the name, the app's port).
+
+## 2026-10-24T15:00:00Z — U11: one real SSO Server sign-in probed
+
+- **Owner** registered a throwaway OIDC application and signed in once (Chrome, privileged account, second factor
+  asked for). A read-only account loops at sign-in and is not logged by SSO Server (owner's reading: it cannot use
+  DSM; not verified). The first sign-in landed on SSO Server's account portal; the authorize link opened again went
+  straight through.
+- **Measured** (scratchpad script; decoded claims only): RS256, signature verifies, altered signature refused; `aud`
+  = application ID; `sub` = the DSM user name; no `amr`/`acr`; **ID token lifetime 180 s, no refresh token**.
+  Recorded in `research-findings.md`, with the consequence for Q4 noted in the plan (not decided).
+- The one-time code was pasted into the chat by the owner; it was redeemed seconds later and is spent.

@@ -161,6 +161,13 @@ Synology MCP server) is an open security-posture item, recorded in `audit.md` 20
 | **B** | **DSM's built-in reverse proxy** for TLS, with the app running the OIDC sign-in itself. ⚠️ Contradicts NFR-29 as ratified ("the app never handles passwords" is kept, but the app then runs the sign-in flow and holds a client secret, which the ratified shape put in the proxy) and would need a requirements change |
 | **C** | **A proxy that has sign-in built in** (e.g. Caddy or Traefik with a forward-auth plugin, or the Q3 = B provider's own proxy mode). Same shape as A, different product; chosen only if Q3 = B makes it simpler |
 
+⚠️ *Added 2026-10-24 after the token probe* (`research-findings.md`): SSO Server's ID tokens live **180 s** and come with
+**no refresh token**, so option A as written (the app verifies the provider's ID token on every request) would hold
+for 3 minutes. The FD must choose between: the proxy re-running a silent sign-in every few minutes (breaks background
+requests and the WebSocket unless handled), the app verifying the ID token **once** and then trusting a session the
+proxy signs (moves trust to the proxy, which NFR-29's shape avoided), or the app running its own short session after
+one verified token (the app then holds a session secret). This may need a follow-up question before Q4 is answered.
+
 [Answer]:
 
 ---

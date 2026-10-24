@@ -744,9 +744,27 @@ certificate assigned to the new `ssoserver-9443` entry under *Certificate → Se
 | Port 5001 | still DSM's factory certificate (DSM's own pages untouched); the SSO paths there now answer `400 unknown endpoint`. **SSO Server answers on one Server URL only** |
 | Before the Server URL moved | 9443 answered `400 unknown endpoint` too: same rule |
 
-**Not yet measured** (needs a registered application and a sign-in): the claims an ID token **actually** carries
-and their values (`sub` stable? `aud` = the application ID?), the token lifetime, whether sign-in asks for the second
-factor, and whether a redirect URI on another port of the same name is accepted.
+**Then, one real sign-in** (2026-10-24 14:58Z): a throwaway OIDC application (*Spotify Companion probe*) registered by
+the owner; authorization code flow with PKCE `S256`, `state` and `nonce`, run by a scratchpad script that printed
+decoded claims and check results only, never a raw token or the secret.
+
+| | Measured |
+|---|---|
+| Redirect URIs | `https://localhost:8765/callback` refused (*"invalid uri"*); `https://<name>.local:8765/callback` accepted: **another port on the same name is fine**, `localhost` is not |
+| ⚠️ An account that cannot use DSM | the owner's read-only account **loops** at SSO Server's sign-in page (`/#/signin`) with no error, and SSO Server's log records **nothing** for it. A privileged account signs in. Owner's reading: the read-only account has no access to DSM's main screens. **Not verified**; *Application Privileges* has no SSO Server entry |
+| Second factor | **asked for** (Secure SignIn), in Chrome, for the privileged account |
+| ⚠️ The sign-in does not resume the request | after signing in from the authorize link, the browser landed on SSO Server's **account portal**, not on the redirect. Opening the authorize link **again**, now signed in, redirected at once with a code (no consent page). The proxy must start the flow so that a second pass happens, or this must be retested |
+| Token response | `200`: `access_token`, `expires_in`, `id_token`, `token_type`. ⚠️ **No `refresh_token`** |
+| ID token | `RS256`, the published `kid`; **signature verifies**; positive control (signature altered) **does not verify** |
+| Claims | `iss` = the issuer; `aud` = the application ID, **a string**; `nonce` echoed; `auth_time`, `iat`, `exp`; `email`; `groups` (`users`, `administrators` for that account); ⚠️ **`sub` = the DSM user name** (same value as `username`), not an opaque ID: renaming the account changes who the app thinks it is |
+| No `amr` / `acr` | the token **does not say** whether a second factor was used. The app cannot check it; it is SSO Server's policy |
+| ⚠️ **Lifetime** | `exp − iat` = **180 s**, `expires_in` 180. Clock skew between Machine 2 and this machine: 0 s |
+| Access token | opaque (not a JWT) |
+
+⚠️ **Consequence for the design** (not a measurement): a 3-minute ID token with no refresh token cannot be checked by
+the app "on every request" for a whole session unless the proxy repeats the sign-in redirect every 3 minutes, which
+breaks background requests and the WebSocket. U11's FD Q4 must settle what the app verifies after the first minutes.
+
 
 ## Sources
 

@@ -209,6 +209,7 @@ sign-out, and the live connection closing at expiry (Step 11).
       installing the root on Windows (with the Firefox note), registering the app with the provider, `setup --server`,
       the secrets files, renewal, copying data off the disk (restore from `data/backups/`, never from a copied
       `history.db`), monitoring, and **one recorder at a time**.
+- [ ] ⚠️ Measured at Step 10 (2026-10-24): **Windows PowerShell 5.1 drops an unquoted `--`** before npm sees it, so `npm run certs -- ca --out …` fails (*Unexpected argument*). Every `npm run … --` command in the guides is written with `'--'` for PowerShell, or the guide says so once.
 - [ ] `docs/INSTALL-DEV.md` (server mode for development), `CONTRIBUTING.md` (traps: one admission rule, recording
       independent of access) and `CLAUDE.md` (`src/access/` in *Where things are*). No hand-written counts; every
       `npm run` and path must resolve (`test/docs.test.ts`). Never Machine 2's name.

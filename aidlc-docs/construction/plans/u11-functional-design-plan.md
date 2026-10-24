@@ -173,7 +173,11 @@ The owner's devices must trust the HTTPS certificate, and the OIDC provider redi
 |---|---|
 | **A** | ⭐ **A LAN name and a small private certificate authority.** A name such as `spotify.home.arpa` (`home.arpa` is reserved for home networks, RFC 8375), resolved by the router or by each device's hosts file; a certificate from a private CA (e.g. `mkcert`), whose root the owner installs once on each device that will open the app. Nothing public, nothing forwarded |
 | **B** | **A public DNS name with a Let's Encrypt certificate by DNS challenge**, the name pointing at the private address. Every device trusts it with no install. Needs a domain the owner controls and a DNS provider with an API; the name (not the app) becomes public |
-| **C** | **The IP address and a self-signed certificate**, warning accepted in each browser. ⚠️ Some OIDC providers refuse a redirect to an IP address, and browsers keep warning. Not recommended |
+| **C** | **The IP address and a self-signed certificate**, warning accepted in each browser. ⚠️ Some OIDC providers refuse a redirect to an IP address, and browsers keep warning. Not recommended. **Ruled out for Q3 = A** (Synology's SSO Server help, read 2026-10-24 through a search summary, not yet seen on the NAS): a redirect URI must use the same protocol as SSO Server, should be an HTTPS domain with a valid TLS certificate, and **cannot be an IP address or a QuickConnect address**; up to 10 per application |
+
+*Added 2026-10-24*: with Q3 = A, SSO Server's own **Server URL** (General Settings) is the token issuer. The browser
+signs in there, and the app fetches its keys from there, so the Q5 name and certificate cover **both** SSO Server's
+address and the app's.
 
 [Answer]:
 

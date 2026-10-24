@@ -761,6 +761,14 @@ decoded claims and check results only, never a raw token or the secret.
 | ⚠️ **Lifetime** | `exp − iat` = **180 s**, `expires_in` 180. Clock skew between Machine 2 and this machine: 0 s |
 | Access token | opaque (not a JWT) |
 
+**Silent re-sign-in** (`prompt=none`, 15:01Z, the same browser still signed in to SSO Server, ~2 min after the first
+token): redirected **at once** with a code, no page shown; a new ID token, same checks all pass (signature, altered
+copy refused, `iss`, `aud`, `nonce`), again **180 s**. ⚠️ `auth_time` **equals the new `iat`**, not the time of the
+real sign-in, so `auth_time` cannot measure how old the sign-in is. ⚠️ **Not tested**: `prompt=none` with **no**
+SSO Server session (does it return `error=login_required`, or show a sign-in page?), and how long SSO Server's own
+session lasts. Without the first, this result cannot tell "`prompt=none` honoured" apart from "`prompt` ignored and
+the session still valid".
+
 ⚠️ **Consequence for the design** (not a measurement): a 3-minute ID token with no refresh token cannot be checked by
 the app "on every request" for a whole session unless the proxy repeats the sign-in redirect every 3 minutes, which
 breaks background requests and the WebSocket. U11's FD Q4 must settle what the app verifies after the first minutes.

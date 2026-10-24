@@ -746,3 +746,8 @@ anonymous manifest HTTP 200).
   = application ID; `sub` = the DSM user name; no `amr`/`acr`; **ID token lifetime 180 s, no refresh token**.
   Recorded in `research-findings.md`, with the consequence for Q4 noted in the plan (not decided).
 - The one-time code was pasted into the chat by the owner; it was redeemed seconds later and is spent.
+
+## 2026-10-24T15:02:00Z — U11: silent re-sign-in (prompt=none) works while signed in
+
+- Owner ran the probe's `prompt=none` link: immediate redirect with a code, a valid 180 s ID token. `auth_time` is
+  reset to the new token's time. Not tested: the no-session case, and SSO Server's session length.

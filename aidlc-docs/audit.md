@@ -898,3 +898,12 @@ anonymous manifest HTTP 200).
   as designed (IN-U11-4, `scripts/`) needs a clone that an App-only install does not have. Put to the owner as **Q2**.
 - Open for the owner: **Q1** (Step 1 build to Machine 2: image file by hand ⭐ / pre-release tag), **Q2** (image
   `certs` command with `openssl` ⭐ / repository script only). Awaiting answers and approval of the plan.
+
+## 2026-10-24T19:20:00Z — U11: Code Generation plan approved
+
+- **Owner**: *"approve the plan and defaults for q1/2"*. **Q1 = A**: the Step 1 build reaches Machine 2 as an image
+  file copied by hand; nothing is published. **Q2 = A**: the image gains a `certs` command and `openssl` (a
+  security-posture choice, the owner's: a program in the published image that only `certs` uses). The P-95
+  refinement (the Step 1 build includes the full admission rule) is approved with the plan.
+- Code starts on `u11-code-generation`, branched from `u11-functional-design` because the design pull request is not
+  yet opened (it waits for the owner's go-ahead); it is rebased onto `main` once that is merged.

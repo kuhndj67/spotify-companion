@@ -1,7 +1,7 @@
 # Code Generation Plan — U11: Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Code Generation (Part 1, planning), Unit U11
-**Status**: written, Q1–Q2 open, awaiting owner approval. This plan is the single source of truth for U11's Code Generation.
+**Status**: ✅ **APPROVED** (owner, 2026-10-24, *"approve the plan and defaults for q1/2"*): Q1 = A, Q2 = A, and the P-95 refinement. This plan is the single source of truth for U11's Code Generation.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield (modify in place; never duplicate a file)
 **Inputs** (all approved 2026-10-24): FD BR-88…BR-99 · NFR Design P-88…P-101, LC-82…LC-96, PBT-91…PBT-100 ·
 Infrastructure IN-U11-1…10 · requirements NFR-29 (amended, ratified) · story **US-34**
@@ -51,7 +51,7 @@ The retest must run on Machine 2: the CA covers only its names (deployment-archi
 | **A** | ⭐ **An image file copied by hand.** I build the candidate image on this PC and save it to a file (`docker save`). You copy the file to the NAS and import it (*For Synology deployment*: Container Manager → Image → Add → Add from file). Nothing is published. The image is `amd64`, which suits the Atom C2538 |
 | **B** | **A pre-release tag you push** (for example `1.0.0-beta.10`). CI publishes it to the public `ghcr.io` package, and the NAS pulls it. The build is incomplete: sign-out, the live connection closing at expiry, and the Access pages are not built yet. Anyone could still pull it as a release |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"defaults for q1/2"*)
 
 ### Q2 — How someone with the App-only install gets the certificate tool
 
@@ -66,7 +66,7 @@ program**, and Node cannot create X.509 certificates by itself.
 
 ⚠️ Option A adds a program to the published image. Nothing in the app calls it, and only `certs` uses it.
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"defaults for q1/2"*). Security posture accepted by the owner: `openssl` in the published image, used only by `certs`
 
 ---
 

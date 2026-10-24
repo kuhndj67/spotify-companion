@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ · Infrastructure Design ✅ · Code Generation plan WRITTEN, awaiting owner approval
+## ▶ Current state (2026-10-24) — FD ✅ · NFR Design ✅ · Infrastructure Design ✅ · Code Generation plan ✅ APPROVED; Part A in progress
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -74,6 +74,8 @@ P-95); Part B (11–16) the rest; Part C (17) the restricted deploy path after t
 certificate tool for an App-only install: the image gains `certs` with `openssl` ⭐, or the repository script only).
 Found while planning: the runtime image has no `openssl` program (measured), so IN-U11-4's script needs a clone.
 
-**Next**: the owner's answers to Q1–Q2 and approval of the plan; then the design pull request (owner's go-ahead),
-merged before `u11-code-generation` branches from `main`. Nothing is installed or changed on the NAS without the
-owner's go-ahead.
+**Code Generation plan approved** (owner, 2026-10-24): Q1 = A (image file copied by hand), Q2 = A (the image gains
+`certs`, with `openssl`), the P-95 refinement accepted. Code on `u11-code-generation`.
+
+**Next**: Part A, Step 1. The design pull request waits for the owner's go-ahead. Nothing is installed or changed on
+the NAS without the owner's go-ahead.

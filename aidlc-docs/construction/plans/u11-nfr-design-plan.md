@@ -1,7 +1,7 @@
 # NFR Design Plan — U11: Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — NFR Design, Unit U11
-**Status**: Q1–Q6 all **A** (owner, 2026-10-24). ✅ **ALL ANSWERED.** Deliverables: `nfr-design/nfr-design-patterns.md` (**P-88…P-101**), `nfr-design/logical-components.md` (**LC-82…LC-96**, **PBT-91…PBT-100**).
+**Status**: Q1–Q6 all **A** (owner, 2026-10-24). ✅ **ALL ANSWERED.** ✅ **NFR Design APPROVED** (owner, 2026-10-24). Deliverables: `nfr-design/nfr-design-patterns.md` (**P-88…P-101**), `nfr-design/logical-components.md` (**LC-82…LC-96**, **PBT-91…PBT-100**).
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: U11 Functional Design (**approved 2026-10-24**): `business-rules.md` **BR-88…BR-99**,
 `business-logic-model.md`, `domain-entities.md`, `frontend-components.md` · **NFR-29** (amended 2026-10-24) ·

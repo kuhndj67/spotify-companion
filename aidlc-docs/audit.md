@@ -850,3 +850,16 @@ anonymous manifest HTTP 200).
   `nfr-design/nfr-design-patterns.md` (**P-88…P-101**), `nfr-design/logical-components.md` (**LC-82…LC-96**,
   **PBT-91…PBT-100**). The deploy command's property test is left to Infrastructure Design with the deploy user.
 - **Owner**: rewrite the branch history to remove Machine 2's name (pushed in `015e836`). Done next.
+
+## 2026-10-24T18:27:00Z — U11: NFR Design approved; Infrastructure Design plan open
+
+- **Owner**: *"Continue"*, in reply to the NFR Design completion message: approved.
+- **Branch history rewritten** (owner's instruction): Machine 2's name replaced by a placeholder in all 27 branch
+  commits (`git filter-branch` over `origin/main..HEAD`; final tree unchanged), force-pushed with a lease; no
+  branch commit on GitHub contains it, verified after fetching. Local copies of the old history removed. ⚠️ GitHub
+  may still serve the old commit by its exact ID until its own garbage collection; nothing references it.
+- Measured for the Infrastructure Design plan: Machine 2's ports 3010, 3443, 8443 closed, 9443 open; a container on
+  this machine's Docker Desktop resolves the `.local` name (through Windows; not representative of the NAS), and a
+  fixed host entry resolves it regardless.
+- Plan written: `construction/plans/u11-infrastructure-design-plan.md`, Q1–Q10. Q5 (CA key custody) is a
+  security-posture decision, the owner's. Q7 is a fact (which devices).

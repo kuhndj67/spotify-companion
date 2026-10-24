@@ -70,6 +70,12 @@ RUN npm run build && npm prune --omit=dev
 # ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 
+# U11 (IN-U11-4, Q2 = A; owner 2026-10-24): `openssl`, for the `certs` command ONLY. Nothing in the app calls it; the
+# base image has no `openssl` program (measured), and Node cannot make certificates by itself.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0 \

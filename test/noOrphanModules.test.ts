@@ -52,6 +52,8 @@ const ALLOWED_ORPHANS: Record<string, string> = {
   // `runSetup` in appOnly/setup.ts, which test/appOnlySetup.property.test.ts drives against real folders.
   'appOnly/setupCli.ts': "entry point: the image's setup command, a wrapper over the tested runSetup",
   'appOnly/updateCli.ts': "entry point: the image's update command, a wrapper over the tested runUpdate",
+  // U11 (IN-U11-4): argument parsing and printing around certTool.ts, which test/certTool.test.ts drives against openssl.
+  'certs/certsCli.ts': "entry point: the image's certs command and npm run certs, a wrapper over the tested certTool",
 
   // Reached only from server.ts. Its report shape is asserted through the /api/diagnostics route
   // (api.test.ts), but the sweep itself — which hits MCP, the Web API and MusicBrainz — is not

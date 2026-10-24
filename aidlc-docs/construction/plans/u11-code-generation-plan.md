@@ -130,12 +130,12 @@ sign-out, and the live connection closing at expiry (Step 11).
       recorded ⭐. With an `http://` origin, no listener opens. A certificate whose key does not match is reported by
       name.
 
-### Step 7 — Certificate tool *(IN-U11-4, IN-U11-5; Q2)*
-- [ ] `src/certs/certPolicy.ts` (⚙️ pure): name and IP validation, the 825-day cap, and the refusal of a destination
+### Step 7 — Certificate tool *(IN-U11-4, IN-U11-5; Q2)* — ✅ DONE · `src/certs/certPolicy.ts` (pure), `certTool.ts`, `certsCli.ts`: `ca`, `issue`, `verify`; `npm run certs` and the image's `certs` (entrypoint; `openssl` added to the runtime image, Q2 = A). The CA key is refused at or under a git repository or an install folder (`compose.yaml` or `secrets/`); seen refused inside this repository. Never overwrites; random serials, so no `.srl` file beside the CA. IPv6 refused with a reason. ⭐ The tool's control is itself tested: a CA **without** a name constraint makes `issue` fail with *name constraint is NOT working*, and nothing is left behind. Run once on this PC with throwaway names (`192.0.2.10`, a documentation address), in the scratchpad. ⚠️ Found earlier, fixed here: Steps 4–5 had not registered `returnPath`, `pendingSignIns`, `authPages` with `purity.test.ts` (an unasserted text replace on a CRLF file did nothing); now registered with `certPolicy`. ⚠️ Found for Step 8: the image's `HEALTHCHECK` asks for `http://127.0.0.1/api/health`, which server mode refuses (HTTPS, public Host)
+- [x] `src/certs/certPolicy.ts` (⚙️ pure): name and IP validation, the 825-day cap, and the refusal of a destination
       inside the repository or an install folder.
-- [ ] The tool: `scripts/certs.mjs` (with `npm run certs`), and, if Q2 = A, the image's `certs` command through
+- [x] The tool: `scripts/certs.mjs` (with `npm run certs`), and, if Q2 = A, the image's `certs` command through
       `scripts/docker-entrypoint.sh`. Actions: make a CA, issue a certificate, and verify after each action.
-- [ ] Tests: the pure checks (each refusal seen to fire). The verify action's positive control is built into the
+- [x] Tests: the pure checks (each refusal seen to fire). The verify action's positive control is built into the
       tool: a throwaway certificate for a name outside the constraint is issued, and verification **must reject
       it**. If it does not, the tool exits non-zero. I run it once on this PC with throwaway names, in the scratchpad.
 

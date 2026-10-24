@@ -646,7 +646,7 @@ anonymous manifest HTTP 200).
   to recover from.
 - **U10 closed** by the owner (*"do it"*). CLAUDE.md's "until beta.9 is live" transition notes removed.
 
-## 2026-10-24T13:30:00Z — U11 Off-machine Deployment: Functional Design plan opened
+## 2026-10-24T13:00:00Z — U11 Off-machine Deployment: Functional Design plan opened
 
 - **Started** by the owner (*"lets start U11"*), choosing it over issues #29/#30 first.
 - **Probed Machine 2** (unauthenticated, read-only, from this machine: TCP connects, `GET`s, one TLS handshake):
@@ -665,7 +665,7 @@ anonymous manifest HTTP 200).
   exit-test counts, story) and six DSM values for the owner. Q3 and Q8 are security posture: options written, not
   decided. Noted in Q8: the repository is public, so U9-c's read-only GitHub deploy key is no longer needed.
 
-## 2026-10-24T14:00:00Z — U11 FD plan: the NAS's security tools; Q3's recommendation revised
+## 2026-10-24T13:27:00Z — U11 FD plan: the NAS's security tools; Q3's recommendation revised
 
 - **Owner**: SSH is on **port 222**; *SSO Client* (Security tab) available, not configured; *OAuth Service* installed,
   no apps; *Secure SignIn* installed, 2FA in use for DSM; *SSO Server* available, **not installed**. *"Ideally I'd
@@ -679,26 +679,26 @@ anonymous manifest HTTP 200).
 - **Q3's recommendation revised** from "probe A (DSM SSO Server) first" to **B** (identity provider in a container,
   DSM untouched), following the owner's stated preference. Still the owner's decision.
 
-## 2026-10-24T14:30:00Z — U11 FD Q3 = A (DSM SSO Server); how to configure it left open
+## 2026-10-24T13:35:00Z — U11 FD Q3 = A (DSM SSO Server); how to configure it left open
 
 - **Owner**: *"I'm OK with using SSO Server since it's a synology product and is part of the already active update
   process. For configuration we can either walk through it interactively OR I can provide limited access to the
   synology OS for tasks."* A full NAS backup (to a separate backup appliance) is running; after it, *"we could use more
   advanced automation if needed (synology mcp module …) with relatively low risk."*
-- **Recorded**: Q3 = A, conditional on probing SSO Server once installed. Supersedes the 14:00Z recommendation of B.
+- **Recorded**: Q3 = A, conditional on probing SSO Server once installed. Supersedes the 13:27Z recommendation of B.
 - **Raised, not decided** (security posture): the backup lowers the cost of a *configuration mistake*; it does not
   lower the *credential* risk of an agent holding DSM administrator access (the credential's reach, and an agent
   acting on content it reads). Offered: walk-through for the one-time SSO Server setup; a limited account or MCP only
   if a later task needs repeated NAS changes.
 
-## 2026-10-24T14:45:00Z — U11: SSO Server configured by hand
+## 2026-10-24T13:40:00Z — U11: SSO Server configured by hand
 
 - **Owner**: *"we can start with manual configuration."* SSO Server is installed and configured by the owner,
   walked through step by step; the agent reads results only from this machine, unauthenticated (the discovery
   document). No DSM credential is given to an agent. A limited account or a Synology MCP server stays possible later
   and is a separate decision.
 
-## 2026-10-24T15:00:00Z — U11: SSO Server's defaults; Machine 2 has a global IPv6 address
+## 2026-10-24T13:46:00Z — U11: SSO Server's defaults; Machine 2 has a global IPv6 address
 
 - **Owner** (SSO Server, General Settings): account type *Domain/LDAP/local* only; Server URL `https://<Machine 2's
   name>:5001` (default).
@@ -708,14 +708,14 @@ anonymous manifest HTTP 200).
   The LAN's "non-forwarding" description covers IPv4 port forwarding; IPv6 has no NAT, and reachability depends on
   the router's IPv6 firewall. Not tested (needs a vantage point outside the LAN).
 
-## 2026-10-24T15:15:00Z — Correction to 15:00Z: Machine 2's name does resolve to 192.168.0.223
+## 2026-10-24T13:50:00Z — Correction to 13:46Z: Machine 2's name does resolve to 192.168.0.223
 
-- The 15:00Z entry said the name resolves "not to `192.168.0.223`". **Wrong**: the probe printed only the **first**
+- The 13:46Z entry said the name resolves "not to `192.168.0.223`". **Wrong**: the probe printed only the **first**
   record returned. Listing all of them, the name has an `A` record (`192.168.0.223`) and an `AAAA` record. Found by
   the owner (`ping` showed IPv4). The posture question raised there is withdrawn as outside U11 (owner). Plan
   Section 4 Q5 note corrected.
 
-## 2026-10-24T14:40:00Z — U11: SSO Server serves OIDC (test certificate); recorded in research-findings
+## 2026-10-24T14:20:00Z — U11: SSO Server serves OIDC (test certificate); recorded in research-findings
 
 - **Owner** (DSM, by hand): imported a **test** certificate for `<Machine 2's name>.local` from a CA generated on this machine
   (name-constrained to Machine 2's names and address; the constraint **seen to refuse** a `www.google.com`

@@ -678,3 +678,15 @@ anonymous manifest HTTP 200).
   sign-in) are not needed. The `403` on discovery is consistent with SSO Server not being installed.
 - **Q3's recommendation revised** from "probe A (DSM SSO Server) first" to **B** (identity provider in a container,
   DSM untouched), following the owner's stated preference. Still the owner's decision.
+
+## 2026-10-24T14:30:00Z — U11 FD Q3 = A (DSM SSO Server); how to configure it left open
+
+- **Owner**: *"I'm OK with using SSO Server since it's a synology product and is part of the already active update
+  process. For configuration we can either walk through it interactively OR I can provide limited access to the
+  synology OS for tasks."* A full NAS backup (to a separate backup appliance) is running; after it, *"we could use more
+  advanced automation if needed (synology mcp module …) with relatively low risk."*
+- **Recorded**: Q3 = A, conditional on probing SSO Server once installed. Supersedes the 14:00Z recommendation of B.
+- **Raised, not decided** (security posture): the backup lowers the cost of a *configuration mistake*; it does not
+  lower the *credential* risk of an agent holding DSM administrator access (the credential's reach, and an agent
+  acting on content it reads). Offered: walk-through for the one-time SSO Server setup; a limited account or MCP only
+  if a later task needs repeated NAS changes.

@@ -1,7 +1,7 @@
 # U11 Functional Design Plan — Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Functional Design, Unit **U11** (Phase 5)
-**Status**: plan OPEN, Q1–Q11 awaiting the owner. Section 3 lists values only the owner can read from DSM.
+**Status**: plan OPEN. **Q3 = A** (2026-10-24); Q1, Q2, Q4–Q11 awaiting the owner. Section 3 lists values only the owner can read from DSM.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U11 (and its *Carried into its design plan*: U9-a, U9-b, U9-c, WAL, WebSocket, CPU
 architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Restore backup*, the one writer) · U7
@@ -145,7 +145,11 @@ best (DSM untouched, nothing leaves the LAN) at the price of one more service to
 maintain but works inside DSM's accounts. **C** keeps DSM untouched and is the best-maintained sign-in, but needs the
 internet at every sign-in. The earlier recommendation (probe A first) is withdrawn.
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"I'm OK with using SSO Server since it's a synology product and is part of the
+already active update process"*). Conditional on the probe: once the owner has installed SSO Server, its discovery
+document, keys, ID-token algorithm and claims, and whether it asks for the second factor are probed before the
+design relies on them. If it fails, Q3 returns. **How it gets configured** (a walk-through, limited DSM access, or a
+Synology MCP server) is an open security-posture item, recorded in `audit.md` 2026-10-24.
 
 ---
 

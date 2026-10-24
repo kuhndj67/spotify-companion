@@ -712,6 +712,21 @@ version exists, **so that** staying current never costs me months of plays I can
 *Covers FR-76, FR-79, FR-80, FR-81, FR-82 · Persona P1 · Source: U10 FD Q6 = A (2026-10-21). FR-77 and FR-78 are developer
 safety and have no story*
 
+### US-34 — I can use the app from another device, and nobody else can ⬜
+**As** the Listener, **I want** to open the app from another device on my home network after signing in, **so that**
+it can run on a machine that is always on, while nobody who has not signed in as me can reach it.
+
+**Acceptance criteria**
+- [ ] From another device on the LAN I sign in through my identity provider, and then the whole app works, live
+      updates included
+- [ ] Without signing in, or signed in as any other account, I reach nothing but a page saying why
+- [ ] My session ends after the lifetime I chose, and I can sign out, on this device or everywhere
+- [ ] The app's address uses HTTPS with a certificate my devices trust
+- [ ] A deployment that stays local works exactly as before, with no sign-in
+- [ ] My real history moves to the server with every table's count unchanged (U11's exit test)
+
+*Covers NFR-29 (as amended 2026-10-24) · Persona P1 · Source: U11 FD plan Q11 = A (2026-10-24)*
+
 ---
 
 ## INVEST Validation
@@ -753,6 +768,7 @@ safety and have no story*
 | | | NFR-28, 30–33 | US-31 |
 | | | FR-74, 75 | US-32 |
 | | | FR-76, 79, 80, 81, 82 | US-33 |
+| | | NFR-29 | US-34 |
 
 **All in-scope functional requirements are covered.** FR-55 was withdrawn on 2026-08-25 and moved
 to the wishlist (§5.1, W-1); US-27 is retained as a **deferred** story documenting why, and is

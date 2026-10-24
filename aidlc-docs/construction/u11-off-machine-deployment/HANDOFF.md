@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — Functional Design plan OPEN
+## ▶ Current state (2026-10-24) — Functional Design WRITTEN, awaiting owner approval
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -43,5 +43,10 @@ note says the same as Q9: the documents must not assume Synology.
 
 **Machine 2** (owner, 2026-10-24): DS1517+, Intel Atom C2538 (x86-64: the `amd64` image fits), 8 GB (24 % in use), DSM 7.2-64570 Update 4, Container Manager 24.0.2-1535; data on Volume 1 (Btrfs, RAID 6, 6.2 TB free).
 
-**Next**: the FD documents
-in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.
+**FD written** (2026-10-24): [`functional-design/`](functional-design/): business-logic-model, business-rules
+(BR-88 … BR-99), domain-entities, frontend-components. US-34 added to `stories.md`. ⚖️ For the owner at review: the
+proposed **7-day** session lifetime (BR-91.3). Carried to later stages: the OIDC library (NFR Design); the name, the
+app's port, CA key custody and renewal, the deploy user (Infrastructure Design); the sign-in loop retest (before Code
+Generation is accepted).
+
+**Next**: owner approval of the FD; then NFR Requirements. Nothing is installed or changed on the NAS without the owner's go-ahead.

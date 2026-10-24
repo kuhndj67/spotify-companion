@@ -808,3 +808,19 @@ anonymous manifest HTTP 200).
   the proposed startup WAL check measures WAL on the real volume.
 
 - **Owner**: Volume 1 is **Btrfs**. WAL on it is still measured by the startup check, not assumed.
+
+## 2026-10-24T17:58:00Z — U11: Functional Design written
+
+- **Owner**: *"go"*. Written in `construction/u11-off-machine-deployment/functional-design/`: business-logic-model
+  (two access modes; the sign-in; admission; the live connection; sign-out; TLS and keys; WAL; the trial, exit test
+  and move; releases; host-agnostic install), business-rules **BR-88 … BR-99**, domain-entities, frontend-components.
+- **US-34** added to `stories.md` (Q11 = A), covering NFR-29.
+- **Proposed, for the owner at review** (security posture): the session lifetime, **7 days** absolute, configurable
+  1 h … 90 days (BR-91.3). Also chosen here and open to change: `SameSite=Lax` with a required `Origin` and
+  `ingestGuard` on every state-changing request (BR-92.4), because the callback arrives by a cross-site redirect;
+  revocation by replacing the session key (*Sign out everywhere*), with single sign-outs remembered only until restart
+  (BR-94).
+- **Rejected in design**: a health or loopback exemption from sign-in in server mode (Q7 = A; no healthcheck exists);
+  a plain-HTTP listener in server mode; storing the provider's tokens.
+- **Carried**: the OIDC library (NFR Design); name, port, CA key custody and renewal, the deploy user (Infrastructure
+  Design); the sign-in loop retest (before Code Generation is accepted; if it persists, Q3 returns).

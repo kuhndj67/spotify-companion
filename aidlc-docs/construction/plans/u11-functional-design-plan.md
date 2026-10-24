@@ -1,7 +1,7 @@
 # U11 Functional Design Plan — Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Functional Design, Unit **U11** (Phase 5)
-**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3 filled.
+**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3 filled. **FD documents written** (2026-10-24), awaiting owner approval.
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U11 (and its *Carried into its design plan*: U9-a, U9-b, U9-c, WAL, WebSocket, CPU
 architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Restore backup*, the one writer) · U7
@@ -333,10 +333,10 @@ A
 
 ## 5. Plan: after the answers
 
-- [ ] Fill in Section 3 (owner) and collect Q1–Q11; ask follow-ups for anything ambiguous (rule Step 5). Amend NFR-29's wording if Q4 = B (`requirements.md`, `audit.md`): **done**, ratified 2026-10-24
-- [ ] If Q3 = A: probe DSM's SSO Server once the owner has installed it (discovery, JWKS, ID-token algorithm and claims, redirect URIs it accepts) and record it in `research-findings.md` **before** the design names its claims
-- [ ] `construction/u11-off-machine-deployment/functional-design/business-logic-model.md`: the two access modes and how one is chosen; the token check on HTTP and on the WebSocket upgrade, through `decideAccess`; the trial and the move (Q1); the exit test sequence (Q10)
-- [ ] `…/functional-design/business-rules.md`: BR-… issuer, audience, subject, signature, expiry and clock-skew checks; key fetching and rotation; what happens when the keys cannot be fetched (refuse, never admit); Host/Origin in trusted-proxy mode (the configured address replaces loopback, so the DNS-rebinding defence is kept); a WebSocket outliving its token; the `403` sentences; trusted-proxy mode never active by accident (one explicit setting, visible in Diagnostics); the startup WAL check (Section 2). Each rule with a test that must be **seen to fail** on a forged, expired, wrong-audience and unsigned token
-- [ ] `…/functional-design/domain-entities.md`: access mode, verified identity, the allowed identity (Q6), the provider's keys
-- [ ] `…/functional-design/frontend-components.md`: the `403` page off-machine (who is signed in and why they were refused); Diagnostics shows the access mode and the provider. Both colour schemes
-- [ ] `HANDOFF.md`, `aidlc-state.md`, `audit.md` updated; completion message; owner approval
+- [x] Fill in Section 3 (owner) and collect Q1–Q11; ask follow-ups for anything ambiguous (rule Step 5). Amend NFR-29's wording if Q4 = B (`requirements.md`, `audit.md`): **done**, ratified 2026-10-24
+- [x] If Q3 = A: probe DSM's SSO Server once the owner has installed it (discovery, JWKS, ID-token algorithm and claims, redirect URIs it accepts) and record it in `research-findings.md` **before** the design names its claims
+- [x] `construction/u11-off-machine-deployment/functional-design/business-logic-model.md`: the two access modes and how one is chosen; the token check on HTTP and on the WebSocket upgrade, through `decideAccess`; the trial and the move (Q1); the exit test sequence (Q10)
+- [x] `…/functional-design/business-rules.md`: BR-… issuer, audience, subject, signature, expiry and clock-skew checks; key fetching and rotation; what happens when the keys cannot be fetched (refuse, never admit); Host/Origin in trusted-proxy mode (the configured address replaces loopback, so the DNS-rebinding defence is kept); a WebSocket outliving its token; the `403` sentences; trusted-proxy mode never active by accident (one explicit setting, visible in Diagnostics); the startup WAL check (Section 2). Each rule with a test that must be **seen to fail** on a forged, expired, wrong-audience and unsigned token
+- [x] `…/functional-design/domain-entities.md`: access mode, verified identity, the allowed identity (Q6), the provider's keys
+- [x] `…/functional-design/frontend-components.md`: the `403` page off-machine (who is signed in and why they were refused); Diagnostics shows the access mode and the provider. Both colour schemes
+- [x] `HANDOFF.md`, `aidlc-state.md`, `audit.md` updated; completion message; owner approval

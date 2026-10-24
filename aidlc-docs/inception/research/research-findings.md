@@ -764,10 +764,13 @@ decoded claims and check results only, never a raw token or the secret.
 **Silent re-sign-in** (`prompt=none`, 15:01Z, the same browser still signed in to SSO Server, ~2 min after the first
 token): redirected **at once** with a code, no page shown; a new ID token, same checks all pass (signature, altered
 copy refused, `iss`, `aud`, `nonce`), again **180 s**. ⚠️ `auth_time` **equals the new `iat`**, not the time of the
-real sign-in, so `auth_time` cannot measure how old the sign-in is. ⚠️ **Not tested**: `prompt=none` with **no**
-SSO Server session (does it return `error=login_required`, or show a sign-in page?), and how long SSO Server's own
-session lasts. Without the first, this result cannot tell "`prompt=none` honoured" apart from "`prompt` ignored and
-the session still valid".
+real sign-in, so `auth_time` cannot measure how old the sign-in is. ⚠️ **`prompt=none` with no SSO Server session** (15:05Z, a Chrome incognito window): SSO Server showed its **sign-in
+page**, not `error=login_required`. So it does **not** honour `prompt=none` there; a silent refresh after the session
+ends lands on a hidden sign-in page. Signing in from it (privileged account, second factor) then **looped** back to
+sign-in, second factor included. ⚠️ This revises the read-only account's loop above: the privileged account loops
+too, so the loop is **not** shown to be about account privileges; it may belong to sign-ins that start from an
+authorize link with no session (the first Chrome sign-in also failed to resume, landing on the portal). Not
+measured: SSO Server's own session length.
 
 ⚠️ **Consequence for the design** (not a measurement): a 3-minute ID token with no refresh token cannot be checked by
 the app "on every request" for a whole session unless the proxy repeats the sign-in redirect every 3 minutes, which

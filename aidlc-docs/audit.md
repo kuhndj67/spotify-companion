@@ -751,3 +751,12 @@ anonymous manifest HTTP 200).
 
 - Owner ran the probe's `prompt=none` link: immediate redirect with a code, a valid 180 s ID token. `auth_time` is
   reset to the new token's time. Not tested: the no-session case, and SSO Server's session length.
+
+## 2026-10-24T15:06:00Z — U11: prompt=none without a session shows sign-in; probes cleaned up
+
+- Incognito, no SSO Server session: `prompt=none` showed the sign-in page (not `login_required`). The owner signed in
+  (privileged account, second factor) and it **looped**. This weakens the earlier "read-only account cannot use DSM"
+  reading of the first loop: the privileged account loops too. Recorded in `research-findings.md`.
+- **Cleaned up** (agent): the probe stopped; `client.json` (the probe application's secret) and the callback files
+  deleted from the session scratchpad. Owner to delete the *Spotify Companion probe* application in SSO Server. The
+  test CA and certificate stay until the real CA replaces them.

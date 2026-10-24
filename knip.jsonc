@@ -28,6 +28,10 @@
     "src/history/skipAttribution.ts"
   ],
 
+  // U11 (P-94): `openssl` is a SYSTEM program, not an npm package. The fake provider's per-run CA is made with it
+  // (test/support/testCa.ts); Git for Windows and CI's Ubuntu both ship one. Nothing to list in package.json.
+  "ignoreBinaries": ["openssl"],
+
   // Exports consumed only inside their own file are not reported. ⚠️ They are still a smell -- an
   // export with no external consumer should usually just be a `const` -- and four were removed on
   // 2026-10-03 because of this tool. This setting stops the report drowning in the harmless ones.

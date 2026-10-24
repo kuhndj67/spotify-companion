@@ -79,7 +79,7 @@ Machine 2 has no Spotify registration during the retest, so the app there shows 
 sign-out, and the live connection closing at expiry (Step 11).
 
 ### Step 1 — Dependency and access configuration *(LC-82; BR-88; P-89; PBT-91, PBT-92)* — ✅ DONE · ⚠️ the pin moves to **Step 5** (knip fails an unused dependency until `ProviderClient.ts` imports it). Checked: `openid-client` 6.8.8 (MIT, 2026-09-05), `oauth4webapi` 3.8.8 (MIT, 2026-09-05); `jose` **6.2.13 is four days old** (2026-10-20), so the lock is held at **6.2.12** (2026-09-05, satisfies `^6.2.12` and the MCP SDK's `^6.1.3`). ⚠️ Deviation from BR-88.1: an unknown `ACCESS_MODE` is a *problem* like BR-88.4's (no listener, recording continues), not a refusal to start, by BR-91.6; empty counts as absent (compose writes `ACCESS_MODE:` as `""`). Positive control: a validator that stops at the first problem fails PBT-92
-- [ ] *(moved to Step 5)* `package.json`: `openid-client` **6.8.8** pinned exactly in `dependencies`; `package-lock.json` locks `jose` and
+- [x] *(done in Step 5)* `package.json`: `openid-client` **6.8.8** pinned exactly in `dependencies`; `package-lock.json` locks `jose` and
       `oauth4webapi`. Before pinning, check that the version is at least two weeks old, and record its licence.
 - [x] `src/access/accessConfig.ts` (⚙️ pure): `parseMode`, `validateServerConfig` (reports every problem at once), the
       derived redirect URI. `src/config.ts` reads `ACCESS_MODE`, `PUBLIC_ORIGIN`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
@@ -109,16 +109,16 @@ sign-out, and the live connection closing at expiry (Step 11).
       once) and `src/access/returnPath.ts` (`safeReturnPath`).
 - [x] Tests: PBT-95, PBT-99. Positive control: a store that does not remove an entry when it is consumed fails PBT-99.
 
-### Step 5 — Fake provider, provider client, sign-in routes *(LC-95, LC-86, LC-88; BR-89, BR-90; P-90, P-94)*
-- [ ] `test/support/fakeOidcProvider.ts`: HTTPS on a random port, a test CA generated for each run, and switches that
+### Step 5 — Fake provider, provider client, sign-in routes *(LC-95, LC-86, LC-88; BR-89, BR-90; P-90, P-94)* — ✅ DONE · the pin landed here (from Step 1). ⚠️ **Found by the fake provider's switches**: (1) `openid-client` does **not verify the ID token's signature** for a token from the token endpoint unless `enableNonRepudiationChecks` is applied (a tampered signature and an unpublished key were admitted); now applied. (2) It does not refuse an `iat` in the future (BR-90.4); checked in `ProviderClient`. (3) Its key-set rule matches BR-90.6 as written: an unknown `kid` refetches only if the cached set is ≥ 60 s old (dropped at 300 s); tested by moving `Date.now`. (4) It form-encodes the client ID and secret inside Basic authentication (RFC 6749 §2.3.1: `-` → `%2D`); whether DSM's SSO Server decodes that is seen at Step 10. Measured: Node's own `fetch` trusts `NODE_EXTRA_CA_CERTS` (refused without it, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`). The test CA is made with `openssl` per run (`test/support/testCa.ts`; knip told it is a system program). Pages in `src/access/authPages.ts` (pure); `/auth/signed-out` served now. Positive controls: an identity check accepting any `sub` fails 2 tests; removing the signature checks fails 3
+- [x] `test/support/fakeOidcProvider.ts`: HTTPS on a random port, a test CA generated for each run, and switches that
       make it misbehave (P-94's list).
-- [ ] `src/access/ProviderClient.ts`: the **only** importer of `openid-client`. RS256 only; 60 s clock tolerance;
+- [x] `src/access/ProviderClient.ts`: the **only** importer of `openid-client`. RS256 only; 60 s clock tolerance;
       discovery with retry; the key set fetched again for an unknown `kid`, at most once a minute. It returns
       `VerifiedIdentity | reason`. Library errors are mapped to a reason and an error **name** only.
-- [ ] `src/access/authRoutes.ts`, mounted in `src/api.ts`: `/auth/sign-in`, `/auth/callback`, `/auth/problem` and the
+- [x] `src/access/authRoutes.ts`, mounted in `src/api.ts`: `/auth/sign-in`, `/auth/callback`, `/auth/problem` and the
       session status read. Sign-out comes in Step 11. A successful callback issues the session and redirects to the
       safe return path.
-- [ ] Tests: one refusal for each BR-90 switch, through the real routes. Positive control: an identity check that
+- [x] Tests: one refusal for each BR-90 switch, through the real routes. Positive control: an identity check that
       accepts any `sub` fails the other-account case. In local mode every `/auth/*` route returns `404`.
 
 ### Step 6 — HTTPS listener and startup order *(LC-90; BR-88.4, BR-96.1; P-89, P-96, P-100)*

@@ -777,6 +777,18 @@ the app "on every request" for a whole session unless the proxy repeats the sign
 breaks background requests and the WebSocket. U11's FD Q4 must settle what the app verifies after the first minutes.
 
 
+## `openid-client` 6.8.8, measured against the fake provider (U11, 2026-10-24)
+
+Measured through the app's real routes against `test/support/fakeOidcProvider.ts`, one misbehaviour per test.
+
+| | Measured |
+|---|---|
+| ⚠️ **ID-token signature** | **Not verified** for a token from the token endpoint by default (OIDC Core 3.1.3.7 allows trusting TLS instead): a tampered signature and a key the key set never published were **admitted**. `enableNonRepudiationChecks` (passed to `discovery` in `execute`) makes both refused. `alg: none` and `HS256` were refused either way (the `RS256` expectation) |
+| ⚠️ `iat` in the future | **Not refused** by the library; the app checks it (BR-90.4) |
+| Unknown `kid` | the key set is fetched again only if the cached one is **≥ 60 s** old; the cache is dropped at **300 s** (oauth4webapi 3.8.8). So a rotated key is refused for up to a minute after the last fetch |
+| Basic client authentication | the ID and secret are **form-encoded** before base64 (RFC 6749 §2.3.1): `-` is sent as `%2D`. A provider that compares without decoding refuses it. ⚠️ Not yet seen against SSO Server |
+| Node's own `fetch` and `NODE_EXTRA_CA_CERTS` | trusted (Node 22.17; positive control: without it, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`) |
+
 ## Sources
 
 - [Spotify: Introducing some changes to our Web API (Nov 2024)](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)

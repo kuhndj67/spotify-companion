@@ -104,10 +104,10 @@ sign-out, and the live connection closing at expiry (Step 11).
       unchanged. Positive controls: a session verifier stub that throws is refused (P-92); an admission rule that
       skips Host when a session is valid fails PBT-94.
 
-### Step 4 — Sign-ins in progress *(LC-87; BR-89; P-99; PBT-95, PBT-99)*
-- [ ] `src/access/pendingSignIns.ts` (at most 32 entries, 10 minutes each, the oldest evicted first, each consumed
+### Step 4 — Sign-ins in progress *(LC-87; BR-89; P-99; PBT-95, PBT-99)* — ✅ DONE · `safeReturnPath` also refuses a backslash anywhere and any return into `/auth/` (a return to the sign-in would start another). ⚠️ **The positive controls caught a weak property**: with 51 state names the generator almost never consumed one twice, and it never passed the cap, so a store that kept consumed entries, and one with no cap, both passed PBT-99 (only the example tests failed). Strengthened with a small name pool and a burst operation; both mutations now fail PBT-99. A return path that allows `//` fails PBT-95
+- [x] `src/access/pendingSignIns.ts` (at most 32 entries, 10 minutes each, the oldest evicted first, each consumed
       once) and `src/access/returnPath.ts` (`safeReturnPath`).
-- [ ] Tests: PBT-95, PBT-99. Positive control: a store that does not remove an entry when it is consumed fails PBT-99.
+- [x] Tests: PBT-95, PBT-99. Positive control: a store that does not remove an entry when it is consumed fails PBT-99.
 
 ### Step 5 — Fake provider, provider client, sign-in routes *(LC-95, LC-86, LC-88; BR-89, BR-90; P-90, P-94)*
 - [ ] `test/support/fakeOidcProvider.ts`: HTTPS on a random port, a test CA generated for each run, and switches that

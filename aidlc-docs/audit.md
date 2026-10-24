@@ -645,3 +645,22 @@ anonymous manifest HTTP 200).
   `/api/health` ok, no refusal in the log. Not seen: the *"Spotify is answering again"* line, since no refusal occurred
   to recover from.
 - **U10 closed** by the owner (*"do it"*). CLAUDE.md's "until beta.9 is live" transition notes removed.
+
+## 2026-10-24T13:30:00Z — U11 Off-machine Deployment: Functional Design plan opened
+
+- **Started** by the owner (*"lets start U11"*), choosing it over issues #29/#30 first.
+- **Probed Machine 2** (unauthenticated, read-only, from this machine: TCP connects, `GET`s, one TLS handshake):
+  80/443/5000/5001 open, **22 refused** (SSH off); DSM 7 (`SYNO.API.Auth` v7) with Container Manager
+  (`SYNO.Docker.*`, including `Project`) and `SYNO.OAUTH.*`; `/webman/sso/.well-known/openid-configuration` → `403`
+  on 5000/5001, and on 80/443 a `200` whose body is only DSM's redirect page (read, not assumed). So DSM's OIDC
+  capability is **unknown**, not absent. Certificate: DSM factory default (`CN = synology.com`). Published
+  `1.0.0-beta.9` manifest: single-platform (`amd64`).
+- **Found**: `SqliteHistoryRepository` sets `journal_mode = WAL` without reading the result; measured with
+  `node:sqlite` on `:memory:` that the call does not throw and the mode stays `memory`. A volume without WAL would
+  go unnoticed. Proposed as a business rule; nothing changed in code.
+- **Corrected before writing**: a draft line claimed the app "refuses to run" without WAL. Checked the code: it does
+  not. Removed.
+- **Plan**: `construction/plans/u11-functional-design-plan.md`, Q1–Q11 (role, registrations, identity provider,
+  proxy, address and certificate, who is admitted, what a signed-in browser may do, deploy path, install document,
+  exit-test counts, story) and six DSM values for the owner. Q3 and Q8 are security posture: options written, not
+  decided. Noted in Q8: the repository is public, so U9-c's read-only GitHub deploy key is no longer needed.

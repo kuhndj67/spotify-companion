@@ -1,7 +1,7 @@
 # NFR Design Plan — U11: Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — NFR Design, Unit U11
-**Status**: plan OPEN, Q1–Q6 for the owner.
+**Status**: Q1–Q6 all **A** (owner, 2026-10-24). ✅ **ALL ANSWERED.** Deliverables: `nfr-design/nfr-design-patterns.md` (**P-88…P-101**), `nfr-design/logical-components.md` (**LC-82…LC-96**, **PBT-91…PBT-100**).
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: U11 Functional Design (**approved 2026-10-24**): `business-rules.md` **BR-88…BR-99**,
 `business-logic-model.md`, `domain-entities.md`, `frontend-components.md` · **NFR-29** (amended 2026-10-24) ·
@@ -61,7 +61,7 @@ logged), NFR-28 (no credentials in the repo) · `research-findings.md`, *Machine
 | **B** | **`oauth4webapi` + `jose` directly**: the same author's lower-level pieces, one dependency fewer, more of the flow wired by us |
 | **C** | **Our own code on `node:crypto`**, as the probe did: no new dependency. ⚠️ Hand-written token validation is where OIDC bugs live (algorithm confusion, `aud` arrays, `azp`); every rule in BR-90 becomes ours to get right and keep right |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"the 6 questions all can take the recommended path"*)
 
 ### Q2 — How the app's session is signed (BR-91)
 
@@ -70,7 +70,7 @@ logged), NFR-28 (no credentials in the repo) · `research-findings.md`, *Machine
 | **A** | ⭐ **HMAC-SHA256 on `node:crypto`**, a fixed format of our own (`v1.<payload>.<mac>`), verified with `timingSafeEqual`. No algorithm field to confuse; about 40 lines; every case property-tested |
 | **B** | **A JWT signed with `jose`** (HS256, algorithm pinned). A standard format, from a library Q1 = A or B brings anyway. A JWT's flexibility (headers, algorithms) is what makes it riskier to verify than needed for one app talking to itself |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"the 6 questions all can take the recommended path"*)
 
 ### Q3 — How the sign-in is tested
 
@@ -79,7 +79,7 @@ logged), NFR-28 (no credentials in the repo) · `research-findings.md`, *Machine
 | **A** | ⭐ **An in-process fake provider in the test suite** (real HTTP, discovery, a key set from a generated RSA key, a token endpoint that can be told to misbehave: wrong `iss`, wrong `aud`, expired, `alg: none`, another `kid`, another account), driving the app's real routes end to end, plus the WebSocket upgrade. **And one live acceptance against SSO Server**, by hand, recorded in `research-findings.md` (it includes the loop retest, Q4) |
 | **B** | **A or plus a container provider in CI** (a mock OIDC server image). Closer to a real provider; one more image pinned and pulled in CI |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"the 6 questions all can take the recommended path"*)
 
 ### Q4 — When the sign-in loop is retested through the app's own flow
 
@@ -90,7 +90,7 @@ The probes saw the provider loop or land on its portal when a sign-in started fr
 | **A** | ⭐ **First, as Code Generation's step 1**: build the sign-in routes (behind server mode, not yet admitting anything), run them against SSO Server, and record the result **before** the rest is built. If the loop persists, stop: Q3 (the provider) returns with the facts |
 | **B** | **At the end**, during the live acceptance. Cheaper if it works; if it does not, everything built on SSO Server waits |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"the 6 questions all can take the recommended path"*)
 
 ### Q5 — Picking up a renewed certificate
 
@@ -101,7 +101,7 @@ The server certificate lasts up to 825 days (Apple's limit, Q5 of the FD plan).
 | **A** | ⭐ **A restart picks it up.** Renewal is rare and done by the owner, who then restarts the container; Diagnostics warns 30 days before expiry (BR-96.2) |
 | **B** | **The app watches the files and reloads** the certificate without a restart. More code, for an event every two years |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"the 6 questions all can take the recommended path"*)
 
 ### Q6 — Repeated sign-in attempts
 
@@ -110,13 +110,13 @@ The server certificate lasts up to 825 days (Apple's limit, Q5 of the FD plan).
 | **A** | ⭐ **The bounded set of PendingSignIns only** (BR-89.3): any number of attempts costs fixed memory, the provider does the password checking (and its own lockout), and the LAN is private |
 | **B** | **Also a per-address rate limit** on `/auth/*`. Useful if the app is ever reachable beyond the LAN, which is out of scope |
 
-[Answer]:
+[Answer]: **A** (owner, 2026-10-24: *"the 6 questions all can take the recommended path"*)
 
 ---
 
 ## 5. Plan: after the answers
 
-- [ ] Collect Q1–Q6; follow-ups for anything ambiguous
-- [ ] `construction/u11-off-machine-deployment/nfr-design/nfr-design-patterns.md`: **P-88 …**, each pattern tied to its BR and its failing test
-- [ ] `…/nfr-design/logical-components.md`: **LC-82 …** (access mode and config, provider client, PendingSignIn store, session codec, admission, sign-in routes, live-connection expiry, Access diagnostics, WAL check, corpus fingerprint, deploy-command parser) and **PBT-91 …**
+- [x] Collect Q1–Q6; follow-ups for anything ambiguous
+- [x] `construction/u11-off-machine-deployment/nfr-design/nfr-design-patterns.md`: **P-88 …**, each pattern tied to its BR and its failing test
+- [x] `…/nfr-design/logical-components.md`: **LC-82 …** (access mode and config, provider client, PendingSignIn store, session codec, admission, sign-in routes, live-connection expiry, Access diagnostics, WAL check, corpus fingerprint, deploy-command parser) and **PBT-91 …**
 - [ ] `HANDOFF.md`, `aidlc-state.md`, `audit.md` updated; completion message; owner approval

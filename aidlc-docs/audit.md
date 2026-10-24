@@ -836,3 +836,17 @@ anonymous manifest HTTP 200).
   Allocates P-88, LC-82, PBT-91 onward.
 - Still awaiting the owner: what to do about Machine 2's name in pushed commit `015e836` (redaction committed
   locally, not pushed).
+
+## 2026-10-24T18:12:00Z — U11: recording made independent of access; NFR Design written
+
+- **Owner**: *"The app as deployed should run indefinitely on the data collection side (other than for cert renewal
+  of course), but user logins can have a limited session length."* The 7-day session lifetime stands for sign-ins.
+- **FD amended after approval** in consequence: **BR-88.4** (a refused server configuration opens no listener but
+  **no longer exits**, so recording continues; first written as an exit, which would have stopped recording),
+  **BR-88.6** (a provider issuer mismatch refuses sign-in instead of refusing to start), **BR-91.6** added (nothing on
+  the poll and record path reads access, sessions or the provider; a structural test enforces it). Frontend gains
+  the `provider-mismatch` sentence.
+- **Owner**: NFR Design **Q1–Q6 all A** (*"the 6 questions all can take the recommended path"*). Written:
+  `nfr-design/nfr-design-patterns.md` (**P-88…P-101**), `nfr-design/logical-components.md` (**LC-82…LC-96**,
+  **PBT-91…PBT-100**). The deploy command's property test is left to Infrastructure Design with the deploy user.
+- **Owner**: rewrite the branch history to remove Machine 2's name (pushed in `015e836`). Done next.

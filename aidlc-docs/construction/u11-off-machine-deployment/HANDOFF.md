@@ -2,7 +2,7 @@
 
 **The single entry point for U11.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-24) — Functional Design ✅ APPROVED · NFR Design plan OPEN
+## ▶ Current state (2026-10-24) — Functional Design ✅ APPROVED · NFR Design WRITTEN, awaiting owner approval
 
 [`plans/u11-functional-design-plan.md`](../plans/u11-functional-design-plan.md): Q1–Q11 for the owner, plus six
 values only the owner can read from DSM (Section 3: model and CPU, DSM version, Container Manager version, the SSO
@@ -53,4 +53,9 @@ Generation is accepted).
 NFR Requirements skipped, as for U1–U10. **NFR Design plan open**: [`plans/u11-nfr-design-plan.md`](../plans/u11-nfr-design-plan.md),
 Q1–Q6 (library, session signing, tests, when the loop is retested, certificate renewal, repeated sign-ins).
 
-**Next**: the owner's answers; then `nfr-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.
+**Recording never depends on access** (owner, 2026-10-24): BR-88.4 and 88.6 amended (a refused configuration
+stops serving, not recording), BR-91.6 added. **NFR Design written**: Q1–Q6 all A; [`nfr-design/`](nfr-design/)
+(P-88…P-101, LC-82…LC-96, PBT-91…PBT-100).
+
+**Next**: owner approval of NFR Design; then Infrastructure Design (name, port, CA key custody and renewal, deploy
+user). Code Generation's step 1 is the sign-in loop retest (P-95). Nothing is installed or changed on the NAS without the owner's go-ahead.

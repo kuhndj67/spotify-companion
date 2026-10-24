@@ -27,7 +27,11 @@ deployment* subsections.
 
 The mode is **one setting** with exactly two values; absent means **local**. Nothing infers it (not the network, not
 the presence of a certificate, not "in a container"). Server mode with any required value missing or invalid
-**refuses to start serving** (BR-88.4): it never falls back to local, and never serves without the sign-in.
+**opens no listener** (BR-88.4): it never falls back to local, and never serves without the sign-in.
+
+**Recording is independent of access** (BR-91.6, owner 2026-10-24): data collection runs indefinitely. Only browser
+sign-ins are time-limited; nothing about sessions, sign-out, the provider or a refused configuration stops polling
+or recording.
 
 `decideAccess` stays the **one** admission rule. It gains the mode and, in server mode, the session check; HTTP and
 the WebSocket upgrade still call it with the same inputs (BR-92).

@@ -29,6 +29,7 @@ Sign-in did not complete
 | `state` | *That sign-in was started in another browser or tab. Start again here.* |
 | `provider-error` | *The sign-in provider refused: <its error code>.* |
 | `provider-unreachable` | *The sign-in provider cannot be reached. Already signed-in devices are unaffected.* |
+| `provider-mismatch` | *The sign-in provider's address does not match this app's configuration (see Diagnostics).* |
 | `verification` | *The sign-in provider's answer could not be verified.* (details in the log, never on the page) |
 | `wrong-account` | *Signed in as <sub>. This app admits only its owner's account.* Shown with `403` |
 

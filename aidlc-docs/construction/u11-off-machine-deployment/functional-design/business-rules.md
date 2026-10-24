@@ -18,16 +18,21 @@ wrong-audience, wrong-account or unsigned token or session), or the rule is a be
 - **88.3 Server mode requires all of**: the **public address** (an `https://` origin: scheme, host, port; no path),
   the **issuer** (exact string), the **client ID**, the **client secret** (a file, BR-95), the **allowed account**
   (BR-90.5), the **certificate and key** (files), the **session lifetime** (BR-91.3).
-- **88.4 Fail closed.** Server mode with any 88.3 value missing, unreadable or invalid (an `http://` public address,
-  a certificate that does not parse, a key that does not match it) → the app **does not listen**. It logs one line
-  per problem and exits non-zero, so the container's restart policy shows it as failing. It never falls back to
-  local mode and never serves without the sign-in. ⚙️ `validateServerConfig(values) → ok | problems[]`. 🔴
+- **88.4 Fail closed: no serving, recording unaffected.** Server mode with any 88.3 value missing, unreadable or
+  invalid (an `http://` public address, a certificate that does not parse, a key that does not match it) → the app
+  **opens no listener at all**: it never falls back to local mode and never serves without the sign-in. It logs one
+  line per problem at startup and repeats a one-line summary every hour. **Polling and recording run as usual**
+  (BR-91.6). *Amended 2026-10-24 after FD approval (owner: the data-collection side runs indefinitely; only user
+  sign-ins are time-limited). As first written, the app exited, which also stopped recording.* ⚙️
+  `validateServerConfig(values) → ok | problems[]`. 🔴 (and a test that recording continues while serving is refused)
 - **88.5 Not inferred.** Nothing switches mode on its own: not the presence of a certificate, not the network, not
   `inContainer`. `trustPublishedPort` and `LOCAL_ONLY=false` have **no effect** in server mode (the server rule
   replaces them), and Diagnostics says so if they are set.
-- **88.6 Provider discovery at startup.** In server mode the app fetches the issuer's discovery document; its
-  `issuer` must equal the configured issuer **exactly**, and it must offer `code`, `S256` and `RS256`. A mismatch →
-  refuse to start (88.4). Unreachable → start, but sign-in is refused until it is reachable (BR-90.6). 🔴
+- **88.6 Provider discovery.** In server mode the app fetches the issuer's discovery document; its `issuer` must
+  equal the configured issuer **exactly**, and it must offer `code`, `S256` and `RS256`. A mismatch or unreachable
+  provider → the app serves, **sign-in is refused** with the reason (BR-90.6), Diagnostics fails, and discovery is
+  retried (at most once a minute, on a sign-in attempt). Existing sessions and recording are unaffected. *Amended
+  2026-10-24 with 88.4: a mismatch first refused to start.* 🔴
 
 ## BR-89 — A sign-in in progress (PendingSignIn)
 
@@ -71,7 +76,7 @@ wrong-audience, wrong-account or unsigned token or session), or the rule is a be
   fails verification is treated as absent, never as partially valid. ⚙️ `signSession` / `verifySession(cookie, key,
   now)`. 🔴 (a flipped byte, a re-signed content under another key, an expired one, an empty one)
 - **91.3 Lifetime**: absolute, from sign-in; **not** extended by use. ⚖️ **Proposed default 7 days**, configurable
-  from 1 hour to 90 days; out of range → refuse to start (BR-88.4). After expiry the owner signs in again; while the
+  from 1 hour to 90 days; out of range → no serving (BR-88.4). After expiry the owner signs in again; while the
   provider's own session lasts, that sign-in may be silent.
 - **91.4 The cookie**: name prefixed `__Host-` (so it is `Secure`, path `/`, and bound to this exact host),
   `HttpOnly`, `SameSite=Lax`, `Max-Age` equal to the remaining lifetime. `Lax` and not `Strict`, because the callback
@@ -79,6 +84,14 @@ wrong-audience, wrong-account or unsigned token or session), or the rule is a be
   BR-92.4, not by `SameSite`.
 - **91.5 The subject is rechecked on every request** against the allowed account, so changing the allowed account
   (a restart with a new value) invalidates every session for the old one.
+
+- **91.6 Recording never depends on access** *(added 2026-10-24, owner: "the app as deployed should run
+  indefinitely on the data collection side … but user logins can have a limited session length")*. Session expiry,
+  sign-out, *Sign out everywhere*, an unreachable or misbehaving provider, and refused server configuration (88.4)
+  never stop, pause or slow polling, recording, kept backups or rule evaluation. Nothing on the poll and record path
+  reads the access mode, a session or the provider. The only planned interruption is a restart (certificate renewal,
+  release), after which the existing backfill recovers recent plays. 🔴 (a structural test: no module on the poll and
+  record path imports an access module)
 
 ## BR-92 — Admission in server mode: `decideAccess`, the one rule (NFR-29)
 

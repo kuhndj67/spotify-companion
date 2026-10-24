@@ -23,7 +23,7 @@ nothing here is in a backup (BR-95.1).
 | `providerTrustAnchor` | optional: a private authority's certificate, for the app's TLS calls to the provider | public file (BR-95.4) |
 
 Derived: `redirectUri = publicOrigin + "/auth/callback"`, registered at the provider by the owner.
-Invariant: valid as a whole or the app does not serve (BR-88.4).
+Invariant: valid as a whole or the app does not serve; recording is unaffected either way (BR-88.4, BR-91.6).
 
 ## AccessPolicy (value, extended)
 

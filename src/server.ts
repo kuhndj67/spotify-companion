@@ -1,6 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
@@ -12,7 +13,11 @@ import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
 import { runDiagnostics } from './diagnostics.js';
 import type { AutomationDiagnosticsInput } from './diagnostics.js';
-import { localGuard, decideAccess, accessRequestFrom } from './localGuard.js';
+import { localGuard, decideAccess, accessRequestFrom, serverGuard, type ServerAccessPolicy, type SessionVerifier } from './localGuard.js';
+import { configureAccess, newSessionId, notServingLines, notServingSummary } from './access/accessStartup.js';
+import { ProviderClient } from './access/ProviderClient.js';
+import { PendingSignIns } from './access/pendingSignIns.js';
+import { verifySession } from './access/session.js';
 import { createApi, type DisplayLiked } from './api.js';
 import { BackTestService } from './rules/BackTestService.js';
 import { EvaluationCoordinator } from './rules/EvaluationCoordinator.js';
@@ -1024,9 +1029,49 @@ const credentials = new CredentialsWriter({
   now: () => Date.now(),
 });
 
+// -- U11: access (BR-88, LC-90) ------------------------------------------------
+//
+// Decided once, here, from the configuration and the server-mode files. It NEVER throws, and whatever it says,
+// recording starts below (`startRecording()`, unconditionally; BR-91.6, pinned by test/accessWiring.test.ts).
+// `not-serving` opens no listener at all: never a fallback to local mode, never serving without the sign-in.
+const access = configureAccess({
+  modeRaw: config.accessModeRaw,
+  publicOriginRaw: config.publicOriginRaw,
+  issuerRaw: config.oidcIssuerRaw,
+  clientIdRaw: config.oidcClientIdRaw,
+  allowedSubjectRaw: config.oidcAllowedSubjectRaw,
+  sessionLifetimeRaw: config.sessionLifetimeRaw,
+  clientSecretPath: config.oidcClientSecretPath,
+  certPath: config.tlsCertPath,
+  keyPath: config.tlsKeyPath,
+  sessionKeyPath: config.sessionKeyPath,
+  localOnlyRaw: process.env.LOCAL_ONLY,
+  trustPublishedPortRaw: process.env.TRUST_PUBLISHED_PORT,
+});
+const serverPolicy: ServerAccessPolicy | null =
+  access.mode === 'server' ? { mode: 'server', publicHost: access.config.publicHost, publicOrigin: access.config.publicOrigin } : null;
+/** The current session key; *Sign out everywhere* replaces it (Step 11). */
+let sessionKey: Buffer | null = access.mode === 'server' ? access.sessionKey : null;
+/** BR-94.1: ids signed out on this run, until their own expiry. */
+const revokedSessions = new Set<string>();
+const verifyRequestSession: SessionVerifier = (cookie) =>
+  access.mode !== 'server' || sessionKey === null
+    ? { kind: 'invalid' }
+    : verifySession(cookie, { key: sessionKey, now: Date.now(), allowedSubject: access.config.allowedSubject, revoked: revokedSessions });
+const provider =
+  access.mode === 'server'
+    ? new ProviderClient({
+        issuer: access.config.issuer,
+        clientId: access.config.clientId,
+        clientSecret: access.clientSecret,
+        redirectUri: access.config.redirectUri,
+      })
+    : null;
+
 const app = express();
 app.disable('x-powered-by');
-app.use(localGuard);
+// One admission rule in both modes (`decideAccess`); in `not-serving` there is no listener for it to guard.
+app.use(serverPolicy !== null ? serverGuard(serverPolicy, verifyRequestSession) : localGuard);
 
 /**
  * The API lives in `api.ts`, built from injected dependencies.
@@ -1073,6 +1118,21 @@ app.use(
     // must say *the machinery is not built* rather than draw a switch that would do nothing if thrown.
     skipExecutorEnabled: SKIP_EXECUTOR_ENABLED,
     skipAttempts,
+    // U11 (LC-88): the sign-in routes, server mode only; absent → every /auth/* path is a 404 (BR-88.2).
+    auth:
+      access.mode === 'server' && provider !== null
+        ? {
+            provider,
+            pending: new PendingSignIns(),
+            publicOrigin: access.config.publicOrigin,
+            allowedSubject: access.config.allowedSubject,
+            sessionLifetimeMs: access.config.sessionLifetimeMs,
+            sessionKey: () => sessionKey ?? access.sessionKey,
+            now: () => Date.now(),
+            newSessionId,
+            log: (line) => console.log(line),
+          }
+        : null,
     // U7. Behind `localGuard` (app-wide) AND `ingestGuard` (per route, in api.ts), like U6.
     rulesWriter,
     credentials,
@@ -1184,7 +1244,8 @@ function automationDiagnostics(): AutomationDiagnosticsInput {
 
 app.use(express.static(publicDir));
 
-const server = createServer(app);
+// U11 (BR-96.1, P-100): server mode has ONE listener, HTTPS. There is no code path to a plain-HTTP one in server mode.
+const server = access.mode === 'server' ? createHttpsServer({ cert: access.tls.cert, key: access.tls.key }, app) : createServer(app);
 
 // -- WebSocket push (Q5) ----------------------------------------------------
 // noServer + manual upgrade handling, so the same local-only rules apply to the
@@ -1198,14 +1259,18 @@ const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  // U11 (P-88): the request is built by the SAME helper the middleware uses (`accessRequestFrom`).
-  const decision = decideAccess(accessRequestFrom(request), {
-    localOnly: config.localOnly,
-    trustPublishedPort: config.trustPublishedPort,
-  });
+  // U11 (P-88): the request is built by the SAME helper the middleware uses (`accessRequestFrom`), and judged by the
+  // same policy and session step.
+  const decision = decideAccess(
+    accessRequestFrom(request),
+    serverPolicy ?? { localOnly: config.localOnly, trustPublishedPort: config.trustPublishedPort },
+    verifyRequestSession,
+  );
 
   if (!decision.ok || request.url !== '/ws') {
-    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+    // BR-92.5: a missing or expired session is 401 before the handshake, so the page knows to sign in (BR-93.3).
+    const unauthenticated = !decision.ok && (decision.reason === 'no-session' || decision.reason === 'session-expired');
+    socket.write(unauthenticated ? 'HTTP/1.1 401 Unauthorized\r\n\r\n' : 'HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
     return;
   }
@@ -1572,10 +1637,13 @@ registerEvaluationTick();
 
 // ---------------------------------------------------------------------------
 
-server.listen(config.port, config.host, () => {
-  console.log(`spotify-companion listening on http://${config.host}:${config.port}`);
+/**
+ * U11 (BR-91.6, P-96): everything that polls, records and backs up. Started UNCONDITIONALLY, before and whatever
+ * the listener does: a refused server configuration stops serving, never recording. Was the body of the
+ * `listen` callback until U11; all of it is fire-and-forget, so nothing here waits for a listener.
+ */
+function startRecording(): void {
   console.log(`MCP server entrypoint: ${config.mcpServerEntrypoint}`);
-  console.log(`Local-only enforcement: ${config.localOnly ? 'on' : 'OFF'}`);
 
   if (repository) {
     console.log(`History: ${config.historyDbPath} (schema v${repository.schemaVersion})`);
@@ -1643,7 +1711,29 @@ server.listen(config.port, config.host, () => {
       })
       .catch((error) => console.warn('[backfill] failed:', error));
   }
-});
+}
+
+startRecording();
+
+if (access.mode === 'not-serving') {
+  // BR-88.4: every problem once, then a one-line summary every hour. No port is opened.
+  for (const line of notServingLines(access.problems)) console.error(line);
+  setInterval(() => console.error(notServingSummary(access.problems)), 3_600_000).unref();
+} else {
+  server.listen(config.port, config.host, () => {
+    if (access.mode === 'server') {
+      console.log(`spotify-companion listening on https://${config.host}:${config.port}, public address ${access.config.publicOrigin}`);
+      console.log(`Access: server mode, sign-in through ${access.config.issuer}`);
+      if (access.ignoredSettings.length > 0) console.warn(`[access] ignored in server mode: ${access.ignoredSettings.join(', ')} (BR-88.5)`);
+      void provider?.discover().then((r) => {
+        if (!r.ok) console.warn(`[access] the sign-in provider is not usable yet: ${r.reason}${r.detail ? ` [${r.detail}]` : ''}; retried on the next sign-in`);
+      });
+    } else {
+      console.log(`spotify-companion listening on http://${config.host}:${config.port}`);
+      console.log(`Local-only enforcement: ${config.localOnly ? 'on' : 'OFF'}`);
+    }
+  });
+}
 
 let shuttingDown = false;
 

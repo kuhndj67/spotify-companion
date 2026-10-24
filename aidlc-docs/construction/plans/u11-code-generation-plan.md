@@ -121,12 +121,12 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [x] Tests: one refusal for each BR-90 switch, through the real routes. Positive control: an identity check that
       accepts any `sub` fails the other-account case. In local mode every `/auth/*` route returns `404`.
 
-### Step 6 — HTTPS listener and startup order *(LC-90; BR-88.4, BR-96.1; P-89, P-96, P-100)*
-- [ ] `src/server.ts`: in server mode the one listener is `node:https`, with the configured certificate and key.
+### Step 6 — HTTPS listener and startup order *(LC-90; BR-88.4, BR-96.1; P-89, P-96, P-100)* — ✅ DONE · `src/access/accessStartup.ts` (`configureAccess`, never throws) decides `local` / `server` / `not-serving`; it also checks the key matches the certificate (`X509Certificate.checkPrivateKey`) and creates the session key only once everything else is valid. `server.ts`: the listen callback's body moved into `startRecording()`, called once at top level before the listener; `not-serving` opens no listener and logs every problem, then an hourly summary; the WebSocket upgrade answers `401` for a missing or expired session (BR-92.5). ⚠️ **Deviation**: the guard test with a *scripted player* is not built: the suite has no way to run `server.ts` with a player, and the real connector cannot be used in a test. In its place, `configureAccess` is tested against real files (each value removed, mismatched key, non-PEM files, every problem listed, no secret in any line) and `server.ts`'s order is pinned on its text (as U6's wiring is). The end-to-end check (plays recorded while serving is refused) is observed on the built image in Step 9 and on Machine 2. ⚠️ Not yet run as a process. Positive control: moving `startRecording()` into the serving branch fails 3 pins
+- [x] `src/server.ts`: in server mode the one listener is `node:https`, with the configured certificate and key.
       Express and the `ws` upgrade attach to it. History opens and polling starts **before** access is configured. A
       refused configuration opens no listener, logs every problem, and logs an hourly *not serving* line. Recording
       continues.
-- [ ] Tests: server mode with each required value removed in turn → no port is open, and a scripted player's plays are
+- [x] Tests: server mode with each required value removed in turn → no port is open, and a scripted player's plays are
       recorded ⭐. With an `http://` origin, no listener opens. A certificate whose key does not match is reported by
       name.
 

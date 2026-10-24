@@ -84,8 +84,8 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 - **The container is the deployment**: `docker compose up -d` → `http://localhost:3010`. ⚠️ `localhost:3000` is a
   **different app**.
 - ⚠️ **Never run the container and `npm start` together.** Both poll Spotify. A host run records into `data-dev/`, and
-  the writer lock (`data/history.db.lock`) refuses a second process on one database. Until `1.0.0-beta.9` is live the
-  container does not take the lock: assume it is running, and `docker compose down` first.
+  the writer lock (`data/history.db.lock`) refuses a second process on one database. Assume the container is running, and
+  `docker compose down` first.
 - **`data/` cannot be regenerated** (months of plays). It is gitignored, which makes it *more* exposed to `git clean
   -xdf`. Never delete play rows to tidy anything.
 - Mounts: `./data` (history, and its automatic backups in `backups/`: same disk, so copy them elsewhere), `./state` (automation kill switch, update-check and reminder switches: **never** in `data/` or `config/`), `./config` (rules,
@@ -96,7 +96,7 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 - **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (public). Pushing a tag is the owner's act.
 - Automation ships **off** (`SKIP_EXECUTOR_ENABLED`, plus the UI kill switch). Never arm it on the owner's behalf.
 - Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and hold
-  the writer lock (container down until `1.0.0-beta.9` is live).
+  the writer lock, so the container must be down.
 
 ## Commands
 

@@ -2,7 +2,17 @@
 
 **The single entry point for U10.** Read this, then the current stage's document.
 
-## ▶ Current state (2026-10-23) — ✅ `1.0.0-beta.9` live and published
+## ▶ Current state (2026-10-24) — ✅ U10 CLOSED (owner)
+
+The poll recovered: Spotify's lockout was its Development-mode quota (`429`, `reason QUOTA_EXCEEDED`,
+`Retry-After 5348` s, read by one direct request at 2026-10-23 21:04Z; the connector reports only *"exceeded its rate
+limits"*). The container was stopped at 21:07Z so polling would not prolong it, and restarted 2026-10-24 12:26Z after
+the same request returned `204`. First start: lock acquired, schema v8, backfill 18 inserted / 32 known, a live
+decision recorded, no refusal logged. Follow-ups filed by the owner's direction, **not built** (each needs a
+requirements round): issue #29 (fetch and show Spotify's own reason and wait; wait exactly `Retry-After`; recommend
+pausing) and issue #30 (pause Spotify polling from Diagnostics).
+
+### Earlier (2026-10-23) — ✅ `1.0.0-beta.9` live and published
 
 Released (owner-approved) with `npm run release -- --apply --app-is-down`: the live container had been stopped on
 purpose during the Spotify rate-limit incident (audit 2026-10-23), so the release's own backup step could not run; a

@@ -78,13 +78,13 @@ for. So the Step 1 build includes the full admission rule (Step 3), and a comple
 Machine 2 has no Spotify registration during the retest, so the app there shows no data. Not yet built at that point:
 sign-out, and the live connection closing at expiry (Step 11).
 
-### Step 1 — Dependency and access configuration *(LC-82; BR-88; P-89; PBT-91, PBT-92)*
-- [ ] `package.json`: `openid-client` **6.8.8** pinned exactly in `dependencies`; `package-lock.json` locks `jose` and
+### Step 1 — Dependency and access configuration *(LC-82; BR-88; P-89; PBT-91, PBT-92)* — ✅ DONE · ⚠️ the pin moves to **Step 5** (knip fails an unused dependency until `ProviderClient.ts` imports it). Checked: `openid-client` 6.8.8 (MIT, 2026-09-05), `oauth4webapi` 3.8.8 (MIT, 2026-09-05); `jose` **6.2.13 is four days old** (2026-10-20), so the lock is held at **6.2.12** (2026-09-05, satisfies `^6.2.12` and the MCP SDK's `^6.1.3`). ⚠️ Deviation from BR-88.1: an unknown `ACCESS_MODE` is a *problem* like BR-88.4's (no listener, recording continues), not a refusal to start, by BR-91.6; empty counts as absent (compose writes `ACCESS_MODE:` as `""`). Positive control: a validator that stops at the first problem fails PBT-92
+- [ ] *(moved to Step 5)* `package.json`: `openid-client` **6.8.8** pinned exactly in `dependencies`; `package-lock.json` locks `jose` and
       `oauth4webapi`. Before pinning, check that the version is at least two weeks old, and record its licence.
-- [ ] `src/access/accessConfig.ts` (⚙️ pure): `parseMode`, `validateServerConfig` (reports every problem at once), the
+- [x] `src/access/accessConfig.ts` (⚙️ pure): `parseMode`, `validateServerConfig` (reports every problem at once), the
       derived redirect URI. `src/config.ts` reads `ACCESS_MODE`, `PUBLIC_ORIGIN`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`,
       `OIDC_ALLOWED_SUBJECT`, `SESSION_LIFETIME` (1 h–90 d, default 7 d) and the secret and certificate paths.
-- [ ] `test/accessConfig.property.test.ts`: PBT-91, PBT-92. Positive control: a validator that stops at the first
+- [x] `test/accessConfig.property.test.ts`: PBT-91, PBT-92. Positive control: a validator that stops at the first
       problem fails PBT-92.
 
 ### Step 2 — Session codec and key store *(LC-84, LC-85; BR-91, BR-95.2; P-91, P-92; PBT-96)*

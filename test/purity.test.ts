@@ -127,6 +127,10 @@ const PURE_MODULES = [
   // ⚠️ DECIDES whether another process is alive (P-76). A clock read here would judge the lock by age — the
   // exact mistake the pattern exists to avoid: a just-killed container's lock looks fresh.
   'lock/lockDecision.ts',
+  // ─── U11 ─────────────────────────────────────────────────────────────────────────────────────
+  // ⚠️ DECIDES whether the app serves at all in server mode (P-89). It is handed what the shell found; a file or
+  // environment read here would make PBT-92 test a different configuration from the one judged at startup.
+  'access/accessConfig.ts',
 ];
 
 /**

@@ -38,6 +38,11 @@ function int(name: string, fallback: number): number {
   return parsed;
 }
 
+/** A file in the app's secrets folder: the container's mount, or `secrets/app/` for a host run. */
+function secretPath(name: string, file: string): string {
+  return process.env[name] ?? (inContainer ? `${CONTAINER_SECRETS_DIR}/${file}` : join(projectRoot, 'secrets', 'app', file));
+}
+
 export const config = {
   /** Port the web app listens on. */
   port: int('PORT', 3000),
@@ -98,6 +103,26 @@ export const config = {
    * inside a container.
    */
   trustPublishedPort: process.env.TRUST_PUBLISHED_PORT === 'true',
+
+  // -- U11: access mode (BR-88, IN-U11-2, IN-U11-7) ---------------------------
+  //
+  // RAW values only. `access/accessConfig.ts` judges them (`parseMode`, `validateServerConfig`), so a bad value is
+  // reported with every other problem instead of throwing here, and never stops recording (BR-88.4, BR-91.6).
+  // ⚠️ `trustPublishedPort` and `localOnly` above have NO effect in server mode (BR-88.5).
+
+  /** `local` (absent) or `server`. Never inferred (BR-88.5). */
+  accessModeRaw: process.env.ACCESS_MODE,
+  publicOriginRaw: process.env.PUBLIC_ORIGIN,
+  oidcIssuerRaw: process.env.OIDC_ISSUER,
+  oidcClientIdRaw: process.env.OIDC_CLIENT_ID,
+  oidcAllowedSubjectRaw: process.env.OIDC_ALLOWED_SUBJECT,
+  sessionLifetimeRaw: process.env.SESSION_LIFETIME,
+
+  /** The secrets folder's U11 files (BR-95.1): inside the `/app/secrets` DIRECTORY mount, so a rename can replace one. */
+  oidcClientSecretPath: secretPath('OIDC_CLIENT_SECRET_PATH', 'oidc-client-secret'),
+  sessionKeyPath: secretPath('SESSION_KEY_PATH', 'session.key'),
+  tlsCertPath: secretPath('TLS_CERT_PATH', 'tls/server-cert.pem'),
+  tlsKeyPath: secretPath('TLS_KEY_PATH', 'tls/server-key.pem'),
 
   // -- U1: listening history --------------------------------------------------
 

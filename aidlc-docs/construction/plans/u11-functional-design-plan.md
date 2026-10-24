@@ -175,6 +175,15 @@ The owner's devices must trust the HTTPS certificate, and the OIDC provider redi
 | **B** | **A public DNS name with a Let's Encrypt certificate by DNS challenge**, the name pointing at the private address. Every device trusts it with no install. Needs a domain the owner controls and a DNS provider with an API; the name (not the app) becomes public |
 | **C** | **The IP address and a self-signed certificate**, warning accepted in each browser. ⚠️ Some OIDC providers refuse a redirect to an IP address, and browsers keep warning. Not recommended. **Ruled out for Q3 = A** (Synology's SSO Server help, read 2026-10-24 through a search summary, not yet seen on the NAS): a redirect URI must use the same protocol as SSO Server, should be an HTTPS domain with a valid TLS certificate, and **cannot be an IP address or a QuickConnect address**; up to 10 per application |
 
+*Added 2026-10-24, from the NAS* (owner): SSO Server's account type is *Domain/LDAP/local* (the only choice; the
+domain/LDAP part greyed out). Its default **Server URL** is `https://<Machine 2's name>:5001`. Probed from this
+machine: that name resolves (Windows name resolution, both the bare name and `.local`) to a **global IPv6 address**
+(`2606:…`), not to `192.168.0.223`, and `https://<name>:5001/` answers `200`. ⚠️ Two consequences, not yet measured:
+(1) a container on the NAS may not resolve a name that this PC resolves by local-network discovery, and the app must
+reach the issuer to fetch its keys; (2) a global IPv6 address is reachable from the internet unless the router's
+IPv6 firewall blocks inbound connections. The "private, non-forwarding LAN" in `unit-of-work.md` was written for IPv4.
+Whether it holds for IPv6 is a security-posture question for the owner (raised 2026-10-24).
+
 *Added 2026-10-24*: with Q3 = A, SSO Server's own **Server URL** (General Settings) is the token issuer. The browser
 signs in there, and the app fetches its keys from there, so the Q5 name and certificate cover **both** SSO Server's
 address and the app's.

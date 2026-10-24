@@ -697,3 +697,13 @@ anonymous manifest HTTP 200).
   walked through step by step; the agent reads results only from this machine, unauthenticated (the discovery
   document). No DSM credential is given to an agent. A limited account or a Synology MCP server stays possible later
   and is a separate decision.
+
+## 2026-10-24T15:00:00Z — U11: SSO Server's defaults; Machine 2 has a global IPv6 address
+
+- **Owner** (SSO Server, General Settings): account type *Domain/LDAP/local* only; Server URL `https://<Machine 2's
+  name>:5001` (default).
+- **Probed** from this machine: the name resolves to a **global IPv6 address** (`2606:…`), not `192.168.0.223`;
+  `https://<name>:5001/` → `200`.
+- **Raised to the owner, not decided** (security posture): whether inbound IPv6 from the internet reaches Machine 2.
+  The LAN's "non-forwarding" description covers IPv4 port forwarding; IPv6 has no NAT, and reachability depends on
+  the router's IPv6 firewall. Not tested (needs a vantage point outside the LAN).

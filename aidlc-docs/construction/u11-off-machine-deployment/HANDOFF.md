@@ -32,5 +32,8 @@ answered: our own CA. Probe results: `research-findings.md`, *Machine 2's SSO Se
 `prompt=none` shows a sign-in page; sign-ins started from an authorize link can loop or land on the portal. Probe
 secret deleted; the owner deletes the probe application. **Q4 must be re-asked** with these facts.
 
-**Next**: Q4 rewritten as a follow-up question; the remaining answers (Q1, Q2, Q4, Q6–Q11, Section 3); then the FD documents
+**Q4a = B** (owner, 2026-10-24): the app is the OIDC client with its own signed session cookie; no proxy. This
+**amends NFR-29**: proposed wording is in the plan's Q4a answer, awaiting the owner's ratification in `requirements.md`.
+
+**Next**: ratify the NFR-29 amendment; the remaining answers (Q1, Q2, Q6–Q11, Section 3); then the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

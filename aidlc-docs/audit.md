@@ -767,3 +767,13 @@ anonymous manifest HTTP 200).
 - **Q4a** added to the FD plan as Q4's follow-up: what carries the session past the 180 s ID token. A (proxy signs
   forwarded requests; unverified feature), ⭐ B (the app is the OIDC client with its own signed session cookie, no
   proxy; amends NFR-29), C (repeat sign-in; measured not to work cleanly). Security posture: the owner's.
+
+## 2026-10-24T16:57:00Z — U11: Q4a = B
+
+- **Owner** (*"Ok lets go with B"*): the app is the OIDC client (authorization code with PKCE), verifies SSO Server's
+  ID token once at sign-in, then keeps **its own signed session cookie**, checked by `decideAccess` on HTTP and the
+  WebSocket upgrade. No proxy; the app serves TLS itself.
+- **Rejected**: A (`oauth2-proxy` signing forwarded requests; its signing feature unverified, one more service and a
+  shared key); C (repeat sign-in; measured not to work cleanly past SSO Server's session).
+- **Consequence**: NFR-29 as written ("behind a proxy … trusted-proxy mode … identity token on every request") no
+  longer fits. Amended wording proposed in the FD plan's Q4a answer; **not yet ratified**, so FD does not start on it.

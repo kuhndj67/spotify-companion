@@ -187,7 +187,18 @@ in the probes and would otherwise sit inside a proxy's configuration. Its cost i
 with an established library rather than by hand, and a requirements change. **A** keeps NFR-29's original shape if
 its unverified signing feature is confirmed by a probe.
 
-[Answer]:
+[Answer]: **B** (owner, 2026-10-24: *"Ok lets go with B"*). The app is the OIDC client and keeps its own signed
+session; no proxy. **NFR-29 must be amended** before this unit's Functional Design; proposed wording, for the owner
+to ratify in `requirements.md`:
+
+> **Off-machine access uses delegated authentication.** The app never handles passwords. Off-machine, the app signs
+> the user in through an external OIDC provider (authorization code with PKCE), verifies the provider's **signed ID
+> token** once at sign-in, and then requires a **session the app itself signed** on every request — HTTP **and** the
+> WebSocket upgrade, through **one** policy function (`decideAccess`). The app serves TLS itself. Local-only stays the
+> default mode.
+
+Open under B, for the FD documents: the session lifetime (owner's choice), the library, and the retest of the
+sign-in loop through the app's own flow.
 
 ---
 

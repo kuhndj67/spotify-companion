@@ -33,7 +33,7 @@ answered: our own CA. Probe results: `research-findings.md`, *Machine 2's SSO Se
 secret deleted; the owner deletes the probe application. **Q4 must be re-asked** with these facts.
 
 **Q4a = B** (owner, 2026-10-24): the app is the OIDC client with its own signed session cookie; no proxy. This
-**amends NFR-29**: proposed wording is in the plan's Q4a answer, awaiting the owner's ratification in `requirements.md`.
+**amends NFR-29**: the new wording is **ratified** (owner, 2026-10-24) and in `requirements.md`.
 
 **Q1–Q11 answered** (owner, 2026-10-24): Q1 = A, and **both modes stay supported** (local-only, as today, and the
 server mode this unit builds); Q2 = A; Q6 = A; Q7 = A; Q8 = B, with A (by hand) for the first deployment; Q9: the
@@ -41,5 +41,7 @@ install instructions are **host-agnostic**, naming the services a container host
 steps in clearly labelled subsections (*For Synology deployment*) inside each step; Q10 = A; Q11 = A (US-34). Q3's
 note says the same as Q9: the documents must not assume Synology.
 
-**Next**: ratify the NFR-29 amendment; Section 3's values; then the FD documents
+**Machine 2** (owner, 2026-10-24): DS1517+, Intel Atom C2538 (x86-64: the `amd64` image fits), 8 GB, DSM 7.2-64570 Update 4.
+
+**Next**: the FD documents
 in `functional-design/`. Nothing is installed or changed on the NAS without the owner's go-ahead.

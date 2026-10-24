@@ -789,3 +789,14 @@ anonymous manifest HTTP 200).
   (an OIDC provider among them), and do not assume Synology; host-specific steps go in labelled subsections
   (*For Synology deployment*) inside each step, so other hosts can be added later. Q3's answer gained the same note.
 - Still open: ratification of the proposed NFR-29 wording; Section 3's DSM values.
+
+## 2026-10-24T17:45:00Z — U11: NFR-29 amendment ratified; Machine 2's hardware
+
+- **Owner** ratified the amended NFR-29 (*"nfr-29 ratified"*): the app signs the user in through an external OIDC
+  provider, verifies its signed ID token once, then requires a session the app itself signed on every request, HTTP
+  and WebSocket upgrade, through `decideAccess`; the app serves TLS. Written into `requirements.md`; a dated
+  amendment note added to `unit-of-work.md` §U11 (its original sentence kept).
+- **Owner** gave Machine 2's values: DS1517+, Intel Atom C2538 (4 cores, 2.4 GHz), 8 GB, DSM 7.2-64570 Update 4.
+  x86-64, so the published `amd64` image fits and no `arm64` build is needed. Not measured: whether the image's Node
+  runtime starts on a CPU without AVX; the trial checks it first. Still open (none blocks the FD): Container Manager
+  version, the data volume and its file system, free RAM.

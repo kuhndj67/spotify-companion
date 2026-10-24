@@ -1,7 +1,7 @@
 # U11 Functional Design Plan — Off-machine Deployment
 
 **Date**: 2026-10-24 · **Stage**: CONSTRUCTION — Functional Design, Unit **U11** (Phase 5)
-**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a). Awaiting: the NFR-29 amendment's ratification and Section 3's values.
+**Status**: plan OPEN. Q1–Q11 answered (owner, 2026-10-24; Q4 via Q4a); NFR-29 amendment ratified. Section 3: values 3, 5 and 6 still open (none blocks the FD).
 **Workspace root**: `D:/Software/Spotify` · **Project type**: Brownfield
 **Inputs**: `unit-of-work.md` §U11 (and its *Carried into its design plan*: U9-a, U9-b, U9-c, WAL, WebSocket, CPU
 architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Restore backup*, the one writer) · U7
@@ -19,7 +19,7 @@ architecture) · **NFR-29** (Requirements Q11a = B) · NFR-28 · W-10 · U6 (*Re
 | | |
 |---|---|
 | **Phase** | 5. Build order U6 → … → U10 → **U11** → U12 |
-| **Settled already** | Q11a = **B**: delegated authentication. An OIDC sign-in at a proxy that terminates TLS; the app verifies a **signed identity token** on every request, HTTP **and** WebSocket upgrade, in **one** function (`decideAccess`). Local-only stays the default mode (NFR-29) |
+| **Settled already** | Q11a = **B**: delegated authentication (NFR-29). *Amended 2026-10-24 by Q4a = B, ratified*: the app runs the OIDC sign-in itself, verifies the provider's signed ID token once, then requires a session it signed on every request, HTTP **and** WebSocket upgrade, in **one** function (`decideAccess`); the app serves TLS; no proxy. Local-only stays the default mode |
 | **Exit criterion** | (from U6, NFR Design Q10 = A) the **real corpus** is backed up here, restored on the NAS through *Restore backup*, and the NAS app runs with **the same counts** |
 | **Verification** | The NAS deployment is performed **by following U8's install routine**: the walk is the test |
 | **Not U11's** | Issue #29 (Spotify's reason and wait) and #30 (pause polling): own requirements round · teams (U12) · in-app Spotify sign-in (W-10: TLS makes it possible, it is not built here) |
@@ -91,12 +91,12 @@ These need a DSM sign-in, which this plan does not have. Each is one line in DSM
 
 | # | Value | Where in DSM | [Answer] |
 |---|---|---|---|
-| 1 | **Model and CPU** (decides `amd64` vs `arm64`) | Control Panel → Info Center → General: *Model name*, *CPU* | |
-| 2 | **DSM version** | same page: *DSM version* | |
+| 1 | **Model and CPU** (decides `amd64` vs `arm64`) | Control Panel → Info Center → General: *Model name*, *CPU* | **DS1517+, Intel Atom C2538** (4 cores, 2.4 GHz), 8 GB RAM installed (owner, 2026-10-24). x86-64, so the published **`amd64`** image is the right architecture; no `arm64` build. ⚠️ An Atom C2000 has no AVX (Intel's specification): whether the image's Node runtime starts on it is **not measured** and is the first thing the trial checks |
+| 2 | **DSM version** | same page: *DSM version* | **DSM 7.2-64570 Update 4** (owner, 2026-10-24) |
 | 3 | **Container Manager version** | Package Center → Installed → Container Manager | |
 | 4 | **What the SSO/OAuth package is called and its state** | Package Center → Installed | **Answered** (owner, 2026-10-24): *SSO Client* (Control Panel, Security tab): available, not configured · *OAuth Service* package: installed, no apps configured · *Secure SignIn* package: installed, 2FA in use for DSM sign-in · *SSO Server* package: available, **not installed**. See Section 2a |
 | 5 | **Which volume would hold the app's data**, and its file system | Storage Manager: e.g. *Volume 1, Btrfs* | |
-| 6 | **Free RAM** | Resource Monitor → Memory | |
+| 6 | **Free RAM** | Resource Monitor → Memory | *Total* given: 8 GB. Free RAM still open |
 
 ---
 
@@ -333,7 +333,7 @@ A
 
 ## 5. Plan: after the answers
 
-- [ ] Fill in Section 3 (owner) and collect Q1–Q11; ask follow-ups for anything ambiguous (rule Step 5). Amend NFR-29's wording if Q4 = B (`requirements.md`, `audit.md`)
+- [ ] Fill in Section 3 (owner) and collect Q1–Q11; ask follow-ups for anything ambiguous (rule Step 5). Amend NFR-29's wording if Q4 = B (`requirements.md`, `audit.md`): **done**, ratified 2026-10-24
 - [ ] If Q3 = A: probe DSM's SSO Server once the owner has installed it (discovery, JWKS, ID-token algorithm and claims, redirect URIs it accepts) and record it in `research-findings.md` **before** the design names its claims
 - [ ] `construction/u11-off-machine-deployment/functional-design/business-logic-model.md`: the two access modes and how one is chosen; the token check on HTTP and on the WebSocket upgrade, through `decideAccess`; the trial and the move (Q1); the exit test sequence (Q10)
 - [ ] `…/functional-design/business-rules.md`: BR-… issuer, audience, subject, signature, expiry and clock-skew checks; key fetching and rotation; what happens when the keys cannot be fetched (refuse, never admit); Host/Origin in trusted-proxy mode (the configured address replaces loopback, so the DNS-rebinding defence is kept); a WebSocket outliving its token; the `403` sentences; trusted-proxy mode never active by accident (one explicit setting, visible in Diagnostics); the startup WAL check (Section 2). Each rule with a test that must be **seen to fail** on a forged, expired, wrong-audience and unsigned token

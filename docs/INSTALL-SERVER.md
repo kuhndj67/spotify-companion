@@ -25,6 +25,18 @@ person can do is a box starting **👤 YOU DO THIS**. Each step says what **any*
 Synology deployment***, what a Synology NAS needs in particular. The Synology parts were measured on a DS1517+ with
 DSM 7.2 and Container Manager 24.0.2; other hosts are written for but not walked.
 
+## If you are an AI agent following this file
+
+1. When you reach a **👤 YOU DO THIS** box, **show it to the person word for word**, then **stop and wait** until they
+   say it is done. Never try to do one yourself: they need a browser, the provider's administration pages, a password,
+   or a private key that must not pass through you.
+2. **Never ask for, read or repeat** the client secret, any private key (`*-key.pem`) or the session key. Ask only
+   for what a box says to tell you.
+3. Where a step runs on the **server**, you may not have a shell there: show the person the command and wait for what
+   they report.
+4. Compare what you see with **Expected**; on a difference, follow **If it differs**, and stop if that does not get
+   you past it.
+
 ⚠️ **One recorder at a time.** If you already run the app on another machine, do **not** give this server your
 Spotify credentials until you have moved your history to it (N7). Two installs recording the same account
 double-count every play, and nothing stops you: each install's one-writer lock covers its own database only.

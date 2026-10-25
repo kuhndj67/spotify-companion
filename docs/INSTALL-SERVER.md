@@ -297,7 +297,8 @@ arrived, and only then let the server record. Afterwards the old machine stops r
 1. On the server: N1–N6 done, signed in, **no Spotify credentials** yet (so it records nothing).
 2. On the machine that records now: **Settings → Create backup** (a `.tar.gz` downloads).
 3. In the server's app, from your browser: **Settings → Restore backup**, choose that file, confirm. The server
-   restarts with your history.
+   restarts with your history. A backup holds the history only, so also bring your **rules**: on the old machine,
+   **Rules → Rules file → Download rules**; on the server, **Rules → Rules file → Upload rules…** that file and confirm.
 4. **The exit test**, immediately, before anything else: run **Diagnostics** on both and compare the row
    ***Table counts and rules hash***: every table and count, and the rules hash, must be identical. To compare by
    machine instead, save each report (`/api/diagnostics`: on the old machine
@@ -320,7 +321,9 @@ the server records.
   bring everything; restore again from the same file and compare again, and report it if it persists.
 - The server recorded before step 4 (credentials added early): its own plays make the counts differ. Restore again,
   then compare.
+- Only the rules hash differs: the rules file was not uploaded to the server (step 3), or was changed on one side.
 - `corpus:compare` says *has no fingerprint*: one side runs a version before server mode, or has no database open.
+  The old machine must run this release too before the test: update it first (*Updating* in its install guide).
 
 ---
 

@@ -154,7 +154,7 @@ sign-out, and the live connection closing at expiry (Step 11).
       Expected: it starts, `/auth/problem` is served, and every other route is refused without a session.
 - [x] Deliver it as Q1 decides. With A, I save the image file in the scratchpad and give you its full path.
 
-### Step 10 — ⛔ Gate: the deployment by hand and the retest (P-95)
+### Step 10 — ⛔ Gate: the deployment by hand and the retest (P-95) — ✅ GATE PASSED WITH A WORKAROUND (owner, 2026-10-24: *"yea lets do A"*) · Deployed by hand on Machine 2 (steps 1–4; permissions fixed by hand, see research-findings). Retest: a sign-in started from the authorize link with **no SSO Server session loops for every account** (dedicated and administrator; SSO Server's log records nothing; the app receives no callback); **with an SSO Server session first it completes** (attempts 2–4: plain, after the app's cookie is deleted, deep link). Version 3.0.7 and DSM's iframe setting ruled out. Not done: attempt 5. **Owner's decision: option A**, keep SSO Server; the app shows *sign in at the provider first, then Continue* when `OIDC_PROVIDER_PORTAL` is set (BR-89.6, added). Rejected: B (look for a DSM setting; none found), C (an identity provider in a container). FD plan Q3 stays A. Built as **Step 10a**
 - [ ] You, with my guidance, follow deployment-architecture §4 steps 1–4:
       1. Make the real CA on this PC and issue the two certificates. Move the CA key offline.
       2. Import SSO Server's certificate in DSM. Register the app in SSO Server.
@@ -167,6 +167,12 @@ sign-out, and the live connection closing at expiry (Step 11).
       state (no SSO Server session, a live one, an expired app session, a deep link, after SSO Server's own
       sign-out). Each is recorded as *completed*, *looped* or *landed on the portal*, in `research-findings.md`.
 - [ ] **All completed → Part B. A persistent loop → stop**; the FD plan's Q3 goes back to you with the records.
+
+### Step 10a — Sign in at the provider first *(BR-89.6; owner's option A)*
+- [ ] `OIDC_PROVIDER_PORTAL` (optional, `https://` only) in `accessConfig` (PBT-92 extended), `config.ts`, `accessStartup`; `compose.server.yaml` (with the Synology value as a comment) and its drift test.
+- [ ] `src/access/authPages.ts`: the *Sign in first* page; `authRoutes.ts`: `/auth/sign-in` shows it unless `go=1`, then proceeds as before. Tests: the page, its two links (portal in a new tab, Continue keeping the return path), escaping, and the sign-in completing through Continue; without the setting, unchanged.
+- [ ] Fix found at Step 10: a lock that cannot be created (`EACCES`) runs the app display-only with the reason instead of crashing into a restart loop (`WriterLock.acquire`, U10).
+- [ ] A new candidate image for Machine 2, so the retest's attempt 5 and a fresh-browser sign-in are run through the page.
 
 ## Part B — after the retest
 

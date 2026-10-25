@@ -928,3 +928,19 @@ anonymous manifest HTTP 200).
   observed: plays recorded while not serving (no Spotify credentials in an isolated run). Saved as an image file
   (Q1 = A). The live `1.0.0-beta.9` container was not touched.
 - Next: Step 10, the deployment by hand and the sign-in retest, by the owner with guidance.
+
+## 2026-10-25T01:10:00Z — U11 Step 10: the P-95 gate; owner chooses option A
+
+- Deployed by hand on Machine 2 with the candidate image (CA and certificates made on this PC by `npm run certs`; SSO
+  Server's certificate imported; the app registered; the CA trusted on this PC; the project created). Found: the share's
+  ACL refuses the container's user (fixed by hand: the four mounted folders owned by uid 1000, Linux mode); a lock that
+  cannot be created crashes the app into a restart loop (U10 defect, to fix); Windows PowerShell drops an unquoted `--`.
+- **Retest** (research-findings): from the authorize link with no SSO Server session, the sign-in **loops for every
+  account**, SSO Server logs nothing and the app receives no callback; **with an SSO Server session first it completes**
+  (plain, after the app's cookie is deleted, deep link). Ruled out: SSO Server version (3.0.7), DSM's iframe setting,
+  account privileges. Web search: no confirmed fix; one unresolved report of the same symptom.
+- **Owner**: *"yea lets do A"*: keep SSO Server; the app shows *sign in at the provider first, then Continue* when the
+  optional `OIDC_PROVIDER_PORTAL` is set (**BR-89.6 added**). Correction given to the owner with the decision: the app
+  cannot detect the provider's session, so the page appears on every sign-in the app needs, not only when SSO Server's
+  session has ended (one click when it has not). Rejected: B (a DSM setting; none found), C (a provider in a container).
+  Built as Step 10a, with the lock fix.

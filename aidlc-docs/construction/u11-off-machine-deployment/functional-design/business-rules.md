@@ -51,6 +51,15 @@ wrong-audience, wrong-account or unsigned token or session), or the rule is a be
   defence. ⚙️ `safeReturnPath(raw)`, property: the result, resolved against the public address, always has the public
   address's origin. 🔴
 
+- **89.6 Sign in at the provider first, when it needs that** *(added 2026-10-24, owner: Step 10 gate, option A)*.
+  Measured on Machine 2: SSO Server's sign-in page does not resume an authorization request that arrives with no SSO
+  Server session (it loops, for every account), but completes at once when its own session exists. So, when the
+  optional setting `OIDC_PROVIDER_PORTAL` is set (an `https://` address), `GET /auth/sign-in` first shows a page:
+  *1. sign in at the provider (opens in a new tab); 2. Continue*. *Continue* is `/auth/sign-in?go=1&return=…`, which
+  starts the sign-in as in 89.1. Without the setting, `/auth/sign-in` starts it at once (a provider that works
+  directly). The app cannot tell whether the provider has a session (`prompt=none` is not honoured there, measured),
+  so the page appears on every sign-in the app needs. Admitted without a session (it is `/auth/sign-in`, BR-92.3).
+
 ## BR-90 — The provider's ID token, verified once at the callback
 
 - **90.1 Signature** with the provider's published key whose `kid` matches the token header. **Algorithm

@@ -53,7 +53,7 @@ the install steps show you how to get them). There are two ways to run it:
 - **Just the app, locally** (most people): [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md). Docker and a prebuilt image;
   no source code or development tools.
 - **On a server, for your other devices**: [`docs/INSTALL-SERVER.md`](docs/INSTALL-SERVER.md). The same image, in
-  server mode, with *For Synology deployment* notes in each step.
+  server mode, with *For Synology deployment* notes in each step, and how to move your history there.
 - **Full development environment** (to change the code): [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md). Then
   `npm ci` and `npm run verify` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 

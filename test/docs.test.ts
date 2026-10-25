@@ -222,7 +222,7 @@ describe('every INSTALL step has its four parts (P-63 ⑤, BR-61.1)', () => {
   });
   it('docs/INSTALL-SERVER.md', () => {
     const install = read('docs/INSTALL-SERVER.md');
-    assert.ok((install.match(/^## N\d+/gm) ?? []).length >= 6, 'expected N1…N6');
+    assert.ok((install.match(/^## N\d+/gm) ?? []).length >= 7, 'expected N1…N7');
     assert.deepEqual(stepsMissingParts(install), []);
   });
   it('positive control: a step without "If it differs" is reported', () => {

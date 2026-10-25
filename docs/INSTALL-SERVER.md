@@ -17,8 +17,7 @@ outside your home network is **not** supported and not designed for.
 
 ⚠️ **Availability.** Server mode is not in `1.0.0-beta.9`; it arrives in the **next release**, and its notes say so.
 The commands below write `<version>`: use the version the [Releases page](https://github.com/kuhndj67/spotify-companion/releases)
-names for server mode. Still to come in later releases: signing out from the app, the live view closing when a
-session ends, and *Settings → Access*.
+names for server mode.
 
 **How to use this document.** As the other install guides: do the steps in order; each has a **Purpose**, the
 **Commands**, what you should see (**Expected**) and what to do otherwise (**If it differs**). A step that only a
@@ -27,9 +26,8 @@ Synology deployment***, what a Synology NAS needs in particular. The Synology pa
 DSM 7.2 and Container Manager 24.0.2; other hosts are written for but not walked.
 
 ⚠️ **One recorder at a time.** If you already run the app on another machine, do **not** give this server your
-Spotify credentials until you move your history to it and stop the other one. Two installs recording the same
-account double-count every play, and nothing stops you. Moving your history is a later section of this guide, still
-to be written; until then, the server can be set up and signed in to without recording anything.
+Spotify credentials until you have moved your history to it (N7). Two installs recording the same account
+double-count every play, and nothing stops you: each install's one-writer lock covers its own database only.
 
 ---
 
@@ -261,8 +259,11 @@ expected until you add credentials.) In a browser, `https://<name>:3443/` goes t
 **Commands**: none beyond the box; afterwards the log has one line per sign-in, `[access] sign-in completed for …` or
 `[access] sign-in refused: <reason>`. Nothing secret is ever logged.
 
-**Expected**: the app's page; the log line *completed*. The sign-in lasts `SESSION_LIFETIME`; when it ends, the next
-page you open asks you to sign in again (with SSO Server still signed in, it completes at once).
+**Expected**: the app's page; the log line *completed*. **Settings → Access** shows who is signed in and when the
+session ends, with **Sign out** (this device) and **Sign out everywhere** (every device: the app replaces its session
+key). The sign-in lasts `SESSION_LIFETIME`; when it ends, the page says **Signed out** (the status bar's connection
+light, and a *Sign in* link) and stops updating until you sign in again. Neither sign-out signs you out of the
+provider, so the next sign-in can be quick. Recording never stops for any of this.
 
 **If it differs**
 
@@ -271,6 +272,43 @@ page you open asks you to sign in again (with SSO Server still signed in, it com
 - SSO Server's sign-in page keeps coming back (*For Synology deployment*): set `OIDC_PROVIDER_PORTAL` (N4). Measured:
   SSO Server 3.0.7; DSM's iframe-embedding setting makes no difference.
 - *The sign-in provider cannot be reached*: N5's last item.
+
+---
+
+## N7 — Move your history to the server
+
+**Purpose**: bring your listening history from the machine that records it now to the server, check that every row
+arrived, and only then let the server record. Afterwards the old machine stops recording.
+
+**Commands**, in this order (the order is the point):
+
+1. On the server: N1–N6 done, signed in, **no Spotify credentials** yet (so it records nothing).
+2. On the machine that records now: **Settings → Create backup** (a `.tar.gz` downloads).
+3. In the server's app, from your browser: **Settings → Restore backup**, choose that file, confirm. The server
+   restarts with your history.
+4. **The exit test**, immediately, before anything else: run **Diagnostics** on both and compare the row
+   ***Table counts and rules hash***: every table and count, and the rules hash, must be identical. To compare by
+   machine instead, save each report (`/api/diagnostics`: on the old machine
+   `curl.exe -s http://localhost:3010/api/diagnostics -o old.json`; on the server, open
+   `https://<name>:3443/api/diagnostics` in the signed-in browser and save it as `new.json`) and, from a source
+   checkout, run `npm run corpus:compare -- old.json new.json`.
+5. Only if the test passes: on the server, **Settings → Spotify**, the server's **own** Spotify app registration
+   (another client id, so the two installs never share one quota). The server now records. The old machine still does
+   too: this is the trial, two recorders on purpose, for as long as you choose.
+6. **The move**, when you are ready: a last **Create backup** on the old machine → **Restore backup** on the server
+   (the trial's own plays are replaced; the old machine's arrive with the backup) → stop the old machine's app
+   (`docker compose down` there) and leave it stopped.
+
+**Expected**: step 4 shows the same counts and hash on both sides (`✓ pass` from `corpus:compare`); after step 6 only
+the server records.
+
+**If it differs**
+
+- Step 4 differs: stop. Do not add Spotify credentials. A difference right after a restore means the restore did not
+  bring everything; restore again from the same file and compare again, and report it if it persists.
+- The server recorded before step 4 (credentials added early): its own plays make the counts differ. Restore again,
+  then compare.
+- `corpus:compare` says *has no fingerprint*: one side runs a version before server mode, or has no database open.
 
 ---
 
@@ -283,5 +321,7 @@ page you open asks you to sign in again (with SSO Server still signed in, it com
 - **Backups**: the app keeps its own in `./data/backups/` (see [`INSTALL-APP.md`](INSTALL-APP.md), *Backups*). Include
   the folder in the host's own backup too (*For Synology*: your NAS backup task). ⚠️ Restore from an archive in
   `./data/backups/`, never from a copied `history.db`: a file copied while the app writes may be inconsistent.
-- **Monitoring**: the container's log (one line per sign-in, the problems at startup, and a summary every hour while
-  not serving) and the container's health status, which is *unhealthy* while it is not serving.
+- **Monitoring**: the container's log (one line per sign-in and sign-out, the problems at startup, and a summary every
+  hour while not serving), the container's health status (*unhealthy* while it is not serving), and **Diagnostics**:
+  *Access* (the mode, the provider, the certificate's expiry, warning 30 days ahead), *WAL* (fails if the volume
+  refused SQLite's WAL mode: then nothing is recorded) and *Table counts and rules hash*.

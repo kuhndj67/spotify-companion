@@ -190,6 +190,14 @@ function toLabelFields(row: Record<string, unknown>): LabelFields {
 export class SqliteHistoryRepository implements HistoryRepository, LabelRepository {
   #db: DatabaseSync;
   #migration: MigrationReport;
+  /**
+   * U11 (BR-97, P-101): the journal mode SQLite ACTUALLY chose. Asking for WAL does not throw when it is refused
+   * (measured: an in-memory database answers `memory`), so it is read back, and `prepareHistory` refuses anything
+   * but `wal` before a single write.
+   */
+  readonly journalMode: string;
+  /** The database file this connection opened (named in the WAL refusal). */
+  readonly path: string;
 
   /**
    * Opens the database and, by default, migrates it at once (every test and tool).
@@ -201,8 +209,9 @@ export class SqliteHistoryRepository implements HistoryRepository, LabelReposito
   constructor(path: string, options: { migrate?: boolean } = {}) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
 
+    this.path = path;
     this.#db = new DatabaseSync(path);
-    this.#db.exec('PRAGMA journal_mode = WAL');
+    this.journalMode = String(this.#db.prepare('PRAGMA journal_mode = WAL').get()?.journal_mode ?? 'unknown').toLowerCase();
     this.#db.exec('PRAGMA busy_timeout = 5000');
     this.#db.exec('PRAGMA foreign_keys = ON');
 

@@ -30,6 +30,7 @@
     "db:backup": "node --import tsx scripts/backup-history.mjs",
     "db:restore": "node --import tsx scripts/restore-history.mjs",
     "db:verify-backups": "node --import tsx scripts/verify-all-backups.mjs",
+    "corpus:compare": "node --import tsx scripts/compare-corpora.mjs",
     "verify:up": "node scripts/verify-install.mjs up",
     "verify:down": "node scripts/verify-install.mjs down",
     "protect": "node scripts/protect.mjs",

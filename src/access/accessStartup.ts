@@ -49,6 +49,8 @@ export interface ServerAccess {
   readonly clientSecret: string;
   readonly tls: { readonly cert: string; readonly key: string };
   readonly certificate: { readonly subject: string; readonly subjectAltName: string; readonly validTo: string };
+  /** BR-96.2: whether the certificate names the public origin's host (Diagnostics warns if not). */
+  readonly coversPublicHost: boolean;
   readonly sessionKeys: SessionKeyStore;
   /** The key as read at startup; *Sign out everywhere* replaces it through `sessionKeys`. */
   readonly sessionKey: Buffer;
@@ -83,10 +85,12 @@ function configure(inputs: AccessInputs): AccessStartup {
   let certFact: FileFact = cert.fact;
   let keyFact: FileFact = key.fact;
   let certificate: ServerAccess['certificate'] | null = null;
+  let x509ForHost: X509Certificate | null = null;
   if (cert.fact.state === 'ok') {
     try {
       const x509 = new X509Certificate(cert.text);
       certificate = { subject: x509.subject, subjectAltName: x509.subjectAltName ?? '', validTo: x509.validTo };
+      x509ForHost = x509;
       if (key.fact.state === 'ok') {
         try {
           if (!x509.checkPrivateKey(createPrivateKey(key.text))) keyFact = { state: 'invalid', reason: 'does not match the certificate' };
@@ -122,9 +126,14 @@ function configure(inputs: AccessInputs): AccessStartup {
     inputs.trustPublishedPortRaw !== undefined ? 'TRUST_PUBLISHED_PORT' : null,
   ].filter((s): s is string => s !== null);
 
+  const host = new URL(validated.config.publicOrigin).hostname.replace(/^\[|\]$/g, '');
+  const coversPublicHost =
+    x509ForHost !== null && (x509ForHost.checkHost(host, { subject: 'never' }) !== undefined || x509ForHost.checkIP(host) !== undefined);
+
   return {
     mode: 'server',
     config: validated.config,
+    coversPublicHost,
     clientSecret: secret.text,
     tls: { cert: cert.text, key: key.text },
     certificate: certificate!,

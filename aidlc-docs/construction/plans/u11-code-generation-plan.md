@@ -191,13 +191,13 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [x] Checked in the browser on the built app, in **light and dark**, against the fake provider. Screenshots go in the
       code summary. Primary screen: state only as a compact indicator; colour never the only signal.
 
-### Step 13 — Diagnostics, WAL, corpus comparison *(LC-91, LC-92, LC-93; BR-96.2, BR-97, BR-98; P-98, P-101; PBT-98)*
-- [ ] `src/history/SqliteHistoryRepository.ts`: read back `journal_mode`. Anything but `wal` makes the app
+### Step 13 — Diagnostics, WAL, corpus comparison *(LC-91, LC-92, LC-93; BR-96.2, BR-97, BR-98; P-98, P-101; PBT-98)* — ✅ DONE · The repository reads back `journalMode`; `prepareHistory` throws `WalRefused` before any backup or migration (excluded from the restore revert: the volume is at fault, not the file); Diagnostics' *WAL* row names the mode and path. *Access* row (`src/access/accessDiagnostics.ts`, pure): local *Local only*; server facts, fails on an undiscovered provider or an expired certificate, warns inside 30 days or when the certificate does not cover the public host (`coversPublicHost`, computed at startup); *not serving* fails naming each problem. *Table counts and rules hash*, and the report's `fingerprint` field. `compareCorpora` (pure, PBT-98) and `npm run corpus:compare -- a.json b.json` (read-only; in smoke). Positive control: removing the WAL check fails the in-memory test
+- [x] `src/history/SqliteHistoryRepository.ts`: read back `journal_mode`. Anything but `wal` makes the app
       display-only, with the reason, before migration.
-- [ ] `src/diagnostics.ts`: the *Access* row (mode, public origin, certificate expiry: a warning 30 days ahead, a
+- [x] `src/diagnostics.ts`: the *Access* row (mode, public origin, certificate expiry: a warning 30 days ahead, a
       failure after it), the *WAL* row, and *Table counts and rules hash*. `src/maintenance/corpusFingerprint.ts`:
       `compareCorpora`.
-- [ ] Tests: PBT-98. Positive control (P-101): an in-memory database answers `memory`, which leads to display-only and
+- [x] Tests: PBT-98. Positive control (P-101): an in-memory database answers `memory`, which leads to display-only and
       a failed row that names `memory`.
 
 ### Step 14 — Structural guards and secrets in output *(LC-96; P-88, P-96, P-97)*

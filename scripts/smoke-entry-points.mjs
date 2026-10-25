@@ -95,6 +95,8 @@ const ENTRY_POINTS = [
     // This also evaluates `backup-history.mjs`, which it imports -- see that entry's skip reason.
   },
   { file: 'verify-all-backups.mjs', args: [], tsx: true },
+  // U11 (BR-98): read-only; with no arguments it prints its usage and exits 2 (it loaded).
+  { file: 'compare-corpora.mjs', args: [], tsx: true },
   { file: 'reclassify-unobserved-tails.mjs', args: [], tsx: true },
   { file: 'repair-backfill-timestamps.mjs', args: [], tsx: true }, // U10: imports the writer lock from src/
   // Dry run by default; `--apply` is required. Refuses while the container is up.

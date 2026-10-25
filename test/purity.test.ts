@@ -141,6 +141,9 @@ const PURE_MODULES = [
   'certs/certPolicy.ts',
   // What the image's HEALTHCHECK asks for, from the environment it is HANDED (never reads it itself).
   'health/healthTarget.ts',
+  // U11 (BR-98): the exit test's verdict, and Diagnostics' Access and WAL rows. Facts and `now` are handed in.
+  'maintenance/corpusFingerprint.ts',
+  'access/accessDiagnostics.ts',
 ];
 
 /**

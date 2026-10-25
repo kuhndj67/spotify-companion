@@ -1,5 +1,5 @@
 import express from 'express';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { WebSocketServer } from 'ws';
@@ -11,7 +11,7 @@ import { hostConnectorMessage } from './mcp/hostConnector.js';
 import { SpotifyWebApiClient } from './spotify/webApiClient.js';
 import { EnrichmentService } from './spotify/enrichment.js';
 import { NowPlayingService, type Snapshot } from './nowPlayingService.js';
-import { runDiagnostics } from './diagnostics.js';
+import { runDiagnostics, type U11DiagnosticsInput } from './diagnostics.js';
 import type { AutomationDiagnosticsInput } from './diagnostics.js';
 import { localGuard, decideAccess, accessRequestFrom, serverGuard, type ServerAccessPolicy, type SessionVerifier } from './localGuard.js';
 import { configureAccess, newSessionId, notServingLines, notServingSummary } from './access/accessStartup.js';
@@ -57,7 +57,8 @@ import { BackupScheduler } from './backup/BackupScheduler.js';
 import { BackupReminder } from './backup/backupReminder.js';
 import { UpdateChecker } from './update/UpdateChecker.js';
 import { KeptBackupStore, type BackupStatusView } from './backup/KeptBackupStore.js';
-import { BeforeChangeBackupFailed, prepareHistory } from './history/prepareHistory.js';
+import { BeforeChangeBackupFailed, WalRefused, prepareHistory } from './history/prepareHistory.js';
+import { tableCounts } from './backup/manifest.js';
 import { WriterLock } from './lock/WriterLock.js';
 import { RequestQueue } from './musicbrainz/RequestQueue.js';
 import { MusicBrainzClient } from './musicbrainz/MusicBrainzClient.js';
@@ -206,6 +207,9 @@ const prepare = (repo: SqliteHistoryRepository) =>
  * migrate, put the previous database back and open that instead (BR-48.6) — never start empty. A failed
  * before-change backup is NOT a reason to revert: nothing was changed, and the restore itself stands.
  */
+/** U11 (BR-97): set when SQLite refused WAL; Diagnostics' WAL row names it. */
+let walRefusal: string | null = null;
+
 async function openHistory(): Promise<SqliteHistoryRepository> {
   let repo: SqliteHistoryRepository | null = null;
   try {
@@ -214,7 +218,8 @@ async function openHistory(): Promise<SqliteHistoryRepository> {
     return repo;
   } catch (error) {
     repo?.close();
-    if (!(error instanceof BeforeChangeBackupFailed) && startupRestore.kind === 'applied' && revertToPrevious(historyDataDir)) {
+    if (error instanceof WalRefused) walRefusal = error.message;
+    if (!(error instanceof BeforeChangeBackupFailed) && !(error instanceof WalRefused) && startupRestore.kind === 'applied' && revertToPrevious(historyDataDir)) {
       const reason = error instanceof Error ? error.message : String(error);
       startupRestore = { kind: 'failed', reason: `the restored database would not open (${reason}); your previous history was put back` };
       console.error(`[restore] ${startupRestore.reason}`);
@@ -1197,7 +1202,40 @@ async function runDiagnosticsReport() {
     automationDiagnostics(),
     maintenance?.status(),
     configurationDiagnostics(),
+    u11Diagnostics(),
   );
+}
+
+/** U11 (LC-91): what Diagnostics' Access, WAL and corpus rows report. Read fresh on every sweep. */
+function u11Diagnostics(): U11DiagnosticsInput {
+  let rulesSha256: string | null = null;
+  try {
+    rulesSha256 = createHash('sha256').update(readFileSync(RULES_PATH)).digest('hex');
+  } catch {
+    rulesSha256 = null;
+  }
+  return {
+    access:
+      access.mode === 'server'
+        ? {
+            mode: 'server',
+            publicOrigin: access.config.publicOrigin,
+            issuer: access.config.issuer,
+            allowedSubject: access.config.allowedSubject,
+            sessionLifetimeMs: access.config.sessionLifetimeMs,
+            providerPortal: access.config.providerPortal,
+            certificate: access.certificate,
+            coversPublicHost: access.coversPublicHost,
+            provider: provider?.status() ?? { discoveredAt: null, lastFailure: null },
+            ignoredSettings: access.ignoredSettings,
+          }
+        : access,
+    journalMode: repository?.journalMode ?? null,
+    walRefusal,
+    dbPath: config.historyDbPath,
+    fingerprint: repository ? { counts: tableCounts(repository.database), rulesSha256 } : null,
+    now: Date.now(),
+  };
 }
 
 /**

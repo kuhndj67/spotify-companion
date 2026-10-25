@@ -185,10 +185,10 @@ sign-out, and the live connection closing at expiry (Step 11).
       everywhere: two sessions are refused afterwards, on HTTP and on WebSocket. A 2 s lifetime closes the socket with
       4401.
 
-### Step 12 — Frontend *(LC-94; frontend-components §2–§5; PBT-97)*
-- [ ] `public/`: the *Sign-in problem* and *Signed out* pages; Settings → *Access* (server mode only); the connection
+### Step 12 — Frontend *(LC-94; frontend-components §2–§5; PBT-97)* — ✅ DONE · `public/connectionDecision.js` (pure, plain JS so the page and PBT-97 import the same file; a `.d.ts` beside it): 4401 → signed out; any other close asks `/auth/session` first, because a browser reports a refused handshake as 1006, not 401; local mode's 404 always reconnects. `app.js`: the *Signed out* state (status bar **✕ Signed out** in words, a notice with *Sign in* keeping the current path, reconnecting stopped, buttons disabled with a tooltip; any API 401 does the same), Settings → *Access* (server mode only: subject, session end in the browser's local time (⚠️ deviation: not the report time zone), public origin, *Sign out*, *Sign out everywhere* behind a confirmation). **Checked in the browser, light and dark**: the real app in local mode with `/auth/session` answered as server mode would, and a WebSocket closed with 4401 (the throwaway CA was not installed as a trusted root: a security change on the owner's PC, avoided); the no-session pages served by their own code. **Found and fixed by looking**: the notice was squeezed into the header row (moved below it); its link was the browser's default blue, unreadable in dark mode (now the text colour, underlined). ⚠️ Noticed, not fixed (pre-U11): other links on the page also keep the default blue in dark mode. Local mode: no Access section, no notice
+- [x] `public/`: the *Sign-in problem* and *Signed out* pages; Settings → *Access* (server mode only); the connection
       indicator's *Signed out* state; `onClose` (⚙️, PBT-97).
-- [ ] Checked in the browser on the built app, in **light and dark**, against the fake provider. Screenshots go in the
+- [x] Checked in the browser on the built app, in **light and dark**, against the fake provider. Screenshots go in the
       code summary. Primary screen: state only as a compact indicator; colour never the only signal.
 
 ### Step 13 — Diagnostics, WAL, corpus comparison *(LC-91, LC-92, LC-93; BR-96.2, BR-97, BR-98; P-98, P-101; PBT-98)*

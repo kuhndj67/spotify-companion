@@ -15,10 +15,6 @@
       <section id="card" class="card" data-state="loading">
         <header class="card-head">
           <p class="status" id="status">Connecting&hellip;</p>
-          <!-- U11 (BR-93.3): shown only when the sign-in has ended; the one control left working. -->
-          <p id="signed-out-banner" class="signed-out-banner" data-testid="signed-out-banner" role="status" hidden>
-            You are signed out. <a id="signed-out-signin" href="/auth/sign-in">Sign in</a>
-          </p>
           <!--
             U6 (FR-63): Export moved INTO Settings. U10 (FR-63 amended, NFR Q3c): Diagnostics came back OUT, as its
             own button between Settings and Rules, because the Status light points to it. Same id and data-testid.
@@ -44,6 +40,10 @@
             data-testid="rules-open-button"
           >Rules</button>
         </header>
+        <!-- U11 (BR-93.3): shown only when the sign-in has ended; the one control left working. -->
+        <p id="signed-out-banner" class="signed-out-banner" data-testid="signed-out-banner" role="status" hidden>
+          You are signed out. <a id="signed-out-signin" href="/auth/sign-in">Sign in</a>
+        </p>
 
         <!-- Blurred cover, sits behind the card content. Purely decorative. -->
         <div class="backdrop" id="backdrop" aria-hidden="true"></div>

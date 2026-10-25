@@ -965,3 +965,16 @@ anonymous manifest HTTP 200).
   `docs/INSTALL-SERVER.md` gained N7 (moving your history: the trial, the exit test, the move).
 - `npm run verify` green; PBT-91…PBT-100 registered. Candidate `spotify-companion:candidate-u11` run isolated.
 - Next: Build & Test (the walks, the exit test, the move), then the release. Pull requests wait for the owner.
+
+## 2026-10-25 — U11 Build & Test: local mode checked on the verification install
+
+- **Owner**: walk scope *"Reuse CA and DSM setup"* (the server walk covers N4–N6 in a fresh folder); local check
+  *"Yes, run it"*.
+- `npm run verify:up -- --candidate` (placeholder Spotify config, hourly poll: no Spotify traffic, the live
+  credentials never copied): `/api/health` 200; every `/auth/*` 404; a wrong Host 403; a cross-site save 403;
+  Diagnostics *Access* "Local only", *WAL* ok, the corpus row and the report's fingerprint present.
+  `npm run verify:down`: removed, and **the live deployment proved unchanged** (container, start time, restart
+  count, image, health; no tracked file changed).
+- **Found reading the exit test against the guide**: a restore brings the database only, so the rules hash would
+  always differ on a new server. N7 now brings the rules file (Download rules → Upload rules…) before comparing, and
+  says the old machine must run this release first (its Diagnostics needs the fingerprint).

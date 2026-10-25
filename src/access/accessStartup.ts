@@ -33,6 +33,7 @@ export interface AccessInputs {
   readonly clientIdRaw: string | undefined;
   readonly allowedSubjectRaw: string | undefined;
   readonly sessionLifetimeRaw: string | undefined;
+  readonly providerPortalRaw?: string | undefined;
   readonly clientSecretPath: string;
   readonly certPath: string;
   readonly keyPath: string;
@@ -104,6 +105,7 @@ function configure(inputs: AccessInputs): AccessStartup {
     clientId: inputs.clientIdRaw,
     allowedSubject: inputs.allowedSubjectRaw,
     sessionLifetime: inputs.sessionLifetimeRaw,
+    providerPortal: inputs.providerPortalRaw,
     clientSecretFile: secret.fact,
     certificateFile: certFact,
     keyFile: keyFact,

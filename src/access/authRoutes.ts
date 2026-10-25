@@ -3,7 +3,8 @@
  * in local mode every `/auth/*` path is a `404` (BR-88.2).
  *
  * The flow (business-logic-model §2):
- *   GET /auth/sign-in?return=  → a PendingSignIn, a pre-sign-in cookie bound to its `state`, 302 to the provider
+ *   GET /auth/sign-in?return=  → BR-89.6: with a provider portal configured and no `go=1`, the *Sign in first* page;
+ *                                otherwise a PendingSignIn, a pre-sign-in cookie bound to its `state`, 302 to the provider
  *   GET /auth/callback         → consume it, check the cookie, redeem and verify (ProviderClient), check the
  *                                allowed account, issue the session cookie, 302 to the return path
  *   GET /auth/problem          → the problem page by reason
@@ -21,7 +22,7 @@
 
 import express, { type Router, type Response } from 'express';
 import { SESSION_COOKIE, readCookie, type AdmittedAccess } from '../localGuard.js';
-import { AUTH_CSS, isSignInRefusal, problemPage, signedOutPage } from './authPages.js';
+import { AUTH_CSS, isSignInRefusal, problemPage, signedOutPage, signInFirstPage } from './authPages.js';
 import type { PendingSignIns } from './pendingSignIns.js';
 import { PENDING_TTL_MS } from './pendingSignIns.js';
 import type { ProviderClient, SignInOutcome, SignInRefusal } from './ProviderClient.js';
@@ -37,6 +38,8 @@ export interface AuthRoutesDeps {
   readonly publicOrigin: string;
   readonly allowedSubject: string;
   readonly sessionLifetimeMs: number;
+  /** BR-89.6: where the owner signs in at the provider first; null → the sign-in starts at once. */
+  readonly providerPortal?: string | null;
   /** The current session key. A function, because *Sign out everywhere* replaces it (BR-94.2). */
   readonly sessionKey: () => Uint8Array;
   readonly now: () => number;
@@ -74,6 +77,13 @@ export function createAuthRoutes(deps: AuthRoutesDeps): Router {
 
   router.get('/auth/sign-in', async (req, res) => {
     const returnPath = safeReturnPath(req.query.return);
+    // BR-89.6: a provider whose sign-in page does not resume a request (Synology SSO Server, measured) is signed in to
+    // first; Continue comes back here with go=1. Nothing is created before then, so the page costs no state.
+    if (deps.providerPortal && req.query.go !== '1') {
+      const continueHref = `/auth/sign-in?go=1&return=${encodeURIComponent(returnPath)}`;
+      res.status(200).type('html').set('Cache-Control', 'no-store').send(signInFirstPage(deps.providerPortal, continueHref));
+      return;
+    }
     const started = await deps.provider.begin(returnPath);
     if (!started.ok) {
       refuse(res, started);

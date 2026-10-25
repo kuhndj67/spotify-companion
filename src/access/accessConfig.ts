@@ -54,6 +54,8 @@ export interface ServerConfigInput {
   readonly allowedSubject: string | undefined;
   /** Absent → the default (BR-91.3). */
   readonly sessionLifetime: string | undefined;
+  /** BR-89.6, optional: where to sign in at the provider first. Absent → the sign-in starts at once. */
+  readonly providerPortal?: string | undefined;
   readonly clientSecretFile: FileFact;
   readonly certificateFile: FileFact;
   readonly keyFile: FileFact;
@@ -78,6 +80,8 @@ export interface ServerConfig {
   readonly sessionLifetimeMs: number;
   /** Derived, never configured: one place it can be wrong (IN-U11-6). */
   readonly redirectUri: string;
+  /** BR-89.6: set → `/auth/sign-in` first asks the owner to sign in here. */
+  readonly providerPortal: string | null;
 }
 
 export const DEFAULT_SESSION_LIFETIME = '7d';
@@ -134,6 +138,11 @@ export function validateServerConfig(
     problems.push({ setting: 'OIDC_ALLOWED_SUBJECT', message: `has a leading or trailing space or is still a placeholder; got ${quote(subject)}` });
   }
 
+  const portal = input.providerPortal;
+  if (portal !== undefined && portal !== '' && !isHttpsUrl(portal)) {
+    problems.push({ setting: 'OIDC_PROVIDER_PORTAL', message: `must be an https:// address, or absent; got ${quote(portal)}` });
+  }
+
   const lifetime = parseSessionLifetime(input.sessionLifetime === undefined || input.sessionLifetime === '' ? DEFAULT_SESSION_LIFETIME : input.sessionLifetime);
   if (!lifetime.ok) problems.push({ setting: 'SESSION_LIFETIME', message: lifetime.message });
 
@@ -157,6 +166,7 @@ export function validateServerConfig(
       allowedSubject: subject as string,
       sessionLifetimeMs: lifetime.ms,
       redirectUri: `${origin.origin}/auth/callback`,
+      providerPortal: portal === undefined || portal === '' ? null : portal,
     },
   };
 }

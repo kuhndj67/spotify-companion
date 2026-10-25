@@ -159,6 +159,17 @@ describe('validateServerConfig (PBT-92)', () => {
     }
   });
 
+  it('BR-89.6: the provider portal is optional; set, it must be https and is passed on; otherwise it is named', () => {
+    assert.equal(validateServerConfig(VALID).ok && (validateServerConfig(VALID) as { config: { providerPortal: unknown } }).config.providerPortal, null);
+    const set = validateServerConfig({ ...VALID, providerPortal: 'https://machine2.local:9443/' });
+    assert.equal(set.ok && set.config.providerPortal, 'https://machine2.local:9443/');
+    for (const bad of ['http://machine2.local:9443/', 'machine2.local', '<the portal>']) {
+      const r = validateServerConfig({ ...VALID, providerPortal: bad });
+      assert.equal(r.ok, false, bad);
+      if (!r.ok) assert.deepEqual(r.problems.map((p) => p.setting), ['OIDC_PROVIDER_PORTAL']);
+    }
+  });
+
   it('the session lifetime defaults to 7d when absent, and an out-of-range one is named', () => {
     const r = validateServerConfig({ ...VALID, sessionLifetime: undefined });
     assert.equal(r.ok && r.config.sessionLifetimeMs, 7 * 24 * 3_600_000);

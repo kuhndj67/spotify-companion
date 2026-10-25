@@ -41,6 +41,23 @@ export function problemPage(
   );
 }
 
+/**
+ * BR-89.6: *Sign in first*. The provider's portal opens in a new tab (so this page stays, with its Continue); Continue
+ * starts the sign-in. Both addresses come from configuration and the app itself, and are escaped all the same.
+ */
+export function signInFirstPage(providerPortal: string, continueHref: string): string {
+  return page(
+    'Sign in',
+    `<h1>Sign in</h1>
+<ol data-testid="sign-in-first">
+<li><a class="button" href="${escapeHtml(providerPortal)}" target="_blank" rel="noopener noreferrer">Sign in at your sign-in provider</a>
+<p class="note">Opens in a new tab. Skip this if you are already signed in there.</p></li>
+<li><a class="button" data-testid="sign-in-continue" href="${escapeHtml(continueHref)}">Continue</a></li>
+</ol>
+<p class="note">Your sign-in provider needs you signed in to it before it can sign you in here.</p>`,
+  );
+}
+
 export function signedOutPage(): string {
   return page(
     'Signed out',

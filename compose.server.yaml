@@ -35,6 +35,9 @@ services:
       OIDC_CLIENT_ID: <the client ID the provider gave>
       # Your account's subject at the provider (Synology SSO Server: your DSM user name). Only this account is let in.
       OIDC_ALLOWED_SUBJECT: <your account's subject>
+      # Optional (BR-89.6): a provider that must be signed in to first. Synology SSO Server needs it: its sign-in page
+      # does not return to the app on its own (measured). Set it to the provider's own address, e.g. https://<name>:9443/
+      # OIDC_PROVIDER_PORTAL: https://<name>:9443/
       # How long a sign-in lasts, from 1h to 90d. Recording never stops when it ends; only the pages do.
       SESSION_LIFETIME: 7d
       # The app trusts the provider's certificate through your CA's certificate (public; config/ca/).

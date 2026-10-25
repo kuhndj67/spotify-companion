@@ -117,6 +117,8 @@ export const config = {
   oidcClientIdRaw: process.env.OIDC_CLIENT_ID,
   oidcAllowedSubjectRaw: process.env.OIDC_ALLOWED_SUBJECT,
   sessionLifetimeRaw: process.env.SESSION_LIFETIME,
+  /** BR-89.6, optional: a provider that needs its own sign-in first (Synology SSO Server, measured). */
+  oidcProviderPortalRaw: process.env.OIDC_PROVIDER_PORTAL,
 
   /** The secrets folder's U11 files (BR-95.1): inside the `/app/secrets` DIRECTORY mount, so a rename can replace one. */
   oidcClientSecretPath: secretPath('OIDC_CLIENT_SECRET_PATH', 'oidc-client-secret'),

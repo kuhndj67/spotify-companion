@@ -168,10 +168,10 @@ sign-out, and the live connection closing at expiry (Step 11).
       sign-out). Each is recorded as *completed*, *looped* or *landed on the portal*, in `research-findings.md`.
 - [ ] **All completed → Part B. A persistent loop → stop**; the FD plan's Q3 goes back to you with the records.
 
-### Step 10a — Sign in at the provider first *(BR-89.6; owner's option A)*
-- [ ] `OIDC_PROVIDER_PORTAL` (optional, `https://` only) in `accessConfig` (PBT-92 extended), `config.ts`, `accessStartup`; `compose.server.yaml` (with the Synology value as a comment) and its drift test.
-- [ ] `src/access/authPages.ts`: the *Sign in first* page; `authRoutes.ts`: `/auth/sign-in` shows it unless `go=1`, then proceeds as before. Tests: the page, its two links (portal in a new tab, Continue keeping the return path), escaping, and the sign-in completing through Continue; without the setting, unchanged.
-- [ ] Fix found at Step 10: a lock that cannot be created (`EACCES`) runs the app display-only with the reason instead of crashing into a restart loop (`WriterLock.acquire`, U10).
+### Step 10a — Sign in at the provider first *(BR-89.6; owner's option A)* — code ✅ · `OIDC_PROVIDER_PORTAL` optional, https only (PBT-92 extended); the page creates no sign-in state; Continue keeps the (already safe) return path. Positive controls: ignoring `go=1` fails the full-flow test; re-throwing in `WriterLock.acquire` fails the new lock test. Lock fix: `acquire()` returns a refusal with the error code for anything but a held lock
+- [x] `OIDC_PROVIDER_PORTAL` (optional, `https://` only) in `accessConfig` (PBT-92 extended), `config.ts`, `accessStartup`; `compose.server.yaml` (with the Synology value as a comment) and its drift test.
+- [x] `src/access/authPages.ts`: the *Sign in first* page; `authRoutes.ts`: `/auth/sign-in` shows it unless `go=1`, then proceeds as before. Tests: the page, its two links (portal in a new tab, Continue keeping the return path), escaping, and the sign-in completing through Continue; without the setting, unchanged.
+- [x] Fix found at Step 10: a lock that cannot be created (`EACCES`) runs the app display-only with the reason instead of crashing into a restart loop (`WriterLock.acquire`, U10).
 - [ ] A new candidate image for Machine 2, so the retest's attempt 5 and a fresh-browser sign-in are run through the page.
 
 ## Part B — after the retest

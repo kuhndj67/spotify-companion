@@ -57,7 +57,7 @@ interface Harness {
   close(): Promise<void>;
 }
 
-async function startApp(provider: FakeOidcProvider, options: { issuer?: string } = {}): Promise<Harness> {
+async function startApp(provider: FakeOidcProvider, options: { issuer?: string; providerPortal?: string } = {}): Promise<Harness> {
   const logs: string[] = [];
   const clock = { now: Date.now() };
   const key = randomBytes(32);
@@ -85,6 +85,7 @@ async function startApp(provider: FakeOidcProvider, options: { issuer?: string }
           publicOrigin: PUBLIC_ORIGIN,
           allowedSubject: 'owner',
           sessionLifetimeMs: LIFETIME_MS,
+          providerPortal: options.providerPortal ?? null,
           sessionKey: () => key,
           now: () => clock.now,
           newSessionId: () => randomBytes(16).toString('base64url'),
@@ -360,6 +361,54 @@ describe('the provider itself (BR-88.6)', () => {
     const r = await new Browser(app).get('/auth/problem?reason=wrong-account&subject=%3Cb%3EZQXJ&providerError=ZQXK');
     assert.equal(r.status, 200);
     assert.ok(!r.body.includes('ZQXJ') && !r.body.includes('ZQXK'));
+  });
+});
+
+describe('sign in at the provider first (BR-89.6)', () => {
+  const PORTAL = 'https://sso.example:9443/';
+
+  it('⭐ with a portal configured: the page first, then Continue starts the sign-in, which completes to the return path', async () => {
+    const withPortal = await startApp(provider, { providerPortal: PORTAL });
+    try {
+      const browser = new Browser(withPortal);
+      const first = await browser.get('/auth/sign-in?return=%2Fhistory%3Ftab%3Dweek');
+      assert.equal(first.status, 200);
+      assert.ok(first.body.includes('data-testid="sign-in-first"'));
+      assert.ok(first.body.includes(`href="${PORTAL}" target="_blank" rel="noopener noreferrer"`), 'the portal, in a new tab');
+      const cont = /data-testid="sign-in-continue" href="([^"]+)"/.exec(first.body)?.[1]?.replace(/&amp;/g, '&');
+      assert.equal(cont, `/auth/sign-in?go=1&return=${encodeURIComponent('/history?tab=week')}`);
+      assert.equal(browser.jar.has(PRE_SIGN_IN_COOKIE), false, 'the page creates no sign-in state');
+
+      const started = await browser.get(cont!);
+      assert.equal(started.status, 302);
+      assert.ok(started.location?.startsWith(provider.issuer));
+      const atProvider = await provider.fetch(started.location!, { redirect: 'manual' });
+      const back = new URL(atProvider.headers.get('location') ?? '');
+      const done = await browser.get(back.pathname + back.search);
+      assert.equal(done.status, 302, withPortal.logs.join('\n'));
+      assert.equal(done.location, '/history?tab=week');
+      assert.ok(browser.jar.has(SESSION_COOKIE));
+    } finally {
+      await withPortal.close();
+    }
+  });
+
+  it('a hostile return path is made safe before it reaches the Continue link', async () => {
+    const withPortal = await startApp(provider, { providerPortal: PORTAL });
+    try {
+      const page = await new Browser(withPortal).get('/auth/sign-in?return=%2F%2Fevil.example%22%3E%3Cscript%3E');
+      assert.ok(!page.body.includes('evil.example'));
+      assert.ok(!page.body.includes('<script>'));
+      assert.ok(page.body.includes('/auth/sign-in?go=1&amp;return=%2F'));
+    } finally {
+      await withPortal.close();
+    }
+  });
+
+  it('without a portal (the default): /auth/sign-in goes straight to the provider, as before', async () => {
+    const r = await new Browser(app).get('/auth/sign-in');
+    assert.equal(r.status, 302);
+    assert.ok(r.location?.startsWith(provider.issuer));
   });
 });
 

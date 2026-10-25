@@ -172,7 +172,7 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [x] `OIDC_PROVIDER_PORTAL` (optional, `https://` only) in `accessConfig` (PBT-92 extended), `config.ts`, `accessStartup`; `compose.server.yaml` (with the Synology value as a comment) and its drift test.
 - [x] `src/access/authPages.ts`: the *Sign in first* page; `authRoutes.ts`: `/auth/sign-in` shows it unless `go=1`, then proceeds as before. Tests: the page, its two links (portal in a new tab, Continue keeping the return path), escaping, and the sign-in completing through Continue; without the setting, unchanged.
 - [x] Fix found at Step 10: a lock that cannot be created (`EACCES`) runs the app display-only with the reason instead of crashing into a restart loop (`WriterLock.acquire`, U10).
-- [ ] A new candidate image for Machine 2, so the retest's attempt 5 and a fresh-browser sign-in are run through the page.
+- [x] A new candidate image for Machine 2, so the retest's attempt 5 and a fresh-browser sign-in are run through the page. Built from `ddd343d` as `spotify-companion:candidate-u11-signin-2` (`sha256:4a5b4288…`); run isolated: the page appears, Continue starts the sign-in. Image file SHA-256 `89554cc1…8752`. ⚠️ Seen: a container reusing a data folder whose previous container was force-removed waits one stale window (30 s) for the old lock before it listens (U10's takeover, as designed). Not yet run on Machine 2
 
 ## Part B — after the retest
 

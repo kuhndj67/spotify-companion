@@ -777,6 +777,18 @@ the app "on every request" for a whole session unless the proxy repeats the sign
 breaks background requests and the WebSocket. U11's FD Q4 must settle what the app verifies after the first minutes.
 
 
+**The P-95 retest on Machine 2** (U11 Code Generation Step 10, 2026-10-24, from 00:22Z on 2026-10-25): the candidate
+build (`spotify-companion:candidate-u11-signin`) running on Machine 2 in server mode, with its own CA's certificates
+on the app and on SSO Server (`ssoserver-9443`), the CA installed in this PC's current-user root store. Edge, InPrivate.
+
+| | Measured |
+|---|---|
+| The app on Machine 2 | serves HTTPS on 3443 (Node runs on the Atom C2538); `/` → 302 to `/auth/sign-in`; `/auth/sign-in` → 302 to SSO Server's authorize endpoint, so `extra_hosts` and `NODE_EXTRA_CA_CERTS` work inside the container (discovery fetched over TLS); `/api/health` and a WebSocket without a session → 401; the LAN address as Host → 403 |
+| ⚠️ Folder permissions | on a DSM share the container's user (uid 1000) is refused by the share's ACL even when it owns the files (`d---------+`; the ACL names only `administrators` and `ContainerManager`). `chown -R 1000:1000` plus `chmod -R u+rwX` on the four mounted folders switched them to Linux mode (`rwx------`, uid 1000) and the app started. Consequence: those folders are no longer browsable in File Station |
+| ⚠️ A lock that cannot be created | `EACCES` on `history.db.lock` **crashed the app into a restart loop** (`WriterLock.acquire` rethrows anything but `EEXIST`; nothing catches it): a U10 defect, to be fixed |
+| A new account, wrong state | SSO Server says *"account or password is invalid"* for an account whose creation was not saved: SSO Server's own refusal, before the app |
+| ⚠️ **Sign-in from the authorize link, no SSO Server session** | a dedicated non-administrator account **loops** at SSO Server's sign-in page, with only a shared-folder privilege and also with the DSM application privilege added; **an administrator account loops too**. The app's log shows **no callback at all** for any attempt (no `[access]` line from 00:22Z to 00:31Z), so the loop is inside SSO Server. The same dedicated account signs in to DSM directly (port 5001) with no prompt |
+
 ## `openid-client` 6.8.8, measured against the fake provider (U11, 2026-10-24)
 
 Measured through the app's real routes against `test/support/fakeOidcProvider.ts`, one misbehaviour per test.

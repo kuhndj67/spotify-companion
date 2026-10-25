@@ -273,6 +273,9 @@ dd[data-flag="no"] { color: var(--muted); }
 .update-available { margin: 0 0 0.25rem; font-weight: 600; }
 .setting-switch { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; font-size: 0.9rem; }
 .setting-note { margin: 0.15rem 0 0; font-size: 0.78rem; }
+/* U11 (BR-93.3): the signed-out notice. Words and a link, not a colour alone. */
+.signed-out-banner { margin: 0; font-weight: 600; }
+.signed-out-banner a { margin-left: 0.4rem; }
 .backups-status { margin: 0 0 0.5rem; font-size: 0.82rem; color: var(--muted); }
 .backups-status[data-level="warn"] { color: var(--warn); }
 .backups-status[data-level="fail"] { color: var(--danger); }

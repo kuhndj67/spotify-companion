@@ -84,7 +84,15 @@ origin rule (would refuse every save in server mode); the image `HEALTHCHECK` co
 Candidate image `spotify-companion:candidate-u11-signin` built and run isolated in all three cases (server,
 refused configuration, local); saved as an image file in the session scratchpad (Q1 = A).
 
-**Next**: ⛔ **Step 10, the owner's**: deployment-architecture §4 steps 1–4 with the candidate image (no Spotify
+**Step 10 gate passed with a workaround** (owner chose option A, 2026-10-24): SSO Server's sign-in page does not resume
+a request with no SSO Server session (measured: loops for every account); the app now shows *sign in at the provider
+first, then Continue* when `OIDC_PROVIDER_PORTAL` is set (BR-89.6, Step 10a), **measured to work on Machine 2**
+(2026-10-25). Also fixed: a lock that cannot be created no longer crashes the app. Machine 2 runs
+`candidate-u11-signin-2` with no Spotify registration (nothing records there).
+
+**Next**: Part B (Steps 11–16). The branch waits for the owner's go-ahead to push.
+
+*(superseded)* **Next**: ⛔ **Step 10, the owner's**: deployment-architecture §4 steps 1–4 with the candidate image (no Spotify
 registration on Machine 2), then at least five sign-ins recorded in `research-findings.md`. A persistent loop stops
 Code Generation and returns FD plan Q3. Not yet pushed: `u11-code-generation` (and the design pull request) wait for
 the owner's go-ahead. Nothing is installed or changed on the NAS by an agent.

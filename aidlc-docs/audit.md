@@ -944,3 +944,10 @@ anonymous manifest HTTP 200).
   cannot detect the provider's session, so the page appears on every sign-in the app needs, not only when SSO Server's
   session has ended (one click when it has not). Rejected: B (a DSM setting; none found), C (a provider in a container).
   Built as Step 10a, with the lock fix.
+
+## 2026-10-25 — U11 Step 10a: the workaround works on Machine 2
+
+- **Owner**, after rebuilding the project with `candidate-u11-signin-2` and `OIDC_PROVIDER_PORTAL`: *"the sign in page
+  displayed, sso opened and allowed me to sign in using companion, and the link to the app also worked"*. With no SSO
+  Server session, the case that looped now completes through the page. Recorded in research-findings. Part A done;
+  Part B next. The branch is not yet pushed (waits for the owner's go-ahead).

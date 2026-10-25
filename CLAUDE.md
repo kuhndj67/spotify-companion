@@ -19,7 +19,8 @@ pre-registered confirmatory test (2026-09-10) found it **not supported**, and th
 able to **disconfirm** it. Rules are valuable without R1.
 
 **Single-USER, always**: each person runs their own deployment with their own Spotify app and corpus. This is not
-multi-tenancy.
+multi-tenancy. Two access modes (U11): **local** (default, loopback only) and **server** (LAN, HTTPS, sign-in at the
+user's OIDC provider, a session the app signs): [`docs/INSTALL-SERVER.md`](docs/INSTALL-SERVER.md).
 
 ## Method: AI-DLC
 
@@ -137,13 +138,15 @@ never by editing the script.
 |---|---|
 | `src/server.ts` | Wiring, startup, and the WebSocket `upgrade` handler (keep it there; a test pins it) |
 | `src/api.ts` | Every route, with injected dependencies (including `now`), so routes are testable |
-| `src/localGuard.ts` | `decideAccess`: the ONE local-access policy, for HTTP and WebSocket alike |
+| `src/localGuard.ts` | `decideAccess`: the ONE access policy (local and server mode), for HTTP and WebSocket alike |
+| `src/access/`, `src/certs/` | Server mode: config, session, sign-in routes, the only `openid-client` importer; the certificate tool |
 | `src/version.ts` | The one reader of the app version |
 | `src/history/`, `src/rules/`, `src/playback/` | Recording, the rules engine, automated skipping |
 | `src/maintenance/`, `src/backup/`, `src/configuration/` | Backup/restore, verification, rules and credential writes |
 | `scripts/` | Developer and owner scripts; covered by `smoke` (load only) and `knip` |
 | `test/` | `node:test` + fast-check. Structural guards: `purity`, `noOrphanModules`, `localGuard`, `propertyObligations`, `versionSources`, `rulesetMatchesWorkflow`, `secretsTracked`, `docs` |
-| `docs/INSTALL-DEV.md`, `docs/INSTALL-APP.md` | The two install routines (development environment; app only), each walked cold by an agent |
+| `docs/INSTALL-DEV.md`, `docs/INSTALL-APP.md` | The two local install routines (development environment; app only), each walked cold by an agent |
+| `docs/INSTALL-SERVER.md` | Server mode, host-agnostic with *For Synology deployment* notes. Its steps were done on Machine 2 with a test build before it was written; the guide itself is not yet walked |
 | `aidlc-docs/` | All design records |
 
 ## Before you change…

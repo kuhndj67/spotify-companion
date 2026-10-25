@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = ['README.md', 'docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md', 'docs/claude-start.md', 'docs/ARCHITECTURE.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
+const DOCS = ['README.md', 'docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md', 'docs/INSTALL-SERVER.md', 'docs/claude-start.md', 'docs/ARCHITECTURE.md', 'CONTRIBUTING.md', 'CLAUDE.md'] as const;
 const read = (rel: string) => readFileSync(join(root, rel), 'utf8');
 
 const scripts = new Set(Object.keys((JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts));
@@ -72,9 +72,9 @@ function handWrittenCounts(text: string): string[] {
 /** INSTALL steps (`## S<n> — …`) missing any of the four parts. */
 function stepsMissingParts(install: string): string[] {
   const parts = ['**Purpose**', '**Commands**', '**Expected**', '**If it differs**'];
-  const steps = install.split(/^## (?=[SA]\d+\b)/m).slice(1);
+  const steps = install.split(/^## (?=[SAN]\d+\b)/m).slice(1);
   return steps.flatMap((body) => {
-    const id = body.match(/^[SA]\d+/)?.[0] ?? '?';
+    const id = body.match(/^[SAN]\d+/)?.[0] ?? '?';
     const section = body.split(/^## /m)[0] ?? '';
     return parts.filter((p) => !section.includes(p)).map((p) => `${id}: ${p}`);
   });
@@ -172,7 +172,7 @@ function unfencedCommandRuns(install: string): string[] {
 }
 
 describe('no 👤 box holds consecutive commands outside a code block', () => {
-  for (const doc of ['docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md']) {
+  for (const doc of ['docs/INSTALL-DEV.md', 'docs/INSTALL-APP.md', 'docs/INSTALL-SERVER.md']) {
     it(doc, () => {
       assert.deepEqual(unfencedCommandRuns(read(doc)), []);
     });
@@ -190,6 +190,11 @@ describe('every 👤 box in INSTALL says what to see and what to report', () => 
     const install = read('docs/INSTALL-DEV.md');
     // 2026-10-21 (going public): S2's sign-in box is gone -- a public repository needs no sign-in.
     assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 7, 'expected the S1, S3–S5, S8 person boxes');
+    assert.deepEqual(personBoxesMissingParts(install), []);
+  });
+  it('docs/INSTALL-SERVER.md', () => {
+    const install = read('docs/INSTALL-SERVER.md');
+    assert.ok((install.match(/👤 \*\*YOU DO THIS\*\*/g) ?? []).length >= 3, 'expected the N1, N2, N6 person boxes');
     assert.deepEqual(personBoxesMissingParts(install), []);
   });
   it('docs/INSTALL-APP.md', () => {
@@ -213,6 +218,11 @@ describe('every INSTALL step has its four parts (P-63 ⑤, BR-61.1)', () => {
   it('docs/INSTALL-APP.md', () => {
     const install = read('docs/INSTALL-APP.md');
     assert.ok((install.match(/^## A\d+/gm) ?? []).length >= 8, 'expected A1…A8');
+    assert.deepEqual(stepsMissingParts(install), []);
+  });
+  it('docs/INSTALL-SERVER.md', () => {
+    const install = read('docs/INSTALL-SERVER.md');
+    assert.ok((install.match(/^## N\d+/gm) ?? []).length >= 6, 'expected N1…N6');
     assert.deepEqual(stepsMissingParts(install), []);
   });
   it('positive control: a step without "If it differs" is reported', () => {

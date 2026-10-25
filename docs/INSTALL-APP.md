@@ -2,7 +2,7 @@
 
 This installs **just the running app**, from its published container image: no source code and no development tools.
 It runs on your own machine, with **your own Spotify account and your own Spotify developer credentials** (a client
-id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md).)
+id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md). To run it on a server and open it from your other devices after signing in, use [`INSTALL-SERVER.md`](INSTALL-SERVER.md).)
 
 The current release is **`1.0.0-beta.9`**. The commands below use it. Newer releases are announced on the
 [Releases page](https://github.com/kuhndj67/spotify-companion/releases), with what changed and how to update.

@@ -209,7 +209,7 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [ ] Positive controls: each guard is seen to fail once, on a deliberate violation that is then reverted (recorded in
       the code summary).
 
-### Step 15 — Documents *(IN-U11-1…7, 9, 10; FD plan Q9)*
+### Step 15 — Documents *(IN-U11-1…7, 9, 10; FD plan Q9)* — ◐ **moved ahead of Steps 11–14** (owner, 2026-10-25: others must see both deployments before any release). Done for what exists: ⚠️ deviation, the server install is its own guide, `docs/INSTALL-SERVER.md` (N1–N6, host-agnostic with *For Synology deployment* notes, the measured Synology findings), not a part of INSTALL-APP; INSTALL-APP and INSTALL-DEV point to it; README has a Local/Server table; ARCHITECTURE has the two modes, the components and the new invariants; CONTRIBUTING has the traps (one admission rule and its builder, recording independent of access, `openid-client`'s signature default, PowerShell's `--`, the Synology ACL, the SSO Server loop); CLAUDE.md names server mode and `src/access/`. `test/docs.test.ts` covers the new guide (four parts per step, 👤 boxes, links, paths). ⚠️ The guide writes `<version>` for the image: replace with the release's version when it is cut. Still to add when built: sign-out, *Settings → Access*, the moving-your-history section (exit test), and the code summary
 - [ ] `docs/INSTALL-APP.md`: a server part. Each step says what any host needs, with a *For Synology deployment*
       subsection where Machine 2 needs something specific. It covers the name, the certificates and the offline CA key,
       installing the root on Windows (with the Firefox note), registering the app with the provider, `setup --server`,

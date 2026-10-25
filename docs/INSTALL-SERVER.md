@@ -1,0 +1,287 @@
+# Install: on a server, for your other devices
+
+This installs the app on an **always-on machine on your home network** (a NAS, a mini PC, a home server), so you can
+open it from your other devices after **signing in**. It is the same app and the same image as the
+[app-only install](INSTALL-APP.md), in its second mode:
+
+| | **Local** (the default) | **Server** (this document) |
+|---|---|---|
+| Who can open it | this machine only (`http://localhost:3010`) | devices on your home network, after signing in |
+| Sign-in | none: the trust boundary is the machine itself | through **your own sign-in provider** (OpenID Connect), one allowed account |
+| Address | `http://localhost:3010` | `https://<name>:3443`, with a certificate your devices trust |
+| Setting | nothing to set | `ACCESS_MODE: server` and the settings below |
+| Guide | [`INSTALL-APP.md`](INSTALL-APP.md), [`INSTALL-DEV.md`](INSTALL-DEV.md) | this one |
+
+It is still a **single-user** app: one person, one Spotify account, one allowed sign-in account. Reaching it from
+outside your home network is **not** supported and not designed for.
+
+⚠️ **Availability.** Server mode is not in `1.0.0-beta.9`; it arrives in the **next release**, and its notes say so.
+The commands below write `<version>`: use the version the [Releases page](https://github.com/kuhndj67/spotify-companion/releases)
+names for server mode. Still to come in later releases: signing out from the app, the live view closing when a
+session ends, and *Settings → Access*.
+
+**How to use this document.** As the other install guides: do the steps in order; each has a **Purpose**, the
+**Commands**, what you should see (**Expected**) and what to do otherwise (**If it differs**). A step that only a
+person can do is a box starting **👤 YOU DO THIS**. Each step says what **any** host needs, then, under ***For
+Synology deployment***, what a Synology NAS needs in particular. The Synology parts were measured on a DS1517+ with
+DSM 7.2 and Container Manager 24.0.2; other hosts are written for but not walked.
+
+⚠️ **One recorder at a time.** If you already run the app on another machine, do **not** give this server your
+Spotify credentials until you move your history to it and stop the other one. Two installs recording the same
+account double-count every play, and nothing stops you. Moving your history is a later section of this guide, still
+to be written; until then, the server can be set up and signed in to without recording anything.
+
+---
+
+## What the server needs
+
+| Service | Why | *For Synology deployment* |
+|---|---|---|
+| A container runtime with `docker compose` | runs the app | **Container Manager** (a *Project* is a compose file) |
+| A **fixed LAN address** | the published port and a host entry use it | a DHCP reservation for the NAS on your router |
+| A **name** your devices resolve | the address and the certificate use it | `<name>.local`, the NAS's own name (local-network discovery) |
+| An **OpenID Connect provider**: authorization code with PKCE (S256), RS256-signed ID tokens, HTTPS redirect addresses | sign-in | **SSO Server** (Package Center), on its own port, for example **9443** |
+| A **certificate authority** your devices trust | HTTPS for the app and the provider | made in N1 by the app's own tool |
+| `amd64` (Intel or AMD) | the image is published for it only | most Plus-series models; ARM models are untested |
+
+On **your PC** (not the server) you need Docker, as in [`INSTALL-APP.md`](INSTALL-APP.md) A1, for the certificate tool.
+
+---
+
+## N1 — Certificates
+
+**Purpose**: make your own small certificate authority (CA) and two certificates from it: one for the sign-in
+provider, one for the app. The CA is **name-constrained** to the server's name and address, so its key can make
+certificates for nothing else. Done **on your PC**: the CA's key must never be on the server.
+
+**Commands**: on your PC, in a folder **outside** any install or repository folder (ideally removable media, here
+`G:\companion-ca`). Replace `<name>` and `<LAN address>`, lower case:
+
+```powershell
+docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs ca --out /work/ca --dns <name> --ip <LAN address>
+docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs issue --ca /work/ca --out /work/sso --name sso --dns <name> --ip <LAN address>
+docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs issue --ca /work/ca --out /work/app --name server --dns <name> --ip <LAN address>
+```
+
+From a source checkout the same tool is `npm run certs -- ca …`. ⚠️ In **Windows PowerShell**, write the `--` as
+`'--'` (PowerShell drops a bare `--` before npm sees it, and the tool then reports *Unexpected argument*); in Command
+Prompt or a Linux shell, a plain `--` works.
+
+> 👤 **YOU DO THIS** — N1 CA key · needs: your password manager, or removable media
+>
+> 1. Move `ca\ca-key.pem` **offline**: an attachment in your password manager, or the removable media kept unplugged.
+> 2. Delete any other copy of it. It is needed again only to issue or renew a certificate.
+>
+> **You should see:** `ca\ca-cert.pem`, `sso\sso-cert.pem`, `sso\sso-key.pem`, `app\server-cert.pem`,
+> `app\server-key.pem` still on disk; `ca-key.pem` nowhere but offline.
+> **When done, tell the agent:** "N1 done, CA key offline".
+
+**Expected**: each command ends with `✓ positive control: a certificate for outside-the-constraint.invalid is refused
+(name constraint works)`. The certificates last 825 days; the CA ten years.
+
+**If it differs**
+
+- `✗ … is (inside) a git repository` or `… an install folder`: the tool refuses to put the CA key where it could be
+  committed or copied to the server. Use another folder.
+- `✗ refusing to overwrite`: a renewal goes into a new, empty folder.
+- `⚠️ the CA vouched for outside-the-constraint.invalid`: the name constraint is not working. Do not use that CA.
+
+---
+
+## N2 — The sign-in provider
+
+**Purpose**: give the provider its certificate, and register the app with it, so it can sign you in and send you
+back.
+
+**Commands**: at your provider, register an **OpenID Connect** application (a confidential client):
+
+- **Redirect address**: exactly `https://<name>:3443/auth/callback`
+- **Scope**: `openid`
+
+Note its **client ID** (not secret), its **issuer** (from its discovery document,
+`https://<issuer>/.well-known/openid-configuration`, the `issuer` value, character for character), and the **subject**
+of the account you will sign in with. Keep the **client secret** for N4; never paste it anywhere else.
+
+### *For Synology deployment*
+
+> 👤 **YOU DO THIS** — N2 SSO Server · needs: DSM as an administrator
+>
+> 1. **Package Center** → install **SSO Server**. Give it its **own HTTPS port**: **Control Panel → Login Portal →
+>    Applications → SSO Server → Edit**, customized HTTPS port, for example `9443` (`5443` is refused as reserved).
+>    Then in SSO Server's **Settings**, set the **Server URL** to `https://<name>:9443` and enable **OIDC**.
+> 2. **Control Panel → Security → Certificate → Add → Import**: private key `sso-key.pem`, certificate `sso-cert.pem`,
+>    intermediate `ca-cert.pem`. Then **Settings** on the same tab: assign it to the **`ssoserver-9443`** entry.
+> 3. **SSO Server → Application → Add → OIDC**: redirect address `https://<name>:3443/auth/callback`. Copy the
+>    **Application ID** (the client ID) and the **secret**.
+> 4. The account you will sign in with: its **subject is its DSM user name**, exactly (case matters). Measured: a
+>    dedicated non-administrator account with DSM's own application privilege works. Whether less suffices is not
+>    measured. The app never uses the account's files, so it needs no shared-folder access.
+>
+> **You should see:** `https://<name>:9443/webman/sso/.well-known/openid-configuration` opens (after N3, without a
+> warning) and its `issuer` is `https://<name>:9443/webman/sso`.
+> **When done, tell the agent:** "N2 done", the client ID and the issuer. Not the secret.
+
+**Expected**: the provider's discovery document offers `code`, `S256` and `RS256`.
+
+**If it differs**
+
+- SSO Server refuses the redirect address: it must be HTTPS and a **name** (`localhost` and IP addresses are refused).
+- DSM still serves its factory certificate on the SSO port: the certificate was imported but not **assigned** to
+  `ssoserver-9443` (step 2's *Settings*).
+
+---
+
+## N3 — Trust the CA on each device
+
+**Purpose**: make each device that opens the app trust your CA, so the app's address shows no warning.
+
+**Commands**: on Windows, for your own account (Command Prompt):
+
+```
+certutil -user -addstore Root G:\companion-ca\ca\ca-cert.pem
+```
+
+or **Manage user certificates** → *Trusted Root Certification Authorities* → *Certificates* → *All Tasks → Import*.
+Edge and Chrome use that store. ⚠️ **Firefox** keeps its own unless its *enterprise roots* setting is on. Other kinds
+of device (macOS, iOS, Android) are not yet written up.
+
+**Expected**: Windows asks to confirm *Spotify Companion CA for `<name>`*; afterwards the provider's discovery
+address opens without a warning.
+
+**If it differs**
+
+- Still a warning: the browser was open during the import; restart it. Firefox: see above.
+- Never import either **key** file on a device: only `ca-cert.pem`.
+
+---
+
+## N4 — The server's folder
+
+**Purpose**: create the folder the app runs from, with the server settings filled in and the certificates and secret
+in place.
+
+**Commands**: in a **new, empty** folder (on your PC, to copy to the server afterwards, or on the server itself):
+
+```powershell
+docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup --server
+```
+
+Then, in the new `compose.yaml`, replace every `<placeholder>`:
+
+| Setting | Value |
+|---|---|
+| `ports` | `"<LAN address>:3443:3000"`: the server's LAN address only |
+| `extra_hosts` | `"<name>:<LAN address>"`: how the container finds the provider (a `.local` name does not resolve inside a Linux container) |
+| `PUBLIC_ORIGIN` | `https://<name>:3443` |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_ALLOWED_SUBJECT` | from N2 |
+| `SESSION_LIFETIME` | how long a sign-in lasts, `1h` to `90d` (default `7d`). Recording never stops when it ends |
+| `OIDC_PROVIDER_PORTAL` | optional; see *For Synology deployment* |
+
+And put these files in the folder (`./` is the folder):
+
+| File | From |
+|---|---|
+| `./config/ca/ca-cert.pem` | N1, `ca\ca-cert.pem` (public) |
+| `./secrets/app/tls/server-cert.pem`, `./secrets/app/tls/server-key.pem` | N1, `app\` |
+| `./secrets/app/oidc-client-secret` | the client secret from N2, one line, no file extension |
+| `./secrets/app/musicbrainz.json` | your contact address, as [`INSTALL-APP.md`](INSTALL-APP.md) A5 |
+
+Do **not** add Spotify credentials yet (see *One recorder at a time*, above).
+
+### *For Synology deployment*
+
+- **Set `OIDC_PROVIDER_PORTAL: https://<name>:9443/`.** Measured: SSO Server's sign-in page does **not** return to the
+  app when you arrive with no SSO Server session (it loops back to its own sign-in, for every account). With this
+  setting the app first shows a short page: *sign in at the provider (opens in a new tab), then Continue*, which
+  completes.
+- **Put the folder in an administrators-only shared folder** (for example `docker/spotify-companion`) on the volume
+  you back up. It holds the client secret, the app's TLS key and the session key.
+- **The container's user must own its four folders.** DSM's shared-folder permissions refuse the container's user
+  (uid 1000) even when it owns the files, and the app then cannot read `ca-cert.pem` or write its database (`EACCES`
+  in the log). Over SSH, as an administrator, in the project folder:
+
+  ```
+  sudo chown -R 1000:1000 data state config secrets
+  sudo chmod -R u+rwX data state config secrets
+  ```
+
+  This switches those four folders to ordinary Linux permissions (owner only). Consequence: File Station can no
+  longer browse them; use SSH (`sudo`) to reach them, for example to copy a backup out of `./data/backups/`.
+
+**Expected**: no `<placeholder>` left; the four files in place.
+
+**If it differs**
+
+- `✗ setup: refusing to overwrite`: use a new, empty folder.
+- `✗ setup: unknown option`: the only option is `--server`.
+
+---
+
+## N5 — Start it, and check that it serves
+
+**Purpose**: start the app on the server and see positive evidence that it serves HTTPS and refuses requests
+without a sign-in.
+
+**Commands**: on the server, in the folder: `docker compose up -d` (*For Synology deployment*: **Container
+Manager → Project → Create**, choose the folder, *use the existing compose.yaml*; leave the **Web Station portal**
+option **off**: the app serves its own HTTPS, and a proxy in front would bypass its address check). Then read the
+log (`docker logs spotify-companion`; *For Synology*: Container Manager → Container → Log).
+
+**Expected**: in the log, `spotify-companion listening on https://0.0.0.0:3000, public address https://<name>:3443`
+and `Access: server mode, sign-in through <issuer>`; no `NOT SERVING`. (Errors that Spotify is not configured are
+expected until you add credentials.) In a browser, `https://<name>:3443/` goes to the sign-in.
+
+**If it differs**
+
+- `[access] NOT SERVING …` followed by named settings: each line names what is missing or wrong; fix it and restart.
+  The app records meanwhile; it only opens no port.
+- `EACCES` or *Ignoring extra certs … Permission denied*: the container's user cannot read its folders (N4,
+  *For Synology deployment*).
+- `[lock] cannot create … the app's user cannot write to the data folder`: the same.
+- Nothing answers for the first half-minute after replacing a container that was force-removed: the app waits one
+  30-second window for the old database lock before taking it over. That is the one-writer rule working.
+- *the sign-in provider is not usable yet: provider-unreachable*: the container cannot reach the provider. Check
+  `extra_hosts` and that `ca-cert.pem` is in `./config/ca/`.
+
+---
+
+## N6 — Sign in
+
+**Purpose**: sign in from another device and reach the app.
+
+> 👤 **YOU DO THIS** — N6 sign-in · needs: a device that trusts the CA (N3), and the account from N2
+>
+> 1. Open `https://<name>:3443/`.
+> 2. With `OIDC_PROVIDER_PORTAL` set: click **Sign in at your sign-in provider** (a new tab), sign in there, come back,
+>    click **Continue**. Without it: you go straight to the provider; sign in.
+>
+> **You should see:** the app's page. A page titled *Sign-in did not complete* gives its reason in one sentence.
+> **When done, tell the agent:** "N6 signed in", or the sentence on the problem page.
+
+**Commands**: none beyond the box; afterwards the log has one line per sign-in, `[access] sign-in completed for …` or
+`[access] sign-in refused: <reason>`. Nothing secret is ever logged.
+
+**Expected**: the app's page; the log line *completed*. The sign-in lasts `SESSION_LIFETIME`; when it ends, the next
+page you open asks you to sign in again (with SSO Server still signed in, it completes at once).
+
+**If it differs**
+
+- *Signed in as … This app admits only its owner's account*: `OIDC_ALLOWED_SUBJECT` does not match that account
+  exactly.
+- SSO Server's sign-in page keeps coming back (*For Synology deployment*): set `OIDC_PROVIDER_PORTAL` (N4). Measured:
+  SSO Server 3.0.7; DSM's iframe-embedding setting makes no difference.
+- *The sign-in provider cannot be reached*: N5's last item.
+
+---
+
+## Renewal, backups, monitoring
+
+- **Renewal**, about every two years (the certificates last 825 days): bring the CA key back from offline, issue both
+  certificates into a new folder (N1's `issue` lines), import SSO Server's again (*For Synology*: N2 step 2), copy the
+  app's pair into `./secrets/app/tls/`, restart the container, put the CA key offline again. Devices keep the CA
+  (ten years) and are not touched.
+- **Backups**: the app keeps its own in `./data/backups/` (see [`INSTALL-APP.md`](INSTALL-APP.md), *Backups*). Include
+  the folder in the host's own backup too (*For Synology*: your NAS backup task). ⚠️ Restore from an archive in
+  `./data/backups/`, never from a copied `history.db`: a file copied while the app writes may be inconsistent.
+- **Monitoring**: the container's log (one line per sign-in, the problems at startup, and a summary every hour while
+  not serving) and the container's health status, which is *unhealthy* while it is not serving.

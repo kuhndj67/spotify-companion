@@ -182,6 +182,17 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
   the database (`data/history.db.lock`) refuses any second process, app or script, naming the holder. It is judged
   by watching its heartbeat, never by its age. Do not add a second guard beside it.
 - **Every uploaded file goes through one admission path** (FR-64). Do not add a second.
+- **Both access modes go through `decideAccess`, and both call sites build its input with `accessRequestFrom`.** No
+  route or handler reads the session cookie, Host or Origin itself. Server mode found one place that did:
+  `ingestGuard` checked `Origin` against the loopback names and would have refused every save; it now takes the origin
+  rule from admission.
+- **Recording never depends on access.** `startRecording()` in `src/server.ts` runs before, and whatever, the listener
+  does; a refused server configuration opens no port but keeps recording. Nothing on the poll and record path imports
+  `src/access/`.
+- **`openid-client` does not verify an ID token's signature by default** for a token from the token endpoint (OIDC
+  Core allows trusting TLS instead), and does not refuse a future `iat`. The provider client turns on
+  `enableNonRepudiationChecks` and checks `iat` itself; the fake provider's tamper and unknown-key cases fail if
+  either is removed. Moving the `openid-client` pin is a reviewed change with `test/signInFlow.test.ts` green.
 
 ### Operations
 
@@ -221,3 +232,10 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
   evidence of headroom.
 - **A probe that writes to the player runs with the container down**, or its skips enter the corpus.
 - **The AI DJ exposes no queue**, and `context.type` cannot tell it from a radio station. Ask the queue at runtime.
+- **Windows PowerShell drops a bare `--`** before npm sees it: `npm run certs -- ca --out …` fails with *Unexpected
+  argument*. Write `'--'` in PowerShell; Command Prompt and Linux shells pass it.
+- **On a Synology share the container's user is refused by the share's ACL** even when it owns the files; the server
+  guide's `chown`/`chmod` gives it the four mounted folders. A lock that cannot be created is a refusal with the
+  reason, never a crash (it was a restart loop until U11).
+- **Synology SSO Server does not resume a sign-in that arrives with no SSO Server session** (it loops at its own
+  sign-in, for every account; measured). `OIDC_PROVIDER_PORTAL` makes the app ask the user to sign in there first.

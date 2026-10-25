@@ -46,7 +46,7 @@ export interface VerifyContext {
   /** BR-91.5: rechecked on every request, so changing the allowed account ends the old one's sessions. */
   readonly allowedSubject: string;
   /** BR-94.1: ids signed out on this run, until their own expiry. */
-  readonly revoked: ReadonlySet<string>;
+  readonly revoked: { has(sid: string): boolean };
 }
 
 export function verifySession(cookie: string | undefined, context: VerifyContext): SessionVerdict {

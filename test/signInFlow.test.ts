@@ -16,6 +16,8 @@ import { createApi, type ApiDeps } from '../src/api.js';
 import { ProviderClient } from '../src/access/ProviderClient.js';
 import { PendingSignIns, PENDING_TTL_MS } from '../src/access/pendingSignIns.js';
 import { verifySession } from '../src/access/session.js';
+import { RevokedSessions } from '../src/access/liveConnections.js';
+import { INGEST_HEADER } from '../src/ingest/types.js';
 import { SESSION_COOKIE, readCookie, serverGuard, type ServerAccessPolicy } from '../src/localGuard.js';
 import { PRE_SIGN_IN_COOKIE } from '../src/access/authRoutes.js';
 import { startFakeOidcProvider, type FakeOidcProvider } from './support/fakeOidcProvider.js';
@@ -60,7 +62,8 @@ interface Harness {
 async function startApp(provider: FakeOidcProvider, options: { issuer?: string; providerPortal?: string } = {}): Promise<Harness> {
   const logs: string[] = [];
   const clock = { now: Date.now() };
-  const key = randomBytes(32);
+  let key = randomBytes(32);
+  const revoked = new RevokedSessions(() => clock.now);
   const client = new ProviderClient({
     issuer: options.issuer ?? provider.issuer,
     clientId: provider.clientId,
@@ -73,7 +76,7 @@ async function startApp(provider: FakeOidcProvider, options: { issuer?: string; 
   const app = express();
   app.use(
     serverGuard(POLICY, (cookie) =>
-      verifySession(cookie, { key, now: clock.now, allowedSubject: 'owner', revoked: new Set() }),
+      verifySession(cookie, { key, now: clock.now, allowedSubject: 'owner', revoked }),
     ),
   );
   app.use(
@@ -90,6 +93,13 @@ async function startApp(provider: FakeOidcProvider, options: { issuer?: string; 
           now: () => clock.now,
           newSessionId: () => randomBytes(16).toString('base64url'),
           log: (line) => logs.push(line),
+          // As server.ts wires them (the live connections are covered in test/liveConnections.test.ts).
+          signOut: (session) => revoked.add(session.sid, session.exp),
+          signOutEverywhere: () => {
+            key = randomBytes(32);
+            revoked.clear();
+            return { ok: true };
+          },
         },
       }),
     ),
@@ -118,10 +128,10 @@ class Browser {
   readonly jar = new Map<string, string>();
   constructor(private readonly app: Harness) {}
 
-  get(path: string, extra: Record<string, string> = {}): Promise<Reply> {
+  get(path: string, extra: Record<string, string> = {}, method = 'GET'): Promise<Reply> {
     const cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ');
     return new Promise((resolve, reject) => {
-      const req = httpRequest(`${this.app.base}${path}`, { headers: { host: POLICY.publicHost, ...(cookie ? { cookie } : {}), ...extra } }, (res) => {
+      const req = httpRequest(`${this.app.base}${path}`, { method, headers: { host: POLICY.publicHost, ...(cookie ? { cookie } : {}), ...extra } }, (res) => {
         let body = '';
         res.setEncoding('utf8');
         res.on('data', (c) => (body += c));
@@ -361,6 +371,51 @@ describe('the provider itself (BR-88.6)', () => {
     const r = await new Browser(app).get('/auth/problem?reason=wrong-account&subject=%3Cb%3EZQXJ&providerError=ZQXK');
     assert.equal(r.status, 200);
     assert.ok(!r.body.includes('ZQXJ') && !r.body.includes('ZQXK'));
+  });
+});
+
+describe('signing out (BR-94)', () => {
+  const sameSite = { origin: 'https://app.test:3443', [INGEST_HEADER]: '1' };
+
+  it('⭐ sign out: the cookie is expired, the session is refused afterwards, and the answer names the signed-out page', async () => {
+    const browser = new Browser(app);
+    assert.equal((await browser.signIn(provider)).status, 302);
+    const cookie = browser.jar.get(SESSION_COOKIE)!;
+    const out = await browser.get('/auth/sign-out', sameSite, 'POST');
+    assert.equal(out.status, 200, out.body);
+    assert.deepEqual(JSON.parse(out.body), { next: '/auth/signed-out' });
+    assert.ok(out.setCookies.some((c) => c.startsWith(`${SESSION_COOKIE}=;`) && /Max-Age=0/.test(c)));
+    // Even a copy of the old cookie, kept by someone, is refused now (revoked until its expiry).
+    const replay = new Browser(app);
+    replay.jar.set(SESSION_COOKIE, cookie);
+    assert.equal((await replay.get('/api/anything')).status, 401);
+    assert.equal((await new Browser(app).get('/auth/signed-out')).status, 200, 'the signed-out page needs no session');
+    assert.ok(app.logs.some((l) => l.startsWith('[access] signed out "owner"')));
+  });
+
+  it('sign out everywhere: two sessions, both refused afterwards', async () => {
+    const one = new Browser(app);
+    const two = new Browser(app);
+    assert.equal((await one.signIn(provider)).status, 302);
+    assert.equal((await two.signIn(provider)).status, 302);
+    assert.equal((await one.get('/auth/session')).status, 200);
+    const out = await one.get('/auth/sign-out-everywhere', sameSite, 'POST');
+    assert.equal(out.status, 200, out.body);
+    assert.equal((await one.get('/auth/session')).status, 401);
+    assert.equal((await two.get('/auth/session')).status, 401);
+  });
+
+  it('BR-92.4: a sign-out from another site is refused, and changes nothing', async () => {
+    const browser = new Browser(app);
+    assert.equal((await browser.signIn(provider)).status, 302);
+    assert.equal((await browser.get('/auth/sign-out', { [INGEST_HEADER]: '1' }, 'POST')).status, 403, 'no Origin');
+    assert.equal((await browser.get('/auth/sign-out', { origin: 'https://evil.example', [INGEST_HEADER]: '1' }, 'POST')).status, 403);
+    assert.equal((await browser.get('/auth/sign-out', { origin: 'https://app.test:3443' }, 'POST')).status, 403, 'no app header');
+    assert.equal((await browser.get('/auth/session')).status, 200, 'still signed in');
+  });
+
+  it('without a session, sign-out is 401 (never a 500)', async () => {
+    assert.equal((await new Browser(app).get('/auth/sign-out', sameSite, 'POST')).status, 401);
   });
 });
 

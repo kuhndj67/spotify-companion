@@ -18,6 +18,7 @@ import { configureAccess, newSessionId, notServingLines, notServingSummary } fro
 import { ProviderClient } from './access/ProviderClient.js';
 import { PendingSignIns } from './access/pendingSignIns.js';
 import { verifySession } from './access/session.js';
+import { LiveConnections, RevokedSessions } from './access/liveConnections.js';
 import { createApi, type DisplayLiked } from './api.js';
 import { BackTestService } from './rules/BackTestService.js';
 import { EvaluationCoordinator } from './rules/EvaluationCoordinator.js';
@@ -1054,7 +1055,9 @@ const serverPolicy: ServerAccessPolicy | null =
 /** The current session key; *Sign out everywhere* replaces it (Step 11). */
 let sessionKey: Buffer | null = access.mode === 'server' ? access.sessionKey : null;
 /** BR-94.1: ids signed out on this run, until their own expiry. */
-const revokedSessions = new Set<string>();
+const revokedSessions = new RevokedSessions();
+/** BR-93: every live connection admitted on a session, closed with 4401 when that session ends. */
+const liveConnections = new LiveConnections();
 const verifyRequestSession: SessionVerifier = (cookie) =>
   access.mode !== 'server' || sessionKey === null
     ? { kind: 'invalid' }
@@ -1133,6 +1136,19 @@ app.use(
             now: () => Date.now(),
             newSessionId,
             log: (line) => console.log(line),
+            signOut: (session) => {
+              revokedSessions.add(session.sid, session.exp);
+              liveConnections.closeSession(session.sid);
+            },
+            signOutEverywhere: () => {
+              // The key first: if it cannot be replaced, nothing else changes and the route says so.
+              const replaced = access.sessionKeys.replace();
+              if (!replaced.ok) return { ok: false, reason: replaced.reason };
+              sessionKey = replaced.key;
+              revokedSessions.clear();
+              liveConnections.closeAll();
+              return { ok: true };
+            },
           }
         : null,
     // U7. Behind `localGuard` (app-wide) AND `ingestGuard` (per route, in api.ts), like U6.
@@ -1277,7 +1293,11 @@ server.on('upgrade', (request, socket, head) => {
     return;
   }
 
-  wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    // U11 (BR-93): a socket admitted on a session is closed with 4401 when that session ends.
+    if (decision.ok && decision.session !== undefined) liveConnections.register(ws, decision.session);
+    wss.emit('connection', ws, request);
+  });
 });
 
 /**

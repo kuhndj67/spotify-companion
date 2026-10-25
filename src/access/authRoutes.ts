@@ -10,6 +10,8 @@
  *   GET /auth/problem          → the problem page by reason
  *   GET /auth/signed-out       → the signed-out page
  *   GET /auth/session          → the session admission verified (NOT an open route: it needs one)
+ *   POST /auth/sign-out        → BR-94.1: this session revoked, its live connections closed, the cookie expired
+ *   POST /auth/sign-out-everywhere → BR-94.2: a new session key, every live connection closed, the cookie expired
  *   GET /auth/auth.css         → the pages' one stylesheet
  *
  * ⚠️ Admission is not decided here. `decideAccess` (in `localGuard.ts`) has already run for every request, and the
@@ -27,7 +29,8 @@ import type { PendingSignIns } from './pendingSignIns.js';
 import { PENDING_TTL_MS } from './pendingSignIns.js';
 import type { ProviderClient, SignInOutcome, SignInRefusal } from './ProviderClient.js';
 import { safeReturnPath } from './returnPath.js';
-import { signSession } from './session.js';
+import { signSession, type Session } from './session.js';
+import { ingestGuard } from '../ingest/ingestGuard.js';
 
 /** BR-89.2: binds a callback to the browser that started the sign-in. Not `__Host-`: that prefix requires path `/`. */
 export const PRE_SIGN_IN_COOKIE = 'companion-signin';
@@ -46,6 +49,10 @@ export interface AuthRoutesDeps {
   /** A fresh random session id (BR-91.1). */
   readonly newSessionId: () => string;
   readonly log: (line: string) => void;
+  /** BR-94.1: revoke this session and close its live connections. */
+  readonly signOut?: (session: Session) => void;
+  /** BR-94.2: replace the session key and close every live connection. */
+  readonly signOutEverywhere?: () => { readonly ok: true } | { readonly ok: false; readonly reason: string };
 }
 
 const STATUS_BY_REASON: Record<SignInRefusal, number> = {
@@ -141,6 +148,39 @@ export function createAuthRoutes(deps: AuthRoutesDeps): Router {
 
   router.get('/auth/auth.css', (_req, res) => {
     res.type('css').send(AUTH_CSS);
+  });
+
+  // BR-94: state-changing, so admission has already required the public Origin (BR-92.4), and `ingestGuard` adds the
+  // app's own header. Both answer JSON naming the page to go to; the page navigates there.
+  const expireCookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0${secure}`;
+  router.post('/auth/sign-out', ingestGuard, (_req, res) => {
+    const session = (res.locals.access as AdmittedAccess | undefined)?.session;
+    if (session === undefined || deps.signOut === undefined) {
+      res.status(401).json({ signIn: '/auth/sign-in' });
+      return;
+    }
+    deps.signOut(session);
+    deps.log(`[access] signed out ${JSON.stringify(session.sub)} (this session)`);
+    res.setHeader('Set-Cookie', expireCookie);
+    res.set('Cache-Control', 'no-store').json({ next: '/auth/signed-out' });
+  });
+
+  router.post('/auth/sign-out-everywhere', ingestGuard, (_req, res) => {
+    const session = (res.locals.access as AdmittedAccess | undefined)?.session;
+    if (session === undefined || deps.signOutEverywhere === undefined) {
+      res.status(401).json({ signIn: '/auth/sign-in' });
+      return;
+    }
+    const outcome = deps.signOutEverywhere();
+    if (!outcome.ok) {
+      // The old key is still in force, so every session still is: say so, never claim it worked.
+      deps.log(`[access] sign out everywhere FAILED: ${outcome.reason}`);
+      res.status(500).json({ error: `Sign out everywhere did not happen: ${outcome.reason}` });
+      return;
+    }
+    deps.log(`[access] signed out everywhere by ${JSON.stringify(session.sub)}: new session key, every connection closed`);
+    res.setHeader('Set-Cookie', expireCookie);
+    res.set('Cache-Control', 'no-store').json({ next: '/auth/signed-out' });
   });
 
   router.get('/auth/session', (_req, res) => {

@@ -176,12 +176,12 @@ sign-out, and the live connection closing at expiry (Step 11).
 
 ## Part B — after the retest
 
-### Step 11 — Live connections and sign-out *(LC-89, LC-88; BR-93, BR-94; P-93)*
-- [ ] `src/server.ts`: a registry of sockets by session id. Each socket gets a timer at its session's expiry and is
+### Step 11 — Live connections and sign-out *(LC-89, LC-88; BR-93, BR-94; P-93)* — ✅ DONE · `src/access/liveConnections.ts`: `LiveConnections` (sockets by session, a timer to `exp`, re-armed past `setTimeout`'s 24.8-day limit, cleared on close; 4401) and `RevokedSessions` (pruned at each id's expiry). The upgrade handler stays in `server.ts` (its pins unchanged) and registers each socket admitted on a session. `POST /auth/sign-out` and `/auth/sign-out-everywhere` (behind admission's Origin rule and `ingestGuard`; JSON naming `/auth/signed-out`); *everywhere* replaces the key first and changes nothing if it cannot. Tests: fake-clock registry, real WebSockets through the same calls as `server.ts` (401 for none/forged/other-key, 4401 at a 300 ms expiry, sign-out closing only its session's socket), HTTP sign-out through the real routes. Positive control: a sign-out that does not revoke fails the replay test
+- [x] `src/server.ts`: a registry of sockets by session id. Each socket gets a timer at its session's expiry and is
       closed with **4401**. Timers are cleared on close.
-- [ ] `/auth/sign-out` (revokes this session and closes its sockets) and `/auth/sign-out-everywhere` (replaces
+- [x] `/auth/sign-out` (revokes this session and closes its sockets) and `/auth/sign-out-everywhere` (replaces
       `session.key` and closes every socket). Both are state-changing and refused from another site (BR-92.4).
-- [ ] Tests: the WebSocket upgrade refuses each bad session with `401`, and a valid one is admitted. Sign out
+- [x] Tests: the WebSocket upgrade refuses each bad session with `401`, and a valid one is admitted. Sign out
       everywhere: two sessions are refused afterwards, on HTTP and on WebSocket. A 2 s lifetime closes the socket with
       4401.
 

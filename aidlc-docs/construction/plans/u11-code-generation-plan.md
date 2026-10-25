@@ -200,13 +200,13 @@ sign-out, and the live connection closing at expiry (Step 11).
 - [x] Tests: PBT-98. Positive control (P-101): an in-memory database answers `memory`, which leads to display-only and
       a failed row that names `memory`.
 
-### Step 14 — Structural guards and secrets in output *(LC-96; P-88, P-96, P-97)*
-- [ ] `test/accessStructure.test.ts`: no session cookie or verifier access outside LC-83 and LC-88; no module on the
+### Step 14 — Structural guards and secrets in output *(LC-96; P-88, P-96, P-97)* — ✅ DONE · `test/accessStructure.test.ts`: only `localGuard.ts`, `access/authRoutes.ts`, `access/session.ts` and `server.ts` touch the session cookie, the cookie parser or the verifier; no module on the poll and record path imports `src/access/`; `openid-client` only in `ProviderClient.ts`; each scanner seen to find a planted violation. `test/accessSecrets.test.ts`: a sign-in, a session read, a sign-out, a wrong-account and a tampered sign-in; every log line, console line and response body searched for codes, both tokens, the cookie, the verifier, `state`, `nonce`, the client secret and the session key (headers deliberately not: `Set-Cookie` and `Location` carry them by design). ⚠️ **Found**: `/auth/sign-in`'s redirect had a BODY (Express's *Found. Redirecting to …*) repeating `state` and `nonce`; now sent with none. The sign-in harness moved to `test/support/signInHarness.ts`, shared by both tests
+- [x] `test/accessStructure.test.ts`: no session cookie or verifier access outside LC-83 and LC-88; no module on the
       poll and record path imports `src/access/`; `openid-client` imported only by `ProviderClient.ts`.
-- [ ] `test/accessSecrets.test.ts`: a full sign-in, a sign-out and a failed sign-in. Every log line and response body
+- [x] `test/accessSecrets.test.ts`: a full sign-in, a sign-out and a failed sign-in. Every log line and response body
       is searched for the code, both tokens, the cookie value, the verifier, `state`, `nonce`, the client secret and
       the session key.
-- [ ] Positive controls: each guard is seen to fail once, on a deliberate violation that is then reverted (recorded in
+- [x] Positive controls: each guard is seen to fail once, on a deliberate violation that is then reverted (recorded in
       the code summary).
 
 ### Step 15 — Documents *(IN-U11-1…7, 9, 10; FD plan Q9)* — ◐ **moved ahead of Steps 11–14** (owner, 2026-10-25: others must see both deployments before any release). Done for what exists: ⚠️ deviation, the server install is its own guide, `docs/INSTALL-SERVER.md` (N1–N6, host-agnostic with *For Synology deployment* notes, the measured Synology findings), not a part of INSTALL-APP; INSTALL-APP and INSTALL-DEV point to it; README has a Local/Server table; ARCHITECTURE has the two modes, the components and the new invariants; CONTRIBUTING has the traps (one admission rule and its builder, recording independent of access, `openid-client`'s signature default, PowerShell's `--`, the Synology ACL, the SSO Server loop); CLAUDE.md names server mode and `src/access/`. `test/docs.test.ts` covers the new guide (four parts per step, 👤 boxes, links, paths). ⚠️ The guide writes `<version>` for the image: replace with the release's version when it is cut. Still to add when built: sign-out, *Settings → Access*, the moving-your-history section (exit test), and the code summary

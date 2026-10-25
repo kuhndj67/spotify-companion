@@ -98,7 +98,9 @@ export function createAuthRoutes(deps: AuthRoutesDeps): Router {
     }
     deps.pending.add(started.pending, deps.now());
     res.setHeader('Set-Cookie', `${PRE_SIGN_IN_COOKIE}=${started.pending.state}; Path=/auth/; Max-Age=${PENDING_TTL_MS / 1000}${secure}`);
-    res.set('Cache-Control', 'no-store').redirect(302, started.url);
+    // No body: Express's redirect() writes one that repeats the address, and with it `state` and `nonce`. They belong
+    // in `Location` (BR-89.1), never on a page (BR-95.3; found by test/accessSecrets.test.ts).
+    res.status(302).set('Cache-Control', 'no-store').set('Location', started.url).end();
   });
 
   router.get('/auth/callback', async (req, res) => {

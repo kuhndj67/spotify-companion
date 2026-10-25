@@ -951,3 +951,17 @@ anonymous manifest HTTP 200).
   displayed, sso opened and allowed me to sign in using companion, and the link to the app also worked"*. With no SSO
   Server session, the case that looped now completes through the page. Recorded in research-findings. Part A done;
   Part B next. The branch is not yet pushed (waits for the owner's go-ahead).
+
+## 2026-10-25 — U11 Code Generation Part B done
+
+- **Owner**: *"lets do part b and then do the walks so we can deploy a complete tested solution"*; earlier the same
+  day, the documents first (*"we should have all the required artifacts for others looking at the project to see
+  the new deployment scenario alongside the original localhost scenario"*), so Step 15 moved ahead of Steps 11–14.
+- Built: sign-out and sign out everywhere; live connections closed with 4401 at session end; the *Signed out* state
+  and Settings → Access (looked at in light and dark; the notice was moved and its link made readable); the WAL
+  read-back (`WalRefused` before any write); Diagnostics' *Access*, *WAL* and *Table counts and rules hash* rows and
+  the report's `fingerprint`; `compareCorpora` (PBT-98) and `npm run corpus:compare`; structural guards; a
+  secrets-in-output test, which **found the sign-in redirect's body repeating `state` and `nonce`** (fixed).
+  `docs/INSTALL-SERVER.md` gained N7 (moving your history: the trial, the exit test, the move).
+- `npm run verify` green; PBT-91…PBT-100 registered. Candidate `spotify-companion:candidate-u11` run isolated.
+- Next: Build & Test (the walks, the exit test, the move), then the release. Pull requests wait for the owner.

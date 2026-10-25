@@ -90,7 +90,16 @@ first, then Continue* when `OIDC_PROVIDER_PORTAL` is set (BR-89.6, Step 10a), **
 (2026-10-25). Also fixed: a lock that cannot be created no longer crashes the app. Machine 2 runs
 `candidate-u11-signin-2` with no Spotify registration (nothing records there).
 
-**Next**: Part B (Steps 11–16). The branch waits for the owner's go-ahead to push.
+**Part B done** (2026-10-25, Steps 11–16; Step 15 moved ahead at the owner's request): sign-out and sign out
+everywhere, live connections closed with 4401, the *Signed out* state and Settings → Access (checked in light and
+dark), the WAL read-back and Diagnostics' *Access*, *WAL* and corpus rows, `npm run corpus:compare`, the structural
+and secrets guards, `docs/INSTALL-SERVER.md` (N1–N7) beside the local guides, and the code summary
+([`code/code-summary.md`](code/code-summary.md)). Candidate `spotify-companion:candidate-u11` built and run isolated.
+Branch pushed.
+
+**Next (owner, 2026-10-25: "do part b and then do the walks")**: Build & Test: the walk of `docs/INSTALL-SERVER.md`
+on Machine 2 with the candidate, a check that local mode is unchanged, then the exit test (N7) and the move. Then the
+release. Pull requests wait for the owner's go-ahead.
 
 *(superseded)* **Next**: ⛔ **Step 10, the owner's**: deployment-architecture §4 steps 1–4 with the candidate image (no Spotify
 registration on Machine 2), then at least five sign-ins recorded in `research-findings.md`. A persistent loop stops

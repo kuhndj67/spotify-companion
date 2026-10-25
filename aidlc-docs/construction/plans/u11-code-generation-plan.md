@@ -210,20 +210,20 @@ sign-out, and the live connection closing at expiry (Step 11).
       the code summary).
 
 ### Step 15 — Documents *(IN-U11-1…7, 9, 10; FD plan Q9)* — ◐ **moved ahead of Steps 11–14** (owner, 2026-10-25: others must see both deployments before any release). Done for what exists: ⚠️ deviation, the server install is its own guide, `docs/INSTALL-SERVER.md` (N1–N6, host-agnostic with *For Synology deployment* notes, the measured Synology findings), not a part of INSTALL-APP; INSTALL-APP and INSTALL-DEV point to it; README has a Local/Server table; ARCHITECTURE has the two modes, the components and the new invariants; CONTRIBUTING has the traps (one admission rule and its builder, recording independent of access, `openid-client`'s signature default, PowerShell's `--`, the Synology ACL, the SSO Server loop); CLAUDE.md names server mode and `src/access/`. `test/docs.test.ts` covers the new guide (four parts per step, 👤 boxes, links, paths). ⚠️ The guide writes `<version>` for the image: replace with the release's version when it is cut. Still to add when built: sign-out, *Settings → Access*, the moving-your-history section (exit test), and the code summary
-- [ ] `docs/INSTALL-APP.md`: a server part. Each step says what any host needs, with a *For Synology deployment*
+- [x] `docs/INSTALL-APP.md`: a server part. Each step says what any host needs, with a *For Synology deployment*
       subsection where Machine 2 needs something specific. It covers the name, the certificates and the offline CA key,
       installing the root on Windows (with the Firefox note), registering the app with the provider, `setup --server`,
       the secrets files, renewal, copying data off the disk (restore from `data/backups/`, never from a copied
       `history.db`), monitoring, and **one recorder at a time**.
-- [ ] ⚠️ Measured at Step 10 (2026-10-24): **Windows PowerShell 5.1 drops an unquoted `--`** before npm sees it, so `npm run certs -- ca --out …` fails (*Unexpected argument*). Every `npm run … --` command in the guides is written with `'--'` for PowerShell, or the guide says so once.
-- [ ] `docs/INSTALL-DEV.md` (server mode for development), `CONTRIBUTING.md` (traps: one admission rule, recording
+- [x] ⚠️ Measured at Step 10 (2026-10-24): **Windows PowerShell 5.1 drops an unquoted `--`** before npm sees it, so `npm run certs -- ca --out …` fails (*Unexpected argument*). Every `npm run … --` command in the guides is written with `'--'` for PowerShell, or the guide says so once.
+- [x] `docs/INSTALL-DEV.md` (server mode for development), `CONTRIBUTING.md` (traps: one admission rule, recording
       independent of access) and `CLAUDE.md` (`src/access/` in *Where things are*). No hand-written counts; every
       `npm run` and path must resolve (`test/docs.test.ts`). Never Machine 2's name.
-- [ ] `construction/u11-off-machine-deployment/code/code-summary.md`: what changed in each step, deviations,
+- [x] `construction/u11-off-machine-deployment/code/code-summary.md`: what changed in each step, deviations,
       screenshots.
 
-### Step 16 — Close Part B
-- [ ] Register PBT-91…PBT-100 with `propertyObligations` (no gaps). `npm run verify` green. Build the candidate image.
+### Step 16 — Close Part B — ✅ DONE except the pull request · PBT-91…PBT-100 registered (`propertyObligations`; removing one label is seen to fail it). `npm run verify` green. Candidate `spotify-companion:candidate-u11` (from `a38d680`) run isolated: Diagnostics' *Access* (fails naming the unreachable dummy provider, as it should), *WAL* ok, *Table counts and rules hash* with all tables, the report's `fingerprint`; sign-out answered, the session refused afterwards; `corpus:compare` reads the saved report. Image file saved for Machine 2. Step 15 ✅ (N7 written; code summary). Next: Build & Test: the walks, the exit test and the move
+- [x] Register PBT-91…PBT-100 with `propertyObligations` (no gaps). `npm run verify` green. Build the candidate image.
       Update HANDOFF, state and audit. Open a pull request (with your go-ahead). Build & Test then runs the trial, the
       exit test and the move (BLM §8).
 

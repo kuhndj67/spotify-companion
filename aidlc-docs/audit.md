@@ -978,3 +978,23 @@ anonymous manifest HTTP 200).
 - **Found reading the exit test against the guide**: a restore brings the database only, so the rules hash would
   always differ on a new server. N7 now brings the rules file (Download rules → Upload rules…) before comparing, and
   says the old machine must run this release first (its Diagnostics needs the fingerprint).
+
+## 2026-10-27 — U11 Build & Test: server walk, attempt 1 (stopped at N4 to fix the guide)
+
+- A separate Claude Code session walked `docs/INSTALL-SERVER.md` N4–N6 cold, with the owner (CA and DSM setup
+  reused). **Owner**: stop and fix, then restart for a clean run. Its findings, all fixed:
+  1. `setup --server` pointed at *"docs/INSTALL-APP.md, server part"* (there is none) and listed *register the app*,
+     already done in N2: the message now names `docs/INSTALL-SERVER.md`, N4, and the N4 order.
+  2. N4's Expected said *"the four files"* over a table of five: it now names all five.
+  3. `musicbrainz.json` already exists after `setup`: N4 now says to edit it; the example file's `_comment` (*"Copy to
+     musicbrainz.json"*) was stale in an install and now says where the file lives.
+  4. *"No `<placeholder>` left"* could not be met (comments mention them) and `OIDC_PROVIDER_PORTAL` ships commented:
+     N4 now says *on a setting line*, and how to uncomment it (the template's comment too).
+  5. Where `<name>` and `<LAN address>` come from was never said, and N2's hand-back did not ask for the subject: N4
+     has a *From* column; N1's and N2's boxes ask for them.
+  6. N4 put the client secret and the TLS key in place with no 👤 box, though the agent rules forbid an agent to
+     handle them: N4 has a box for them (the agent copies only the two public files).
+  7. *"On your PC … or on the server itself"* left the agent without a shell on the server unsure: N4 is on the PC;
+     N5 now starts by copying the folder over, with the Synology permissions as a 👤 box.
+  The `image:` line (the walk's candidate tag) is a side effect of an unreleased build, not a guide gap; N4 now says to
+  leave it, because `setup` writes its own version.

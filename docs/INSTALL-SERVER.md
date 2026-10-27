@@ -84,7 +84,7 @@ Prompt or a Linux shell, a plain `--` works.
 >
 > **You should see:** `ca\ca-cert.pem`, `sso\sso-cert.pem`, `sso\sso-key.pem`, `app\server-cert.pem`,
 > `app\server-key.pem` still on disk; `ca-key.pem` nowhere but offline.
-> **When done, tell the agent:** "N1 done, CA key offline".
+> **When done, tell the agent:** "N1 done, CA key offline", and the name and LAN address you used (N4 needs them).
 
 **Expected**: each command ends with `✓ positive control: a certificate for outside-the-constraint.invalid is refused
 (name constraint works)`. The certificates last 825 days; the CA ten years.
@@ -129,7 +129,8 @@ of the account you will sign in with. Keep the **client secret** for N4; never p
 >
 > **You should see:** `https://<name>:9443/webman/sso/.well-known/openid-configuration` opens (after N3, without a
 > warning) and its `issuer` is `https://<name>:9443/webman/sso`.
-> **When done, tell the agent:** "N2 done", the client ID and the issuer. Not the secret.
+> **When done, tell the agent:** "N2 done", the client ID, the issuer, and the subject of the account you will sign
+> in with. Not the secret.
 
 **Expected**: the provider's discovery document offers `code`, `S256` and `RS256`.
 
@@ -167,58 +168,57 @@ address opens without a warning.
 
 ## N4 — The server's folder
 
-**Purpose**: create the folder the app runs from, with the server settings filled in and the certificates and secret
-in place.
+**Purpose**: on your PC, create the folder the app will run from, with the server settings filled in and the
+certificates and secret in place. N5 copies it to the server, so no shell on the server is needed here.
 
-**Commands**: in a **new, empty** folder (on your PC, to copy to the server afterwards, or on the server itself):
+**Commands**: on your PC, in a **new, empty** folder outside any repository (here `D:\companion-server`):
 
 ```powershell
 docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup --server
 ```
 
-Then, in the new `compose.yaml`, replace every `<placeholder>`:
+Then, in the new `compose.yaml`, replace every `<placeholder>` on a setting line (the comments mention them too;
+those can stay). The values come from earlier steps:
 
-| Setting | Value |
-|---|---|
-| `ports` | `"<LAN address>:3443:3000"`: the server's LAN address only |
-| `extra_hosts` | `"<name>:<LAN address>"`: how the container finds the provider (a `.local` name does not resolve inside a Linux container) |
-| `PUBLIC_ORIGIN` | `https://<name>:3443` |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_ALLOWED_SUBJECT` | from N2 |
-| `SESSION_LIFETIME` | how long a sign-in lasts, `1h` to `90d` (default `7d`). Recording never stops when it ends |
-| `OIDC_PROVIDER_PORTAL` | optional; see *For Synology deployment* |
+| Placeholder | Value | From |
+|---|---|---|
+| `<name>` | the server's name, for example `machine.local` | N1's `--dns` |
+| `<LAN address>` | the server's address, for example `192.168.0.10`; it appears **twice** (`ports`, `extra_hosts`) | N1's `--ip` |
+| `OIDC_ISSUER` | the issuer, exactly as the discovery document gives it | N2 |
+| `OIDC_CLIENT_ID` | the client ID | N2 |
+| `OIDC_ALLOWED_SUBJECT` | your account's subject (Synology: your DSM user name, exact letter case) | N2 |
+| `SESSION_LIFETIME` | how long a sign-in lasts, `1h` to `90d` (default `7d`). Recording never stops when it ends | your choice |
+| `OIDC_PROVIDER_PORTAL` | optional; it ships as a comment. To set it, remove the `# ` in front of it and fill in `<name>` | *For Synology deployment* |
 
-And put these files in the folder (`./` is the folder):
+Leave the `image:` line as it is: `setup` wrote the version you ran it with.
 
-| File | From |
-|---|---|
-| `./config/ca/ca-cert.pem` | N1, `ca\ca-cert.pem` (public) |
-| `./secrets/app/tls/server-cert.pem`, `./secrets/app/tls/server-key.pem` | N1, `app\` |
-| `./secrets/app/oidc-client-secret` | the client secret from N2, one line, no file extension |
-| `./secrets/app/musicbrainz.json` | your contact address, as [`INSTALL-APP.md`](INSTALL-APP.md) A5 |
+Then the files. The two **public** ones (the agent may copy these): `ca\ca-cert.pem` → `.\config\ca\ca-cert.pem`, and
+`app\server-cert.pem` → `.\secrets\app\tls\server-cert.pem`.
+
+> 👤 **YOU DO THIS** — N4 secrets · needs: the files from N1, the client secret from N2, a text editor
+>
+> 1. Copy `app\server-key.pem` (from N1) to `.\secrets\app\tls\server-key.pem`.
+> 2. Create `.\secrets\app\oidc-client-secret` (no file extension; in Notepad, save as `oidc-client-secret.` with the
+>    final dot) holding the client secret from N2 on one line.
+> 3. Open `.\secrets\app\musicbrainz.json` (setup already wrote it) and replace `you@example.com` with an address
+>    where you can be reached, as [`INSTALL-APP.md`](INSTALL-APP.md) A5.
+>
+> **You should see:** in `.\secrets\app\`: `musicbrainz.json`, `oidc-client-secret`, and `tls\` holding
+> `server-cert.pem` and `server-key.pem`.
+> **When done, tell the agent:** "N4 secrets done". Not the secret, not the key.
 
 Do **not** add Spotify credentials yet (see *One recorder at a time*, above).
 
 ### *For Synology deployment*
 
-- **Set `OIDC_PROVIDER_PORTAL: https://<name>:9443/`.** Measured: SSO Server's sign-in page does **not** return to the
-  app when you arrive with no SSO Server session (it loops back to its own sign-in, for every account). With this
-  setting the app first shows a short page: *sign in at the provider (opens in a new tab), then Continue*, which
-  completes.
-- **Put the folder in an administrators-only shared folder** (for example `docker/spotify-companion`) on the volume
-  you back up. It holds the client secret, the app's TLS key and the session key.
-- **The container's user must own its four folders.** DSM's shared-folder permissions refuse the container's user
-  (uid 1000) even when it owns the files, and the app then cannot read `ca-cert.pem` or write its database (`EACCES`
-  in the log). Over SSH, as an administrator, in the project folder:
+- **Set `OIDC_PROVIDER_PORTAL: https://<name>:9443/`** (uncommented). Measured: SSO Server's sign-in page does
+  **not** return to the app when you arrive with no SSO Server session (it loops back to its own sign-in, for every
+  account). With this setting the app first shows a short page: *sign in at the provider (opens in a new tab), then
+  Continue*, which completes.
 
-  ```
-  sudo chown -R 1000:1000 data state config secrets
-  sudo chmod -R u+rwX data state config secrets
-  ```
-
-  This switches those four folders to ordinary Linux permissions (owner only). Consequence: File Station can no
-  longer browse them; use SSH (`sudo`) to reach them, for example to copy a backup out of `./data/backups/`.
-
-**Expected**: no `<placeholder>` left; the four files in place.
+**Expected**: no `<placeholder>` left on a setting line of `compose.yaml`; these five files in place:
+`./config/ca/ca-cert.pem`, `./secrets/app/tls/server-cert.pem`, `./secrets/app/tls/server-key.pem`,
+`./secrets/app/oidc-client-secret`, and `./secrets/app/musicbrainz.json` with your address.
 
 **If it differs**
 
@@ -227,15 +227,40 @@ Do **not** add Spotify credentials yet (see *One recorder at a time*, above).
 
 ---
 
-## N5 — Start it, and check that it serves
+## N5 — Copy it to the server, start it, check that it serves
 
-**Purpose**: start the app on the server and see positive evidence that it serves HTTPS and refuses requests
-without a sign-in.
+**Purpose**: put the folder on the server, start the app there, and see positive evidence that it serves HTTPS and
+refuses requests without a sign-in.
 
-**Commands**: on the server, in the folder: `docker compose up -d` (*For Synology deployment*: **Container
-Manager → Project → Create**, choose the folder, *use the existing compose.yaml*; leave the **Web Station portal**
-option **off**: the app serves its own HTTPS, and a proxy in front would bypass its address check). Then read the
-log (`docker logs spotify-companion`; *For Synology*: Container Manager → Container → Log).
+> 👤 **YOU DO THIS** — N5 server · needs: the server's administration (Synology: DSM as an administrator, and SSH)
+>
+> 1. Copy the whole folder from N4 to the server, into a place only administrators can open, on a volume you back
+>    up. It holds the client secret, the app's TLS key and (once started) the session key.
+> 2. Start it: `docker compose up -d` in the folder on the server.
+>
+> *For Synology deployment*, instead of 2:
+>
+> 1. Copy the folder into an administrators-only shared folder, for example `docker/spotify-companion`.
+> 2. **Give the container's user its four folders.** DSM's shared-folder permissions refuse the container's user
+>    (uid 1000) even when it owns the files, so the app could not read `ca-cert.pem` or write its database. Over SSH,
+>    as an administrator, in that folder:
+>
+>    ```
+>    sudo chown -R 1000:1000 data state config secrets
+>    sudo chmod -R u+rwX data state config secrets
+>    ```
+>
+>    This switches those four folders to ordinary Linux permissions (owner only): File Station can no longer browse
+>    them; use SSH (`sudo`) to reach them, for example to copy a backup out of `./data/backups/`.
+> 3. **Container Manager → Project → Create**: choose the folder, *use the existing compose.yaml*. Leave the **Web
+>    Station portal** option **off**: the app serves its own HTTPS, and a proxy in front would bypass its address
+>    check. Start it.
+>
+> **You should see:** the container running.
+> **When done, tell the agent:** "N5 started", and paste the first lines of the container's log (`docker logs
+> spotify-companion`; *Synology*: Container Manager → Container → Log). The log holds no secrets.
+
+**Commands**: the agent reads the log lines you paste, then opens `https://<name>:3443/` (or asks you to).
 
 **Expected**: in the log, `spotify-companion listening on https://0.0.0.0:3000, public address https://<name>:3443`
 and `Access: server mode, sign-in through <issuer>`; no `NOT SERVING`. (Errors that Spotify is not configured are
@@ -245,8 +270,8 @@ expected until you add credentials.) In a browser, `https://<name>:3443/` goes t
 
 - `[access] NOT SERVING …` followed by named settings: each line names what is missing or wrong; fix it and restart.
   The app records meanwhile; it only opens no port.
-- `EACCES` or *Ignoring extra certs … Permission denied*: the container's user cannot read its folders (N4,
-  *For Synology deployment*).
+- `EACCES` or *Ignoring extra certs … Permission denied*: the container's user cannot read its folders (the box's
+  Synology step 2).
 - `[lock] cannot create … the app's user cannot write to the data folder`: the same.
 - Nothing answers for the first half-minute after replacing a container that was force-removed: the app waits one
   30-second window for the old database lock before taking it over. That is the one-writer rule working.

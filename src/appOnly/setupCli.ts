@@ -20,9 +20,9 @@ if (!outcome.ok) {
 }
 if (kind === 'server') {
   console.log(`✓ setup --server wrote: ${outcome.written.join(', ')} (and empty data/, state/, config/ca/, secrets/app/tls/)`);
-  console.log('Next (docs/INSTALL-APP.md, server part): fill in every <placeholder> in compose.yaml; put ca-cert.pem in');
-  console.log('config/ca/, the app\'s certificate and key in secrets/app/tls/, the client secret in secrets/app/oidc-client-secret;');
-  console.log('register the app at your sign-in provider; your contact address in secrets/app/musicbrainz.json.');
+  console.log('Next (docs/INSTALL-SERVER.md, N4): fill in every <placeholder> on a setting line of compose.yaml; put');
+  console.log('ca-cert.pem in config/ca/, the app\'s certificate and key in secrets/app/tls/, the client secret in');
+  console.log('secrets/app/oidc-client-secret; your contact address in secrets/app/musicbrainz.json. Then N5.');
 } else {
   console.log(`✓ setup wrote: ${outcome.written.join(', ')} (and empty data/, state/)`);
   console.log('Next: put your contact address in secrets/app/musicbrainz.json, then run the sign-in (README, App only).');

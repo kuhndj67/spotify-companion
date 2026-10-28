@@ -1043,3 +1043,9 @@ anonymous manifest HTTP 200).
 - The exit test runs without a release: the old side's fingerprint is the backup archive's own `manifest.json`
   counts (exactly what is restored) and the live rules file's SHA-256; the new side is the server's Diagnostics
   fingerprint right after the restore.
+- **Corrected while moving**: N7 said *"A backup holds the history only"* (written without checking). Measured: the
+  archive holds `history.db`, `manifest.json` and `rules.json` (its hash equals the live rules file's), and *Restore
+  backup* replaces the rules only when *Also replace my rules with the backup's* is ticked (U7, BR-59.2). N7 now says
+  to tick it; the download/upload of rules stays as the fallback.
+- Exit-test baseline, from the backup's manifest (`spotify-backup-20261028T004701Z`, schema v8): 12 tables, counts
+  recorded in the comparison; the rules file's SHA-256 `49cca69b…`.

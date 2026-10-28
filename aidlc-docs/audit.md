@@ -1089,3 +1089,13 @@ anonymous manifest HTTP 200).
   stopped.
 - Version `1.0.0-beta.10` (package.json, the four compose tags, INSTALL-APP, INSTALL-SERVER's `<version>`, README).
   N7 gained the measured *pause label lookups* step.
+
+## 2026-10-28 — 1.0.0-beta.10 released and live on Machine 2
+
+- PR #32 merged by the owner. `npm run release -- --apply --no-deploy` on `main`: verify green, image built, healthy
+  on the verification install (live setup proved unchanged), tagged `v1.0.0-beta.10`; nothing started on this PC.
+- **Owner** pushed the tag; CI's publish run succeeded; the image is pullable anonymously. **Owner** moved Machine 2's
+  `image:` line to `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10` and rebuilt: *"App is back up and running and no
+  issues are apparent."* The server answers.
+- Still to do: the GitHub Release (notes drafted); Step 17, the restricted deploy path, after which U11 closes
+  (Infrastructure plan Q9 = A).

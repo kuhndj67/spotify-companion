@@ -102,7 +102,13 @@ checked on the verification install; **the move done**: exit test passed (second
 same Spotify credentials, this PC's container stopped; Machine 2 is the only recorder. Release `1.0.0-beta.10`
 prepared (`npm run release -- --apply --no-deploy` added).
 
-**Next**: the pull request (owner reviews, merges); `npm run release -- --apply --no-deploy` on `main`; the owner's tag
+**Released** (2026-10-28): `1.0.0-beta.10` merged (PR #32), tagged, published by CI, and live on Machine 2 (`image:` moved
+to the published version by the owner; no issues).
+
+**Next**: the GitHub Release (notes drafted); Step 17, the restricted deploy path (probe first: can a non-administrator
+use SSH on DSM?); U11 closes when a release has gone out that way.
+
+*(superseded)* **Next**: the pull request (owner reviews, merges); `npm run release -- --apply --no-deploy` on `main`; the owner's tag
 push; CI publishes; Machine 2's `image:` line to `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10`; the GitHub
 Release. Then Step 17 (the restricted deploy path).
 

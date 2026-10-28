@@ -350,7 +350,7 @@ per database (lock file with heartbeat, probed across the bind mount) · **FR-78
 
 **Purpose**: the app runs on another machine on the user's LAN (a Synology NAS first), fully working, under
 the security posture chosen in Requirements **Question 11a = B**: **delegated authentication** (NFR-29) —
-an OIDC sign-in at a proxy that terminates TLS, and a signed-token check in the app. The user's NAS has its
+an OIDC sign-in at a proxy that terminates TLS, and a signed-token check in the app. *(Amended 2026-10-24, U11 Q4a = B: the app runs the OIDC sign-in itself, serves TLS, and checks a session it signed; no proxy. NFR-29 holds the current wording.)* The user's NAS has its
 OAuth/SSO service installed but unconfigured — a candidate identity provider, **to be probed**. A Synology MCP
 server could let the agent do NAS configuration directly; ⚠️ that is an administrator credential (NFR-28,
 least privilege).

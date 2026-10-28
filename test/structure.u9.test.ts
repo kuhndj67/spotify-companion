@@ -106,7 +106,7 @@ describe('one connector pin (NFR-40, BR-68.1)', () => {
 });
 
 describe("none of upstream's new features is switched on (BR-68.2)", () => {
-  for (const file of ['compose.yaml', 'compose.verify.yaml', 'compose.app.yaml', 'Dockerfile']) {
+  for (const file of ['compose.yaml', 'compose.verify.yaml', 'compose.app.yaml', 'compose.server.yaml', 'Dockerfile']) {
     it(`${file} sets none of ${UPSTREAM_FEATURE_VARIABLES.join(', ')}`, () => {
       assert.deepEqual(featureVariablesIn(read(file)), []);
     });

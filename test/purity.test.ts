@@ -127,6 +127,23 @@ const PURE_MODULES = [
   // ⚠️ DECIDES whether another process is alive (P-76). A clock read here would judge the lock by age — the
   // exact mistake the pattern exists to avoid: a just-killed container's lock looks fresh.
   'lock/lockDecision.ts',
+  // ─── U11 ─────────────────────────────────────────────────────────────────────────────────────
+  // ⚠️ DECIDES whether the app serves at all in server mode (P-89). It is handed what the shell found; a file or
+  // environment read here would make PBT-92 test a different configuration from the one judged at startup.
+  'access/accessConfig.ts',
+  // ⚠️ The open-redirect defence (BR-89.5) and the bounded sign-in store (BR-89.3). The clock is a parameter in the
+  // second; a Date.now() inside would make PBT-99's ten-minute boundary untestable.
+  'access/returnPath.ts',
+  'access/pendingSignIns.ts',
+  // What the pages served WITHOUT a session say. A lookup here could put words on a page nobody signed in to see.
+  'access/authPages.ts',
+  // The certificate tool's rules (IN-U11-4/5): which names, how long, and where the CA key may never go.
+  'certs/certPolicy.ts',
+  // What the image's HEALTHCHECK asks for, from the environment it is HANDED (never reads it itself).
+  'health/healthTarget.ts',
+  // U11 (BR-98): the exit test's verdict, and Diagnostics' Access and WAL rows. Facts and `now` are handed in.
+  'maintenance/corpusFingerprint.ts',
+  'access/accessDiagnostics.ts',
 ];
 
 /**

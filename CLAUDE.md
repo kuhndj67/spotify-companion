@@ -19,7 +19,8 @@ pre-registered confirmatory test (2026-09-10) found it **not supported**, and th
 able to **disconfirm** it. Rules are valuable without R1.
 
 **Single-USER, always**: each person runs their own deployment with their own Spotify app and corpus. This is not
-multi-tenancy.
+multi-tenancy. Two access modes (U11): **local** (default, loopback only) and **server** (LAN, HTTPS, sign-in at the
+user's OIDC provider, a session the app signs): [`docs/INSTALL-SERVER.md`](docs/INSTALL-SERVER.md).
 
 ## Method: AI-DLC
 
@@ -79,15 +80,17 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 - **Versions**: SemVer, `package.json` is the one source (`src/version.ts` is its one reader; the compose image tags
   are checked copies). Releases go through `npm run release`, then the tag push, then a GitHub Release with notes (how users hear of a new version). An image tag is never overwritten.
 
-## The deployment (the owner's machine)
+## The deployment (Machine 2, since U11)
 
-- **The container is the deployment**: `docker compose up -d` → `http://localhost:3010`. ⚠️ `localhost:3000` is a
-  **different app**.
-- ⚠️ **Never run the container and `npm start` together.** Both poll Spotify. A host run records into `data-dev/`, and
-  the writer lock (`data/history.db.lock`) refuses a second process on one database. Assume the container is running, and
-  `docker compose down` first.
-- **`data/` cannot be regenerated** (months of plays). It is gitignored, which makes it *more* exposed to `git clean
-  -xdf`. Never delete play rows to tidy anything.
+- **The owner's deployment is the server**: Machine 2, server mode, `https://<Machine 2's name>:3443`, behind a sign-in
+  (`docs/INSTALL-SERVER.md`). It is the **only recorder** since 2026-10-28.
+- ⚠️ **This machine's container is stopped and stays stopped.** Never `docker compose up` here: a second recorder on the
+  same account double-counts every play, and the writer lock cannot see across machines. `npm run release` takes
+  `--no-deploy` for this. ⚠️ `localhost:3000` is a **different app**.
+- A host run (`npm start`) records into `data-dev/`, never `data/`; the writer lock refuses a second process on one
+  database.
+- **`data/` here is the fallback copy** of the history moved to the server (months of plays; cannot be regenerated). It
+  is gitignored, which makes it *more* exposed to `git clean -xdf`. Never delete it or its play rows.
 - Mounts: `./data` (history, and its automatic backups in `backups/`: same disk, so copy them elsewhere), `./state` (automation kill switch, update-check and reminder switches: **never** in `data/` or `config/`), `./config` (rules,
   written only by `RulesWriter`), `./secrets/app` (credentials, a **directory** mount at `/app/secrets` since U9, the app's subfolder only; never in
   a backup, never in a response).
@@ -96,7 +99,9 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 - **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (public). Pushing a tag is the owner's act.
 - Automation ships **off** (`SKIP_EXECUTOR_ENABLED`, plus the UI kill switch). Never arm it on the owner's behalf.
 - Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and hold
-  the writer lock, so the container must be down.
+  the writer lock.
+- Releases: `npm run release -- --apply --no-deploy` here (health-checked on the `:3011` verification install), then the
+  owner's tag push, then the server's `image:` line moved to the published version.
 
 ## Commands
 
@@ -137,13 +142,15 @@ never by editing the script.
 |---|---|
 | `src/server.ts` | Wiring, startup, and the WebSocket `upgrade` handler (keep it there; a test pins it) |
 | `src/api.ts` | Every route, with injected dependencies (including `now`), so routes are testable |
-| `src/localGuard.ts` | `decideAccess`: the ONE local-access policy, for HTTP and WebSocket alike |
+| `src/localGuard.ts` | `decideAccess`: the ONE access policy (local and server mode), for HTTP and WebSocket alike |
+| `src/access/`, `src/certs/` | Server mode: config, session, sign-in routes, the only `openid-client` importer; the certificate tool |
 | `src/version.ts` | The one reader of the app version |
 | `src/history/`, `src/rules/`, `src/playback/` | Recording, the rules engine, automated skipping |
 | `src/maintenance/`, `src/backup/`, `src/configuration/` | Backup/restore, verification, rules and credential writes |
 | `scripts/` | Developer and owner scripts; covered by `smoke` (load only) and `knip` |
 | `test/` | `node:test` + fast-check. Structural guards: `purity`, `noOrphanModules`, `localGuard`, `propertyObligations`, `versionSources`, `rulesetMatchesWorkflow`, `secretsTracked`, `docs` |
-| `docs/INSTALL-DEV.md`, `docs/INSTALL-APP.md` | The two install routines (development environment; app only), each walked cold by an agent |
+| `docs/INSTALL-DEV.md`, `docs/INSTALL-APP.md` | The two local install routines (development environment; app only), each walked cold by an agent |
+| `docs/INSTALL-SERVER.md` | Server mode, host-agnostic with *For Synology deployment* notes. Its steps were done on Machine 2 with a test build before it was written; the guide itself is not yet walked |
 | `aidlc-docs/` | All design records |
 
 ## Before you change…

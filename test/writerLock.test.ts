@@ -41,6 +41,19 @@ describe('WriterLock', () => {
     assert.deepEqual(await lock('app').acquire(), { ok: true });
   });
 
+  it('⭐ a lock that cannot be created is a REFUSAL with the reason, never an exception (found on Machine 2, U11)', async () => {
+    // The data "folder" is a file, so the lock can be neither created nor its folder made: an error that is not
+    // EEXIST, as EACCES was on the NAS. Before the fix this threw out of acquire() and crashed the app.
+    writeFileSync(join(dir, 'not-a-folder'), '');
+    db = join(dir, 'not-a-folder', 'history.db');
+    const outcome = await lock('app').acquire();
+    assert.equal(outcome.ok, false);
+    if (!outcome.ok) {
+      assert.equal(outcome.holder, null);
+      assert.match(outcome.detail, /cannot create .*history\.db\.lock \((EEXIST|ENOTDIR|EACCES)\)/);
+    }
+  });
+
   it('acquires a free lock and records who holds it', async () => {
     const a = lock('app');
     assert.deepEqual(await a.acquire(), { ok: true });

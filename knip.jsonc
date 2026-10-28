@@ -16,7 +16,9 @@
   // U9 (LC-68): `src/appOnly/setupCli.ts` IS an entry point -- the image's `setup` command, run by
   // scripts/docker-entrypoint.sh as `node /app/dist/appOnly/setupCli.js`. Nothing imports it; that is its job.
   // U10 (LC-79): `src/appOnly/updateCli.ts` likewise -- the image's `update` command.
-  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts", "src/appOnly/updateCli.ts"],
+  // U11 (IN-U11-4): `src/certs/certsCli.ts` (the image's `certs` command) needs no entry here: `npm run certs` names it.
+  // U11: `src/health/healthcheckCli.ts` IS one -- the image's HEALTHCHECK runs it; nothing imports it.
+  "entry": ["test/*.test.ts", "scripts/*.mjs", "public/app.js", "src/appOnly/setupCli.ts", "src/appOnly/updateCli.ts", "src/health/healthcheckCli.ts"],
 
   "project": ["src/**/*.ts", "scripts/**/*.mjs", "scripts/**/*.ts", "test/**/*.ts"],
 
@@ -27,6 +29,10 @@
     // not import it -- `domain-entities.md` §6 says do not read it either.
     "src/history/skipAttribution.ts"
   ],
+
+  // U11 (P-94): `openssl` is a SYSTEM program, not an npm package. The fake provider's per-run CA is made with it
+  // (test/support/testCa.ts); Git for Windows and CI's Ubuntu both ship one. Nothing to list in package.json.
+  "ignoreBinaries": ["openssl"],
 
   // Exports consumed only inside their own file are not reported. ⚠️ They are still a smell -- an
   // export with no external consumer should usually just be a `const` -- and four were removed on

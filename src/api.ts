@@ -51,6 +51,7 @@ import type { SkipAttemptRepository } from './playback/SkipAttemptRepository.js'
 import type { AutomationState, WriteOutcome } from './playback/types.js';
 import { haltPanel, switchView } from './ui/automationPanel.js';
 import { ingestGuard } from './ingest/ingestGuard.js';
+import { createAuthRoutes, type AuthRoutesDeps } from './access/authRoutes.js';
 import { RULES_UPLOAD_CAP_BYTES } from './ingest/types.js';
 import { REPLACE_WORD, type RulesRefusal, type RulesWriter } from './configuration/RulesWriter.js';
 import type { CredentialsRefusal, CredentialsWriter } from './configuration/CredentialsWriter.js';
@@ -174,6 +175,11 @@ export interface ApiDeps {
   backupStatus?: (() => BackupStatusView) | null;
   /** BR-87.1: called when a *Create backup* download has sent its LAST byte — not when it starts. */
   onBackupDownloaded?: () => void;
+  /**
+   * U11 (LC-88): the sign-in routes, in server mode only. Absent → no `/auth/*` route exists, so each is a `404`
+   * (BR-88.2). Admission (`decideAccess`) runs before this router; the open routes are listed there.
+   */
+  auth?: AuthRoutesDeps | null;
 }
 
 /**
@@ -198,6 +204,8 @@ export function createApi(deps: ApiDeps): Router {
   // live in this file. Bounded: an unbounded body on a local service is still a way to spend
   // memory by accident.
   router.use(express.json({ limit: '64kb' }));
+
+  if (deps.auth) router.use(createAuthRoutes(deps.auth));
 
   /** REST snapshot. The UI uses the WebSocket; this stays for scripting and debugging. */
   router.get('/api/now-playing', (_req, res) => {

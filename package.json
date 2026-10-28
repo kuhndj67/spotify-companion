@@ -1,6 +1,6 @@
 {
   "name": "spotify-companion",
-  "version": "1.0.0-beta.9",
+  "version": "1.0.0-beta.10",
   "private": true,
   "license": "GPL-3.0-or-later",
   "type": "module",
@@ -14,6 +14,7 @@
     "dev": "tsx watch src/server.ts",
     "auth": "node scripts/auth.mjs",
     "rules:init": "node scripts/rules-init.mjs",
+    "certs": "node --import tsx src/certs/certsCli.ts",
     "mcp:setup": "node --import tsx scripts/mcp-setup.mjs",
     "test": "node --import tsx --test test/*.test.ts",
     "test:watch": "node --import tsx --test --watch test/*.test.ts",
@@ -29,6 +30,7 @@
     "db:backup": "node --import tsx scripts/backup-history.mjs",
     "db:restore": "node --import tsx scripts/restore-history.mjs",
     "db:verify-backups": "node --import tsx scripts/verify-all-backups.mjs",
+    "corpus:compare": "node --import tsx scripts/compare-corpora.mjs",
     "verify:up": "node scripts/verify-install.mjs up",
     "verify:down": "node scripts/verify-install.mjs down",
     "protect": "node scripts/protect.mjs",
@@ -45,6 +47,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
     "express": "^5.1.0",
+    "openid-client": "6.8.8",
     "tar": "7.5.22",
     "ws": "^8.18.0"
   },

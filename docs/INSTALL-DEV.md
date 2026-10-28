@@ -3,7 +3,9 @@
 This installs your own copy of Spotify Companion **from source**, with the tools to change and test it (to run
 just the app, use [`INSTALL-APP.md`](INSTALL-APP.md) instead), on your own machine, with **your own Spotify account and your own
 Spotify developer credentials** (a client id and secret, which S3 shows you how to get). Nothing is shared with anyone
-else's install.
+else's install. This install runs in **local** mode. Server mode, for opening the app from other devices after signing
+in, is in [`INSTALL-SERVER.md`](INSTALL-SERVER.md); its certificate tool is `npm run certs` here (in Windows
+PowerShell, write the `--` after it as `'--'`).
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should
 see (**Expected**), and what to do if you see something else (**If it differs**). If a step does not match its

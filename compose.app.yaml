@@ -4,7 +4,7 @@
 
 services:
   spotify-companion:
-    image: ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9
+    image: ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10
     container_name: spotify-companion
 
     ports:

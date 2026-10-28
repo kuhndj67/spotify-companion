@@ -113,6 +113,20 @@ export class WriterLock {
   }
 
   async acquire(): Promise<AcquireOutcome> {
+    // Found on Machine 2 (U11, 2026-10-24): a lock that cannot be CREATED (`EACCES`: the data folder is not writable
+    // by the app's user) threw out of here, and nothing caught it, so the app crashed into a restart loop instead of
+    // running display-only with the reason. Any failure that is not "someone holds it" is now a refusal, said once.
+    try {
+      return await this.#acquire();
+    } catch (error) {
+      this.#state = 'refused';
+      this.#detail = `cannot create ${this.#path} (${codeOf(error) ?? 'error'}): the app's user cannot write to the data folder`;
+      this.#log(`[lock] ${this.#detail}`);
+      return { ok: false, holder: null, detail: this.#detail };
+    }
+  }
+
+  async #acquire(): Promise<AcquireOutcome> {
     // The database's folder may not exist yet (a first host run's `data-dev/`): the repository used to create it on
     // open, and the lock now comes first. Found 2026-10-23 running the built app on a fresh folder.
     mkdirSync(dirname(this.#path), { recursive: true });

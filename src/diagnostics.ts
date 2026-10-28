@@ -19,6 +19,18 @@ import type { MaintenanceStatus } from './maintenance/MaintenanceService.js';
 import { maintenanceDiagnosticSteps } from './maintenance/maintenanceDiagnostics.js';
 import { configurationDiagnosticSteps, type ConfigurationDiagnosticsInput } from './configuration/configurationDiagnostics.js';
 import { readAppVersion } from './version.js';
+import { accessRow, walRow, type AccessDiagnosticsInput, type RowVerdict } from './access/accessDiagnostics.js';
+import type { CorpusFingerprint } from './maintenance/corpusFingerprint.js';
+
+/** U11 (LC-91): the Access, WAL and corpus rows, and the fingerprint the exit test compares (BR-98). */
+export interface U11DiagnosticsInput {
+  readonly access: AccessDiagnosticsInput;
+  readonly journalMode: string | null;
+  readonly walRefusal: string | null;
+  readonly dbPath: string;
+  readonly fingerprint: CorpusFingerprint | null;
+  readonly now: number;
+}
 
 export interface DiagnosticStep {
   name: string;
@@ -62,6 +74,8 @@ export interface DiagnosticsReport {
   steps: DiagnosticStep[];
   /** Absent when label enrichment is disabled or history is unavailable. */
   coverage?: CoverageReport;
+  /** U11 (BR-98.1): every table's row count and the rules file's hash; what `npm run corpus:compare` reads. */
+  fingerprint?: CorpusFingerprint;
   /**
    * M1–M4 (U5). Absent when automation is not deployed.
    *
@@ -341,6 +355,7 @@ export async function runDiagnostics(
   automation?: AutomationDiagnosticsInput,
   maintenance?: MaintenanceStatus,
   configuration?: ConfigurationDiagnosticsInput,
+  u11?: U11DiagnosticsInput,
 ): Promise<DiagnosticsReport> {
   const steps: DiagnosticStep[] = [];
   let trackId: string | null = null;
@@ -572,11 +587,29 @@ export async function runDiagnostics(
   // --- U7: configuration (IN-U7-6) ------------------------------------------
   if (configuration !== undefined) steps.push(...configurationDiagnosticSteps(configuration));
 
+  // --- U11: access, WAL, the corpus fingerprint (BR-96.2, BR-97, BR-98) --------
+  if (u11 !== undefined) {
+    const row = (name: string, v: RowVerdict): DiagnosticStep => ({ name, status: v.status, detail: v.detail, durationMs: 0 });
+    steps.push(row('Access', accessRow(u11.access, u11.now)));
+    steps.push(row('WAL', walRow({ journalMode: u11.journalMode, refusal: u11.walRefusal, dbPath: u11.dbPath })));
+    steps.push(
+      u11.fingerprint === null
+        ? row('Table counts and rules hash', { status: 'skip', detail: 'Skipped — no database open' })
+        : row('Table counts and rules hash', {
+            status: 'ok',
+            detail:
+              `${Object.entries(u11.fingerprint.counts).map(([t, n]) => `${t} ${n}`).join(', ')} · ` +
+              `rules ${u11.fingerprint.rulesSha256 === null ? 'none' : `sha256 ${u11.fingerprint.rulesSha256.slice(0, 12)}…`}`,
+          }),
+    );
+  }
+
   return {
     ranAt: new Date().toISOString(),
     ok: steps.every((s) => s.status !== 'fail'),
     steps,
     ...(labels?.coverage ? { coverage: labels.coverage } : {}),
+    ...(u11?.fingerprint ? { fingerprint: u11.fingerprint } : {}),
     ...(automation ? { metrics: automation.metrics } : {}),
   };
 }

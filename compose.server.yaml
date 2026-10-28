@@ -1,0 +1,75 @@
+# Server mode (U11, NFR-29, IN-U11-2): the compose file for a deployment other devices open, after signing in.
+# The image's `setup --server` writes this into a folder as compose.yaml. It is compose.app.yaml with exactly these
+# differences: the port is published on the server's LAN address (HTTPS, 3443), the provider's name is a fixed host
+# entry, the access settings replace LOCAL_ONLY and TRUST_PUBLISHED_PORT, and the CA's certificate is trusted.
+# test/versionSources.test.ts keeps its image tag equal to package.json's version (a checked copy).
+#
+# ⚠️ Fill in EVERY <placeholder> before starting. <LAN address> appears TWICE. While it is unfilled, compose refuses
+# the port line and nothing starts. With an access setting or file missing, the app starts and records, but opens no
+# port at all and logs which setting is missing (BR-88.4).
+
+services:
+  spotify-companion:
+    image: ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10
+    container_name: spotify-companion
+
+    ports:
+      # The server's LAN address ONLY (Infrastructure Q3 = A): not reachable through its other interfaces (VPN,
+      # other bridges). HTTPS: the app serves TLS itself, with the certificate in secrets/app/tls/.
+      - "<LAN address>:3443:3000"
+
+    extra_hosts:
+      # The container finds the sign-in provider by this fixed entry, not by DNS (Q2 = A): a `.local` name is not
+      # expected to resolve inside a container on Linux. <name> is the name your devices open, e.g. machine.local.
+      - "<name>:<LAN address>"
+
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      # -- Access (BR-88). Each is checked at startup; a wrong one is named in the log.
+      ACCESS_MODE: server
+      # The address your devices open, exactly: https, the name, the published port. No path.
+      PUBLIC_ORIGIN: https://<name>:3443
+      # The provider's issuer, EXACTLY as its discovery document gives it (character for character).
+      OIDC_ISSUER: <the provider's issuer>
+      OIDC_CLIENT_ID: <the client ID the provider gave>
+      # Your account's subject at the provider (Synology SSO Server: your DSM user name). Only this account is let in.
+      OIDC_ALLOWED_SUBJECT: <your account's subject>
+      # Optional (BR-89.6): a provider that must be signed in to first. Synology SSO Server needs it: its sign-in page
+      # does not return to the app on its own (measured). To set it, remove the '# ' below and fill in <name>.
+      # OIDC_PROVIDER_PORTAL: https://<name>:9443/
+      # How long a sign-in lasts, from 1h to 90d. Recording never stops when it ends; only the pages do.
+      SESSION_LIFETIME: 7d
+      # The app trusts the provider's certificate through your CA's certificate (public; config/ca/).
+      NODE_EXTRA_CA_CERTS: /config/ca/ca-cert.pem
+      # -- As compose.app.yaml from here.
+      POLL_INTERVAL_MS: 3000
+      SPOTIFY_CONFIG_PATH: /app/secrets/spotify-config.json
+      HISTORY_DB_PATH: /data/history.db
+      COMPLETION_THRESHOLD: "0.90"
+      SNAPSHOT_INTERVAL_HOURS: 24
+      SNAPSHOT_KEEP: 14
+      LABEL_TTL_UNKNOWN_DAYS: 30
+      LABEL_TTL_RESOLVED_DAYS: 90
+      LABEL_BACKFILL_INTERVAL_HOURS: 6
+      LABEL_BACKFILL_BATCH: 25
+      MUSICBRAINZ_BASE_URL: https://musicbrainz.org/ws/2
+      RULES_PATH: /config/rules.json
+      RULES_POLL_INTERVAL_MS: 5000
+      ENRICHMENT_WAIT_MS: 10000
+      # The skip machinery exists, but automation is OFF until you arm it in the app (state/ starts empty).
+      SKIP_EXECUTOR_ENABLED: "true"
+      AUTOMATION_STATE_PATH: /state/automation-state.json
+
+    volumes:
+      # Credentials, the client secret (oidc-client-secret), the session key and tls/: the app's own SUBFOLDER,
+      # read-write (token refreshes, Settings saves and *Sign out everywhere* rename a temp file into it).
+      - ./secrets/app:/app/secrets:rw
+      # Listening history. ⚠️ It cannot be regenerated. Restore from an archive in data/backups/, never from a
+      # copied history.db (a file-level copy taken while the app writes may be inconsistent).
+      - ./data:/data:rw
+      # Rules, and ca/ca-cert.pem.
+      - ./config:/config:rw
+      - ./state:/state:rw
+
+    restart: unless-stopped

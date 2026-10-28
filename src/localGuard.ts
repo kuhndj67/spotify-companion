@@ -22,7 +22,9 @@
  * `npm start` deployment, and was accepted there.
  */
 
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import type { IncomingMessage } from 'node:http';
+import type { Session, SessionVerdict } from './access/session.js';
 import { config } from './config.js';
 import { isIP } from 'node:net';
 
@@ -114,15 +116,86 @@ export interface AccessPolicy {
  * admitted while every WebSocket handshake was refused. The whole test suite passed, because the
  * tests exercised the policy function and the upgrade handler was not covered by any of them.
  * Keep exactly one rule.
+ *
+ * U11 (P-88): both call sites build this with {@link accessRequestFrom}, one helper, so neither reads a header or a
+ * cookie itself. `method`, `path` and `sessionCookie` are read only by the server policy; local mode ignores them.
  */
 export interface AccessRequest {
   remoteAddress: string | undefined;
   host: string | undefined;
   origin: string | undefined;
+  method?: string | undefined;
+  /** The path alone, without the query. */
+  path?: string | undefined;
+  /** The value of the session cookie, if the request carried one. */
+  sessionCookie?: string | undefined;
 }
 
-/** Why a request was refused, so callers can keep their own distinct 403 bodies. */
-export type AccessDecision = { ok: true } | { ok: false; reason: 'peer' | 'host-or-origin' };
+/**
+ * U11 (BR-92): the server policy. It replaces the local one entirely: `localOnly` and `trustPublishedPort` have no
+ * effect in server mode (BR-88.5).
+ */
+export interface ServerAccessPolicy {
+  readonly mode: 'server';
+  /** `URL.host` of the public origin: what a browser sends as `Host` (BR-92.2). */
+  readonly publicHost: string;
+  /** `URL.origin` of the public origin. */
+  readonly publicOrigin: string;
+}
+
+/** Why a request was refused, so callers can keep their own distinct responses (BR-92.5). */
+export type AccessRefusal =
+  | 'peer'
+  | 'host-or-origin'
+  /** U11 (BR-92.4): a state-changing request without an `Origin` equal to the public origin. */
+  | 'cross-site'
+  /** U11: no session, or one that failed verification (treated as absent, BR-91.2). */
+  | 'no-session'
+  | 'session-expired';
+
+export type AccessDecision = { ok: true; session?: Session } | { ok: false; reason: AccessRefusal };
+
+/** The session step, with its key, clock, allowed account and revocations already bound by the caller. */
+export type SessionVerifier = (cookie: string | undefined) => SessionVerdict;
+
+/** `__Host-` (BR-91.4): the browser sends it only over HTTPS, for exactly this host, at path `/`. */
+export const SESSION_COOKIE = '__Host-companion-session';
+
+/**
+ * BR-92.3: the ONLY routes admitted without a session, and only for `GET` (and `HEAD`, which Express answers as
+ * `GET`). The list is here, in the rule, not in the routes.
+ *
+ * ⚠️ Deviation from BR-92.3, which names three pages and a stylesheet: `/auth/signed-out` is added. *Sign out*
+ * redirects there (BR-94.1), and by then there is no session to admit it with.
+ */
+export const OPEN_ROUTES: ReadonlySet<string> = new Set([
+  '/auth/sign-in',
+  '/auth/callback',
+  '/auth/problem',
+  '/auth/signed-out',
+  '/auth/auth.css',
+]);
+
+const SAFE_METHODS = new Set(['GET', 'HEAD']);
+
+/**
+ * BR-92.2: `Host` equals the public origin's host and port. The default port (443) may be omitted or explicit.
+ * Nothing may follow: the same discipline as {@link isLoopbackHostHeader}, whose bypass was appended content.
+ */
+export function isPublicHostHeader(value: string | undefined, publicHost: string): boolean {
+  if (!value) return false;
+  const given = value.toLowerCase();
+  const expected = publicHost.toLowerCase();
+  if (given === expected) return true;
+  // `URL.host` omits :443 for https, so an explicit :443 is the only other accepted spelling, and only then.
+  const hasPort = expected.startsWith('[') ? /\]:\d+$/.test(expected) : expected.includes(':');
+  return !hasPort && given === `${expected}:443`;
+}
+
+/** BR-92.2: an `Origin`, when present, equals the public origin exactly. */
+export function isPublicOrigin(origin: string | undefined, publicOrigin: string): boolean {
+  return origin === undefined || origin === publicOrigin;
+}
 
 /**
  * The admission rule. **The single source of truth** — HTTP and WebSocket both route here.
@@ -130,11 +203,22 @@ export type AccessDecision = { ok: true } | { ok: false; reason: 'peer' | 'host-
  * ⚠️ Host/Origin validation is **not** conditional. It is the DNS-rebinding defence, it is the
  * check that caught a real bypass (see `isLoopbackHostHeader`), and under
  * `trustPublishedPort` it is the *only* remaining check — so it must never be skipped.
+ *
+ * U11 (BR-92.1): in server mode the order is Host/Origin → route class → session; the first failure decides. A
+ * session step that throws is `no-session`, never an admission (P-92). Local mode is exactly the pre-U11 rule
+ * (BR-92.6, PBT-100): it ignores `method`, `path` and `sessionCookie`.
  */
-export function decideAccess(req: AccessRequest, policy: AccessPolicy): AccessDecision {
-  if (!policy.localOnly) return { ok: true };
+export function decideAccess(
+  req: AccessRequest,
+  policy: AccessPolicy | ServerAccessPolicy,
+  verifySession?: SessionVerifier,
+): AccessDecision {
+  if ('mode' in policy && policy.mode === 'server') return decideServerAccess(req, policy, verifySession);
+  const local = policy as AccessPolicy;
 
-  if (!policy.trustPublishedPort && !isLoopbackAddress(req.remoteAddress)) {
+  if (!local.localOnly) return { ok: true };
+
+  if (!local.trustPublishedPort && !isLoopbackAddress(req.remoteAddress)) {
     return { ok: false, reason: 'peer' };
   }
 
@@ -145,31 +229,137 @@ export function decideAccess(req: AccessRequest, policy: AccessPolicy): AccessDe
   return { ok: true };
 }
 
+function decideServerAccess(
+  req: AccessRequest,
+  policy: ServerAccessPolicy,
+  verifySession: SessionVerifier | undefined,
+): AccessDecision {
+  if (!isPublicHostHeader(req.host, policy.publicHost) || !isPublicOrigin(req.origin, policy.publicOrigin)) {
+    return { ok: false, reason: 'host-or-origin' };
+  }
+  const method = (req.method ?? 'GET').toUpperCase();
+  // BR-92.4: a browser sends the cookie on its own, but it does not let a page forge `Origin`. Absent is refused.
+  if (!SAFE_METHODS.has(method) && req.origin !== policy.publicOrigin) return { ok: false, reason: 'cross-site' };
+
+  if (SAFE_METHODS.has(method) && req.path !== undefined && OPEN_ROUTES.has(req.path)) return { ok: true };
+
+  if (verifySession === undefined) return { ok: false, reason: 'no-session' };
+  let verdict: SessionVerdict;
+  try {
+    verdict = verifySession(req.sessionCookie);
+  } catch {
+    return { ok: false, reason: 'no-session' };
+  }
+  if (verdict.kind === 'valid') return { ok: true, session: verdict.session };
+  return { ok: false, reason: verdict.kind === 'expired' ? 'session-expired' : 'no-session' };
+}
+
+/**
+ * U11 (P-88): the ONE builder of an {@link AccessRequest}, for the Express middleware and the upgrade handler alike.
+ * Neither call site reads a header or the cookie itself.
+ */
+export function accessRequestFrom(incoming: IncomingMessage): AccessRequest {
+  return {
+    remoteAddress: incoming.socket?.remoteAddress,
+    host: incoming.headers.host,
+    origin: incoming.headers.origin,
+    method: incoming.method,
+    path: pathOf(incoming.url),
+    sessionCookie: readCookie(incoming.headers.cookie, SESSION_COOKIE),
+  };
+}
+
+function pathOf(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  try {
+    return new URL(url, 'http://path.invalid').pathname;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * One cookie's value from a `Cookie` header. A name that appears twice counts as absent: two values for the session
+ * cookie means something set one the app did not, and choosing between them would be a guess.
+ */
+export function readCookie(header: string | undefined, name: string): string | undefined {
+  if (!header) return undefined;
+  let found: string | undefined;
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() !== name) continue;
+    if (found !== undefined) return undefined;
+    found = part.slice(eq + 1).trim();
+  }
+  return found;
+}
+
+/**
+ * What admission hands the routes after it (`res.locals.access`): the session it verified, and the `Origin` rule
+ * of the mode in force, so `ingestGuard` checks the same origin admission did (U11: in server mode the loopback
+ * rule would refuse every save).
+ */
+export interface AdmittedAccess {
+  readonly session: Session | undefined;
+  readonly originAllowed: (origin: string | undefined) => boolean;
+}
+
 export function applyAccessPolicy(
   req: Request,
   res: Response,
   next: NextFunction,
-  policy: AccessPolicy,
+  policy: AccessPolicy | ServerAccessPolicy,
+  verifySession?: SessionVerifier,
 ): void {
-  const decision = decideAccess(
-    {
-      remoteAddress: req.socket.remoteAddress,
-      host: req.headers.host,
-      origin: req.headers.origin,
-    },
-    policy,
-  );
+  const decision = decideAccess(accessRequestFrom(req), policy, verifySession);
 
   if (decision.ok) {
+    const access: AdmittedAccess = {
+      session: decision.session,
+      originAllowed:
+        'mode' in policy && policy.mode === 'server'
+          ? (origin) => origin !== undefined && origin === policy.publicOrigin
+          : isAllowedOrigin,
+    };
+    // Always present in Express. The pre-U11 tests' response doubles have none, and stay unchanged (BR-92.6).
+    if (res.locals !== undefined) res.locals.access = access;
     next();
     return;
   }
 
-  const body =
-    decision.reason === 'peer'
-      ? 'This application only accepts local connections.'
-      : 'Invalid Host or Origin.';
-  res.status(403).type('text/plain').send(body);
+  switch (decision.reason) {
+    case 'peer':
+      res.status(403).type('text/plain').send('This application only accepts local connections.');
+      return;
+    case 'host-or-origin':
+      res.status(403).type('text/plain').send('Invalid Host or Origin.');
+      return;
+    case 'cross-site':
+      res.status(403).type('text/plain').send('A change must come from this app\'s own pages.');
+      return;
+    case 'no-session':
+    case 'session-expired':
+      // BR-92.5: a page navigation goes to the sign-in; anything else (fetch, API) is told where it is.
+      if (isNavigation(req)) {
+        res.redirect(302, `/auth/sign-in?return=${encodeURIComponent(req.originalUrl ?? req.url ?? '/')}`);
+      } else {
+        res.status(401).json({ signIn: '/auth/sign-in' });
+      }
+      return;
+  }
+}
+
+function isNavigation(req: Request): boolean {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  const mode = req.headers['sec-fetch-mode'];
+  if (mode !== undefined) return mode === 'navigate';
+  return (req.headers.accept ?? '').includes('text/html');
+}
+
+/** U11 (LC-83): the server-mode middleware, with the policy and the session step bound once at startup. */
+export function serverGuard(policy: ServerAccessPolicy, verifySession: SessionVerifier): RequestHandler {
+  return (req, res, next) => applyAccessPolicy(req, res, next, policy, verifySession);
 }
 
 export function localGuard(req: Request, res: Response, next: NextFunction): void {

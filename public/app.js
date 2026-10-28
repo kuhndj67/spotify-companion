@@ -6,6 +6,8 @@
  * interpolated locally between pushes so the bar moves smoothly at 3s push intervals.
  */
 
+import { needsSessionCheck, onClose } from './connectionDecision.js';
+
 const el = (id) => document.getElementById(id);
 
 const ui = {
@@ -746,6 +748,7 @@ async function refreshMaintenance() {
 el('settings-open').addEventListener('click', () => {
   maintenanceMessage(null);
   el('settings').showModal();
+  void refreshAccess();
   void refreshMaintenance();
   void refreshCredentials();
   void refreshSettingsStatus();
@@ -1509,6 +1512,13 @@ function connectionIndicatorView() {
         level: 'fail',
         label: 'Disconnected',
         detail: 'No live connection. The page is not updating.',
+      };
+    // U11 (BR-93.3, frontend-components §3): the session ended. Text, not only colour; reconnecting has stopped.
+    case 'signedOut':
+      return {
+        level: 'fail',
+        label: 'Signed out',
+        detail: 'Your sign-in has ended. Sign in again to see live updates.',
       };
     default:
       return { level: 'unknown', label: 'Connection', detail: 'Not yet attempted.' };
@@ -2406,9 +2416,16 @@ function connect() {
 
   socket.addEventListener('open', () => setConnectionState('open'));
 
-  socket.addEventListener('close', () => {
-    setState('error', 'Disconnected — reconnecting…');
+  socket.addEventListener('close', async (event) => {
     progress.running = false;
+    // U11 (BR-93.3): 4401 is the server's *signed out*; any other close asks the session check first, because a
+    // browser cannot see the 401 a refused handshake gets. In local mode that check is a 404, so this reconnects.
+    const status = needsSessionCheck(event.code) ? await sessionStatus() : null;
+    if (onClose(event.code, status) === 'signedOut') {
+      enterSignedOut();
+      return;
+    }
+    setState('error', 'Disconnected — reconnecting…');
     // ⚠️ `reconnecting`, not `closed`: a retry is pending, and the two are different facts.
     // `closed` is reserved for a socket with nothing scheduled behind it.
     setConnectionState('reconnecting');
@@ -2417,6 +2434,87 @@ function connect() {
 
   socket.addEventListener('error', () => socket.close());
 }
+
+// -- U11: signed out, and Settings → Access (BR-93, BR-94; frontend-components §3, §4) -----------------------------
+//
+// ⚠️ DOM WIRING ONLY. The server decides who is signed in and until when (`/auth/session`); the close decision is
+// `connectionDecision.js`, which is tested. In local mode `/auth/session` is a 404 and none of this shows.
+
+let signedOut = false;
+
+/** The session check's status, or null if it could not be asked (the server is restarting, say). */
+async function sessionStatus() {
+  try {
+    return (await realFetch('/auth/session', { cache: 'no-store' })).status;
+  } catch {
+    return null;
+  }
+}
+
+/** BR-93.3: stop reconnecting, say *Signed out* in words, offer the sign-in, disable what would only fail. */
+function enterSignedOut() {
+  if (signedOut) return;
+  signedOut = true;
+  progress.running = false;
+  setState('error', 'Signed out');
+  setConnectionState('signedOut');
+  const banner = el('signed-out-banner');
+  const link = el('signed-out-signin');
+  link.href = `/auth/sign-in?return=${encodeURIComponent(location.pathname + location.search)}`;
+  banner.hidden = false;
+  for (const button of document.querySelectorAll('button')) {
+    if (button.closest('#signed-out-banner')) continue;
+    button.disabled = true;
+    button.title = 'Signed out: sign in again first';
+  }
+}
+
+// An API call answered 401 (server mode, the session ended): the same state as a 4401 close.
+const realFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const response = await realFetch(...args);
+  if (response.status === 401 && !signedOut) enterSignedOut();
+  return response;
+};
+
+async function refreshAccess() {
+  const section = el('access-section');
+  let session = null;
+  try {
+    const r = await realFetch('/auth/session', { cache: 'no-store' });
+    if (r.ok) session = await r.json();
+  } catch {
+    session = null;
+  }
+  // Local mode (404) or no session: the section is not drawn at all.
+  section.hidden = session === null;
+  if (session === null) return;
+  el('access-subject').textContent = session.subject;
+  el('access-ends').textContent = new Date(session.expiresAt).toLocaleString();
+  el('access-origin').textContent = session.publicOrigin;
+  el('access-message').textContent = '';
+}
+
+async function signOut(path) {
+  const message = el('access-message');
+  message.textContent = '';
+  try {
+    const r = await realFetch(path, { method: 'POST', headers: INGEST_HEADERS });
+    const body = await r.json().catch(() => ({}));
+    if (r.ok && body.next) {
+      location.href = body.next;
+      return;
+    }
+    message.textContent = body.error ?? `Sign-out did not complete (${r.status}).`;
+  } catch {
+    message.textContent = 'Sign-out did not complete: the app did not answer.';
+  }
+}
+
+el('access-sign-out').addEventListener('click', () => void signOut('/auth/sign-out'));
+el('access-sign-out-everywhere').addEventListener('click', () => {
+  if (window.confirm('This ends every session, on every device, including this one.')) void signOut('/auth/sign-out-everywhere');
+});
 
 requestAnimationFrame(paintProgress);
 connect();

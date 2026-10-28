@@ -31,20 +31,26 @@ set -e
 #   docker run --rm -v "${PWD}:/work" <image> setup                              write compose.yaml, secrets/, config/…
 #   docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 <image> auth    the Spotify sign-in
 #   docker run --rm -v "${PWD}:/work" <new image> update                        U10: rewrite compose.yaml's image line
+#   docker run --rm -v "<folder>:/work" <image> certs ca --out /work/ca ...     U11: the certificate tool (IN-U11-4),
+#                                                                               run on the owner's PC, never on a server
 #
 # Both run as the OWNER of /work (Infrastructure Q4 = A): on a Linux host the files then belong to the user, not to
 # root. On Windows/Rancher the mount reports root, and running as root there does no harm. Anything else starts the
 # app, as before.
 # ---------------------------------------------------------------------------------------------------------------
 case "${1:-}" in
-  setup|auth|update)
+  setup|auth|update|certs)
     command="$1"; shift
     if [ ! -d /work ]; then
       echo "Mount the folder to set up at /work, e.g.:  docker run --rm -v \"\${PWD}:/work\" <image> $command" >&2
       exit 2
     fi
     if [ "$command" = setup ]; then
-      set -- node /app/dist/appOnly/setupCli.js
+      # U11 (IN-U11-3): `setup --server` passes its option through.
+      set -- node /app/dist/appOnly/setupCli.js "$@"
+    elif [ "$command" = certs ]; then
+      # U11 (IN-U11-4, Q2 = A): the only user of the image's `openssl`. Its arguments pass through unchanged.
+      set -- node /app/dist/certs/certsCli.js "$@"
     elif [ "$command" = update ]; then
       # U10 (BR-83): one line of /work/compose.yaml, nothing else. No backup here: the updated app takes one before
       # its first run (BR-79), because a throwaway container cannot reach the running app.

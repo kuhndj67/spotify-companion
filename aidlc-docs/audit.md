@@ -645,3 +645,447 @@ anonymous manifest HTTP 200).
   `/api/health` ok, no refusal in the log. Not seen: the *"Spotify is answering again"* line, since no refusal occurred
   to recover from.
 - **U10 closed** by the owner (*"do it"*). CLAUDE.md's "until beta.9 is live" transition notes removed.
+
+## 2026-10-24T13:00:00Z — U11 Off-machine Deployment: Functional Design plan opened
+
+- **Started** by the owner (*"lets start U11"*), choosing it over issues #29/#30 first.
+- **Probed Machine 2** (unauthenticated, read-only, from this machine: TCP connects, `GET`s, one TLS handshake):
+  80/443/5000/5001 open, **22 refused** (SSH off); DSM 7 (`SYNO.API.Auth` v7) with Container Manager
+  (`SYNO.Docker.*`, including `Project`) and `SYNO.OAUTH.*`; `/webman/sso/.well-known/openid-configuration` → `403`
+  on 5000/5001, and on 80/443 a `200` whose body is only DSM's redirect page (read, not assumed). So DSM's OIDC
+  capability is **unknown**, not absent. Certificate: DSM factory default (`CN = synology.com`). Published
+  `1.0.0-beta.9` manifest: single-platform (`amd64`).
+- **Found**: `SqliteHistoryRepository` sets `journal_mode = WAL` without reading the result; measured with
+  `node:sqlite` on `:memory:` that the call does not throw and the mode stays `memory`. A volume without WAL would
+  go unnoticed. Proposed as a business rule; nothing changed in code.
+- **Corrected before writing**: a draft line claimed the app "refuses to run" without WAL. Checked the code: it does
+  not. Removed.
+- **Plan**: `construction/plans/u11-functional-design-plan.md`, Q1–Q11 (role, registrations, identity provider,
+  proxy, address and certificate, who is admitted, what a signed-in browser may do, deploy path, install document,
+  exit-test counts, story) and six DSM values for the owner. Q3 and Q8 are security posture: options written, not
+  decided. Noted in Q8: the repository is public, so U9-c's read-only GitHub deploy key is no longer needed.
+
+## 2026-10-24T13:27:00Z — U11 FD plan: the NAS's security tools; Q3's recommendation revised
+
+- **Owner**: SSH is on **port 222**; *SSO Client* (Security tab) available, not configured; *OAuth Service* installed,
+  no apps; *Secure SignIn* installed, 2FA in use for DSM; *SSO Server* available, **not installed**. *"Ideally I'd
+  like to avoid needing access to the primary NAS environment for this work but it may be needed"* … *"I'm guessing
+  we need a level of access for dev and (possibly different) level of access for the running app."*
+- **Probed** port 222 with an unauthenticated connection: SSH offers `publickey,password`.
+- **Plan Section 2a added**: four kinds of access (signing in to the app; the running app, which needs **no** NAS
+  account; deploying; one-time setup by the owner) and what each DSM tool does (Synology's documented behaviour,
+  **not probed**): only *SSO Server* provides OIDC; *OAuth Service* (DSM resource grants) and *SSO Client* (DSM's own
+  sign-in) are not needed. The `403` on discovery is consistent with SSO Server not being installed.
+- **Q3's recommendation revised** from "probe A (DSM SSO Server) first" to **B** (identity provider in a container,
+  DSM untouched), following the owner's stated preference. Still the owner's decision.
+
+## 2026-10-24T13:35:00Z — U11 FD Q3 = A (DSM SSO Server); how to configure it left open
+
+- **Owner**: *"I'm OK with using SSO Server since it's a synology product and is part of the already active update
+  process. For configuration we can either walk through it interactively OR I can provide limited access to the
+  synology OS for tasks."* A full NAS backup (to a separate backup appliance) is running; after it, *"we could use more
+  advanced automation if needed (synology mcp module …) with relatively low risk."*
+- **Recorded**: Q3 = A, conditional on probing SSO Server once installed. Supersedes the 13:27Z recommendation of B.
+- **Raised, not decided** (security posture): the backup lowers the cost of a *configuration mistake*; it does not
+  lower the *credential* risk of an agent holding DSM administrator access (the credential's reach, and an agent
+  acting on content it reads). Offered: walk-through for the one-time SSO Server setup; a limited account or MCP only
+  if a later task needs repeated NAS changes.
+
+## 2026-10-24T13:40:00Z — U11: SSO Server configured by hand
+
+- **Owner**: *"we can start with manual configuration."* SSO Server is installed and configured by the owner,
+  walked through step by step; the agent reads results only from this machine, unauthenticated (the discovery
+  document). No DSM credential is given to an agent. A limited account or a Synology MCP server stays possible later
+  and is a separate decision.
+
+## 2026-10-24T13:46:00Z — U11: SSO Server's defaults; Machine 2 has a global IPv6 address
+
+- **Owner** (SSO Server, General Settings): account type *Domain/LDAP/local* only; Server URL `https://<Machine 2's
+  name>:5001` (default).
+- **Probed** from this machine: the name resolves to a **global IPv6 address** (`2606:…`), not `192.168.0.223`;
+  `https://<name>:5001/` → `200`.
+- **Raised to the owner, not decided** (security posture): whether inbound IPv6 from the internet reaches Machine 2.
+  The LAN's "non-forwarding" description covers IPv4 port forwarding; IPv6 has no NAT, and reachability depends on
+  the router's IPv6 firewall. Not tested (needs a vantage point outside the LAN).
+
+## 2026-10-24T13:50:00Z — Correction to 13:46Z: Machine 2's name does resolve to 192.168.0.223
+
+- The 13:46Z entry said the name resolves "not to `192.168.0.223`". **Wrong**: the probe printed only the **first**
+  record returned. Listing all of them, the name has an `A` record (`192.168.0.223`) and an `AAAA` record. Found by
+  the owner (`ping` showed IPv4). The posture question raised there is withdrawn as outside U11 (owner). Plan
+  Section 4 Q5 note corrected.
+
+## 2026-10-24T14:20:00Z — U11: SSO Server serves OIDC (test certificate); recorded in research-findings
+
+- **Owner** (DSM, by hand): imported a **test** certificate for `<Machine 2's name>.local` from a CA generated on this machine
+  (name-constrained to Machine 2's names and address; the constraint **seen to refuse** a `www.google.com`
+  certificate signed by the same CA, `openssl verify`: `permitted subtree violation`; that certificate deleted).
+  The CA's key stayed off the NAS. Server URL `https://<name>.local:5001` saved; OIDC enabled (a first attempt was
+  not saved: the endpoint still said `not enabled`).
+- **Probed**: discovery `200`, issuer derived from the Server URL, one RS256 key, claims include `sub`, `aud`,
+  `groups`. ⚠️ Port 5001 still serves the factory certificate. Saving the Server URL did **not** prove the
+  certificate is served (owner's doubt, confirmed by measurement). Details: `research-findings.md`.
+
+## 2026-10-24T14:45:00Z — U11: SSO Server on port 9443 with the test certificate; Q5 answered
+
+- **Owner** (DSM, by hand): Let's Encrypt ruled out (*"needs a public address"*); own CA chosen (*"option A does sound
+  like the best way to go"*). DSM's *Create certificate* had no self-signed option. SSO Server moved to its own
+  HTTPS port (`5443` refused as reserved; `9443` accepted); test certificate assigned to `ssoserver-9443` only;
+  Server URL `https://<name>.local:9443`.
+- **Probed**: 9443 serves the test certificate, verified against the test CA alone; controls refused without it
+  (curl and Node). Issuer moved to 9443, same signing key. 5001 keeps DSM's factory certificate.
+- **Q5 = own CA** recorded in the plan, with what is still open (key custody, renewal, the name, the app's port).
+
+## 2026-10-24T15:00:00Z — U11: one real SSO Server sign-in probed
+
+- **Owner** registered a throwaway OIDC application and signed in once (Chrome, privileged account, second factor
+  asked for). A read-only account loops at sign-in and is not logged by SSO Server (owner's reading: it cannot use
+  DSM; not verified). The first sign-in landed on SSO Server's account portal; the authorize link opened again went
+  straight through.
+- **Measured** (scratchpad script; decoded claims only): RS256, signature verifies, altered signature refused; `aud`
+  = application ID; `sub` = the DSM user name; no `amr`/`acr`; **ID token lifetime 180 s, no refresh token**.
+  Recorded in `research-findings.md`, with the consequence for Q4 noted in the plan (not decided).
+- The one-time code was pasted into the chat by the owner; it was redeemed seconds later and is spent.
+
+## 2026-10-24T15:02:00Z — U11: silent re-sign-in (prompt=none) works while signed in
+
+- Owner ran the probe's `prompt=none` link: immediate redirect with a code, a valid 180 s ID token. `auth_time` is
+  reset to the new token's time. Not tested: the no-session case, and SSO Server's session length.
+
+## 2026-10-24T15:06:00Z — U11: prompt=none without a session shows sign-in; probes cleaned up
+
+- Incognito, no SSO Server session: `prompt=none` showed the sign-in page (not `login_required`). The owner signed in
+  (privileged account, second factor) and it **looped**. This weakens the earlier "read-only account cannot use DSM"
+  reading of the first loop: the privileged account loops too. Recorded in `research-findings.md`.
+- **Cleaned up** (agent): the probe stopped; `client.json` (the probe application's secret) and the callback files
+  deleted from the session scratchpad. Owner to delete the *Spotify Companion probe* application in SSO Server. The
+  test CA and certificate stay until the real CA replaces them.
+
+## 2026-10-24T15:15:00Z — U11: probe application deleted; Q4a written
+
+- **Owner** deleted the *Spotify Companion probe* application in SSO Server (*"done"*).
+- **Q4a** added to the FD plan as Q4's follow-up: what carries the session past the 180 s ID token. A (proxy signs
+  forwarded requests; unverified feature), ⭐ B (the app is the OIDC client with its own signed session cookie, no
+  proxy; amends NFR-29), C (repeat sign-in; measured not to work cleanly). Security posture: the owner's.
+
+## 2026-10-24T16:57:00Z — U11: Q4a = B
+
+- **Owner** (*"Ok lets go with B"*): the app is the OIDC client (authorization code with PKCE), verifies SSO Server's
+  ID token once at sign-in, then keeps **its own signed session cookie**, checked by `decideAccess` on HTTP and the
+  WebSocket upgrade. No proxy; the app serves TLS itself.
+- **Rejected**: A (`oauth2-proxy` signing forwarded requests; its signing feature unverified, one more service and a
+  shared key); C (repeat sign-in; measured not to work cleanly past SSO Server's session).
+- **Consequence**: NFR-29 as written ("behind a proxy … trusted-proxy mode … identity token on every request") no
+  longer fits. Amended wording proposed in the FD plan's Q4a answer; **not yet ratified**, so FD does not start on it.
+## 2026-10-24T17:28:00Z — U11: owner answers Q1, Q2, Q6–Q11
+
+- **Q1 = A** (trial, then the move), with the owner's addition: the app must support **both** a simple local-only
+  deployment (today's "only this machine" protection) **and** the server deployment this unit develops. Consistent
+  with NFR-29's "local-only stays the default mode".
+- **Q2 = A** (the NAS gets its own Spotify registration) · **Q6 = A** (exactly one identity) · **Q7 = A** (everything
+  the local app can do) · **Q8 = B, with A for the first deployment** · **Q10 = A** (every table counted) ·
+  **Q11 = A** (US-34).
+- **Q9** (neither A nor B as written): the install instructions target **any container host** with the needed services
+  (an OIDC provider among them), and do not assume Synology; host-specific steps go in labelled subsections
+  (*For Synology deployment*) inside each step, so other hosts can be added later. Q3's answer gained the same note.
+- Still open: ratification of the proposed NFR-29 wording; Section 3's DSM values.
+
+## 2026-10-24T17:45:00Z — U11: NFR-29 amendment ratified; Machine 2's hardware
+
+- **Owner** ratified the amended NFR-29 (*"nfr-29 ratified"*): the app signs the user in through an external OIDC
+  provider, verifies its signed ID token once, then requires a session the app itself signed on every request, HTTP
+  and WebSocket upgrade, through `decideAccess`; the app serves TLS. Written into `requirements.md`; a dated
+  amendment note added to `unit-of-work.md` §U11 (its original sentence kept).
+- **Owner** gave Machine 2's values: DS1517+, Intel Atom C2538 (4 cores, 2.4 GHz), 8 GB, DSM 7.2-64570 Update 4.
+  x86-64, so the published `amd64` image fits and no `arm64` build is needed. Not measured: whether the image's Node
+  runtime starts on a CPU without AVX; the trial checks it first. Still open (none blocks the FD): Container Manager
+  version, the data volume and its file system, free RAM.
+
+## 2026-10-24T17:51:00Z — U11: Section 3 filled
+
+- **Owner**: Container Manager 24.0.2-1535 (Docker Inc., published by Synology), on Volume 1. Volume 1: RAID 6,
+  14.7 TB formatted, 6.2 TB free. RAM 24 % in use of 8 GB. The volume's file system was not given; not blocking, since
+  the proposed startup WAL check measures WAL on the real volume.
+
+- **Owner**: Volume 1 is **Btrfs**. WAL on it is still measured by the startup check, not assumed.
+
+## 2026-10-24T17:58:00Z — U11: Functional Design written
+
+- **Owner**: *"go"*. Written in `construction/u11-off-machine-deployment/functional-design/`: business-logic-model
+  (two access modes; the sign-in; admission; the live connection; sign-out; TLS and keys; WAL; the trial, exit test
+  and move; releases; host-agnostic install), business-rules **BR-88 … BR-99**, domain-entities, frontend-components.
+- **US-34** added to `stories.md` (Q11 = A), covering NFR-29.
+- **Proposed, for the owner at review** (security posture): the session lifetime, **7 days** absolute, configurable
+  1 h … 90 days (BR-91.3). Also chosen here and open to change: `SameSite=Lax` with a required `Origin` and
+  `ingestGuard` on every state-changing request (BR-92.4), because the callback arrives by a cross-site redirect;
+  revocation by replacing the session key (*Sign out everywhere*), with single sign-outs remembered only until restart
+  (BR-94).
+- **Rejected in design**: a health or loopback exemption from sign-in in server mode (Q7 = A; no healthcheck exists);
+  a plain-HTTP listener in server mode; storing the provider's tokens.
+- **Carried**: the OIDC library (NFR Design); name, port, CA key custody and renewal, the deploy user (Infrastructure
+  Design); the sign-in loop retest (before Code Generation is accepted; if it persists, Q3 returns).
+
+## 2026-10-24T18:04:00Z — U11: Functional Design approved; NFR Design plan open
+
+- **Owner**: *"continue"*, in reply to the FD completion message, read as approval of the Functional Design **as
+  written**, including the proposed 7-day session lifetime (BR-91.3) and `SameSite=Lax` (BR-91.4).
+- NFR Requirements skipped, as for U1–U10. NFR Design plan written: `construction/plans/u11-nfr-design-plan.md`,
+  Q1 (OIDC library: ⭐ `openid-client` 6.8.8, MIT, measured on npm today), Q2 (session MAC: ⭐ HMAC-SHA256 on
+  `node:crypto`), Q3 (tests: ⭐ in-process fake provider plus one live acceptance), Q4 (loop retest: ⭐ Code
+  Generation's step 1), Q5 (certificate renewal: ⭐ restart), Q6 (repeated sign-ins: ⭐ bounded pending set only).
+  Allocates P-88, LC-82, PBT-91 onward.
+- Still awaiting the owner: what to do about Machine 2's name in pushed commit `015e836` (redaction committed
+  locally, not pushed).
+
+## 2026-10-24T18:12:00Z — U11: recording made independent of access; NFR Design written
+
+- **Owner**: *"The app as deployed should run indefinitely on the data collection side (other than for cert renewal
+  of course), but user logins can have a limited session length."* The 7-day session lifetime stands for sign-ins.
+- **FD amended after approval** in consequence: **BR-88.4** (a refused server configuration opens no listener but
+  **no longer exits**, so recording continues; first written as an exit, which would have stopped recording),
+  **BR-88.6** (a provider issuer mismatch refuses sign-in instead of refusing to start), **BR-91.6** added (nothing on
+  the poll and record path reads access, sessions or the provider; a structural test enforces it). Frontend gains
+  the `provider-mismatch` sentence.
+- **Owner**: NFR Design **Q1–Q6 all A** (*"the 6 questions all can take the recommended path"*). Written:
+  `nfr-design/nfr-design-patterns.md` (**P-88…P-101**), `nfr-design/logical-components.md` (**LC-82…LC-96**,
+  **PBT-91…PBT-100**). The deploy command's property test is left to Infrastructure Design with the deploy user.
+- **Owner**: rewrite the branch history to remove Machine 2's name (pushed in `015e836`). Done next.
+
+## 2026-10-24T18:27:00Z — U11: NFR Design approved; Infrastructure Design plan open
+
+- **Owner**: *"Continue"*, in reply to the NFR Design completion message: approved.
+- **Branch history rewritten** (owner's instruction): Machine 2's name replaced by a placeholder in all 27 branch
+  commits (`git filter-branch` over `origin/main..HEAD`; final tree unchanged), force-pushed with a lease; no
+  branch commit on GitHub contains it, verified after fetching. Local copies of the old history removed. ⚠️ GitHub
+  may still serve the old commit by its exact ID until its own garbage collection; nothing references it.
+- Measured for the Infrastructure Design plan: Machine 2's ports 3010, 3443, 8443 closed, 9443 open; a container on
+  this machine's Docker Desktop resolves the `.local` name (through Windows; not representative of the NAS), and a
+  fixed host entry resolves it regardless.
+- Plan written: `construction/plans/u11-infrastructure-design-plan.md`, Q1–Q10. Q5 (CA key custody) is a
+  security-posture decision, the owner's. Q7 is a fact (which devices).
+
+## 2026-10-24T18:43:00Z — U11: Infrastructure Design written
+
+- **Owner**: *"accept recommendations for all questions"*: Q1–Q6 and Q8–Q10 = A. **Q7** (which devices open the app)
+  is a fact with no recommendation, so it stays open as a follow-up; the design covers Windows, macOS, iOS and
+  Android until then.
+- Written: `infrastructure-design/infrastructure-design.md` (**IN-U11-1…IN-U11-10**: host services, the server
+  compose with `extra_hosts` and the LAN-address-only publish on 3443, `setup --server`, the certificate script and
+  renewal, CA key offline, provider registration, secrets files, the deploy path, off-disk copies, monitoring) and
+  `deployment-architecture.md`.
+- Found while designing: (1) a file-level host backup of `history.db` taken while the app writes may be
+  inconsistent; the archives in `data/backups/` are the copies to restore from (IN-U11-9). (2) The sign-in loop
+  retest must run on Machine 2, since the CA is constrained to its names; how the step-1 build gets there is for the
+  Code Generation plan. (3) DSM may allow SSH only to administrators (believed, not measured); if so, the deploy
+  path (IN-U11-8) returns.
+
+- **Owner**, Q7: *"This machine (windows 11) will be used for now..."*. The install guide covers Windows (current-user
+  trusted root; Firefox's own store noted); other devices, and the `.local` check on a phone, when they are used.
+
+## 2026-10-24T19:05:00Z — U11: Infrastructure Design approved; Code Generation plan written
+
+- **Owner**: *"approved"*, in reply to the Infrastructure Design completion message.
+- Plan written: `construction/plans/u11-code-generation-plan.md`, 17 steps. **Part A** (1–9) builds only what the
+  sign-in loop needs, ending in a candidate image; **Step 10 is the P-95 gate**: the first deployment by hand
+  (deployment-architecture §4 steps 1–4, no Spotify registration on Machine 2) and at least five recorded sign-ins.
+  A persistent loop stops Code Generation and returns FD plan Q3. **Part B** (11–16): live connections and sign-out,
+  frontend, Diagnostics and WAL, structural and secrets guards, documents. **Part C** (17): the restricted deploy
+  path, probed first.
+- Refinement of P-95, stated in the plan: the Step 1 build includes the full admission rule (Step 3), so a completed
+  sign-in lands on the app itself rather than on a page written only for the test. With no Spotify registration,
+  Machine 2 shows no data.
+- **Found while planning** (measured): `node:22.23-bookworm-slim` has no `openssl` program, so the certificate tool
+  as designed (IN-U11-4, `scripts/`) needs a clone that an App-only install does not have. Put to the owner as **Q2**.
+- Open for the owner: **Q1** (Step 1 build to Machine 2: image file by hand ⭐ / pre-release tag), **Q2** (image
+  `certs` command with `openssl` ⭐ / repository script only). Awaiting answers and approval of the plan.
+
+## 2026-10-24T19:20:00Z — U11: Code Generation plan approved
+
+- **Owner**: *"approve the plan and defaults for q1/2"*. **Q1 = A**: the Step 1 build reaches Machine 2 as an image
+  file copied by hand; nothing is published. **Q2 = A**: the image gains a `certs` command and `openssl` (a
+  security-posture choice, the owner's: a program in the published image that only `certs` uses). The P-95
+  refinement (the Step 1 build includes the full admission rule) is approved with the plan.
+- Code starts on `u11-code-generation`, branched from `u11-functional-design` because the design pull request is not
+  yet opened (it waits for the owner's go-ahead); it is rebased onto `main` once that is merged.
+
+## 2026-10-24T23:15:00Z — U11 Code Generation: Part A (Steps 1–9) done; Step 10 is the owner's
+
+- Branch `u11-code-generation` (from `u11-functional-design`; the design pull request is not opened). One commit per
+  step, `npm run verify` green after each; details and deviations in the plan, per step.
+- **Found by positive controls and the fake provider** (each fixed, each now failing a test if undone):
+  `openid-client` 6.8.8 does not verify the ID token's signature for a token from the token endpoint unless
+  `enableNonRepudiationChecks` is applied (a tampered signature and an unpublished key were admitted); it does not
+  refuse a future `iat`; PBT-99 was too weak to see a store that kept consumed entries or had no cap; Steps 4–5's pure
+  modules were never registered with `purity.test.ts` (an unasserted text replace on a CRLF file).
+- **Found in the design's gaps**: `ingestGuard` used the loopback origin rule, which would refuse every save in server
+  mode; the image `HEALTHCHECK` asked plain HTTP on loopback, which server mode refuses. Both fixed.
+- **Deviations** (recorded in the plan): an unknown `ACCESS_MODE` stops serving rather than starting (BR-91.6 over
+  BR-88.1); `/auth/signed-out` is an open route; the scripted-player guard test is replaced by file-level tests of
+  `configureAccess` and a pin on `server.ts`'s order; the `openid-client` pin moved from Step 1 to Step 5; `jose` held
+  at 6.2.12 (6.2.13 is four days old).
+- **Candidate image** `spotify-companion:candidate-u11-signin` (`sha256:d61fd8d4…`, from `18da3ff`) run isolated on
+  this PC in server mode, with a refused configuration, and in local mode; every admission result as designed. Not
+  observed: plays recorded while not serving (no Spotify credentials in an isolated run). Saved as an image file
+  (Q1 = A). The live `1.0.0-beta.9` container was not touched.
+- Next: Step 10, the deployment by hand and the sign-in retest, by the owner with guidance.
+
+## 2026-10-25T01:10:00Z — U11 Step 10: the P-95 gate; owner chooses option A
+
+- Deployed by hand on Machine 2 with the candidate image (CA and certificates made on this PC by `npm run certs`; SSO
+  Server's certificate imported; the app registered; the CA trusted on this PC; the project created). Found: the share's
+  ACL refuses the container's user (fixed by hand: the four mounted folders owned by uid 1000, Linux mode); a lock that
+  cannot be created crashes the app into a restart loop (U10 defect, to fix); Windows PowerShell drops an unquoted `--`.
+- **Retest** (research-findings): from the authorize link with no SSO Server session, the sign-in **loops for every
+  account**, SSO Server logs nothing and the app receives no callback; **with an SSO Server session first it completes**
+  (plain, after the app's cookie is deleted, deep link). Ruled out: SSO Server version (3.0.7), DSM's iframe setting,
+  account privileges. Web search: no confirmed fix; one unresolved report of the same symptom.
+- **Owner**: *"yea lets do A"*: keep SSO Server; the app shows *sign in at the provider first, then Continue* when the
+  optional `OIDC_PROVIDER_PORTAL` is set (**BR-89.6 added**). Correction given to the owner with the decision: the app
+  cannot detect the provider's session, so the page appears on every sign-in the app needs, not only when SSO Server's
+  session has ended (one click when it has not). Rejected: B (a DSM setting; none found), C (a provider in a container).
+  Built as Step 10a, with the lock fix.
+
+## 2026-10-25 — U11 Step 10a: the workaround works on Machine 2
+
+- **Owner**, after rebuilding the project with `candidate-u11-signin-2` and `OIDC_PROVIDER_PORTAL`: *"the sign in page
+  displayed, sso opened and allowed me to sign in using companion, and the link to the app also worked"*. With no SSO
+  Server session, the case that looped now completes through the page. Recorded in research-findings. Part A done;
+  Part B next. The branch is not yet pushed (waits for the owner's go-ahead).
+
+## 2026-10-25 — U11 Code Generation Part B done
+
+- **Owner**: *"lets do part b and then do the walks so we can deploy a complete tested solution"*; earlier the same
+  day, the documents first (*"we should have all the required artifacts for others looking at the project to see
+  the new deployment scenario alongside the original localhost scenario"*), so Step 15 moved ahead of Steps 11–14.
+- Built: sign-out and sign out everywhere; live connections closed with 4401 at session end; the *Signed out* state
+  and Settings → Access (looked at in light and dark; the notice was moved and its link made readable); the WAL
+  read-back (`WalRefused` before any write); Diagnostics' *Access*, *WAL* and *Table counts and rules hash* rows and
+  the report's `fingerprint`; `compareCorpora` (PBT-98) and `npm run corpus:compare`; structural guards; a
+  secrets-in-output test, which **found the sign-in redirect's body repeating `state` and `nonce`** (fixed).
+  `docs/INSTALL-SERVER.md` gained N7 (moving your history: the trial, the exit test, the move).
+- `npm run verify` green; PBT-91…PBT-100 registered. Candidate `spotify-companion:candidate-u11` run isolated.
+- Next: Build & Test (the walks, the exit test, the move), then the release. Pull requests wait for the owner.
+
+## 2026-10-25 — U11 Build & Test: local mode checked on the verification install
+
+- **Owner**: walk scope *"Reuse CA and DSM setup"* (the server walk covers N4–N6 in a fresh folder); local check
+  *"Yes, run it"*.
+- `npm run verify:up -- --candidate` (placeholder Spotify config, hourly poll: no Spotify traffic, the live
+  credentials never copied): `/api/health` 200; every `/auth/*` 404; a wrong Host 403; a cross-site save 403;
+  Diagnostics *Access* "Local only", *WAL* ok, the corpus row and the report's fingerprint present.
+  `npm run verify:down`: removed, and **the live deployment proved unchanged** (container, start time, restart
+  count, image, health; no tracked file changed).
+- **Found reading the exit test against the guide**: a restore brings the database only, so the rules hash would
+  always differ on a new server. N7 now brings the rules file (Download rules → Upload rules…) before comparing, and
+  says the old machine must run this release first (its Diagnostics needs the fingerprint).
+
+## 2026-10-27 — U11 Build & Test: server walk, attempt 1 (stopped at N4 to fix the guide)
+
+- A separate Claude Code session walked `docs/INSTALL-SERVER.md` N4–N6 cold, with the owner (CA and DSM setup
+  reused). **Owner**: stop and fix, then restart for a clean run. Its findings, all fixed:
+  1. `setup --server` pointed at *"docs/INSTALL-APP.md, server part"* (there is none) and listed *register the app*,
+     already done in N2: the message now names `docs/INSTALL-SERVER.md`, N4, and the N4 order.
+  2. N4's Expected said *"the four files"* over a table of five: it now names all five.
+  3. `musicbrainz.json` already exists after `setup`: N4 now says to edit it; the example file's `_comment` (*"Copy to
+     musicbrainz.json"*) was stale in an install and now says where the file lives.
+  4. *"No `<placeholder>` left"* could not be met (comments mention them) and `OIDC_PROVIDER_PORTAL` ships commented:
+     N4 now says *on a setting line*, and how to uncomment it (the template's comment too).
+  5. Where `<name>` and `<LAN address>` come from was never said, and N2's hand-back did not ask for the subject: N4
+     has a *From* column; N1's and N2's boxes ask for them.
+  6. N4 put the client secret and the TLS key in place with no 👤 box, though the agent rules forbid an agent to
+     handle them: N4 has a box for them (the agent copies only the two public files).
+  7. *"On your PC … or on the server itself"* left the agent without a shell on the server unsure: N4 is on the PC;
+     N5 now starts by copying the folder over, with the Synology permissions as a 👤 box.
+  The `image:` line (the walk's candidate tag) is a side effect of an unreleased build, not a guide gap; N4 now says to
+  leave it, because `setup` writes its own version.
+
+## 2026-10-27 — U11 Build & Test: server walk, attempt 2 (N4–N6 completed)
+
+- A new cold session walked N4–N6 with the owner, against `candidate-u11` (rebuilt after attempt 1), CA and DSM setup
+  reused. **The sign-in completed**: the app's log, `[access] sign-in completed for "<the dedicated account>"; session
+  ends …`, exactly the 7-day `SESSION_LIFETIME`. The walker changed no repository file.
+- Findings, all fixed in `docs/INSTALL-SERVER.md` (the N5 check re-measured against the walk's deployment: `302 …
+  /auth/sign-in?return=%2F`; `401` without the header; exit 35 without `--ssl-no-revoke`):
+  1. (owner) What `<name>` and `<LAN address>` are: now defined once, near the top; the provider and the app share
+     the server's name; the CA is files, not a server.
+  2. (owner) Why the issuer is asked for and how to find it: N2 explains it and gives the Synology form,
+     `https://<name>:9443/webman/sso`.
+  3. (owner) Where the client secret is: N2's box says the secret shown beside the Application ID, to keep it in a
+     password manager, and that a new one can be generated; N4's box points back to it.
+  4. N4 never said to create the folder or `cd` into it (`${PWD}`): it does now.
+  5. N4's *"Leave the image: line as it is"* was wrong for a test build (`setup` writes the image's own version,
+     beta.9 until the release bumps it): now says so, with the exception.
+  6. N4's table named settings, not the text to find: it now gives both.
+  7. N5's Synology list said *"instead of 2"* but replaced 1 and 2: now says so.
+  8. Container Manager shows the newest log line first, and *"the first lines"* were Spotify errors: N5 names the
+     three lines to send and says where they are.
+  9. The log shows the MusicBrainz contact address: N5 says so and that it may be left out.
+  10. How an agent checks *"goes to the sign-in"*: N5 gives the `curl.exe` command and its expected output.
+  11. N6 did not ask for the app's `[access] sign-in` line, nor say which log: it does now.
+- Outside the guide: the CA key still on G: (acceptable only if G: is kept unplugged: the owner's call); the candidate
+  reports `1.0.0-beta.9` until the release raises the version.
+
+- **Owner**, the two browser checks the walker could not make: after *Continue* the app's page appears, and Settings →
+  Access shows who is signed in, when the session ends, *Sign out* and *Sign out everywhere*: *"verified"*. N4–N6
+  of the server walk are complete.
+
+## 2026-10-27 — U11: the move now, on the test build, with the same Spotify credentials (owner)
+
+- **Owner**: *"we've not added the spotify credentials and we've not restored the database to the synology
+  deployment"*, then: *"we're OK transferring the same credentials to the synology version (we'll shut down the local
+  version once the server deployment is running... with a few minutes of overlap)"*. This **amends FD plan Q2 = A**
+  (a separate Spotify registration for the server) for the move: one registration, moved with the history; the
+  overlap is minutes, not a trial. Owner's basis: both installs have shared one quota before, and it caused trouble
+  only after a long period.
+- Surfaced with the decision: if Spotify rotates the refresh token on one install's refresh, the other's copy may
+  fail (*Failed to get access token*), fixed by signing in again; plays this PC records between the backup and its
+  shutdown are recovered by restarting the server once (its startup backfill reads the last 50 plays).
+- The exit test runs without a release: the old side's fingerprint is the backup archive's own `manifest.json`
+  counts (exactly what is restored) and the live rules file's SHA-256; the new side is the server's Diagnostics
+  fingerprint right after the restore.
+- **Corrected while moving**: N7 said *"A backup holds the history only"* (written without checking). Measured: the
+  archive holds `history.db`, `manifest.json` and `rules.json` (its hash equals the live rules file's), and *Restore
+  backup* replaces the rules only when *Also replace my rules with the backup's* is ticked (U7, BR-59.2). N7 now says
+  to tick it; the download/upload of rules stays as the fallback.
+- Exit-test baseline, from the backup's manifest (`spotify-backup-20261028T004701Z`, schema v8): 12 tables, counts
+  recorded in the comparison; the rules file's SHA-256 `49cca69b…`.
+
+## 2026-10-28 — U11 exit test, attempt 1: FAIL (label tables grew); owner chooses option A
+
+- Compared the backup's manifest (old side) with the server's Diagnostics fingerprint taken right after *Restore
+  backup* (rules replaced, no Spotify credentials): `play` 1639 = 1639, `observation` 96088 = 96088, every other
+  history table equal, the rules hash equal; **`label_candidate` +1, `label_resolution` +12, `label_signal_vote` +2**.
+  By BR-98.2's rule: **fail**, and nothing goes on.
+- Likely cause (inference, not yet measured): the server's MusicBrainz label backfill ran on the first start after the
+  restore (Diagnostics: *backfill running*); it needs no Spotify credentials, so BR-98.3's premise (nothing writes
+  before the credentials) does not hold for the label tables.
+- **Owner**: *"A"*: prove it, then fix the procedure. Run the label lookups off (`LABELS_ENABLED: "false"`) on the
+  server, restore the same backup again, compare again; on a pass, turn them back on and continue. N7 will say to
+  pause label lookups during the test. Rejected: B (compare only the irreplaceable tables: weaker, needs a BR-98
+  amendment), C (accept a failed test on the evidence).
+
+## 2026-10-28 — U11 exit test, attempt 2: PASS (label lookups off); the cause of attempt 1 measured
+
+- Server with `LABELS_ENABLED: "false"` (log: *Labels: DISABLED*), the same backup restored again with *Also replace
+  my rules*, no Spotify credentials. `npm run corpus:compare` (old side: the backup's manifest counts and the live
+  rules file's SHA-256; new side: the server's Diagnostics fingerprint after the restore): **✓ pass**, all 12 tables
+  equal (`play` 1639, `observation` 96088, `label_*` now equal too), the rules hash equal.
+- With only the label lookups changed between the two attempts, attempt 1's extra `label_*` rows are **measured** to
+  come from the MusicBrainz backfill on the first start after a restore. N7 gets the step (label lookups off during
+  the test, then back on).
+- Side issue, not the app's: Edge showed *Not secure* (*"Active content with certificate errors"*) with a valid
+  certificate: a certificate warning clicked through earlier in the setup, remembered until Edge fully restarted.
+  Cleared by restarting Edge; the automated Chrome found both pages fully HTTPS and secure.
+
+## 2026-10-28 — U11: the move done; release 1.0.0-beta.10 prepared
+
+- **Owner**: *"everything appears to be working as expected and the app is pulling the full listening history... so I
+  think we're ready to release."* Measured here: this PC's `spotify-companion` container no longer exists (stopped and
+  removed); Machine 2 is the only recorder.
+- Found preparing the release: `npm run release -- --apply` would start this PC's container (`docker compose up -d`)
+  and so a second recorder. Added `--no-deploy`: build, then health on the throwaway verification install
+  (`verify:up`/`verify:down`, which prove the live setup here unchanged), then the tag; nothing started from
+  `compose.yaml`. `CLAUDE.md` and CONTRIBUTING now say the deployment is Machine 2 and this PC's container stays
+  stopped.
+- Version `1.0.0-beta.10` (package.json, the four compose tags, INSTALL-APP, INSTALL-SERVER's `<version>`, README).
+  N7 gained the measured *pause label lookups* step.

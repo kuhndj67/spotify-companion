@@ -711,6 +711,100 @@ second as the **treatment**. They should be stored as **separate fields**, never
 **Cost**: 2 requests per *artist* (URL join + release browse), and artists repeat heavily across a
 listening history — so a per-artist cache is far more effective than a per-track one.
 
+## Machine 2's SSO Server as an OIDC provider (U11, 2026-10-24)
+
+Probed from this machine, unauthenticated, after the owner installed *SSO Server*, imported a **test** certificate
+for `<Machine 2's name>.local` (a CA generated on this machine, name-constrained; no private key of the CA on the NAS), set the
+Server URL to `https://<Machine 2's name>.local:5001` and enabled OIDC. Before enabling, the same address returned
+`400 {"error":"not enabled"}`; before installing, `403`.
+
+| | Measured |
+|---|---|
+| Discovery | `GET /webman/sso/.well-known/openid-configuration` → `200` JSON |
+| **Issuer** | `https://<name>.local:5001/webman/sso`: **derived from the Server URL**, so changing that URL changes the issuer every token carries |
+| Keys | `jwks_uri` `…/webman/sso/openid-jwks.json` → `200`: **one RSA 2048-bit key, `alg RS256`, `use sig`**, with a `kid` |
+| ID-token signing | `RS256` only |
+| Claims offered | `aud`, `email`, `exp`, `groups`, `iat`, `iss`, `sub`, `username` |
+| Scopes | `openid`, `email`, `groups` |
+| Flows | `authorization_code` and `implicit`; response types include `code`; PKCE `S256` **and `plain`** |
+| Client authentication | `client_secret_basic`, `client_secret_post` |
+| ⚠️ TLS | Port 5001 still **presents DSM's factory certificate** (`CN = synology.com`) for `<Machine 2's name>.local`, so the test certificate was accepted by the Server URL check but is **not being served**. DSM's "valid certificate" check therefore did not verify what is served (inference: it checks that a certificate covering the name exists in its store) |
+
+**Then, the same day: SSO Server on its own port, with the test certificate served.** *Login Portal → Applications →
+Synology SSO → customized HTTPS port* (`5443` refused, *"reserved for system use only"*; `9443` accepted), the test
+certificate assigned to the new `ssoserver-9443` entry under *Certificate → Settings*, Server URL set to
+`https://<name>.local:9443`. Measured:
+
+| | |
+|---|---|
+| TLS on 9443 | presents `CN = <name>.local`, issued by the test CA; `openssl s_client -verify_hostname` → `0 (ok)` |
+| Positive controls | `curl` with system trust only → `SEC_E_UNTRUSTED_ROOT`; Node without the CA → `SELF_SIGNED_CERT_IN_CHAIN`. Both connect when given only the test CA (`--cacert`; `NODE_EXTRA_CA_CERTS`) |
+| ⚠️ Windows `curl` (Schannel) | also needs `--ssl-no-revoke`: the test CA publishes no revocation list (`CERT_TRUST_REVOCATION_STATUS_UNKNOWN`). Node and OpenSSL do not require one |
+| Issuer | `https://<name>.local:9443/webman/sso`; all endpoints moved to 9443; the **signing key is unchanged** (same `kid`) |
+| Port 5001 | still DSM's factory certificate (DSM's own pages untouched); the SSO paths there now answer `400 unknown endpoint`. **SSO Server answers on one Server URL only** |
+| Before the Server URL moved | 9443 answered `400 unknown endpoint` too: same rule |
+
+**Then, one real sign-in** (2026-10-24 14:58Z): a throwaway OIDC application (*Spotify Companion probe*) registered by
+the owner; authorization code flow with PKCE `S256`, `state` and `nonce`, run by a scratchpad script that printed
+decoded claims and check results only, never a raw token or the secret.
+
+| | Measured |
+|---|---|
+| Redirect URIs | `https://localhost:8765/callback` refused (*"invalid uri"*); `https://<name>.local:8765/callback` accepted: **another port on the same name is fine**, `localhost` is not |
+| ⚠️ An account that cannot use DSM | the owner's read-only account **loops** at SSO Server's sign-in page (`/#/signin`) with no error, and SSO Server's log records **nothing** for it. A privileged account signs in. Owner's reading: the read-only account has no access to DSM's main screens. **Not verified**; *Application Privileges* has no SSO Server entry |
+| Second factor | **asked for** (Secure SignIn), in Chrome, for the privileged account |
+| ⚠️ The sign-in does not resume the request | after signing in from the authorize link, the browser landed on SSO Server's **account portal**, not on the redirect. Opening the authorize link **again**, now signed in, redirected at once with a code (no consent page). The proxy must start the flow so that a second pass happens, or this must be retested |
+| Token response | `200`: `access_token`, `expires_in`, `id_token`, `token_type`. ⚠️ **No `refresh_token`** |
+| ID token | `RS256`, the published `kid`; **signature verifies**; positive control (signature altered) **does not verify** |
+| Claims | `iss` = the issuer; `aud` = the application ID, **a string**; `nonce` echoed; `auth_time`, `iat`, `exp`; `email`; `groups` (`users`, `administrators` for that account); ⚠️ **`sub` = the DSM user name** (same value as `username`), not an opaque ID: renaming the account changes who the app thinks it is |
+| No `amr` / `acr` | the token **does not say** whether a second factor was used. The app cannot check it; it is SSO Server's policy |
+| ⚠️ **Lifetime** | `exp − iat` = **180 s**, `expires_in` 180. Clock skew between Machine 2 and this machine: 0 s |
+| Access token | opaque (not a JWT) |
+
+**Silent re-sign-in** (`prompt=none`, 15:01Z, the same browser still signed in to SSO Server, ~2 min after the first
+token): redirected **at once** with a code, no page shown; a new ID token, same checks all pass (signature, altered
+copy refused, `iss`, `aud`, `nonce`), again **180 s**. ⚠️ `auth_time` **equals the new `iat`**, not the time of the
+real sign-in, so `auth_time` cannot measure how old the sign-in is. ⚠️ **`prompt=none` with no SSO Server session** (15:05Z, a Chrome incognito window): SSO Server showed its **sign-in
+page**, not `error=login_required`. So it does **not** honour `prompt=none` there; a silent refresh after the session
+ends lands on a hidden sign-in page. Signing in from it (privileged account, second factor) then **looped** back to
+sign-in, second factor included. ⚠️ This revises the read-only account's loop above: the privileged account loops
+too, so the loop is **not** shown to be about account privileges; it may belong to sign-ins that start from an
+authorize link with no session (the first Chrome sign-in also failed to resume, landing on the portal). Not
+measured: SSO Server's own session length.
+
+⚠️ **Consequence for the design** (not a measurement): a 3-minute ID token with no refresh token cannot be checked by
+the app "on every request" for a whole session unless the proxy repeats the sign-in redirect every 3 minutes, which
+breaks background requests and the WebSocket. U11's FD Q4 must settle what the app verifies after the first minutes.
+
+
+**The P-95 retest on Machine 2** (U11 Code Generation Step 10, 2026-10-24, from 00:22Z on 2026-10-25): the candidate
+build (`spotify-companion:candidate-u11-signin`) running on Machine 2 in server mode, with its own CA's certificates
+on the app and on SSO Server (`ssoserver-9443`), the CA installed in this PC's current-user root store. Edge, InPrivate.
+
+| | Measured |
+|---|---|
+| The app on Machine 2 | serves HTTPS on 3443 (Node runs on the Atom C2538); `/` → 302 to `/auth/sign-in`; `/auth/sign-in` → 302 to SSO Server's authorize endpoint, so `extra_hosts` and `NODE_EXTRA_CA_CERTS` work inside the container (discovery fetched over TLS); `/api/health` and a WebSocket without a session → 401; the LAN address as Host → 403 |
+| ⚠️ Folder permissions | on a DSM share the container's user (uid 1000) is refused by the share's ACL even when it owns the files (`d---------+`; the ACL names only `administrators` and `ContainerManager`). `chown -R 1000:1000` plus `chmod -R u+rwX` on the four mounted folders switched them to Linux mode (`rwx------`, uid 1000) and the app started. Consequence: those folders are no longer browsable in File Station |
+| ⚠️ A lock that cannot be created | `EACCES` on `history.db.lock` **crashed the app into a restart loop** (`WriterLock.acquire` rethrows anything but `EEXIST`; nothing catches it): a U10 defect, to be fixed |
+| A new account, wrong state | SSO Server says *"account or password is invalid"* for an account whose creation was not saved: SSO Server's own refusal, before the app |
+| ⚠️ **Sign-in from the authorize link, no SSO Server session** | a dedicated non-administrator account **loops** at SSO Server's sign-in page, with only a shared-folder privilege and also with the DSM application privilege added; **an administrator account loops too**. The app's log shows **no callback at all** for any attempt (no `[access]` line from 00:22Z to 00:31Z), so the loop is inside SSO Server. The same dedicated account signs in to DSM directly (port 5001) with no prompt |
+| **With an SSO Server session first** (normal Edge window: sign in at `:9443`, then open the app) | **completes**: the app's page appears with a session (attempt 2). Then: the app's session cookie deleted and the page reloaded → silently signed in again, new cookie (attempt 3, what a 7-day expiry will look like while SSO Server's session lives); a deep link `/?tab=history` → completed (attempt 4) |
+| Checks against the loop (web search found no confirmed fix; one unresolved report of the same symptom, Grist community 2022–2024) | SSO Server is **3.0.7** (newer than the 3.0.4 fix for mobile apps not being redirected); DSM's *Do not allow DSM to be embedded with iFrame* was on, and adding the app to its allowed list **made no difference** (still loops). `/var/log/auth.log` records a **wrong** password (`pam_unix(webui:auth): authentication failure`) but **nothing** for the looping sign-ins with the right one: inference, not measurement, that the password is accepted and SSO Server then fails to proceed |
+| **With the *Sign in first* page** (BR-89.6; `candidate-u11-signin-2`, `OIDC_PROVIDER_PORTAL` set to SSO Server's own address; 2026-10-25) | fresh InPrivate window, no SSO Server session: the app's page appears → SSO Server opened in a new tab, signed in as the dedicated account → *Continue* → **the app**. The case that looped now completes |
+| Conclusion (measured, matches the 14:58Z probe) | SSO Server's sign-in page does **not resume** an authorization request that arrived with no SSO Server session; once its own session exists, the authorize link redirects back at once. Not about accounts or privileges. Not yet measured: SSO Server's own session length; attempt 5 (after signing out of SSO Server's portal) |
+
+## `openid-client` 6.8.8, measured against the fake provider (U11, 2026-10-24)
+
+Measured through the app's real routes against `test/support/fakeOidcProvider.ts`, one misbehaviour per test.
+
+| | Measured |
+|---|---|
+| ⚠️ **ID-token signature** | **Not verified** for a token from the token endpoint by default (OIDC Core 3.1.3.7 allows trusting TLS instead): a tampered signature and a key the key set never published were **admitted**. `enableNonRepudiationChecks` (passed to `discovery` in `execute`) makes both refused. `alg: none` and `HS256` were refused either way (the `RS256` expectation) |
+| ⚠️ `iat` in the future | **Not refused** by the library; the app checks it (BR-90.4) |
+| Unknown `kid` | the key set is fetched again only if the cached one is **≥ 60 s** old; the cache is dropped at **300 s** (oauth4webapi 3.8.8). So a rotated key is refused for up to a minute after the last fetch |
+| Basic client authentication | the ID and secret are **form-encoded** before base64 (RFC 6749 §2.3.1): `-` is sent as `%2D`. A provider that compares without decoding refuses it. ⚠️ Not yet seen against SSO Server |
+| Node's own `fetch` and `NODE_EXTRA_CA_CERTS` | trusted (Node 22.17; positive control: without it, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`) |
+
 ## Sources
 
 - [Spotify: Introducing some changes to our Web API (Nov 2024)](https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api)

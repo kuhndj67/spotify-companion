@@ -1,6 +1,6 @@
 # Spotify Companion
 
-A **local, single-user** companion for Spotify subscribers (you need to have a paid subscription for api access). It shows what is playing and enriches it with the record label,
+A **single-user** companion for Spotify subscribers (you need to have a paid subscription for api access). It shows what is playing and enriches it with the record label,
 genres, liked status and your own history with the track. It records every play, and it can skip tracks
 automatically by rules you write.
 
@@ -25,7 +25,10 @@ quality product with AI doing all the coding.
 
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
   account and developer credentials**. Nothing is shared between installs.
-- **Not reachable from other machines.** The app answers only on `localhost`.
+- **Not reachable from other machines, unless you choose server mode.** By default the app answers only on
+  `localhost`. Server mode (from `1.0.0-beta.10`) puts it on an always-on machine on your home network, behind a
+  sign-in through your own sign-in provider. It is still for one person, and not for reaching from outside your home
+  network.
 
 ## Status
 
@@ -37,11 +40,20 @@ off until you arm it.
 
 ## Install
 
-Each install runs on your own machine, with your own Spotify account and your own Spotify developer credentials (a
-client id and secret; the install steps show you how to get them).
+Each install runs with your own Spotify account and your own Spotify developer credentials (a client id and secret;
+the install steps show you how to get them). There are two ways to run it:
 
-- **Just the app** (most people): [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md). Docker and a prebuilt image; no
-  source code or development tools.
+| | **Local** (the default) | **Server** (from `1.0.0-beta.10`) |
+|---|---|---|
+| Where | your own computer | an always-on machine on your home network (a NAS, a mini PC) |
+| Who can open it | that computer only, at `http://localhost:3010` | your devices on the home network, after signing in, over HTTPS |
+| What it needs | Docker | Docker on the server, your own sign-in provider (OpenID Connect; for example Synology's SSO Server), and a small certificate authority the app's own tool makes |
+| Guide | [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md) | [`docs/INSTALL-SERVER.md`](docs/INSTALL-SERVER.md) |
+
+- **Just the app, locally** (most people): [`docs/INSTALL-APP.md`](docs/INSTALL-APP.md). Docker and a prebuilt image;
+  no source code or development tools.
+- **On a server, for your other devices**: [`docs/INSTALL-SERVER.md`](docs/INSTALL-SERVER.md). The same image, in
+  server mode, with *For Synology deployment* notes in each step, and how to move your history there.
 - **Full development environment** (to change the code): [`docs/INSTALL-DEV.md`](docs/INSTALL-DEV.md). Then
   `npm ci` and `npm run verify` (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 

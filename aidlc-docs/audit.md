@@ -1028,3 +1028,18 @@ anonymous manifest HTTP 200).
 - **Owner**, the two browser checks the walker could not make: after *Continue* the app's page appears, and Settings →
   Access shows who is signed in, when the session ends, *Sign out* and *Sign out everywhere*: *"verified"*. N4–N6
   of the server walk are complete.
+
+## 2026-10-27 — U11: the move now, on the test build, with the same Spotify credentials (owner)
+
+- **Owner**: *"we've not added the spotify credentials and we've not restored the database to the synology
+  deployment"*, then: *"we're OK transferring the same credentials to the synology version (we'll shut down the local
+  version once the server deployment is running... with a few minutes of overlap)"*. This **amends FD plan Q2 = A**
+  (a separate Spotify registration for the server) for the move: one registration, moved with the history; the
+  overlap is minutes, not a trial. Owner's basis: both installs have shared one quota before, and it caused trouble
+  only after a long period.
+- Surfaced with the decision: if Spotify rotates the refresh token on one install's refresh, the other's copy may
+  fail (*Failed to get access token*), fixed by signing in again; plays this PC records between the backup and its
+  shutdown are recovered by restarting the server once (its startup backfill reads the last 50 plays).
+- The exit test runs without a release: the old side's fingerprint is the backup archive's own `manifest.json`
+  counts (exactly what is restored) and the live rules file's SHA-256; the new side is the server's Diagnostics
+  fingerprint right after the restore.

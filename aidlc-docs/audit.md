@@ -998,3 +998,29 @@ anonymous manifest HTTP 200).
      N5 now starts by copying the folder over, with the Synology permissions as a 👤 box.
   The `image:` line (the walk's candidate tag) is a side effect of an unreleased build, not a guide gap; N4 now says to
   leave it, because `setup` writes its own version.
+
+## 2026-10-27 — U11 Build & Test: server walk, attempt 2 (N4–N6 completed)
+
+- A new cold session walked N4–N6 with the owner, against `candidate-u11` (rebuilt after attempt 1), CA and DSM setup
+  reused. **The sign-in completed**: the app's log, `[access] sign-in completed for "<the dedicated account>"; session
+  ends …`, exactly the 7-day `SESSION_LIFETIME`. The walker changed no repository file.
+- Findings, all fixed in `docs/INSTALL-SERVER.md` (the N5 check re-measured against the walk's deployment: `302 …
+  /auth/sign-in?return=%2F`; `401` without the header; exit 35 without `--ssl-no-revoke`):
+  1. (owner) What `<name>` and `<LAN address>` are: now defined once, near the top; the provider and the app share
+     the server's name; the CA is files, not a server.
+  2. (owner) Why the issuer is asked for and how to find it: N2 explains it and gives the Synology form,
+     `https://<name>:9443/webman/sso`.
+  3. (owner) Where the client secret is: N2's box says the secret shown beside the Application ID, to keep it in a
+     password manager, and that a new one can be generated; N4's box points back to it.
+  4. N4 never said to create the folder or `cd` into it (`${PWD}`): it does now.
+  5. N4's *"Leave the image: line as it is"* was wrong for a test build (`setup` writes the image's own version,
+     beta.9 until the release bumps it): now says so, with the exception.
+  6. N4's table named settings, not the text to find: it now gives both.
+  7. N5's Synology list said *"instead of 2"* but replaced 1 and 2: now says so.
+  8. Container Manager shows the newest log line first, and *"the first lines"* were Spotify errors: N5 names the
+     three lines to send and says where they are.
+  9. The log shows the MusicBrainz contact address: N5 says so and that it may be left out.
+  10. How an agent checks *"goes to the sign-in"*: N5 gives the `curl.exe` command and its expected output.
+  11. N6 did not ask for the app's `[access] sign-in` line, nor say which log: it does now.
+- Outside the guide: the CA key still on G: (acceptable only if G: is kept unplugged: the owner's call); the candidate
+  reports `1.0.0-beta.9` until the release raises the version.

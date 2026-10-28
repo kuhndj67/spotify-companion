@@ -56,6 +56,13 @@ double-count every play, and nothing stops you: each install's one-writer lock c
 
 On **your PC** (not the server) you need Docker, as in [`INSTALL-APP.md`](INSTALL-APP.md) A1, for the certificate tool.
 
+**Two values used throughout**, decided once:
+
+- **`<name>`**: the name your devices use to reach the server, with its suffix, for example `machine.local` (on a
+  Synology NAS, its name plus `.local`). The sign-in provider and the app both run on that one server, on different
+  ports (for example 9443 and 3443), so they share this name. The CA is not a server: it is two files on your PC.
+- **`<LAN address>`**: the server's fixed address on your home network, for example `192.168.0.10`.
+
 ---
 
 ## N1 — Certificates
@@ -65,7 +72,7 @@ provider, one for the app. The CA is **name-constrained** to the server's name a
 certificates for nothing else. Done **on your PC**: the CA's key must never be on the server.
 
 **Commands**: on your PC, in a folder **outside** any install or repository folder (ideally removable media, here
-`G:\companion-ca`). Replace `<name>` and `<LAN address>`, lower case:
+`G:\companion-ca`). Replace `<name>` and `<LAN address>` (see *Two values used throughout*, above), lower case:
 
 ```powershell
 docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs ca --out /work/ca --dns <name> --ip <LAN address>
@@ -108,9 +115,13 @@ back.
 - **Redirect address**: exactly `https://<name>:3443/auth/callback`
 - **Scope**: `openid`
 
-Note its **client ID** (not secret), its **issuer** (from its discovery document,
-`https://<issuer>/.well-known/openid-configuration`, the `issuer` value, character for character), and the **subject**
-of the account you will sign in with. Keep the **client secret** for N4; never paste it anywhere else.
+Note its **client ID** (not secret), its **issuer** and the **subject** of the account you will sign in with. Keep
+the **client secret** for N4 (a password manager is a good place); never paste it anywhere else.
+
+The **issuer** is the provider's own address for itself. The app compares it character for character with what the
+provider announces, so copy it, do not type it: open the provider's discovery document (its documentation names the
+address; it ends in `/.well-known/openid-configuration`) and copy the value of `"issuer"`. *For Synology deployment*,
+it is `https://<name>:9443/webman/sso`.
 
 ### *For Synology deployment*
 
@@ -121,9 +132,12 @@ of the account you will sign in with. Keep the **client secret** for N4; never p
 >    Then in SSO Server's **Settings**, set the **Server URL** to `https://<name>:9443` and enable **OIDC**.
 > 2. **Control Panel → Security → Certificate → Add → Import**: private key `sso-key.pem`, certificate `sso-cert.pem`,
 >    intermediate `ca-cert.pem`. Then **Settings** on the same tab: assign it to the **`ssoserver-9443`** entry.
-> 3. **SSO Server → Application → Add → OIDC**: redirect address `https://<name>:3443/auth/callback`. Copy the
->    **Application ID** (the client ID) and the **secret**.
-> 4. The account you will sign in with: its **subject is its DSM user name**, exactly (case matters). Measured: a
+> 3. **SSO Server → Application → Add → OIDC**: redirect address `https://<name>:3443/auth/callback`. When it is
+>    saved, the entry shows an **Application ID** (the client ID) and a **secret** beside it (the client secret).
+>    Copy both, and keep the secret somewhere safe (a password manager): N4 puts it in a file, and nothing else ever
+>    asks for it. If you no longer have it later, the entry can be given a new secret; the old one then stops working.
+> 4. The **issuer** on a Synology NAS is always `https://<name>:9443/webman/sso` (with your SSO Server port).
+> 5. The account you will sign in with: its **subject is its DSM user name**, exactly (case matters). Measured: a
 >    dedicated non-administrator account with DSM's own application privilege works. Whether less suffices is not
 >    measured. The app never uses the account's files, so it needs no shared-folder access.
 >
@@ -171,26 +185,31 @@ address opens without a warning.
 **Purpose**: on your PC, create the folder the app will run from, with the server settings filled in and the
 certificates and secret in place. N5 copies it to the server, so no shell on the server is needed here.
 
-**Commands**: on your PC, in a **new, empty** folder outside any repository (here `D:\companion-server`):
+**Commands**: on your PC, create a **new, empty** folder outside any repository (here `D:\companion-server`), go
+into it, and run `setup` there (`${PWD}` is the folder you are in):
 
 ```powershell
+mkdir D:\companion-server
+cd D:\companion-server
 docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup --server
 ```
 
 Then, in the new `compose.yaml`, replace every `<placeholder>` on a setting line (the comments mention them too;
 those can stay). The values come from earlier steps:
 
-| Placeholder | Value | From |
-|---|---|---|
-| `<name>` | the server's name, for example `machine.local` | N1's `--dns` |
-| `<LAN address>` | the server's address, for example `192.168.0.10`; it appears **twice** (`ports`, `extra_hosts`) | N1's `--ip` |
-| `OIDC_ISSUER` | the issuer, exactly as the discovery document gives it | N2 |
-| `OIDC_CLIENT_ID` | the client ID | N2 |
-| `OIDC_ALLOWED_SUBJECT` | your account's subject (Synology: your DSM user name, exact letter case) | N2 |
-| `SESSION_LIFETIME` | how long a sign-in lasts, `1h` to `90d` (default `7d`). Recording never stops when it ends | your choice |
-| `OIDC_PROVIDER_PORTAL` | optional; it ships as a comment. To set it, remove the `# ` in front of it and fill in `<name>` | *For Synology deployment* |
+| Setting | Text to replace | Value | From |
+|---|---|---|---|
+| `ports` | `<LAN address>` | the server's address | N1's `--ip` |
+| `extra_hosts` | `<name>` and `<LAN address>` | the server's name and address | N1's `--dns` and `--ip` |
+| `PUBLIC_ORIGIN` | `<name>` | the server's name | N1's `--dns` |
+| `OIDC_ISSUER` | `<the provider's issuer>` | the issuer, copied (*For Synology*: `https://<name>:9443/webman/sso`) | N2 |
+| `OIDC_CLIENT_ID` | `<the client ID the provider gave>` | the client ID (*Synology*: the Application ID) | N2 |
+| `OIDC_ALLOWED_SUBJECT` | `<your account's subject>` | your account's subject (*Synology*: the DSM user name, exact letter case) | N2 |
+| `SESSION_LIFETIME` | (none: `7d`) | how long a sign-in lasts, `1h` to `90d`. Recording never stops when it ends | your choice |
+| `OIDC_PROVIDER_PORTAL` | the whole line is a comment | optional: remove the `# ` in front of it and fill in `<name>` | *For Synology deployment* |
 
-Leave the `image:` line as it is: `setup` wrote the version you ran it with.
+The `image:` line names the version of the image you ran `setup` with; leave it. (A test build is the one exception:
+its tag is not a release, so put that tag on the line instead.)
 
 Then the files. The two **public** ones (the agent may copy these): `ca\ca-cert.pem` → `.\config\ca\ca-cert.pem`, and
 `app\server-cert.pem` → `.\secrets\app\tls\server-cert.pem`.
@@ -199,7 +218,8 @@ Then the files. The two **public** ones (the agent may copy these): `ca\ca-cert.
 >
 > 1. Copy `app\server-key.pem` (from N1) to `.\secrets\app\tls\server-key.pem`.
 > 2. Create `.\secrets\app\oidc-client-secret` (no file extension; in Notepad, save as `oidc-client-secret.` with the
->    final dot) holding the client secret from N2 on one line.
+>    final dot) holding the **client secret** on one line: the secret you kept in N2 (*Synology*: SSO Server →
+>    Application → your app's entry, the secret shown beside the Application ID).
 > 3. Open `.\secrets\app\musicbrainz.json` (setup already wrote it) and replace `you@example.com` with an address
 >    where you can be reached, as [`INSTALL-APP.md`](INSTALL-APP.md) A5.
 >
@@ -238,7 +258,7 @@ refuses requests without a sign-in.
 >    up. It holds the client secret, the app's TLS key and (once started) the session key.
 > 2. Start it: `docker compose up -d` in the folder on the server.
 >
-> *For Synology deployment*, instead of 2:
+> *For Synology deployment*, these three replace 1 and 2:
 >
 > 1. Copy the folder into an administrators-only shared folder, for example `docker/spotify-companion`.
 > 2. **Give the container's user its four folders.** DSM's shared-folder permissions refuse the container's user
@@ -257,14 +277,24 @@ refuses requests without a sign-in.
 >    check. Start it.
 >
 > **You should see:** the container running.
-> **When done, tell the agent:** "N5 started", and paste the first lines of the container's log (`docker logs
-> spotify-companion`; *Synology*: Container Manager → Container → Log). The log holds no secrets.
+> **When done, tell the agent:** "N5 started", and the lines of the container's log from its start that begin
+> `spotify-companion listening on`, `Access:` and `[access]` (`docker logs spotify-companion`; *Synology*: Container
+> Manager → Container → Log, which shows the **newest line first**, so the start is at the bottom). The log holds no
+> secrets, but it does show your MusicBrainz contact address (the `Labels:` line); leave that line out if you prefer.
 
-**Commands**: the agent reads the log lines you paste, then opens `https://<name>:3443/` (or asks you to).
+**Commands**: the agent reads the log lines you send, then checks that a page request goes to the sign-in
+(`--ssl-no-revoke` is for Windows' `curl.exe`, whose certificate check otherwise wants a revocation list your CA does
+not publish):
+
+```powershell
+curl.exe -s -o NUL -w "%{http_code} %{redirect_url}" --ssl-no-revoke -H "Sec-Fetch-Mode: navigate" https://<name>:3443/
+```
 
 **Expected**: in the log, `spotify-companion listening on https://0.0.0.0:3000, public address https://<name>:3443`
 and `Access: server mode, sign-in through <issuer>`; no `NOT SERVING`. (Errors that Spotify is not configured are
-expected until you add credentials.) In a browser, `https://<name>:3443/` goes to the sign-in.
+expected until you add credentials.) The check prints `302 https://<name>:3443/auth/sign-in?return=%2F`. (Without the
+`Sec-Fetch-Mode` header, which a browser sends, the answer is `401`: that is an API request without a session, also
+correct.)
 
 **If it differs**
 
@@ -291,7 +321,9 @@ expected until you add credentials.) In a browser, `https://<name>:3443/` goes t
 >    click **Continue**. Without it: you go straight to the provider; sign in.
 >
 > **You should see:** the app's page. A page titled *Sign-in did not complete* gives its reason in one sentence.
-> **When done, tell the agent:** "N6 signed in", or the sentence on the problem page.
+> **When done, tell the agent:** "N6 signed in", or the sentence on the problem page, and the line from the **app's**
+> container log (not the provider's) that begins `[access] sign-in` (*Synology*: Container Manager → Container →
+> Log, newest first).
 
 **Commands**: none beyond the box; afterwards the log has one line per sign-in, `[access] sign-in completed for …` or
 `[access] sign-in refused: <reason>`. Nothing secret is ever logged.

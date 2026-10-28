@@ -1099,3 +1099,6 @@ anonymous manifest HTTP 200).
   issues are apparent."* The server answers.
 - Still to do: the GitHub Release (notes drafted); Step 17, the restricted deploy path, after which U11 closes
   (Infrastructure plan Q9 = A).
+- **Owner**: *"go ahead with 1 and 2"*: the GitHub Release `v1.0.0-beta.10` published as a pre-release with the drafted
+  notes (https://github.com/kuhndj67/spotify-companion/releases/tag/v1.0.0-beta.10). The owner has removed the
+  removable drive holding the CA key (kept offline, IN-U11-5).

@@ -1063,3 +1063,16 @@ anonymous manifest HTTP 200).
   server, restore the same backup again, compare again; on a pass, turn them back on and continue. N7 will say to
   pause label lookups during the test. Rejected: B (compare only the irreplaceable tables: weaker, needs a BR-98
   amendment), C (accept a failed test on the evidence).
+
+## 2026-10-28 — U11 exit test, attempt 2: PASS (label lookups off); the cause of attempt 1 measured
+
+- Server with `LABELS_ENABLED: "false"` (log: *Labels: DISABLED*), the same backup restored again with *Also replace
+  my rules*, no Spotify credentials. `npm run corpus:compare` (old side: the backup's manifest counts and the live
+  rules file's SHA-256; new side: the server's Diagnostics fingerprint after the restore): **✓ pass**, all 12 tables
+  equal (`play` 1639, `observation` 96088, `label_*` now equal too), the rules hash equal.
+- With only the label lookups changed between the two attempts, attempt 1's extra `label_*` rows are **measured** to
+  come from the MusicBrainz backfill on the first start after a restore. N7 gets the step (label lookups off during
+  the test, then back on).
+- Side issue, not the app's: Edge showed *Not secure* (*"Active content with certificate errors"*) with a valid
+  certificate: a certificate warning clicked through earlier in the setup, remembered until Edge fully restarted.
+  Cleared by restarting Edge; the automated Chrome found both pages fully HTTPS and secure.

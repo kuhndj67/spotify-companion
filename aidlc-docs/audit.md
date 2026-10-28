@@ -1049,3 +1049,17 @@ anonymous manifest HTTP 200).
   to tick it; the download/upload of rules stays as the fallback.
 - Exit-test baseline, from the backup's manifest (`spotify-backup-20261028T004701Z`, schema v8): 12 tables, counts
   recorded in the comparison; the rules file's SHA-256 `49cca69b…`.
+
+## 2026-10-28 — U11 exit test, attempt 1: FAIL (label tables grew); owner chooses option A
+
+- Compared the backup's manifest (old side) with the server's Diagnostics fingerprint taken right after *Restore
+  backup* (rules replaced, no Spotify credentials): `play` 1639 = 1639, `observation` 96088 = 96088, every other
+  history table equal, the rules hash equal; **`label_candidate` +1, `label_resolution` +12, `label_signal_vote` +2**.
+  By BR-98.2's rule: **fail**, and nothing goes on.
+- Likely cause (inference, not yet measured): the server's MusicBrainz label backfill ran on the first start after the
+  restore (Diagnostics: *backfill running*); it needs no Spotify credentials, so BR-98.3's premise (nothing writes
+  before the credentials) does not hold for the label tables.
+- **Owner**: *"A"*: prove it, then fix the procedure. Run the label lookups off (`LABELS_ENABLED: "false"`) on the
+  server, restore the same backup again, compare again; on a pass, turn them back on and continue. N7 will say to
+  pause label lookups during the test. Rejected: B (compare only the irreplaceable tables: weaker, needs a BR-98
+  amendment), C (accept a failed test on the evidence).

@@ -80,15 +80,17 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 - **Versions**: SemVer, `package.json` is the one source (`src/version.ts` is its one reader; the compose image tags
   are checked copies). Releases go through `npm run release`, then the tag push, then a GitHub Release with notes (how users hear of a new version). An image tag is never overwritten.
 
-## The deployment (the owner's machine)
+## The deployment (Machine 2, since U11)
 
-- **The container is the deployment**: `docker compose up -d` → `http://localhost:3010`. ⚠️ `localhost:3000` is a
-  **different app**.
-- ⚠️ **Never run the container and `npm start` together.** Both poll Spotify. A host run records into `data-dev/`, and
-  the writer lock (`data/history.db.lock`) refuses a second process on one database. Assume the container is running, and
-  `docker compose down` first.
-- **`data/` cannot be regenerated** (months of plays). It is gitignored, which makes it *more* exposed to `git clean
-  -xdf`. Never delete play rows to tidy anything.
+- **The owner's deployment is the server**: Machine 2, server mode, `https://<Machine 2's name>:3443`, behind a sign-in
+  (`docs/INSTALL-SERVER.md`). It is the **only recorder** since 2026-10-28.
+- ⚠️ **This machine's container is stopped and stays stopped.** Never `docker compose up` here: a second recorder on the
+  same account double-counts every play, and the writer lock cannot see across machines. `npm run release` takes
+  `--no-deploy` for this. ⚠️ `localhost:3000` is a **different app**.
+- A host run (`npm start`) records into `data-dev/`, never `data/`; the writer lock refuses a second process on one
+  database.
+- **`data/` here is the fallback copy** of the history moved to the server (months of plays; cannot be regenerated). It
+  is gitignored, which makes it *more* exposed to `git clean -xdf`. Never delete it or its play rows.
 - Mounts: `./data` (history, and its automatic backups in `backups/`: same disk, so copy them elsewhere), `./state` (automation kill switch, update-check and reminder switches: **never** in `data/` or `config/`), `./config` (rules,
   written only by `RulesWriter`), `./secrets/app` (credentials, a **directory** mount at `/app/secrets` since U9, the app's subfolder only; never in
   a backup, never in a response).
@@ -97,7 +99,9 @@ Credentials are in `secrets/app/spotify-config.json` (gitignored). Probe scripts
 - **The image is published by CI** on a pushed `v*` tag, to `ghcr.io/kuhndj67/spotify-companion` (public). Pushing a tag is the owner's act.
 - Automation ships **off** (`SKIP_EXECUTOR_ENABLED`, plus the UI kill switch). Never arm it on the owner's behalf.
 - Backup and restore are **in-app** (Settings), with one writer. The `db:*` scripts are a developer path and hold
-  the writer lock, so the container must be down.
+  the writer lock.
+- Releases: `npm run release -- --apply --no-deploy` here (health-checked on the `:3011` verification install), then the
+  owner's tag push, then the server's `image:` line moved to the published version.
 
 ## Commands
 

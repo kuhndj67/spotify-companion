@@ -4,6 +4,11 @@
  *
  *   npm run release                 --plan: gather the facts, print the decision and the commands. Changes nothing
  *   npm run release -- --apply      verify -> decide -> build -> deploy -> health -> git tag. Does NOT push
+ *   npm run release -- --apply --no-deploy
+ *                                   U11: the deployment is ELSEWHERE (a server). verify -> decide -> build -> health
+ *                                   on the throwaway verification install (:3011, `verify:up` / `verify:down`, which
+ *                                   prove this machine's live setup unchanged) -> git tag. Never starts compose.yaml
+ *                                   here: a second recorder beside the server would double-count every play.
  *
  * The version is whatever `package.json` says (bump it first, in its own commit). The decision is the pure
  * `scripts/lib/releaseDecision.ts`; this file only gathers facts and runs commands.
@@ -31,6 +36,7 @@ if (apply && process.argv.includes('--plan')) {
   process.exit(2);
 }
 const CONTAINER = 'spotify-companion'; // U9 (BR-71.1); the image repository has the same name
+const noDeploy = process.argv.includes('--no-deploy');
 const HEALTH_TIMEOUT_MS = 180_000;
 
 function run(cmd, args, { inherit = false } = {}) {
@@ -117,10 +123,15 @@ if (!apply) {
   } else {
     console.log(`  would ACCEPT ${candidate} (previous release: ${d.previous ?? 'none'})`);
     console.log('  then: npm run verify');
-    console.log('        POST /api/backups on the running app (a before-change backup; --app-is-down skips it)');
-    console.log('        docker compose build');
-    console.log('        docker compose up -d');
-    console.log(`        wait for ${CONTAINER} to be healthy`);
+    if (noDeploy) {
+      console.log('        docker compose build   (--no-deploy: nothing is started from compose.yaml)');
+      console.log('        npm run verify:up, wait for it to be healthy, npm run verify:down (proves the live setup unchanged)');
+    } else {
+      console.log('        POST /api/backups on the running app (a before-change backup; --app-is-down skips it)');
+      console.log('        docker compose build');
+      console.log('        docker compose up -d');
+      console.log(`        wait for ${CONTAINER} to be healthy`);
+    }
     console.log(`        git tag -a ${d.gitTag} -m "Release ${candidate}"`);
     console.log('  Nothing is pushed. Run with --apply to do it.');
   }
@@ -138,7 +149,9 @@ if (!d.accept) {
 // U10 (FR-76b, BR-82, IN-U10-7): before anything is built, ask the RUNNING app to keep a before-change backup, and
 // go on only when the host can SEE that file. `--app-is-down` skips only this step: the new version still backs up
 // before its first run (BR-79).
-if (process.argv.includes('--app-is-down')) {
+if (noDeploy) {
+  console.log('\n--no-deploy: the deployment is elsewhere; no backup from an app here, and nothing started from compose.yaml.');
+} else if (process.argv.includes('--app-is-down')) {
   console.log('\n--app-is-down: no backup from the running app. The new version backs up before its first run.');
 } else {
   const kept = await keepReleaseBackup(process.env.SPOTIFY_COMPANION_PORT ?? '3010', candidate);
@@ -153,7 +166,7 @@ if (process.argv.includes('--app-is-down')) {
 // Check every exit code DIRECTLY -- a piped build once read as success here (CLAUDE.md).
 for (const [label, args] of [
   ['build', ['compose', 'build']],
-  ['deploy', ['compose', 'up', '-d']],
+  ...(noDeploy ? [] : [['deploy', ['compose', 'up', '-d']]]),
 ]) {
   console.log(`\n${label}: docker ${args.join(' ')}`);
   const r = run('docker', args, { inherit: true });
@@ -161,6 +174,30 @@ for (const [label, args] of [
     console.error(`${label} FAILED (exit ${r.status}). No tag was made.`);
     process.exit(1);
   }
+}
+
+if (noDeploy) {
+  // The built image, run on the throwaway verification install: compose.verify.yaml's image is this version (a
+  // checked copy of package.json), and verify:up waits for it to be healthy. verify:down then proves the live setup
+  // here unchanged. Either failing means no tag.
+  for (const [label, sub] of [['verification install up', 'up'], ['verification install down', 'down']]) {
+    console.log(`\n${label}: node scripts/verify-install.mjs ${sub}`);
+    const r = run('node', ['scripts/verify-install.mjs', sub], { inherit: true });
+    if (!r.ok) {
+      console.error(`${label} FAILED (exit ${r.status}). No tag was made.`);
+      if (sub === 'up') run('node', ['scripts/verify-install.mjs', 'down'], { inherit: true });
+      process.exit(1);
+    }
+  }
+  const tagged = run('git', ['tag', '-a', d.gitTag, '-m', `Release ${candidate}`]);
+  if (!tagged.ok) {
+    console.error(`Built and healthy on the verification install, but git tag ${d.gitTag} FAILED: ${tagged.err}`);
+    process.exit(1);
+  }
+  console.log(`\nReleased ${candidate}: ${d.imageTag} built and healthy on the verification install, tagged ${d.gitTag}.`);
+  console.log('Nothing was deployed here. Update the server to the published image after CI publishes it.');
+  console.log(`Not pushed. To publish the tag: git push origin ${d.gitTag}`);
+  process.exit(0);
 }
 
 const deadline = Date.now() + HEALTH_TIMEOUT_MS;

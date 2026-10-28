@@ -1076,3 +1076,16 @@ anonymous manifest HTTP 200).
 - Side issue, not the app's: Edge showed *Not secure* (*"Active content with certificate errors"*) with a valid
   certificate: a certificate warning clicked through earlier in the setup, remembered until Edge fully restarted.
   Cleared by restarting Edge; the automated Chrome found both pages fully HTTPS and secure.
+
+## 2026-10-28 — U11: the move done; release 1.0.0-beta.10 prepared
+
+- **Owner**: *"everything appears to be working as expected and the app is pulling the full listening history... so I
+  think we're ready to release."* Measured here: this PC's `spotify-companion` container no longer exists (stopped and
+  removed); Machine 2 is the only recorder.
+- Found preparing the release: `npm run release -- --apply` would start this PC's container (`docker compose up -d`)
+  and so a second recorder. Added `--no-deploy`: build, then health on the throwaway verification install
+  (`verify:up`/`verify:down`, which prove the live setup here unchanged), then the tag; nothing started from
+  `compose.yaml`. `CLAUDE.md` and CONTRIBUTING now say the deployment is Machine 2 and this PC's container stays
+  stopped.
+- Version `1.0.0-beta.10` (package.json, the four compose tags, INSTALL-APP, INSTALL-SERVER's `<version>`, README).
+  N7 gained the measured *pause label lookups* step.

@@ -97,7 +97,16 @@ and secrets guards, `docs/INSTALL-SERVER.md` (N1–N7) beside the local guides, 
 ([`code/code-summary.md`](code/code-summary.md)). Candidate `spotify-companion:candidate-u11` built and run isolated.
 Branch pushed.
 
-**Next (owner, 2026-10-25: "do part b and then do the walks")**: Build & Test: the walk of `docs/INSTALL-SERVER.md`
+**Build & Test** (2026-10-27/28): server walk N4–N6 done in two attempts (findings fixed in the guide); local mode
+checked on the verification install; **the move done**: exit test passed (second attempt, label lookups paused),
+same Spotify credentials, this PC's container stopped; Machine 2 is the only recorder. Release `1.0.0-beta.10`
+prepared (`npm run release -- --apply --no-deploy` added).
+
+**Next**: the pull request (owner reviews, merges); `npm run release -- --apply --no-deploy` on `main`; the owner's tag
+push; CI publishes; Machine 2's `image:` line to `ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10`; the GitHub
+Release. Then Step 17 (the restricted deploy path).
+
+*(superseded)* **Next (owner, 2026-10-25: "do part b and then do the walks")**: Build & Test: the walk of `docs/INSTALL-SERVER.md`
 on Machine 2 with the candidate, a check that local mode is unchanged, then the exit test (N7) and the move. Then the
 release. Pull requests wait for the owner's go-ahead.
 

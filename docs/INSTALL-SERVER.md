@@ -15,9 +15,8 @@ open it from your other devices after **signing in**. It is the same app and the
 It is still a **single-user** app: one person, one Spotify account, one allowed sign-in account. Reaching it from
 outside your home network is **not** supported and not designed for.
 
-⚠️ **Availability.** Server mode is not in `1.0.0-beta.9`; it arrives in the **next release**, and its notes say so.
-The commands below write `<version>`: use the version the [Releases page](https://github.com/kuhndj67/spotify-companion/releases)
-names for server mode.
+**Availability.** Server mode arrives in **`1.0.0-beta.10`**; the commands below use it. Newer releases are announced
+on the [Releases page](https://github.com/kuhndj67/spotify-companion/releases).
 
 **How to use this document.** As the other install guides: do the steps in order; each has a **Purpose**, the
 **Commands**, what you should see (**Expected**) and what to do otherwise (**If it differs**). A step that only a
@@ -75,9 +74,9 @@ certificates for nothing else. Done **on your PC**: the CA's key must never be o
 `G:\companion-ca`). Replace `<name>` and `<LAN address>` (see *Two values used throughout*, above), lower case:
 
 ```powershell
-docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs ca --out /work/ca --dns <name> --ip <LAN address>
-docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs issue --ca /work/ca --out /work/sso --name sso --dns <name> --ip <LAN address>
-docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:<version> certs issue --ca /work/ca --out /work/app --name server --dns <name> --ip <LAN address>
+docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 certs ca --out /work/ca --dns <name> --ip <LAN address>
+docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 certs issue --ca /work/ca --out /work/sso --name sso --dns <name> --ip <LAN address>
+docker run --rm -v "G:\companion-ca:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 certs issue --ca /work/ca --out /work/app --name server --dns <name> --ip <LAN address>
 ```
 
 From a source checkout the same tool is `npm run certs -- ca …`. ⚠️ In **Windows PowerShell**, write the `--` as
@@ -191,7 +190,7 @@ into it, and run `setup` there (`${PWD}` is the folder you are in):
 ```powershell
 mkdir D:\companion-server
 cd D:\companion-server
-docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:<version> setup --server
+docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 setup --server
 ```
 
 Then, in the new `compose.yaml`, replace every `<placeholder>` on a setting line (the comments mention them too;
@@ -351,7 +350,10 @@ arrived, and only then let the server record. Afterwards the old machine stops r
 
 **Commands**, in this order (the order is the point):
 
-1. On the server: N1–N6 done, signed in, **no Spotify credentials** yet (so it records nothing).
+1. On the server: N1–N6 done, signed in, **no Spotify credentials** yet (so it records nothing). **Pause label
+   lookups** for the test: add `LABELS_ENABLED: "false"` to `compose.yaml`'s `environment:` and recreate the
+   container. Measured: right after a restore, the label lookups (MusicBrainz, which need no Spotify credentials) add
+   label rows on their own, and the test then fails on those tables though your history arrived whole.
 2. On the machine that records now: **Settings → Create backup** (a `.tar.gz` downloads).
 3. In the server's app, from your browser: **Settings → Restore backup**, choose that file, confirm. The server
    restarts with your history. Tick **Also replace my rules with the backup's** in the restore dialog, so your rules
@@ -363,7 +365,8 @@ arrived, and only then let the server record. Afterwards the old machine stops r
    `curl.exe -s http://localhost:3010/api/diagnostics -o old.json`; on the server, open
    `https://<name>:3443/api/diagnostics` in the signed-in browser and save it as `new.json`) and, from a source
    checkout, run `npm run corpus:compare -- old.json new.json`.
-5. Only if the test passes: on the server, **Settings → Spotify**, the server's **own** Spotify app registration
+5. Only if the test passes: remove the `LABELS_ENABLED` line again and recreate the container. Then, on the server,
+   **Settings → Spotify**, the server's **own** Spotify app registration
    (another client id, so the two installs never share one quota). The server now records. The old machine still does
    too: this is the trial, two recorders on purpose, for as long as you choose.
 6. **The move**, when you are ready: a last **Create backup** on the old machine → **Restore backup** on the server
@@ -379,6 +382,8 @@ the server records.
   bring everything; restore again from the same file and compare again, and report it if it persists.
 - The server recorded before step 4 (credentials added early): its own plays make the counts differ. Restore again,
   then compare.
+- Only `label_*` tables differ, each higher on the server: label lookups were running (step 1). Pause them, restore
+  again, compare again.
 - Only the rules hash differs: the restore did not replace the rules (step 3's tick box), or a rules file was changed
   on one side.
 - `corpus:compare` says *has no fingerprint*: one side runs a version before server mode, or has no database open.

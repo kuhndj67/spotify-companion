@@ -26,7 +26,7 @@ quality product with AI doing all the coding.
 - **Not a hosted service.** Each person runs their own copy, on their own machine, with their **own Spotify
   account and developer credentials**. Nothing is shared between installs.
 - **Not reachable from other machines, unless you choose server mode.** By default the app answers only on
-  `localhost`. Server mode (from the next release) puts it on an always-on machine on your home network, behind a
+  `localhost`. Server mode (from `1.0.0-beta.10`) puts it on an always-on machine on your home network, behind a
   sign-in through your own sign-in provider. It is still for one person, and not for reaching from outside your home
   network.
 
@@ -43,7 +43,7 @@ off until you arm it.
 Each install runs with your own Spotify account and your own Spotify developer credentials (a client id and secret;
 the install steps show you how to get them). There are two ways to run it:
 
-| | **Local** (the default) | **Server** (from the next release) |
+| | **Local** (the default) | **Server** (from `1.0.0-beta.10`) |
 |---|---|---|
 | Where | your own computer | an always-on machine on your home network (a NAS, a mini PC) |
 | Who can open it | that computer only, at `http://localhost:3010` | your devices on the home network, after signing in, over HTTPS |

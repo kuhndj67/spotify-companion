@@ -4,7 +4,7 @@ This installs **just the running app**, from its published container image: no s
 It runs on your own machine, with **your own Spotify account and your own Spotify developer credentials** (a client
 id and secret, which A4 shows you how to get). Nothing is shared with anyone else's install. (To work on the code instead, use [`INSTALL-DEV.md`](INSTALL-DEV.md). To run it on a server and open it from your other devices after signing in, use [`INSTALL-SERVER.md`](INSTALL-SERVER.md).)
 
-The current release is **`1.0.0-beta.9`**. The commands below use it. Newer releases are announced on the
+The current release is **`1.0.0-beta.10`**. The commands below use it. Newer releases are announced on the
 [Releases page](https://github.com/kuhndj67/spotify-companion/releases), with what changed and how to update.
 
 **How to use this document.** Do the steps in order. Each step has a **Purpose**, the **Commands**, what you should
@@ -131,16 +131,16 @@ folder, and no files appear. Your folder and its files come in A3.
 **Commands**
 
 ```powershell
-docker pull ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9
-docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9
+docker pull ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10
+docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10
 ```
 
 **Expected**
 
 - `docker pull` takes a minute or two the first time. It prints a line per part of the image (`Pull complete`), and
-  ends with `Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9` (or `Image is up to
+  ends with `Status: Downloaded newer image for ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10` (or `Image is up to
   date` if it was downloaded before).
-- `docker image ls` prints a heading line and **one line naming `1.0.0-beta.9`**: the image is stored and ready.
+- `docker image ls` prints a heading line and **one line naming `1.0.0-beta.10`**: the image is stored and ready.
   (The columns differ between Docker versions; the version on the line is what matters.)
 
 **If it differs**
@@ -162,7 +162,7 @@ docker image ls ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9
 **Commands**: in a **new, empty** folder (for example `C:\spotify-companion`):
 
 ```powershell
-docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9 setup
+docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 setup
 ```
 
 **Expected**:
@@ -259,7 +259,7 @@ edit and change only the address.
 >    Then run:
 >
 >    ```powershell
->    docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9 auth
+>    docker run --rm -it -v "${PWD}:/work" -p 127.0.0.1:8888:8888 ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 auth
 >    ```
 >    Keep the `127.0.0.1:` in it: it keeps the sign-in reachable from this computer only.
 > 2. Type the **Client ID** and **Client Secret** when asked.
@@ -416,7 +416,7 @@ somewhere else.
   command below names the current release (the top of this file says which); it is the version you move to:
 
   ```powershell
-  docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.9 update
+  docker run --rm -v "${PWD}:/work" ghcr.io/kuhndj67/spotify-companion:1.0.0-beta.10 update
   docker compose up -d
   ```
 

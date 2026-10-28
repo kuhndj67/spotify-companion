@@ -196,11 +196,11 @@ Each of these is short. The full story is in `aidlc-docs/audit.md` under the dat
 
 ### Operations
 
-- **The deployment is the container on `http://localhost:3010`.** Port 3000 on the owner's machine is a different
-  app.
-- **Never run the container and `npm start` together**: both poll Spotify. Since U10 a host run records into
-  `data-dev/`, and the lock refuses two processes on one database. ⚠️ Until `1.0.0-beta.9` is deployed, the running
-  container does not take the lock: `docker compose down` first.
+- **The owner's deployment is the server (Machine 2, server mode) since U11**; the container on this machine is
+  stopped and stays stopped. **Never start it**: two recorders on one Spotify account double-count every play, and the
+  writer lock is per database, not per account. Release with `npm run release -- --apply --no-deploy`. Port 3000 on
+  the owner's machine is a different app.
+- **A host run (`npm start`) records into `data-dev/`**, and the lock refuses two processes on one database.
 - **`data/` is the only thing that cannot be regenerated**, and being gitignored makes it *more* exposed to `git
   clean -xdf`. **Verify a backup the day you take it.** Row counts are not verification: a corrupt snapshot with
   plausible counts is kept as the negative control.

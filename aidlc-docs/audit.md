@@ -1024,3 +1024,7 @@ anonymous manifest HTTP 200).
   11. N6 did not ask for the app's `[access] sign-in` line, nor say which log: it does now.
 - Outside the guide: the CA key still on G: (acceptable only if G: is kept unplugged: the owner's call); the candidate
   reports `1.0.0-beta.9` until the release raises the version.
+
+- **Owner**, the two browser checks the walker could not make: after *Continue* the app's page appears, and Settings →
+  Access shows who is signed in, when the session ends, *Sign out* and *Sign out everywhere*: *"verified"*. N4–N6
+  of the server walk are complete.
